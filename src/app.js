@@ -72,3 +72,7 @@ export function createApp() {
 
   return app;
 }
+
+/** Default export for Vercel Express / serverless entry detection */
+const app = createApp();
+export default app;

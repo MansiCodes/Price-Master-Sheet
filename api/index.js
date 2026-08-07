@@ -1,6 +1,4 @@
-import { createApp } from '../src/app.js';
-
 /**
- * Vercel serverless entry — exports the Express app as a request handler.
+ * Vercel serverless entry — re-exports the Express app.
  */
-export default createApp();
+export { default } from '../src/app.js';
