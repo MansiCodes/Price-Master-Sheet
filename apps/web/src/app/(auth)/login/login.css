@@ -1,0 +1,279 @@
+/* Cable Junction — login landing (page-scoped) */
+
+.login-screen {
+  min-height: 100dvh;
+  display: flex;
+  overflow-x: hidden;
+}
+
+/* ---------- Left: animated brand atmosphere ---------- */
+
+.login-visual {
+  position: relative;
+  flex: 0 0 55%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 4rem 4.5rem;
+  background:
+    radial-gradient(56% 56% at 8% 6%, rgba(45, 212, 191, 0.4) 0%, transparent 62%),
+    radial-gradient(52% 52% at 94% 14%, rgba(251, 113, 133, 0.32) 0%, transparent 62%),
+    radial-gradient(58% 58% at 78% 96%, rgba(245, 158, 11, 0.36) 0%, transparent 62%),
+    #fffaf0;
+}
+
+.login-visual__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(38px);
+  opacity: 0.75;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.login-visual__blob--teal {
+  top: -8%;
+  left: -6%;
+  width: 20rem;
+  height: 20rem;
+  background: radial-gradient(circle, #2dd4bf 0%, rgba(45, 212, 191, 0) 70%);
+  animation: floatDriftA 16s ease-in-out infinite;
+}
+
+.login-visual__blob--coral {
+  bottom: -10%;
+  right: -4%;
+  width: 18rem;
+  height: 18rem;
+  background: radial-gradient(circle, #fb7185 0%, rgba(251, 113, 133, 0) 70%);
+  animation: floatDriftB 13s ease-in-out infinite;
+}
+
+.login-visual__blob--amber {
+  top: 44%;
+  left: 60%;
+  width: 15rem;
+  height: 15rem;
+  background: radial-gradient(circle, #fbbf24 0%, rgba(251, 191, 36, 0) 70%);
+  animation: floatDriftC 19s ease-in-out infinite;
+}
+
+.login-visual__cables {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cable-wire {
+  fill: none;
+  opacity: 0.65;
+}
+
+.cable-line {
+  fill: none;
+  stroke-dasharray: 1 17;
+  stroke-dashoffset: 0;
+  animation: dashFlow 3.4s linear infinite;
+}
+
+.cable-line--2 {
+  animation-duration: 4.1s;
+  animation-delay: -1.2s;
+}
+
+.cable-line--3 {
+  animation-duration: 2.9s;
+  animation-delay: -1.9s;
+}
+
+.cable-line--4 {
+  animation-duration: 4.6s;
+  animation-delay: -0.6s;
+}
+
+.cable-line--5 {
+  animation-duration: 3.7s;
+  animation-delay: -2.4s;
+}
+
+.cable-line--6 {
+  animation-duration: 3.2s;
+  animation-delay: -0.9s;
+}
+
+.cable-ring {
+  fill: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ringPulse 3.2s ease-out infinite;
+}
+
+.cable-ring--2 {
+  animation-delay: 1.6s;
+}
+
+.cable-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fadePulse 3.2s ease-in-out infinite;
+}
+
+.login-visual__content {
+  position: relative;
+  z-index: 2;
+  max-width: 30rem;
+}
+
+.login-visual__brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(2.9rem, 5.4vw, 5rem);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  background: linear-gradient(100deg, #0f766e 0%, #fb7185 55%, #d97706 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.login-visual__tagline {
+  margin: 1rem 0 0;
+  max-width: 26ch;
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  font-weight: 500;
+  color: #44403c;
+}
+
+/* ---------- Right: login form panel ---------- */
+
+.login-form-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--bg);
+}
+
+.login-form-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.25rem 2rem;
+  box-shadow: var(--shadow);
+}
+
+.login-form-card h2 {
+  font-family: var(--font-display);
+  font-size: 1.9rem;
+  margin: 0 0 0.3rem;
+  letter-spacing: -0.02em;
+}
+
+.login-form-card .lead {
+  color: var(--fg-muted);
+  margin: 0 0 1.5rem;
+}
+
+.login-submit {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.85rem 1.1rem;
+  font-size: 1rem;
+}
+
+/* ---------- Keyframes ---------- */
+
+@keyframes floatDriftA {
+  0% { transform: translate(0, 0); }
+  30% { transform: translate(18px, -26px); }
+  60% { transform: translate(-12px, -36px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes floatDriftB {
+  0% { transform: translate(0, 0); }
+  35% { transform: translate(-20px, -18px); }
+  70% { transform: translate(10px, -32px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes floatDriftC {
+  0% { transform: translate(0, 0); }
+  40% { transform: translate(16px, 20px); }
+  75% { transform: translate(-18px, 10px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes dashFlow {
+  to { stroke-dashoffset: -180; }
+}
+
+@keyframes fadePulse {
+  0%, 100% {
+    opacity: 0.75;
+    filter: drop-shadow(0 0 0 rgba(251, 113, 133, 0.55));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(251, 113, 133, 0.8));
+  }
+}
+
+@keyframes ringPulse {
+  0% { transform: scale(1); opacity: 0.85; }
+  100% { transform: scale(3.4); opacity: 0; }
+}
+
+/* ---------- Responsive: stack on mobile ---------- */
+
+@media (max-width: 880px) {
+  .login-screen {
+    flex-direction: column;
+  }
+
+  .login-visual {
+    flex: 0 0 auto;
+    min-height: 240px;
+    height: 36vh;
+    padding: 2.25rem 1.75rem;
+    align-items: flex-end;
+  }
+
+  .login-visual__content {
+    padding-bottom: 0.25rem;
+  }
+
+  .login-visual__brand {
+    font-size: clamp(2.1rem, 9vw, 2.75rem);
+  }
+
+  .login-visual__tagline {
+    font-size: 0.95rem;
+    max-width: 32ch;
+  }
+
+  .login-form-panel {
+    flex: 1;
+    padding: 1.5rem 1.25rem 2.5rem;
+  }
+
+  .login-form-card {
+    padding: 1.85rem 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-visual__blob,
+  .cable-line,
+  .cable-ring,
+  .cable-node {
+    animation: none;
+  }
+}

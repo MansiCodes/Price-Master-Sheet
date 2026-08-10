@@ -1,0 +1,63 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import NextAuth from "next-auth";
+import { authConfig, SESSION_COOKIE } from "@/auth.config";
+
+/** Old Auth.js / NextAuth cookie names that must never be decrypted with the current secret. */
+const STALE_COOKIE_PREFIXES = [
+  "authjs.session-token",
+  "__Secure-authjs.session-token",
+  "__Host-authjs.session-token",
+  "next-auth.session-token",
+  "__Secure-next-auth.session-token",
+  "cj.session-token", // pre-v2 (exact + chunked .0/.1…)
+];
+
+function isStaleSessionCookie(name: string): boolean {
+  if (name === SESSION_COOKIE) return false;
+  return STALE_COOKIE_PREFIXES.some(
+    (prefix) => name === prefix || name.startsWith(`${prefix}.`),
+  );
+}
+
+function expireCookie(res: NextResponse, name: string) {
+  res.cookies.set(name, "", {
+    path: "/",
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: "lax",
+  });
+}
+
+const { auth } = NextAuth(authConfig);
+
+/** Auth.js middleware (authorized callback in authConfig handles redirects). */
+const withAuth = auth(() => NextResponse.next());
+
+/**
+ * 1) If browser still has old session cookies → expire them and redirect once
+ *    (so Auth.js never tries to decrypt them → no JWTSessionError spam).
+ * 2) Otherwise run Auth.js middleware as usual.
+ */
+export default async function middleware(req: NextRequest) {
+  const stale = req.cookies
+    .getAll()
+    .filter((c) => isStaleSessionCookie(c.name));
+
+  if (stale.length > 0) {
+    const res = NextResponse.redirect(req.nextUrl);
+    for (const cookie of stale) {
+      expireCookie(res, cookie.name);
+    }
+    return res;
+  }
+
+  // Auth.js middleware typing is overloaded; cast keeps Next middleware signature clean.
+  return (withAuth as (req: NextRequest) => ReturnType<typeof withAuth>)(req);
+}
+
+export const config = {
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+};
