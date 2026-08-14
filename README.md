@@ -1,17 +1,33 @@
 # Cable Junction Ops
 
-Monorepo: **Price Sheet** (Google Sheets rates) + **Plant P&L** (Postgres daily entry & live P&L).
+Single Next.js 15 app: **Price Sheet** (Google Sheets rates) + **Plant P&L** (Postgres daily entry & live P&L).
 
-## Apps
+## Project Directory Layout
 
-- `apps/web` — Next.js 15 (Auth.js, Prisma, Plant forms, P&L, Price Sheet UI)
+```
+Price-master-sheet/
+├── src/                   # Application source (App Router, components, lib, API routes)
+│   ├── app/               # Pages and Route Handlers
+│   ├── components/        # UI, shell, dashboard, today, admin
+│   ├── hooks/
+│   ├── lib/               # Prisma, RBAC, sheets rates, P&L, audit
+│   └── types/
+├── prisma/                # Database schema & seed
+├── public/
+├── credentials/           # Local Google service-account credentials
+├── docker-compose.yml     # Local PostgreSQL
+├── .env                   # Environment configuration
+└── package.json
+```
 
-## Setup
+## Environment (.env) Setup
+
+Copy `.env.example` to `.env` and fill in values. Next.js and Prisma load this file from the project root.
+
+## Setup & Running
 
 ```bash
-cd apps/web
 cp .env.example .env
-# Set DATABASE_URL, AUTH_SECRET, SUPER_ADMIN_PASSWORD, Google Sheets vars
 npm install
 npx prisma generate
 npx prisma db push
@@ -38,16 +54,13 @@ Open http://localhost:3000 — login with Super Admin from `.env`.
 
 ## Vercel
 
-In the existing project (`price-master-sheet`), set **Root Directory** to `apps/web`.
+Use the repository root as the project root (not `apps/web`).
 
-Add env vars from `apps/web/.env.example` (at minimum: `DATABASE_URL`, `AUTH_SECRET`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, Google Sheets vars, `CRON_SECRET`).
+Add env vars from `.env.example` (at minimum: `DATABASE_URL`, `AUTH_SECRET`, `SUPER_ADMIN_EMAIL`, `SUPER_ADMIN_PASSWORD`, Google Sheets vars, `CRON_SECRET`).
 
 After first deploy with `DATABASE_URL` set, run locally once:
 
 ```bash
-cd apps/web
 npx prisma db push
 npm run db:seed
 ```
-
-(Or use a one-off Vercel / Neon SQL + seed from CI.)
