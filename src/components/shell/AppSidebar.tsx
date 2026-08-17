@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { AppHeaderUser } from "./AppHeader";
 import type { NavIconName, NavSection } from "./nav-config";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PlantSwitcher, type PlantSwitcherPlant } from "./PlantSwitcher";
 
 function navSectionTitle(
@@ -195,6 +196,7 @@ export function AppSidebar({
   user,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const tCommon = useTranslations("common");
 
   return (
     <>
@@ -243,6 +245,12 @@ export function AppSidebar({
               showLabels
               onNavigate={onCloseMobile}
             />
+            <div className="dash-mobile-nav__lang">
+              <span className="dash-mobile-nav__lang-label">
+                {tCommon("language")}
+              </span>
+              <LanguageSwitcher compact />
+            </div>
             {user ? <SidebarUser user={user} showLabels /> : null}
           </div>
         </div>

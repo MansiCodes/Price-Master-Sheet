@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export const REPORT_PAGE_SIZE = 7;
+export const REPORT_PAGE_SIZE = 10;
 
 type PaginatedResponse<T> = {
   rows?: T[];
