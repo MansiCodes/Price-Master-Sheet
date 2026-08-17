@@ -83,10 +83,29 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [sendingOtp, setSendingOtp] = useState(false);
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
 
   useEffect(() => {
     clearStaleAuthCookies();
   }, []);
+
+  useEffect(() => {
+    if (!otpExpiresAt) {
+      setOtpSecondsLeft(0);
+      return;
+    }
+
+    function updateCountdown() {
+      setOtpSecondsLeft(
+        Math.max(0, Math.ceil((otpExpiresAt! - Date.now()) / 1000)),
+      );
+    }
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [otpExpiresAt]);
 
   function switchMode(next: LoginMode) {
     setMode(next);
@@ -96,6 +115,7 @@ export default function LoginPage() {
     if (next === "whatsapp") {
       setWhatsappStep("phone");
       setOtp("");
+      setOtpExpiresAt(null);
     }
   }
 
@@ -122,6 +142,7 @@ export default function LoginPage() {
         message?: string;
         stub?: boolean;
         devCode?: string;
+        expiresAt?: string;
       };
       if (!res.ok || !data.ok) {
         setError(data.message ?? "Could not send OTP.");
@@ -130,6 +151,9 @@ export default function LoginPage() {
 
       setWhatsappStep("otp");
       setOtp("");
+      setOtpExpiresAt(
+        data.expiresAt ? new Date(data.expiresAt).getTime() : Date.now() + 600_000,
+      );
       if (data.stub && data.devCode) {
         setDevOtp(data.devCode);
         setOtp(data.devCode);
@@ -151,6 +175,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
 
+    if (otpSecondsLeft <= 0) {
+      setError("OTP has expired. Request a new OTP.");
+      return;
+    }
+
     const e164 = toIndiaPhoneE164(phone);
     if (!e164 || otp.trim().length < 4) {
       setError("Enter the OTP sent to your mobile.");
@@ -168,7 +197,7 @@ export default function LoginPage() {
         setError("Invalid or expired OTP.");
         return;
       }
-      router.replace("/");
+      router.replace("/select-plant");
       router.refresh();
     } catch {
       setError("Sign-in failed. Try again.");
@@ -192,7 +221,7 @@ export default function LoginPage() {
         setError("Invalid email or password.");
         return;
       }
-      router.replace("/");
+      router.replace("/select-plant");
       router.refresh();
     } catch {
       setError("Sign-in failed. Try again.");
@@ -328,11 +357,6 @@ export default function LoginPage() {
             </button>
           </div>
 
-          <p className="login-alt-hint">
-            Waiting for WhatsApp OTP setup? Use <strong>Email login</strong> with
-            your account email and password.
-          </p>
-
           {error ? (
             <div className="alert alert--error" role="alert" aria-live="assertive">
               {error}
@@ -381,7 +405,22 @@ export default function LoginPage() {
             ) : (
               <form className="form-grid" onSubmit={onWhatsappLogin}>
                 <p className="login-otp-hint">
-                  OTP sent to <strong>+91 {phone}</strong>
+                  OTP sent to your WhatsApp
+                </p>
+                <p
+                  className={`login-otp-expiry${
+                    otpSecondsLeft <= 0 ? " is-expired" : ""
+                  }`}
+                  role="timer"
+                  aria-live="polite"
+                >
+                  {otpSecondsLeft > 0
+                    ? `OTP expires in ${String(
+                        Math.floor(otpSecondsLeft / 60),
+                      ).padStart(2, "0")}:${String(
+                        otpSecondsLeft % 60,
+                      ).padStart(2, "0")}`
+                    : "OTP expired"}
                 </p>
                 {devOtp ? (
                   <div className="login-dev-otp" role="status" aria-live="polite">
@@ -413,7 +452,7 @@ export default function LoginPage() {
                 <button
                   className="btn btn-primary login-submit"
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || otpSecondsLeft <= 0}
                 >
                   {loading ? "Signing in…" : "Login"}
                 </button>
@@ -425,6 +464,7 @@ export default function LoginPage() {
                     setWhatsappStep("phone");
                     setOtp("");
                     setDevOtp(null);
+                    setOtpExpiresAt(null);
                     setInfo(null);
                     setError(null);
                   }}

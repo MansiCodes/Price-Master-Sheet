@@ -17,6 +17,10 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { BillUpload } from "@/components/today/BillUpload";
 import { PRODUCT_UNITS } from "@/lib/units";
+import {
+  DEFAULT_PURCHASE_GOODS,
+  getPurchaseCatalog,
+} from "@/lib/plant-catalogs";
 import "./today-hub.css";
 
 export type TodayModuleKey =
@@ -69,7 +73,7 @@ const MODULE_KIND: Record<TodayModuleKey, EntryKind> = {
   saleFilled: "sale",
   stockFilled: "stock",
   productionFilled: "production",
-  pettyCashFilled: "expense",
+  pettyCashFilled: "pettyCash",
 };
 
 const KIND_TO_MODULE: Record<EntryKind, TodayModuleKey> = {
@@ -78,9 +82,16 @@ const KIND_TO_MODULE: Record<EntryKind, TodayModuleKey> = {
   stock: "stockFilled",
   production: "productionFilled",
   expense: "pettyCashFilled",
+  pettyCash: "pettyCashFilled",
 };
 
-type EntryKind = "purchase" | "sale" | "stock" | "production" | "expense";
+type EntryKind =
+  | "purchase"
+  | "sale"
+  | "stock"
+  | "production"
+  | "expense"
+  | "pettyCash";
 
 const ENTRY_OPTIONS: { value: EntryKind; label: string }[] = [
   { value: "purchase", label: "Purchase" },
@@ -88,6 +99,7 @@ const ENTRY_OPTIONS: { value: EntryKind; label: string }[] = [
   { value: "stock", label: "Stock" },
   { value: "production", label: "Production" },
   { value: "expense", label: "Expense" },
+  { value: "pettyCash", label: "Petty Cash" },
 ];
 
 type LineItem = {
@@ -99,36 +111,7 @@ type LineItem = {
   gstPercent: string;
 };
 
-const RAW_MATERIALS = [
-  "INSU & OUT",
-  "TAPE",
-  "INSU",
-  "DHAGA",
-  "BOXES",
-  "IN-PVC",
-  "ALU",
-  "Spool",
-  "COPPER",
-  "MASTER BATCH",
-  "OT-PVC",
-] as const;
-
-const STOCK_ITEMS = [...RAW_MATERIALS, "Others"] as const;
-
-const VENDORS = [
-  "3R Polymers Private Limited",
-  "Bells Insulations Private Ltd.",
-  "Cablemac Automations India Pvt. Ltd",
-  "Crown Trading C",
-  "Goel Packers",
-  "Hycount Cables Private Limited",
-  "Paramhans Wires Private Limited",
-  "Perfect Metals",
-  "Pryas Wire Industries",
-  "Sag Polymers Private Limited",
-  "SINGHAL PRINT PACK",
-  "Tirupati Plastics",
-] as const;
+const STOCK_ITEMS = [...DEFAULT_PURCHASE_GOODS, "Others"] as const;
 
 const CUSTOMERS = [
   "Noto Fire",
@@ -231,6 +214,10 @@ export function TodayHub({
 }: TodayHubProps) {
   const router = useRouter();
   const today = useMemo(() => todayLocalISO(), []);
+  const purchaseCatalog = useMemo(
+    () => getPurchaseCatalog(plantCode),
+    [plantCode],
+  );
 
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<EntryKind>("purchase");
@@ -244,9 +231,7 @@ export function TodayHub({
   const [purchaseType, setPurchaseType] =
     useState<PurchaseTypeValue>("RAW_MATERIAL");
   const [purchaseTypeOther, setPurchaseTypeOther] = useState("");
-  const [vendorName, setVendorName] = useState<(typeof VENDORS)[number] | "">(
-    "",
-  );
+  const [vendorName, setVendorName] = useState("");
   const [billNumber, setBillNumber] = useState("");
   const [purchaseRemarks, setPurchaseRemarks] = useState("");
   const [billPhotos, setBillPhotos] = useState<string[]>([]);
@@ -268,7 +253,9 @@ export function TodayHub({
   ]);
 
   // Stock
-  const [stockItem, setStockItem] = useState<string>(RAW_MATERIALS[0]);
+  const [stockItem, setStockItem] = useState<string>(
+    DEFAULT_PURCHASE_GOODS[0],
+  );
   const [stockItemOther, setStockItemOther] = useState("");
   const [stockQty, setStockQty] = useState("");
   const [stockValue, setStockValue] = useState("");
@@ -297,7 +284,16 @@ export function TodayHub({
   const [expenseAmount, setExpenseAmount] = useState("");
   const [paidTo, setPaidTo] = useState("");
   const [expenseDesc, setExpenseDesc] = useState("");
+  const [expenseOpeningReading, setExpenseOpeningReading] = useState("");
+  const [expenseClosingReading, setExpenseClosingReading] = useState("");
   const [expensePhotos, setExpensePhotos] = useState<string[]>([]);
+  const [pettyCashPayMode, setPettyCashPayMode] = useState("");
+  const [pettyCashDescription, setPettyCashDescription] = useState("");
+  const [pettyCashBillNumber, setPettyCashBillNumber] = useState("");
+  const [pettyCashExpense, setPettyCashExpense] = useState("");
+  const [pettyCashContractorSalary, setPettyCashContractorSalary] = useState("");
+  const [pettyCashSupervisorSalary, setPettyCashSupervisorSalary] = useState("");
+  const [pettyCashPhotos, setPettyCashPhotos] = useState<string[]>([]);
 
   const activeModules = checklist[reportShift];
   const activeCompleted = activeModules.filter((m) => m.filled).length;
@@ -349,7 +345,7 @@ export function TodayHub({
     setSaleRemarks("");
     setInvoicePhotos([]);
     setSaleLines([newLine(PRODUCTS[0].unit, PRODUCTS[0].name)]);
-    setStockItem(RAW_MATERIALS[0]);
+    setStockItem(DEFAULT_PURCHASE_GOODS[0]);
     setStockItemOther("");
     setStockQty("");
     setStockValue("");
@@ -366,7 +362,16 @@ export function TodayHub({
     setExpenseAmount("");
     setPaidTo("");
     setExpenseDesc("");
+    setExpenseOpeningReading("");
+    setExpenseClosingReading("");
     setExpensePhotos([]);
+    setPettyCashPayMode("");
+    setPettyCashDescription("");
+    setPettyCashBillNumber("");
+    setPettyCashExpense("");
+    setPettyCashContractorSalary("");
+    setPettyCashSupervisorSalary("");
+    setPettyCashPhotos([]);
   }
 
   useEffect(() => {
@@ -557,7 +562,7 @@ export function TodayHub({
           helper: Number(helpers) || 0,
         },
       });
-    } else {
+    } else if (kind === "expense") {
       const amount = Number(expenseAmount);
       if (!(amount > 0) || !expenseHead) {
         fail("Enter category and amount.");
@@ -571,10 +576,45 @@ export function TodayHub({
         description: [paidTo && `Paid to: ${paidTo}`, expenseDesc]
           .filter(Boolean)
           .join(" · ") || null,
+        openingReading:
+          expenseHead === "Electricity" && expenseOpeningReading
+            ? Number(expenseOpeningReading)
+            : null,
+        closingReading:
+          expenseHead === "Electricity" && expenseClosingReading
+            ? Number(expenseClosingReading)
+            : null,
         amount,
         contractorSalary: 0,
         supervisorSalary: 0,
         billPhotoUrls: expensePhotos,
+      });
+    } else {
+      const amount = Number(pettyCashExpense) || 0;
+      const contractorSalary = Number(pettyCashContractorSalary) || 0;
+      const supervisorSalary = Number(pettyCashSupervisorSalary) || 0;
+      if (
+        !pettyCashPayMode.trim() ||
+        !pettyCashDescription.trim() ||
+        amount + contractorSalary + supervisorSalary <= 0
+      ) {
+        fail(
+          "Enter pay mode, description, and at least one expense or salary amount.",
+        );
+        return;
+      }
+      result = await postJson(`/api/plants/${plantId}/petty-cash`, {
+        date: entryDate,
+        shift,
+        entryType: "PETTY_CASH",
+        payMode: pettyCashPayMode.trim(),
+        expenseHead: "Petty Cash",
+        description: pettyCashDescription.trim(),
+        billNumber: pettyCashBillNumber.trim() || null,
+        amount,
+        contractorSalary,
+        supervisorSalary,
+        billPhotoUrls: pettyCashPhotos,
       });
     }
 
@@ -590,6 +630,7 @@ export function TodayHub({
       stock: "Stock saved",
       production: "Production saved",
       expense: "Expense saved",
+      pettyCash: "Petty cash saved",
     };
     toast.success(labels[kind]);
     closePanel();
@@ -726,7 +767,9 @@ export function TodayHub({
                 />
               </div>
               <div className="field">
-                <label htmlFor="entry-date">Date</label>
+                <label htmlFor="entry-date">
+                  {kind === "pettyCash" ? "Bill date" : "Date"}
+                </label>
                 <input
                   id="entry-date"
                   type="date"
@@ -795,12 +838,10 @@ export function TodayHub({
                     <SelectMenu
                       id="p-vendor"
                       value={vendorName}
-                      options={VENDORS}
+                      options={purchaseCatalog.suppliers}
                       required
                       placeholder="Select supplier"
-                      onChange={(next) =>
-                        setVendorName(next as (typeof VENDORS)[number])
-                      }
+                      onChange={setVendorName}
                     />
                   </div>
                   <div className="field">
@@ -817,8 +858,8 @@ export function TodayHub({
                   onChange={setPurchaseLines}
                   defaultUnit="KGS"
                   itemLabel="Description"
-                  itemOptions={["", ...RAW_MATERIALS]}
-                  itemPlaceholder="Select raw material"
+                  itemOptions={["", ...purchaseCatalog.goods]}
+                  itemPlaceholder="Select description"
                   unitOptions={PRODUCT_UNITS}
                   showGst
                 />
@@ -924,7 +965,7 @@ export function TodayHub({
                   <label htmlFor="st-item">Item</label>
                   <SelectMenu
                     id="st-item"
-                    value={stockItem || RAW_MATERIALS[0]}
+                    value={stockItem || DEFAULT_PURCHASE_GOODS[0]}
                     options={STOCK_ITEMS}
                     required
                     onChange={(next) => {
@@ -1076,9 +1117,35 @@ export function TodayHub({
                     value={String(expenseHead)}
                     options={EXPENSE_HEADS}
                     required
-                    onChange={(next) => setExpenseHead(next)}
+                    onChange={(next) => {
+                      setExpenseHead(next);
+                      if (next !== "Electricity") {
+                        setExpenseOpeningReading("");
+                        setExpenseClosingReading("");
+                      }
+                    }}
                   />
                 </div>
+                {expenseHead === "Electricity" ? (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="e-opening">Opening reading</label>
+                      <DecimalInput
+                        id="e-opening"
+                        value={expenseOpeningReading}
+                        onChange={setExpenseOpeningReading}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="e-closing">Closing reading</label>
+                      <DecimalInput
+                        id="e-closing"
+                        value={expenseClosingReading}
+                        onChange={setExpenseClosingReading}
+                      />
+                    </div>
+                  </div>
+                ) : null}
                 <div className="prod-fields__row">
                   <div className="field">
                     <label htmlFor="e-amt">Amount</label>
@@ -1099,7 +1166,7 @@ export function TodayHub({
                   </div>
                 </div>
                 <div className="field expense-desc">
-                  <label htmlFor="e-desc">Description</label>
+                  <label htmlFor="e-desc">Remarks / notes</label>
                   <textarea
                     id="e-desc"
                     value={expenseDesc}
@@ -1108,6 +1175,72 @@ export function TodayHub({
                   />
                 </div>
                 <BillUpload urls={expensePhotos} onChange={setExpensePhotos} />
+              </>
+            ) : null}
+
+            {kind === "pettyCash" ? (
+              <>
+                <div className="field">
+                  <label htmlFor="pc-pay-mode">Pay mode</label>
+                  <input
+                    id="pc-pay-mode"
+                    required
+                    placeholder="e.g. ADV-Cash or ADV-Bank"
+                    value={pettyCashPayMode}
+                    onChange={(e) => setPettyCashPayMode(e.target.value)}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="pc-bill-number">Bill number</label>
+                  <input
+                    id="pc-bill-number"
+                    value={pettyCashBillNumber}
+                    onChange={(e) => setPettyCashBillNumber(e.target.value)}
+                  />
+                </div>
+                <div className="field expense-desc">
+                  <label htmlFor="pc-description">
+                    Description of expense
+                  </label>
+                  <textarea
+                    id="pc-description"
+                    required
+                    value={pettyCashDescription}
+                    onChange={(e) => setPettyCashDescription(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                <div className="prod-fields__row">
+                  <div className="field">
+                    <label htmlFor="pc-expense">Expenses</label>
+                    <DecimalInput
+                      id="pc-expense"
+                      value={pettyCashExpense}
+                      onChange={setPettyCashExpense}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="pc-contractor">Contractor salary</label>
+                    <DecimalInput
+                      id="pc-contractor"
+                      value={pettyCashContractorSalary}
+                      onChange={setPettyCashContractorSalary}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="pc-supervisor">Supervisor salary</label>
+                  <DecimalInput
+                    id="pc-supervisor"
+                    value={pettyCashSupervisorSalary}
+                    onChange={setPettyCashSupervisorSalary}
+                  />
+                </div>
+                <BillUpload
+                  label="Upload bill"
+                  urls={pettyCashPhotos}
+                  onChange={setPettyCashPhotos}
+                />
               </>
             ) : null}
           </form>

@@ -1,3 +1,16 @@
+export type PlantOption = {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
+};
+
+export type UserPlantRoleRow = {
+  plantId: string;
+  role: string;
+  plant: { id: string; name: string; code: string };
+};
+
 export type UserRow = {
   id: string;
   email: string;
@@ -9,6 +22,7 @@ export type UserRow = {
   isActive: boolean;
   coinsBalance: number;
   createdAt: string;
+  plantRoles?: UserPlantRoleRow[];
 };
 
 export const ROLES = [

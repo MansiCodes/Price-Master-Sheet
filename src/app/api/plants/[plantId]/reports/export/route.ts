@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
+import { PettyCashKind } from "@prisma/client";
 import {
   requirePlantAccess,
   requireSession,
@@ -21,7 +22,8 @@ type ExportKind =
   | "purchase"
   | "production"
   | "stock"
-  | "expense";
+  | "expense"
+  | "pettyCash";
 
 function toNum(v: unknown): number {
   if (v == null) return 0;
@@ -244,9 +246,50 @@ export async function GET(
         value: toNum(r.closingValue),
       });
     });
+  } else if (kind === "pettyCash") {
+    const rows = await prisma.pettyCashEntry.findMany({
+      where: {
+        plantId,
+        date: { gte: from, lte: to },
+        entryType: PettyCashKind.PETTY_CASH,
+      },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    });
+    sheet.columns = [
+      { header: "S.No", key: "sno", width: 8 },
+      { header: "Pay Mode", key: "payMode", width: 16 },
+      { header: "Description of Expense", key: "desc", width: 44 },
+      { header: "Bill Number", key: "billNumber", width: 22 },
+      { header: "Bill Date", key: "date", width: 12 },
+      { header: "Expenses", key: "amount", width: 14 },
+      { header: "Contractor Salary", key: "contractorSalary", width: 18 },
+      { header: "Supervisor Salary", key: "supervisorSalary", width: 18 },
+      { header: "Total", key: "total", width: 14 },
+    ];
+    styleHeader(sheet.getRow(1));
+    rows.forEach((r, i) => {
+      sheet.addRow({
+        sno: i + 1,
+        payMode: r.payMode,
+        desc: r.description ?? "",
+        billNumber: r.billNumber ?? "",
+        date: iso(r.date),
+        amount: toNum(r.amount),
+        contractorSalary: toNum(r.contractorSalary),
+        supervisorSalary: toNum(r.supervisorSalary),
+        total:
+          toNum(r.amount) +
+          toNum(r.contractorSalary) +
+          toNum(r.supervisorSalary),
+      });
+    });
   } else {
     const rows = await prisma.pettyCashEntry.findMany({
-      where: { plantId, date: { gte: from, lte: to } },
+      where: {
+        plantId,
+        date: { gte: from, lte: to },
+        entryType: PettyCashKind.EXPENSE,
+      },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
     sheet.columns = [
@@ -254,7 +297,9 @@ export async function GET(
       { header: "Date", key: "date", width: 12 },
       { header: "Shift", key: "shift", width: 10 },
       { header: "Category", key: "head", width: 18 },
-      { header: "Description", key: "desc", width: 28 },
+      { header: "Remarks / notes", key: "desc", width: 36 },
+      { header: "Opening reading", key: "opening", width: 16 },
+      { header: "Closing reading", key: "closing", width: 16 },
       { header: "Amount", key: "amount", width: 14 },
     ];
     styleHeader(sheet.getRow(1));
@@ -265,6 +310,10 @@ export async function GET(
         shift: r.shift,
         head: r.expenseHead,
         desc: r.description ?? "",
+        opening:
+          r.openingReading == null ? "" : toNum(r.openingReading),
+        closing:
+          r.closingReading == null ? "" : toNum(r.closingReading),
         amount:
           toNum(r.amount) +
           toNum(r.contractorSalary) +

@@ -41,6 +41,11 @@ enum ManpowerShift {
   NIGHT
 }
 
+enum PettyCashKind {
+  EXPENSE
+  PETTY_CASH
+}
+
 enum ManpowerRole {
   MANAGER
   OPERATOR
@@ -112,6 +117,7 @@ model UserPlantRole {
 
 model Purchase {
   id              String        @id @default(cuid())
+  sourceKey       String?
   plantId         String
   date            DateTime      @db.Date
   shift           ManpowerShift @default(DAY)
@@ -139,10 +145,12 @@ model Purchase {
   enteredBy       User          @relation("PurchaseEnteredBy", fields: [enteredById], references: [id])
 
   @@index([plantId, date])
+  @@index([sourceKey])
 }
 
 model Sale {
   id              String        @id @default(cuid())
+  sourceKey       String?
   plantId         String
   date            DateTime      @db.Date
   shift           ManpowerShift @default(DAY)
@@ -167,6 +175,7 @@ model Sale {
   enteredBy       User          @relation("SaleEnteredBy", fields: [enteredById], references: [id])
 
   @@index([plantId, date])
+  @@index([sourceKey])
 }
 
 model StockEntry {
@@ -233,27 +242,33 @@ model ProductionEntry {
 }
 
 model PettyCashEntry {
-  id                String        @id @default(cuid())
+  id                String            @id @default(cuid())
+  sourceKey         String?
   plantId           String
-  date              DateTime      @db.Date
-  shift             ManpowerShift @default(DAY)
+  date              DateTime          @db.Date
+  shift             ManpowerShift     @default(DAY)
+  entryType         PettyCashKind     @default(EXPENSE)
   payMode           String
   expenseHead       String
   description       String?
+  openingReading    Decimal?          @db.Decimal(18, 2)
+  closingReading    Decimal?          @db.Decimal(18, 2)
   billNumber        String?
-  amount            Decimal       @db.Decimal(18, 2) @default(0)
-  contractorSalary  Decimal       @db.Decimal(18, 2) @default(0)
-  supervisorSalary  Decimal       @db.Decimal(18, 2) @default(0)
+  amount            Decimal           @db.Decimal(18, 4) @default(0)
+  contractorSalary  Decimal           @db.Decimal(18, 2) @default(0)
+  supervisorSalary  Decimal           @db.Decimal(18, 2) @default(0)
   billPhotoUrl      String?
-  billPhotoUrls     String[]      @default([])
+  billPhotoUrls     String[]          @default([])
   enteredById       String
-  isBackdated       Boolean       @default(false)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  plant             Plant         @relation(fields: [plantId], references: [id])
-  enteredBy         User          @relation("PettyCashEnteredBy", fields: [enteredById], references: [id])
+  isBackdated       Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  plant             Plant             @relation(fields: [plantId], references: [id])
+  enteredBy         User              @relation("PettyCashEnteredBy", fields: [enteredById], references: [id])
 
   @@index([plantId, date])
+  @@index([plantId, entryType, date])
+  @@index([sourceKey])
 }
 
 model ElectricityRent {

@@ -1,6 +1,7 @@
 import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { AppShell } from "@/components/shell/AppShell";
+import { prisma } from "@/lib/db";
 import {
   getAccessiblePlantIds,
   canEnterData,
@@ -10,6 +11,7 @@ import {
   isPlantManager,
   isSuperAdmin,
 } from "@/lib/rbac";
+import { resolveSelectedPlantId } from "@/lib/selected-plant";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +23,29 @@ export default async function AppLayout({
   const session = await auth();
   const user = session?.user;
   const role = user?.globalRole;
+  const superAdmin = role ? isSuperAdmin(role) : false;
   const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
-  const primaryPlantId = plantIds[0] ?? null;
+  const selectedPlantId = user
+    ? await resolveSelectedPlantId(user.id, { isSuperAdmin: false })
+    : null;
+  const primaryPlantId = selectedPlantId ?? plantIds[0] ?? null;
+
+  const switchablePlants =
+    user && plantIds.length > 1
+      ? await prisma.plant.findMany({
+          where: { id: { in: plantIds }, isActive: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, code: true },
+        })
+      : [];
+
+  const selectedPlant =
+    selectedPlantId && user
+      ? await prisma.plant.findUnique({
+          where: { id: selectedPlantId },
+          select: { name: true },
+        })
+      : null;
 
   const showPnl = role ? canViewPnl(role) : false;
   const showPriceSheet =
@@ -32,6 +55,7 @@ export default async function AppLayout({
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
   const canEnter = role ? canEnterData(role) : false;
+  const showSwitchPlant = plantIds.length > 1;
 
   return (
     <AppShell
@@ -42,6 +66,8 @@ export default async function AppLayout({
         showSuper,
         isManager,
         primaryPlantId,
+        showSwitchPlant,
+        selectedPlantName: selectedPlant?.name ?? null,
       }}
       user={
         user
@@ -49,6 +75,9 @@ export default async function AppLayout({
           : null
       }
       canEnter={canEnter}
+      plants={switchablePlants}
+      currentPlantId={selectedPlantId}
+      allowAllPlants={superAdmin}
     >
       {children}
     </AppShell>

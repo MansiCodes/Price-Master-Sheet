@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { AppHeaderUser } from "./AppHeader";
 import type { NavIconName, NavSection } from "./nav-config";
+import { PlantSwitcher, type PlantSwitcherPlant } from "./PlantSwitcher";
 
 /** Minimal stroke-icon set (24x24) — no extra icon dependency. */
 const ICON_PATHS: Record<NavIconName, string> = {
@@ -135,6 +136,9 @@ function SidebarNav({
 
 type AppSidebarProps = {
   navSections: NavSection[];
+  plants?: PlantSwitcherPlant[];
+  currentPlantId?: string | null;
+  allowAllPlants?: boolean;
   collapsed: boolean;
   onToggleCollapsed?: () => void;
   mobileOpen: boolean;
@@ -144,6 +148,9 @@ type AppSidebarProps = {
 
 export function AppSidebar({
   navSections,
+  plants = [],
+  currentPlantId = null,
+  allowAllPlants = false,
   collapsed,
   mobileOpen,
   onCloseMobile,
@@ -160,6 +167,12 @@ export function AppSidebar({
         <SidebarNav
           navSections={navSections}
           pathname={pathname}
+          showLabels={!collapsed}
+        />
+        <PlantSwitcher
+          plants={plants}
+          currentPlantId={currentPlantId}
+          allowAllPlants={allowAllPlants}
           showLabels={!collapsed}
         />
         {user ? <SidebarUser user={user} showLabels={!collapsed} /> : null}
@@ -182,6 +195,13 @@ export function AppSidebar({
             <SidebarNav
               navSections={navSections}
               pathname={pathname}
+              showLabels
+              onNavigate={onCloseMobile}
+            />
+            <PlantSwitcher
+              plants={plants}
+              currentPlantId={currentPlantId}
+              allowAllPlants={allowAllPlants}
               showLabels
               onNavigate={onCloseMobile}
             />

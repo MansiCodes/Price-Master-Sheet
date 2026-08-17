@@ -138,12 +138,10 @@ export async function POST(request: Request) {
   }
 
   if (role !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
-    const plant = await prisma.plant.findFirst({
-      where: { isActive: true },
-      orderBy: { name: "asc" },
-      select: { id: true },
-    });
-    if (plant) plantIds.push(plant.id);
+    return NextResponse.json(
+      { ok: false, message: "Assign at least one plant for this user" },
+      { status: 400 },
+    );
   }
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);

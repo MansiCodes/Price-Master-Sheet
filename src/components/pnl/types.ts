@@ -4,7 +4,8 @@ export type ReportTab =
   | "purchase"
   | "production"
   | "stock"
-  | "expense";
+  | "expense"
+  | "pettyCash";
 
 export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "pnl", label: "P&L" },
@@ -13,6 +14,7 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "production", label: "Production" },
   { key: "stock", label: "Stock" },
   { key: "expense", label: "Expense" },
+  { key: "pettyCash", label: "Petty Cash" },
 ];
 
 export function toISODate(d: Date): string {

@@ -106,6 +106,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
   }
+  const nextRole = data.globalRole ?? existing.globalRole;
+
   if (data.plantIds) {
     const plantIds = [...new Set(data.plantIds)];
     if (plantIds.length > 0) {
@@ -119,9 +121,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
     }
+    if (nextRole !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "Assign at least one plant for this user" },
+        { status: 400 },
+      );
+    }
   }
-
-  const nextRole = data.globalRole ?? existing.globalRole;
   const passwordHash = data.password
     ? await bcrypt.hash(data.password, 12)
     : undefined;

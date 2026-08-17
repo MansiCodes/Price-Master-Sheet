@@ -11,6 +11,7 @@ import { UsersToolbar } from "@/components/admin/users/UsersToolbar";
 import {
   ROLE_LABEL,
   ROLES,
+  type PlantOption,
   type RoleValue,
   type UserRow,
 } from "@/components/admin/users/types";
@@ -18,6 +19,7 @@ import "@/components/admin/users/users.css";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [plants, setPlants] = useState<PlantOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -38,16 +40,28 @@ export default function AdminUsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const usersRes = await fetch("/api/admin/users");
+      const [usersRes, plantsRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/plants"),
+      ]);
       const usersJson = (await usersRes.json()) as {
         ok?: boolean;
         message?: string;
         users?: UserRow[];
       };
+      const plantsJson = (await plantsRes.json()) as {
+        ok?: boolean;
+        message?: string;
+        plants?: PlantOption[];
+      };
       if (!usersRes.ok || !usersJson.ok) {
         throw new Error(usersJson.message || "Failed to load users");
       }
+      if (!plantsRes.ok || !plantsJson.ok) {
+        throw new Error(plantsJson.message || "Failed to load plants");
+      }
       setUsers(usersJson.users ?? []);
+      setPlants(plantsJson.plants ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -114,6 +128,7 @@ export default function AdminUsersPage() {
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
     isActive: boolean;
+    plantIds: string[];
   }) {
     setSaving(true);
     setFormError(null);
@@ -126,7 +141,7 @@ export default function AdminUsersPage() {
           globalRole: payload.globalRole,
           canViewPriceSheet: payload.canViewPriceSheet,
           isActive: payload.isActive,
-          plantIds: [],
+          plantIds: payload.plantIds,
         };
         if (payload.password.trim()) body.password = payload.password;
         const res = await fetch(`/api/admin/users/${editing.id}`, {
@@ -150,7 +165,7 @@ export default function AdminUsersPage() {
             password: payload.password,
             globalRole: payload.globalRole,
             canViewPriceSheet: payload.canViewPriceSheet,
-            plantIds: [],
+            plantIds: payload.plantIds,
           }),
         });
         const data = (await res.json()) as { ok?: boolean; message?: string };
@@ -210,6 +225,7 @@ export default function AdminUsersPage() {
         "Email",
         "Mobile",
         "Role",
+        "Plants",
         "Credit score",
         "Price Sheet",
         "Status",
@@ -219,6 +235,9 @@ export default function AdminUsersPage() {
         u.email,
         u.phone ?? "",
         ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ?? u.globalRole,
+        u.globalRole === "SUPER_ADMIN"
+          ? "All plants"
+          : (u.plantRoles ?? []).map((role) => role.plant.name).join(", "),
         u.creditScore ?? "",
         u.canViewPriceSheet ? "Yes" : "No",
         u.isActive ? "Active" : "Inactive",
@@ -282,6 +301,7 @@ export default function AdminUsersPage() {
         saving={saving}
         error={formError}
         allowSuperAdmin={allowSuperAdmin}
+        plants={plants}
         onClose={closeForm}
         onSubmit={handleSubmit}
       />

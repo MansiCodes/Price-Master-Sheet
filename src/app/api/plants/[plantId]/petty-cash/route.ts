@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ManpowerShift } from "@prisma/client";
+import { ManpowerShift, PettyCashKind } from "@prisma/client";
 import { z } from "zod";
 import {
   requireCanEnter,
@@ -19,9 +19,12 @@ import { paginate } from "@/lib/ui/paginate";
 const pettyCashSchema = z.object({
   date: z.string().regex(dateOnlyRegex),
   shift: z.enum(ManpowerShift).default(ManpowerShift.DAY),
+  entryType: z.enum(PettyCashKind).default(PettyCashKind.EXPENSE),
   payMode: z.string().min(1),
   expenseHead: z.string().min(1),
   description: z.string().optional().nullable(),
+  openingReading: z.coerce.number().nonnegative().optional().nullable(),
+  closingReading: z.coerce.number().nonnegative().optional().nullable(),
   billNumber: z.string().optional().nullable(),
   amount: z.coerce.number().nonnegative().default(0),
   contractorSalary: z.coerce.number().nonnegative().default(0),
@@ -51,8 +54,14 @@ export async function GET(
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
 
+  const requestedType = sp.get("entryType");
+  const entryType =
+    requestedType && requestedType in PettyCashKind
+      ? (requestedType as PettyCashKind)
+      : null;
+
   const entries = await prisma.pettyCashEntry.findMany({
-    where: { plantId, ...filter },
+    where: { plantId, ...filter, ...(entryType ? { entryType } : {}) },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
@@ -94,9 +103,18 @@ export async function POST(
       plantId,
       date: parseDateOnly(data.date),
       shift: data.shift,
+      entryType: data.entryType,
       payMode: data.payMode,
       expenseHead: data.expenseHead,
       description: data.description ?? null,
+      openingReading:
+        data.expenseHead === "Electricity"
+          ? (data.openingReading ?? null)
+          : null,
+      closingReading:
+        data.expenseHead === "Electricity"
+          ? (data.closingReading ?? null)
+          : null,
       billNumber: data.billNumber ?? null,
       amount: data.amount,
       contractorSalary: data.contractorSalary,

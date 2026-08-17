@@ -10,12 +10,14 @@ import { PurchaseReport } from "@/components/pnl/PurchaseReport";
 import { ProductionReport } from "@/components/pnl/ProductionReport";
 import { StockReport } from "@/components/pnl/StockReport";
 import { ExpenseReport } from "@/components/pnl/ExpenseReport";
+import { PettyCashReport } from "@/components/pnl/PettyCashReport";
 import { useReportRange } from "@/components/pnl/useReportRange";
 import type { ReportTab } from "@/components/pnl/types";
 import "@/components/pnl/pnl-reports.css";
 
 export function PnlReportsShell({
   plantId,
+  plantName,
 }: {
   plantId: string;
   plantName?: string;
@@ -25,6 +27,9 @@ export function PnlReportsShell({
 
   return (
     <div className="pnl-reports">
+      {plantName ? (
+        <p className="pnl-reports__plant">{plantName}</p>
+      ) : null}
       <div className="pnl-reports__toolbar">
         <div className="pnl-reports__tabs">
           <PnlTabNav active={tab} onChange={setTab} />
@@ -63,6 +68,9 @@ export function PnlReportsShell({
         ) : null}
         {tab === "expense" ? (
           <ExpenseReport plantId={plantId} from={from} to={to} />
+        ) : null}
+        {tab === "pettyCash" ? (
+          <PettyCashReport plantId={plantId} from={from} to={to} />
         ) : null}
       </div>
     </div>

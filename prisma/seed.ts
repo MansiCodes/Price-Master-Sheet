@@ -18,18 +18,24 @@ async function main() {
     throw new Error("SUPER_ADMIN_PASSWORD must be set to seed Super Admin");
   }
 
-  const plant = await prisma.plant.upsert({
-    where: { code: "CAT6" },
-    update: {
-      name: "CAT-6 Cable Plant",
-      isActive: true,
-    },
-    create: {
-      name: "CAT-6 Cable Plant",
-      code: "CAT6",
-      isActive: true,
-    },
-  });
+  const PLANTS = [
+    { code: "CAT6", name: "CAT-6 Cable Plant" },
+    { code: "PVC", name: "PVC Plant" },
+    { code: "LTDROPE", name: "LTD Rope Light Plant" },
+  ];
+
+  const plants = [];
+  for (const entry of PLANTS) {
+    plants.push(
+      await prisma.plant.upsert({
+        where: { code: entry.code },
+        update: { name: entry.name, isActive: true },
+        create: { name: entry.name, code: entry.code, isActive: true },
+      }),
+    );
+  }
+
+  const plant = plants[0]!;
 
   const rateRows: { role: ManpowerRole; ratePerDay: number }[] = [
     { role: ManpowerRole.MANAGER, ratePerDay: 4000 },
@@ -37,23 +43,25 @@ async function main() {
     { role: ManpowerRole.HELPER, ratePerDay: 800 },
   ];
 
-  for (const row of rateRows) {
-    await prisma.manpowerRateSetting.upsert({
-      where: {
-        plantId_role: {
-          plantId: plant.id,
-          role: row.role,
+  for (const target of plants) {
+    for (const row of rateRows) {
+      await prisma.manpowerRateSetting.upsert({
+        where: {
+          plantId_role: {
+            plantId: target.id,
+            role: row.role,
+          },
         },
-      },
-      update: {
-        ratePerDay: row.ratePerDay,
-      },
-      create: {
-        plantId: plant.id,
-        role: row.role,
-        ratePerDay: row.ratePerDay,
-      },
-    });
+        update: {
+          ratePerDay: row.ratePerDay,
+        },
+        create: {
+          plantId: target.id,
+          role: row.role,
+          ratePerDay: row.ratePerDay,
+        },
+      });
+    }
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -141,7 +149,9 @@ async function main() {
   });
 
   console.log("Seed complete:");
-  console.log(`  Plant: ${plant.name} (${plant.code}) id=${plant.id}`);
+  for (const target of plants) {
+    console.log(`  Plant: ${target.name} (${target.code}) id=${target.id}`);
+  }
   console.log(`  Super Admin: ${admin.email} id=${admin.id}`);
   console.log(`  Plant Manager: ${manager.email} id=${manager.id}`);
   console.log("  Manpower rates: Manager 4000 / Operator 1500 / Helper 800");

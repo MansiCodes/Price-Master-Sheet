@@ -35,6 +35,7 @@ export function UsersTable({
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Plants</th>
               <th>Credit score</th>
               <th>Price Sheet</th>
               <th>Status</th>
@@ -44,7 +45,7 @@ export function UsersTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="empty">
+                <td colSpan={8} className="empty">
                   {emptyMessage}
                 </td>
               </tr>
@@ -65,6 +66,16 @@ export function UsersTable({
                       {ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ??
                         u.globalRole}
                     </span>
+                  </td>
+                  <td>
+                    {u.globalRole === "SUPER_ADMIN" ? (
+                      <span className="users-pill">All plants</span>
+                    ) : (
+                      <span className="users-plants-cell">
+                        {(u.plantRoles ?? []).map((role) => role.plant.name).join(", ") ||
+                          "—"}
+                      </span>
+                    )}
                   </td>
                   <td>{u.creditScore ?? "—"}</td>
                   <td>

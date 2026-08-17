@@ -7,9 +7,12 @@ import {
   canEnterData,
   canViewPnl,
   getAccessiblePlantIds,
-  isPlantManager,
   isSuperAdmin,
 } from "@/lib/rbac";
+import {
+  needsPlantSelection,
+  resolveSelectedPlantId,
+} from "@/lib/selected-plant";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { maybeAwardCreditScore } from "@/lib/credit-score";
 import {
@@ -57,12 +60,22 @@ export default async function DashboardPage() {
 
   const user = session.user;
   const superAdmin = isSuperAdmin(user.globalRole);
-  const manager = isPlantManager(user.globalRole);
   const plantIds = await getAccessiblePlantIds(user.id);
+
+  if (!superAdmin && (await needsPlantSelection(user.id))) {
+    redirect("/select-plant");
+  }
+
+  const selectedPlantId = await resolveSelectedPlantId(user.id, {
+    isSuperAdmin: false,
+  });
+
+  const scopedPlantIds = selectedPlantId ? [selectedPlantId] : plantIds;
+
   const plants =
-    plantIds.length > 0
+    scopedPlantIds.length > 0
       ? await prisma.plant.findMany({
-          where: { id: { in: plantIds }, isActive: true },
+          where: { id: { in: scopedPlantIds }, isActive: true },
           orderBy: { name: "asc" },
           select: { id: true, name: true, code: true },
         })
@@ -83,7 +96,7 @@ export default async function DashboardPage() {
   }
 
   const ownEntriesOnly = !isSuperAdmin(user.globalRole);
-  const metrics = await getDashboardMetrics(plantIds, {
+  const metrics = await getDashboardMetrics(scopedPlantIds, {
     includePnl: showPnl,
     enteredById: ownEntriesOnly ? user.id : undefined,
   });
@@ -112,7 +125,7 @@ export default async function DashboardPage() {
       showNet={showNet}
       plant={primary}
       shiftModules={shiftModules}
-      scope={manager ? "plant" : "org"}
+      scope={primary ? "plant" : "org"}
       showCreditScore={!superAdmin}
       creditScore={creditScore}
     />

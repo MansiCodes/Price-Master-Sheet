@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
-import { ROLE_LABEL, ROLES, fromStoredIndiaPhone, indianMobileDigits, type RoleValue, type UserRow } from "./types";
+import { ROLE_LABEL, ROLES, fromStoredIndiaPhone, indianMobileDigits, type PlantOption, type RoleValue, type UserRow } from "./types";
+import { PlantMultiSelect } from "./PlantMultiSelect";
 
 type UserFormModalProps = {
   open: boolean;
@@ -11,6 +12,7 @@ type UserFormModalProps = {
   saving: boolean;
   error: string | null;
   allowSuperAdmin: boolean;
+  plants: PlantOption[];
   onClose: () => void;
   onSubmit: (payload: {
     email: string;
@@ -20,6 +22,7 @@ type UserFormModalProps = {
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
     isActive: boolean;
+    plantIds: string[];
   }) => Promise<void>;
 };
 
@@ -29,6 +32,7 @@ export function UserFormModal({
   saving,
   error,
   allowSuperAdmin,
+  plants,
   onClose,
   onSubmit,
 }: UserFormModalProps) {
@@ -46,6 +50,14 @@ export function UserFormModal({
   const [globalRole, setGlobalRole] = useState<RoleValue>("ACCOUNTANT");
   const [canViewPriceSheet, setCanViewPriceSheet] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
+  const [plantError, setPlantError] = useState<string | null>(null);
+
+  const activePlants = useMemo(
+    () => plants.filter((p) => p.isActive),
+    [plants],
+  );
+  const requiresPlants = globalRole !== "SUPER_ADMIN";
 
   useEffect(() => {
     if (open) {
@@ -69,6 +81,9 @@ export function UserFormModal({
       setPassword("");
       setGlobalRole(editing.globalRole as RoleValue);
       setCanViewPriceSheet(editing.canViewPriceSheet);
+      setSelectedPlantIds(
+        editing.plantRoles?.map((role) => role.plantId) ?? [],
+      );
     } else {
       setEmail("");
       setName("");
@@ -76,15 +91,31 @@ export function UserFormModal({
       setPassword("");
       setGlobalRole("ACCOUNTANT");
       setCanViewPriceSheet(false);
+      setSelectedPlantIds(
+        activePlants[0] ? [activePlants[0].id] : [],
+      );
     }
     setShowPassword(false);
-  }, [open, editing]);
+    setPlantError(null);
+  }, [open, editing, activePlants]);
 
   useEffect(() => {
     if (!visible) return;
     const t = window.setTimeout(() => firstFieldRef.current?.focus(), 40);
     return () => window.clearTimeout(t);
   }, [visible, editingId]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (globalRole === "SUPER_ADMIN") {
+      setSelectedPlantIds([]);
+      setPlantError(null);
+      return;
+    }
+    if (selectedPlantIds.length === 0 && activePlants[0] && !editing) {
+      setSelectedPlantIds([activePlants[0].id]);
+    }
+  }, [globalRole, open, activePlants, editing, selectedPlantIds.length]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -114,6 +145,11 @@ export function UserFormModal({
     if (digits.length !== 10) {
       return;
     }
+    if (requiresPlants && selectedPlantIds.length === 0) {
+      setPlantError("Select at least one plant.");
+      return;
+    }
+    setPlantError(null);
     await onSubmit({
       email,
       name,
@@ -122,7 +158,13 @@ export function UserFormModal({
       globalRole,
       canViewPriceSheet,
       isActive: editing?.isActive ?? true,
+      plantIds: globalRole === "SUPER_ADMIN" ? [] : selectedPlantIds,
     });
+  }
+
+  function onPlantIdsChange(next: string[]) {
+    setPlantError(null);
+    setSelectedPlantIds(next);
   }
 
   return (
@@ -272,6 +314,25 @@ export function UserFormModal({
                 }}
               />
             </div>
+            {requiresPlants ? (
+              <div className="field">
+                <label htmlFor="user-plant">Plant</label>
+                <PlantMultiSelect
+                  id="user-plant"
+                  plants={activePlants}
+                  value={selectedPlantIds}
+                  required
+                  disabled={saving || activePlants.length === 0}
+                  placeholder="Select plant(s)"
+                  onChange={onPlantIdsChange}
+                />
+                {plantError ? (
+                  <p className="users-plants__error" role="alert">
+                    {plantError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
           <div className="users-modal__checks">

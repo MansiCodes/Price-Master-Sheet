@@ -86,6 +86,7 @@ export async function getAccessiblePlantIds(userId: string): Promise<string[]> {
   if (user.globalRole === GlobalRole.SUPER_ADMIN) {
     const plants = await prisma.plant.findMany({
       where: { isActive: true },
+      orderBy: { name: "asc" },
       select: { id: true },
     });
     return plants.map((p) => p.id);

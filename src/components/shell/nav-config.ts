@@ -44,6 +44,8 @@ export type NavFlags = {
   showSuper: boolean;
   isManager: boolean;
   primaryPlantId: string | null;
+  showSwitchPlant: boolean;
+  selectedPlantName: string | null;
 };
 
 export function getNavSections(flags: NavFlags): NavSection[] {

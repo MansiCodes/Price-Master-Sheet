@@ -10,6 +10,8 @@ type ExpenseRow = {
   shift: string;
   expenseHead: string;
   description: string | null;
+  openingReading: string | number | null;
+  closingReading: string | number | null;
   amount: string | number;
   contractorSalary: string | number;
   supervisorSalary: string | number;
@@ -44,7 +46,7 @@ export function ExpenseReport({
     setError(null);
     try {
       const res = await fetch(
-        `/api/plants/${plantId}/petty-cash?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=200`,
+        `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=200`,
       );
       const json = await res.json();
       if (!res.ok) {
@@ -71,8 +73,23 @@ export function ExpenseReport({
     { key: "head", label: "Category", render: (r) => r.expenseHead },
     {
       key: "desc",
-      label: "Description",
+      label: "Remarks / notes",
+      wrap: "wide",
       render: (r) => r.description || "—",
+    },
+    {
+      key: "opening",
+      label: "Opening reading",
+      align: "right",
+      render: (r) =>
+        r.openingReading == null ? "—" : String(r.openingReading),
+    },
+    {
+      key: "closing",
+      label: "Closing reading",
+      align: "right",
+      render: (r) =>
+        r.closingReading == null ? "—" : String(r.closingReading),
     },
     {
       key: "amount",

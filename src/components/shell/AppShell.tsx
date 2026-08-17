@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader, type AppHeaderUser } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { getNavSections, type NavFlags } from "./nav-config";
+import type { PlantSwitcherPlant } from "./PlantSwitcher";
 
 const SIDEBAR_STORAGE_KEY = "cj-sidebar-collapsed";
 
@@ -12,9 +13,20 @@ type AppShellProps = {
   navFlags: NavFlags;
   user: AppHeaderUser | null;
   canEnter?: boolean;
+  plants?: PlantSwitcherPlant[];
+  currentPlantId?: string | null;
+  allowAllPlants?: boolean;
 };
 
-export function AppShell({ children, navFlags, user, canEnter = false }: AppShellProps) {
+export function AppShell({
+  children,
+  navFlags,
+  user,
+  canEnter = false,
+  plants = [],
+  currentPlantId = null,
+  allowAllPlants = false,
+}: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [ready, setReady] = useState(false);
@@ -67,6 +79,9 @@ export function AppShell({ children, navFlags, user, canEnter = false }: AppShel
       <div className="dash-body">
         <AppSidebar
           navSections={navSections}
+          plants={plants}
+          currentPlantId={currentPlantId}
+          allowAllPlants={allowAllPlants}
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
           mobileOpen={mobileOpen}
