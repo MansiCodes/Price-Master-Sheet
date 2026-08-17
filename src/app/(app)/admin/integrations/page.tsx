@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import "./integrations.css";
 
 type ConfigView = {
@@ -15,6 +16,7 @@ type ConfigView = {
 };
 
 export default function AdminIntegrationsPage() {
+  const t = useTranslations("admin");
   const [config, setConfig] = useState<ConfigView | null>(null);
   const [apiKey, setApiKey] = useState("");
   const [otpCampaignName, setOtpCampaignName] = useState("");
@@ -98,7 +100,7 @@ export default function AdminIntegrationsPage() {
   return (
     <div className="integrations-page">
       <header className="integrations-page__head">
-        <h1 className="page-title">Integrations</h1>
+        <h1 className="page-title">{t("integrations")}</h1>
         <p className="page-sub">
           WhatsApp / AiSensy credentials are stored securely in the database.
           Campaign names must match the live AiSensy templates exactly.

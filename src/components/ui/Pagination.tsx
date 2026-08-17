@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslations } from "next-intl";
+
 type PaginationProps = {
   page: number;
   pageSize: number;
@@ -6,6 +10,7 @@ type PaginationProps = {
 };
 
 export function Pagination({ page, pageSize, total, onPageChange }: PaginationProps) {
+  const t = useTranslations("common");
   if (total <= pageSize) return null;
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -15,7 +20,7 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
   return (
     <div className="pagination">
       <span className="pagination__info">
-        {start}–{end} of {total}
+        {t("rangeOf", { start, end, total })}
       </span>
       <div className="pagination__controls">
         <button
@@ -23,17 +28,17 @@ export function Pagination({ page, pageSize, total, onPageChange }: PaginationPr
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
-          Prev
+          {t("previous")}
         </button>
         <span>
-          Page {page} / {totalPages}
+          {t("pageOf", { page, totalPages })}
         </span>
         <button
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
         >
-          Next
+          {t("next")}
         </button>
       </div>
     </div>

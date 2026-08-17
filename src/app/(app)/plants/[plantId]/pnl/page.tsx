@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { auth } from "@/auth";
 import { canAccessPlant, canViewPnl } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
@@ -12,13 +13,13 @@ export default async function PlantPnlPage({ params }: PageProps) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
+  const t = await getTranslations("pnl");
+
   if (!canViewPnl(session.user.globalRole)) {
     return (
       <div>
-        <h1 className="page-title">P&amp;L hidden</h1>
-        <p className="page-sub">
-          Your role cannot view plant profit &amp; loss.
-        </p>
+        <h1 className="page-title">{t("hiddenTitle")}</h1>
+        <p className="page-sub">{t("hiddenBody")}</p>
       </div>
     );
   }
@@ -28,8 +29,8 @@ export default async function PlantPnlPage({ params }: PageProps) {
   if (!allowed) {
     return (
       <div>
-        <h1 className="page-title">Access denied</h1>
-        <p className="page-sub">You do not have access to this plant.</p>
+        <h1 className="page-title">{t("accessDenied")}</h1>
+        <p className="page-sub">{t("accessDeniedBody")}</p>
       </div>
     );
   }
@@ -42,7 +43,7 @@ export default async function PlantPnlPage({ params }: PageProps) {
   if (!plant) {
     return (
       <div>
-        <h1 className="page-title">Plant not found</h1>
+        <h1 className="page-title">{t("plantNotFound")}</h1>
       </div>
     );
   }

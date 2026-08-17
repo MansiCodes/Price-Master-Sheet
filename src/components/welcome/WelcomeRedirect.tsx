@@ -2,11 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 const REDIRECT_DELAY_MS = 2200;
 
 export function WelcomeRedirect({ plantName }: { plantName: string }) {
   const router = useRouter();
+  const t = useTranslations("welcome");
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -32,9 +34,9 @@ export function WelcomeRedirect({ plantName }: { plantName: string }) {
             <path d="M4 21V10l8-6 8 6v11M9 21v-6h6v6" />
           </svg>
         </div>
-        <p className="welcome-card__eyebrow">Welcome to</p>
+        <p className="welcome-card__eyebrow">{t("eyebrow")}</p>
         <h1 className="welcome-card__plant">{plantName}</h1>
-        <p className="welcome-card__hint">Taking you to your dashboard…</p>
+        <p className="welcome-card__hint">{t("hint")}</p>
         <div className="welcome-card__bar" aria-hidden="true">
           <span />
         </div>

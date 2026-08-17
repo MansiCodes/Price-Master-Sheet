@@ -167,6 +167,13 @@
   border-radius: 20px;
   padding: 2.25rem 2rem;
   box-shadow: var(--shadow);
+  position: relative;
+}
+
+.login-form-card__lang {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
 }
 
 .login-form-card h2 {

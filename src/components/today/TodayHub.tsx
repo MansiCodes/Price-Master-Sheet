@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { postJson, todayLocalISO } from "@/lib/client-forms";
 import { formatINR } from "@/lib/format/inr";
@@ -93,14 +94,23 @@ type EntryKind =
   | "expense"
   | "pettyCash";
 
-const ENTRY_OPTIONS: { value: EntryKind; label: string }[] = [
-  { value: "purchase", label: "Purchase" },
-  { value: "sale", label: "Sales" },
-  { value: "stock", label: "Stock" },
-  { value: "production", label: "Production" },
-  { value: "expense", label: "Expense" },
-  { value: "pettyCash", label: "Petty Cash" },
+const ENTRY_KINDS: EntryKind[] = [
+  "purchase",
+  "sale",
+  "stock",
+  "production",
+  "expense",
+  "pettyCash",
 ];
+
+const ENTRY_KIND_LABEL_KEY: Record<EntryKind, string> = {
+  purchase: "purchase",
+  sale: "sales",
+  stock: "stock",
+  production: "production",
+  expense: "expense",
+  pettyCash: "pettyCash",
+};
 
 type LineItem = {
   id: string;
@@ -213,10 +223,21 @@ export function TodayHub({
   embedded = false,
 }: TodayHubProps) {
   const router = useRouter();
+  const t = useTranslations("today");
+  const tCommon = useTranslations("common");
   const today = useMemo(() => todayLocalISO(), []);
   const purchaseCatalog = useMemo(
     () => getPurchaseCatalog(plantCode),
     [plantCode],
+  );
+
+  const entryOptions = useMemo(
+    () =>
+      ENTRY_KINDS.map((value) => ({
+        value,
+        label: t(ENTRY_KIND_LABEL_KEY[value] as "purchase"),
+      })),
+    [t],
   );
 
   const [open, setOpen] = useState(false);
@@ -547,7 +568,7 @@ export function TodayHub({
       });
     } else if (kind === "production") {
       if (!productName.trim() || !(Number(prodQty) > 0)) {
-        fail("Enter product and production quantity.");
+        fail(t("enterProductQty"));
         return;
       }
       result = await postJson(`/api/plants/${plantId}/production`, {
@@ -565,7 +586,7 @@ export function TodayHub({
     } else if (kind === "expense") {
       const amount = Number(expenseAmount);
       if (!(amount > 0) || !expenseHead) {
-        fail("Enter category and amount.");
+        fail(t("enterCategoryAmount"));
         return;
       }
       result = await postJson(`/api/plants/${plantId}/petty-cash`, {
@@ -598,9 +619,7 @@ export function TodayHub({
         !pettyCashDescription.trim() ||
         amount + contractorSalary + supervisorSalary <= 0
       ) {
-        fail(
-          "Enter pay mode, description, and at least one expense or salary amount.",
-        );
+        fail(t("enterPettyCash"));
         return;
       }
       result = await postJson(`/api/plants/${plantId}/petty-cash`, {
@@ -625,12 +644,12 @@ export function TodayHub({
     }
 
     const labels: Record<EntryKind, string> = {
-      purchase: "Purchase saved",
-      sale: "Sales saved",
-      stock: "Stock saved",
-      production: "Production saved",
-      expense: "Expense saved",
-      pettyCash: "Petty cash saved",
+      purchase: t("purchaseSaved"),
+      sale: t("salesSaved"),
+      stock: t("stockSaved"),
+      production: t("productionSaved"),
+      expense: t("expenseSaved"),
+      pettyCash: t("pettyCashSaved"),
     };
     toast.success(labels[kind]);
     closePanel();
@@ -731,18 +750,18 @@ export function TodayHub({
       <SlideOver
         open={open}
         onClose={closePanel}
-        title="Today's entry"
+        title={t("title")}
         footer={
           <>
             <Button variant="secondary" onClick={closePanel}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button
               type="submit"
               form="today-entry-form"
               disabled={saving}
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? tCommon("saving") : tCommon("save")}
             </Button>
           </>
         }
@@ -752,23 +771,24 @@ export function TodayHub({
         <form id="today-entry-form" className="form-grid" onSubmit={onSubmit}>
             <div className="form-grid three">
               <div className="field">
-                <label htmlFor="entry-kind">Entry type</label>
+                <label htmlFor="entry-kind">{t("entryType")}</label>
                 <SelectMenu
                   id="entry-kind"
                   value={
-                    ENTRY_OPTIONS.find((o) => o.value === kind)?.label ?? "Purchase"
+                    entryOptions.find((o) => o.value === kind)?.label ??
+                    t("purchase")
                   }
-                  options={ENTRY_OPTIONS.map((o) => o.label)}
+                  options={entryOptions.map((o) => o.label)}
                   required
                   onChange={(label) => {
-                    const next = ENTRY_OPTIONS.find((o) => o.label === label);
+                    const next = entryOptions.find((o) => o.label === label);
                     if (next) setKind(next.value);
                   }}
                 />
               </div>
               <div className="field">
                 <label htmlFor="entry-date">
-                  {kind === "pettyCash" ? "Bill date" : "Date"}
+                  {kind === "pettyCash" ? t("billDate") : t("date")}
                 </label>
                 <input
                   id="entry-date"
@@ -779,21 +799,21 @@ export function TodayHub({
                 />
               </div>
               <div className="field">
-                <label>Shift</label>
+                <label>{t("shift")}</label>
                 <div className="shift-toggle">
                   <button
                     type="button"
                     className={shift === "DAY" ? "is-active" : ""}
                     onClick={() => setShift("DAY")}
                   >
-                    Day
+                    {tCommon("day")}
                   </button>
                   <button
                     type="button"
                     className={shift === "NIGHT" ? "is-active" : ""}
                     onClick={() => setShift("NIGHT")}
                   >
-                    Night
+                    {tCommon("night")}
                   </button>
                 </div>
               </div>
@@ -1111,7 +1131,7 @@ export function TodayHub({
             {kind === "expense" ? (
               <>
                 <div className="field">
-                  <label htmlFor="e-head">Category</label>
+                  <label htmlFor="e-head">{t("category")}</label>
                   <SelectMenu
                     id="e-head"
                     value={String(expenseHead)}
@@ -1129,7 +1149,7 @@ export function TodayHub({
                 {expenseHead === "Electricity" ? (
                   <div className="prod-fields__row">
                     <div className="field">
-                      <label htmlFor="e-opening">Opening reading</label>
+                      <label htmlFor="e-opening">{t("openingReading")}</label>
                       <DecimalInput
                         id="e-opening"
                         value={expenseOpeningReading}
@@ -1137,7 +1157,7 @@ export function TodayHub({
                       />
                     </div>
                     <div className="field">
-                      <label htmlFor="e-closing">Closing reading</label>
+                      <label htmlFor="e-closing">{t("closingReading")}</label>
                       <DecimalInput
                         id="e-closing"
                         value={expenseClosingReading}
@@ -1148,7 +1168,7 @@ export function TodayHub({
                 ) : null}
                 <div className="prod-fields__row">
                   <div className="field">
-                    <label htmlFor="e-amt">Amount</label>
+                    <label htmlFor="e-amt">{t("amount")}</label>
                     <DecimalInput
                       id="e-amt"
                       required
@@ -1157,7 +1177,7 @@ export function TodayHub({
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="e-paid">Paid to</label>
+                    <label htmlFor="e-paid">{t("paidTo")}</label>
                     <input
                       id="e-paid"
                       value={paidTo}
@@ -1166,7 +1186,7 @@ export function TodayHub({
                   </div>
                 </div>
                 <div className="field expense-desc">
-                  <label htmlFor="e-desc">Remarks / notes</label>
+                  <label htmlFor="e-desc">{t("remarksNotes")}</label>
                   <textarea
                     id="e-desc"
                     value={expenseDesc}
@@ -1181,7 +1201,7 @@ export function TodayHub({
             {kind === "pettyCash" ? (
               <>
                 <div className="field">
-                  <label htmlFor="pc-pay-mode">Pay mode</label>
+                  <label htmlFor="pc-pay-mode">{t("payMode")}</label>
                   <input
                     id="pc-pay-mode"
                     required
@@ -1191,7 +1211,7 @@ export function TodayHub({
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="pc-bill-number">Bill number</label>
+                  <label htmlFor="pc-bill-number">{t("billNumber")}</label>
                   <input
                     id="pc-bill-number"
                     value={pettyCashBillNumber}
@@ -1200,7 +1220,7 @@ export function TodayHub({
                 </div>
                 <div className="field expense-desc">
                   <label htmlFor="pc-description">
-                    Description of expense
+                    {t("descriptionOfExpense")}
                   </label>
                   <textarea
                     id="pc-description"
@@ -1212,7 +1232,7 @@ export function TodayHub({
                 </div>
                 <div className="prod-fields__row">
                   <div className="field">
-                    <label htmlFor="pc-expense">Expenses</label>
+                    <label htmlFor="pc-expense">{t("expenses")}</label>
                     <DecimalInput
                       id="pc-expense"
                       value={pettyCashExpense}
@@ -1220,7 +1240,7 @@ export function TodayHub({
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="pc-contractor">Contractor salary</label>
+                    <label htmlFor="pc-contractor">{t("contractorSalary")}</label>
                     <DecimalInput
                       id="pc-contractor"
                       value={pettyCashContractorSalary}
@@ -1229,7 +1249,7 @@ export function TodayHub({
                   </div>
                 </div>
                 <div className="field">
-                  <label htmlFor="pc-supervisor">Supervisor salary</label>
+                  <label htmlFor="pc-supervisor">{t("supervisorSalary")}</label>
                   <DecimalInput
                     id="pc-supervisor"
                     value={pettyCashSupervisorSalary}
@@ -1237,7 +1257,7 @@ export function TodayHub({
                   />
                 </div>
                 <BillUpload
-                  label="Upload bill"
+                  label={t("uploadBill")}
                   urls={pettyCashPhotos}
                   onChange={setPettyCashPhotos}
                 />

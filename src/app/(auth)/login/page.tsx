@@ -3,10 +3,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   indianMobileDigits,
   toIndiaPhoneE164,
 } from "@/lib/phone";
+import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import "./login.css";
 
 type LoginMode = "whatsapp" | "email";
@@ -71,6 +73,7 @@ function clearStaleAuthCookies() {
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("auth");
   const [mode, setMode] = useState<LoginMode>("whatsapp");
   const [whatsappStep, setWhatsappStep] = useState<WhatsappStep>("phone");
   const [phone, setPhone] = useState("");
@@ -126,7 +129,7 @@ export default function LoginPage() {
 
     const e164 = toIndiaPhoneE164(phone);
     if (!e164) {
-      setError("Enter a valid 10-digit mobile number.");
+      setError(t("invalidPhone"));
       return;
     }
 
@@ -157,15 +160,13 @@ export default function LoginPage() {
       if (data.stub && data.devCode) {
         setDevOtp(data.devCode);
         setOtp(data.devCode);
-        setInfo(
-          "WhatsApp OTP is not configured yet (Admin → Integrations). Using local Dev OTP for now.",
-        );
+        setInfo(t("devOtpInfo"));
       } else {
         setDevOtp(null);
-        setInfo("OTP sent to your WhatsApp number.");
+        setInfo(t("otpSentInfo"));
       }
     } catch {
-      setError("Could not send OTP. Try again.");
+      setError(t("couldNotSendOtp"));
     } finally {
       setSendingOtp(false);
     }
@@ -176,13 +177,13 @@ export default function LoginPage() {
     setError(null);
 
     if (otpSecondsLeft <= 0) {
-      setError("OTP has expired. Request a new OTP.");
+      setError(t("otpExpiredRequest"));
       return;
     }
 
     const e164 = toIndiaPhoneE164(phone);
     if (!e164 || otp.trim().length < 4) {
-      setError("Enter the OTP sent to your mobile.");
+      setError(t("enterOtp"));
       return;
     }
 
@@ -194,13 +195,13 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error) {
-        setError("Invalid or expired OTP.");
+        setError(t("invalidOtp"));
         return;
       }
       router.replace("/select-plant");
       router.refresh();
     } catch {
-      setError("Sign-in failed. Try again.");
+      setError(t("signInFailed"));
     } finally {
       setLoading(false);
     }
@@ -218,13 +219,13 @@ export default function LoginPage() {
         redirect: false,
       });
       if (result?.error) {
-        setError("Invalid email or password.");
+        setError(t("invalidEmailPassword"));
         return;
       }
       router.replace("/select-plant");
       router.refresh();
     } catch {
-      setError("Sign-in failed. Try again.");
+      setError(t("signInFailed"));
     } finally {
       setLoading(false);
     }
@@ -324,19 +325,20 @@ export default function LoginPage() {
         </svg>
 
         <div className="login-visual__content">
-          <h1 className="login-visual__brand">Cable Junction</h1>
-          <p className="login-visual__tagline">
-            Every plant&rsquo;s numbers, wired into one place.
-          </p>
+          <h1 className="login-visual__brand">{t("brandName")}</h1>
+          <p className="login-visual__tagline">{t("tagline")}</p>
         </div>
       </section>
 
       <section className="login-form-panel">
         <div className="login-form-card">
-          <h2>Welcome back</h2>
-          <p className="lead">Sign in to enter plant data.</p>
+          <div className="login-form-card__lang">
+            <LanguageSwitcher />
+          </div>
+          <h2>{t("welcomeBack")}</h2>
+          <p className="lead">{t("signInLead")}</p>
 
-          <div className="login-mode-tabs" role="tablist" aria-label="Sign-in method">
+          <div className="login-mode-tabs" role="tablist" aria-label={t("title")}>
             <button
               type="button"
               role="tab"
@@ -344,7 +346,7 @@ export default function LoginPage() {
               className={mode === "whatsapp" ? "is-active" : ""}
               onClick={() => switchMode("whatsapp")}
             >
-              WhatsApp login
+              {t("whatsappLogin")}
             </button>
             <button
               type="button"
@@ -353,7 +355,7 @@ export default function LoginPage() {
               className={mode === "email" ? "is-active" : ""}
               onClick={() => switchMode("email")}
             >
-              Email login
+              {t("emailLogin")}
             </button>
           </div>
 
@@ -372,7 +374,7 @@ export default function LoginPage() {
             whatsappStep === "phone" ? (
               <form className="form-grid" onSubmit={onSendOtp}>
                 <div className="field">
-                  <label htmlFor="login-phone">Mobile number</label>
+                  <label htmlFor="login-phone">{t("mobile")}</label>
                   <div className="login-phone">
                     <span className="login-phone__prefix" aria-hidden="true">
                       +91
@@ -387,7 +389,7 @@ export default function LoginPage() {
                       value={phone}
                       maxLength={10}
                       pattern="[0-9]{10}"
-                      placeholder="Mobile number"
+                      placeholder={t("mobile")}
                       onChange={(e) =>
                         setPhone(indianMobileDigits(e.target.value).slice(0, 10))
                       }
@@ -399,14 +401,12 @@ export default function LoginPage() {
                   type="submit"
                   disabled={sendingOtp}
                 >
-                  {sendingOtp ? "Sending OTP…" : "Send OTP"}
+                  {sendingOtp ? t("sendingOtp") : t("sendOtp")}
                 </button>
               </form>
             ) : (
               <form className="form-grid" onSubmit={onWhatsappLogin}>
-                <p className="login-otp-hint">
-                  OTP sent to your WhatsApp
-                </p>
+                <p className="login-otp-hint">{t("otpSentWhatsapp")}</p>
                 <p
                   className={`login-otp-expiry${
                     otpSecondsLeft <= 0 ? " is-expired" : ""
@@ -415,24 +415,24 @@ export default function LoginPage() {
                   aria-live="polite"
                 >
                   {otpSecondsLeft > 0
-                    ? `OTP expires in ${String(
-                        Math.floor(otpSecondsLeft / 60),
-                      ).padStart(2, "0")}:${String(
-                        otpSecondsLeft % 60,
-                      ).padStart(2, "0")}`
-                    : "OTP expired"}
+                    ? t("otpExpiresIn", {
+                        time: `${String(
+                          Math.floor(otpSecondsLeft / 60),
+                        ).padStart(2, "0")}:${String(
+                          otpSecondsLeft % 60,
+                        ).padStart(2, "0")}`,
+                      })
+                    : t("otpExpired")}
                 </p>
                 {devOtp ? (
                   <div className="login-dev-otp" role="status" aria-live="polite">
-                    <span className="login-dev-otp__label">Dev OTP</span>
+                    <span className="login-dev-otp__label">{t("devOtpLabel")}</span>
                     <strong className="login-dev-otp__code">{devOtp}</strong>
-                    <span className="login-dev-otp__note">
-                      Local testing only — removed when WhatsApp template is live
-                    </span>
+                    <span className="login-dev-otp__note">{t("devOtpNote")}</span>
                   </div>
                 ) : null}
                 <div className="field">
-                  <label htmlFor="login-otp">Enter OTP</label>
+                  <label htmlFor="login-otp">{t("enterOtpLabel")}</label>
                   <input
                     id="login-otp"
                     type="text"
@@ -442,7 +442,7 @@ export default function LoginPage() {
                     required
                     maxLength={6}
                     pattern="[0-9]{4,6}"
-                    placeholder="6-digit code"
+                    placeholder={t("otpPlaceholder")}
                     value={otp}
                     onChange={(e) =>
                       setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
@@ -454,7 +454,7 @@ export default function LoginPage() {
                   type="submit"
                   disabled={loading || otpSecondsLeft <= 0}
                 >
-                  {loading ? "Signing in…" : "Login"}
+                  {loading ? t("signingIn") : t("verifyLogin")}
                 </button>
                 <button
                   type="button"
@@ -469,34 +469,34 @@ export default function LoginPage() {
                     setError(null);
                   }}
                 >
-                  Change number
+                  {t("changeNumber")}
                 </button>
               </form>
             )
           ) : (
             <form className="form-grid" onSubmit={onEmailSubmit}>
               <div className="field">
-                <label htmlFor="email">Email</label>
+                <label htmlFor="email">{t("email")}</label>
                 <input
                   id="email"
                   type="email"
                   autoComplete="email"
                   autoFocus
                   required
-                  placeholder="Enter your email"
+                  placeholder={t("email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="field">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">{t("password")}</label>
                 <div className="login-password">
                   <input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     required
-                    placeholder="Enter your password"
+                    placeholder={t("password")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -504,7 +504,9 @@ export default function LoginPage() {
                     type="button"
                     className="login-password__toggle"
                     onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={
+                      showPassword ? t("hidePassword") : t("showPassword")
+                    }
                     disabled={loading}
                   >
                     <PasswordEyeIcon visible={showPassword} />
@@ -516,7 +518,7 @@ export default function LoginPage() {
                 type="submit"
                 disabled={loading}
               >
-                {loading ? "Signing in…" : "Sign in"}
+                {loading ? t("signingIn") : t("signInEmail")}
               </button>
             </form>
           )}

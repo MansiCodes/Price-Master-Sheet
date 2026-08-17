@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import {
   selectPlantAction,
   viewAllPlantsAction,
@@ -27,6 +28,7 @@ export function PlantSwitcher({
   allowAllPlants = false,
   onNavigate,
 }: PlantSwitcherProps) {
+  const t = useTranslations("plantSwitcher");
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -83,7 +85,7 @@ export function PlantSwitcher({
         aria-expanded={open}
         aria-haspopup="listbox"
         disabled={pending}
-        title={showLabels ? undefined : current?.name ?? "Plant"}
+        title={showLabels ? undefined : current?.name ?? t("label")}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="dash-sidebar__icon">
@@ -102,11 +104,11 @@ export function PlantSwitcher({
           </svg>
         </span>
         <span className="dash-sidebar__plant-meta">
-          <span className="dash-sidebar__plant-label">Plant</span>
+          <span className="dash-sidebar__plant-label">{t("label")}</span>
           {current ? (
             <span className="dash-sidebar__plant-current">{current.name}</span>
           ) : allPlantsActive ? (
-            <span className="dash-sidebar__plant-current">All plants</span>
+            <span className="dash-sidebar__plant-current">{t("allPlants")}</span>
           ) : null}
         </span>
         <span className="dash-sidebar__plant-chevron" aria-hidden="true">
@@ -125,10 +127,12 @@ export function PlantSwitcher({
                 onClick={chooseAllPlants}
               >
                 <span className="dash-sidebar__plant-option-name">
-                  All plants
+                  {t("allPlants")}
                 </span>
                 {allPlantsActive ? (
-                  <span className="dash-sidebar__plant-option-tag">Current</span>
+                  <span className="dash-sidebar__plant-option-tag">
+                    {t("current")}
+                  </span>
                 ) : null}
               </button>
             </li>
@@ -148,7 +152,7 @@ export function PlantSwitcher({
                   </span>
                   {isCurrent ? (
                     <span className="dash-sidebar__plant-option-tag">
-                      Current
+                      {t("current")}
                     </span>
                   ) : null}
                 </button>

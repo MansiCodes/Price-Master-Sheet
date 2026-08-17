@@ -4,6 +4,13 @@
   place-items: center;
   padding: 1.5rem;
   background: var(--bg, #f6f7f9);
+  position: relative;
+}
+
+.select-plant-screen__lang {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
 }
 
 .select-plant-card {

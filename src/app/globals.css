@@ -284,6 +284,48 @@ textarea {
   outline: none;
 }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.18rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong, #c9d5d0);
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.lang-switch__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted, #5b6b66);
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1;
+  min-height: 1.7rem;
+}
+
+.lang-switch__btn.is-active {
+  background: var(--teal, #0f766e);
+  color: #fff;
+}
+
+.lang-switch__btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.lang-switch--compact .lang-switch__btn {
+  padding: 0.28rem 0.45rem;
+  font-size: 0.68rem;
+  min-height: 1.55rem;
+}
+
 .dash-sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
@@ -669,6 +711,11 @@ textarea {
   .dash-header__logout {
     padding: 0 0.7rem;
     font-size: 0.78rem;
+  }
+
+  .lang-switch {
+    height: 36px;
+    box-sizing: border-box;
   }
 
   .dash-header__logout:hover,

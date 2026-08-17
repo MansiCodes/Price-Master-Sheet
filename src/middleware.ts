@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import NextAuth from "next-auth";
 import { authConfig, SESSION_COOKIE } from "@/auth.config";
+import {
+  defaultLocale,
+  isAppLocale,
+  LOCALE_COOKIE,
+} from "@/i18n/config";
 
 /** Old Auth.js / NextAuth cookie names that must never be decrypted with the current secret. */
 const STALE_COOKIE_PREFIXES = [
@@ -29,10 +34,25 @@ function expireCookie(res: NextResponse, name: string) {
   });
 }
 
+function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
+  const raw = req.cookies.get(LOCALE_COOKIE)?.value;
+  if (isAppLocale(raw)) return;
+  res.cookies.set(LOCALE_COOKIE, defaultLocale, {
+    path: "/",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 365,
+    secure: process.env.NODE_ENV === "production",
+  });
+}
+
 const { auth } = NextAuth(authConfig);
 
 /** Auth.js middleware (authorized callback in authConfig handles redirects). */
-const withAuth = auth(() => NextResponse.next());
+const withAuth = auth((req) => {
+  const res = NextResponse.next();
+  ensureLocaleCookie(req, res);
+  return res;
+});
 
 /**
  * 1) If browser still has old session cookies → expire them and redirect once
@@ -49,6 +69,7 @@ export default async function middleware(req: NextRequest) {
     for (const cookie of stale) {
       expireCookie(res, cookie.name);
     }
+    ensureLocaleCookie(req, res);
     return res;
   }
 

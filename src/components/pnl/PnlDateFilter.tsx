@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 export function PnlDateFilter({
   from,
   to,
@@ -11,10 +13,12 @@ export function PnlDateFilter({
   onFromChange: (value: string) => void;
   onToChange: (value: string) => void;
 }) {
+  const t = useTranslations("common");
+
   return (
     <div className="pnl-date-filter" aria-label="Date range filter">
       <div className="pnl-date-filter__field">
-        <label htmlFor="pnl-from">From</label>
+        <label htmlFor="pnl-from">{t("from")}</label>
         <input
           id="pnl-from"
           type="date"
@@ -24,7 +28,7 @@ export function PnlDateFilter({
         />
       </div>
       <div className="pnl-date-filter__field">
-        <label htmlFor="pnl-to">To</label>
+        <label htmlFor="pnl-to">{t("to")}</label>
         <input
           id="pnl-to"
           type="date"

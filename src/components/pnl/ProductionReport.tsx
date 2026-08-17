@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  REPORT_PAGE_SIZE,
+  usePaginatedReport,
+} from "@/components/pnl/usePaginatedReport";
 
 type ProductionRow = {
   id: string;
@@ -26,35 +31,10 @@ export function ProductionReport({
   from: string;
   to: string;
 }) {
-  const [rows, setRows] = useState<ProductionRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/plants/${plantId}/production?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=200`,
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Failed to load production");
-        setRows([]);
-        return;
-      }
-      setRows(json.rows ?? []);
-    } catch {
-      setError("Network error");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [plantId, from, to]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const t = useTranslations("pnl");
+  const baseUrl = `/api/plants/${plantId}/production?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const { rows, page, total, loading, error, setPage } =
+    usePaginatedReport<ProductionRow>(baseUrl, t("networkError"));
 
   const columns: ReportColumn<ProductionRow>[] = [
     { key: "date", label: "Date", render: (r) => isoDate(r.date) },
@@ -70,9 +50,15 @@ export function ProductionReport({
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">Production</h3>
+      <h3 className="pnl-report-panel__title">{t("productionTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable columns={columns} rows={rows} loading={loading} />
+      <Pagination
+        page={page}
+        pageSize={REPORT_PAGE_SIZE}
+        total={total}
+        onPageChange={setPage}
+      />
     </section>
   );
 }

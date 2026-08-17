@@ -1,10 +1,13 @@
 import type { NextConfig } from "next";
 import { config as loadEnv } from "dotenv";
 import path from "node:path";
+import createNextIntlPlugin from "next-intl/plugin";
 
 loadEnv({ path: path.join(__dirname, ".env") });
 
 const authSecret = process.env.AUTH_SECRET ?? "";
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // Force AUTH_SECRET into Edge middleware (fixes JWT "no matching decryption secret").
@@ -23,4 +26,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

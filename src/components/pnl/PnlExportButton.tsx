@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import type { ReportTab } from "@/components/pnl/types";
 
@@ -15,6 +16,7 @@ export function PnlExportButton({
   from: string;
   to: string;
 }) {
+  const t = useTranslations("pnl");
   const [exporting, setExporting] = useState(false);
 
   async function onExport() {
@@ -40,7 +42,7 @@ export function PnlExportButton({
       a.click();
       a.remove();
       URL.revokeObjectURL(href);
-      toast.success("Excel downloaded");
+      toast.success(t("exportExcel"));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Export failed");
     } finally {
@@ -54,7 +56,7 @@ export function PnlExportButton({
       className="pnl-export-btn"
       onClick={() => void onExport()}
       disabled={exporting}
-      title="Export as Excel"
+      title={t("exportExcel")}
     >
       <svg
         viewBox="0 0 24 24"
@@ -72,7 +74,7 @@ export function PnlExportButton({
         <path d="M8 13h8M8 17h5" />
       </svg>
       <span className="pnl-export-btn__label">
-        {exporting ? "Exporting…" : "Export Excel"}
+        {exporting ? "…" : t("exportExcel")}
       </span>
     </button>
   );

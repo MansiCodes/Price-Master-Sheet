@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ROLE_LABEL, ROLES } from "./types";
 
 type UsersToolbarProps = {
@@ -46,6 +47,7 @@ export function UsersToolbar({
   onAddUser,
   onExport,
 }: UsersToolbarProps) {
+  const t = useTranslations("admin");
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -85,8 +87,8 @@ export function UsersToolbar({
           type="button"
           className="users-icon-btn users-icon-btn--primary"
           onClick={onAddUser}
-          title="Add user"
-          aria-label="Add user"
+          title={t("addUser")}
+          aria-label={t("addUser")}
         >
           <PlusIcon />
         </button>

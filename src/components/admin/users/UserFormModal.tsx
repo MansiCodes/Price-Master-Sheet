@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { ROLE_LABEL, ROLES, fromStoredIndiaPhone, indianMobileDigits, type PlantOption, type RoleValue, type UserRow } from "./types";
@@ -39,6 +40,8 @@ export function UserFormModal({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const t = useTranslations("admin");
+  const tCommon = useTranslations("common");
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -146,7 +149,7 @@ export function UserFormModal({
       return;
     }
     if (requiresPlants && selectedPlantIds.length === 0) {
-      setPlantError("Select at least one plant.");
+      setPlantError(t("assignPlantRequired"));
       return;
     }
     setPlantError(null);
@@ -188,7 +191,7 @@ export function UserFormModal({
       >
         <div className="users-modal__header">
           <h2 id={titleId} className="users-sr-only">
-            {editingId ? "Edit user" : "Create user"}
+            {editingId ? t("editUser") : t("createUser")}
           </h2>
           <div className="users-modal__hero-icon" aria-hidden="true">
             {editingId ? (
@@ -316,14 +319,14 @@ export function UserFormModal({
             </div>
             {requiresPlants ? (
               <div className="field">
-                <label htmlFor="user-plant">Plant</label>
+                <label htmlFor="user-plant">{t("plant")}</label>
                 <PlantMultiSelect
                   id="user-plant"
                   plants={activePlants}
                   value={selectedPlantIds}
                   required
                   disabled={saving || activePlants.length === 0}
-                  placeholder="Select plant(s)"
+                  placeholder={t("selectPlants")}
                   onChange={onPlantIdsChange}
                 />
                 {plantError ? (
@@ -350,7 +353,7 @@ export function UserFormModal({
 
         <div className="users-modal__footer">
           <Button variant="secondary" onClick={onClose} disabled={saving}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             type="submit"
@@ -358,7 +361,11 @@ export function UserFormModal({
             disabled={saving}
             style={{ flex: "none" }}
           >
-            {saving ? "Saving…" : editingId ? "Save changes" : "Create user"}
+            {saving
+              ? tCommon("saving")
+              : editingId
+                ? t("saveChanges")
+                : t("createUser")}
           </Button>
         </div>
       </div>

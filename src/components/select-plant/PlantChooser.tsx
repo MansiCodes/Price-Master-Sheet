@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { selectPlantAction } from "@/app/select-plant/actions";
 
 type PlantChoice = {
@@ -19,6 +20,7 @@ export function PlantChooser({
   plants,
   currentPlantId = null,
 }: PlantChooserProps) {
+  const t = useTranslations("plantSwitcher");
   const [pending, startTransition] = useTransition();
 
   function choose(plantId: string) {
@@ -53,7 +55,7 @@ export function PlantChooser({
               <span className="select-plant-option__code">{plant.code}</span>
             </span>
             {isCurrent ? (
-              <span className="select-plant-option__badge">Current</span>
+              <span className="select-plant-option__badge">{t("current")}</span>
             ) : (
               <span className="select-plant-option__arrow" aria-hidden="true">
                 →

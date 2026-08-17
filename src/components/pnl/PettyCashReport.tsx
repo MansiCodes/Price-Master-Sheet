@@ -1,9 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { formatDisplayDate } from "@/components/pnl/types";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  REPORT_PAGE_SIZE,
+  usePaginatedReport,
+} from "@/components/pnl/usePaginatedReport";
 
 type PettyCashRow = {
   id: string;
@@ -14,6 +20,13 @@ type PettyCashRow = {
   amount: string | number;
   contractorSalary: string | number;
   supervisorSalary: string | number;
+};
+
+type PettyCashTotals = {
+  expenses: number;
+  contractorSalary: number;
+  supervisorSalary: number;
+  total: number;
 };
 
 function isoDate(value: string | Date) {
@@ -36,128 +49,105 @@ export function PettyCashReport({
   from: string;
   to: string;
 }) {
-  const [rows, setRows] = useState<PettyCashRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("pnl");
+  const tCommon = useTranslations("common");
+  const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const { rows, page, total, loading, error, response, setPage } =
+    usePaginatedReport<PettyCashRow>(baseUrl, t("failedPettyCash"));
+  const totals = response?.totals as PettyCashTotals | undefined;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=500`,
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Failed to load petty cash");
-        setRows([]);
-        return;
-      }
-      setRows(json.rows ?? []);
-    } catch {
-      setError("Network error");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [plantId, from, to]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const totals = rows.reduce(
-    (acc, r) => ({
-      expenses: acc.expenses + Number(r.amount),
-      contractor: acc.contractor + Number(r.contractorSalary),
-      supervisor: acc.supervisor + Number(r.supervisorSalary),
-      total: acc.total + rowTotal(r),
-    }),
-    { expenses: 0, contractor: 0, supervisor: 0, total: 0 },
+  const columns: ReportColumn<PettyCashRow>[] = useMemo(
+    () => [
+      {
+        key: "s",
+        label: t("sNo"),
+        compact: true,
+        render: (_r, index) =>
+          String((page - 1) * REPORT_PAGE_SIZE + (index ?? 0) + 1),
+      },
+      {
+        key: "payMode",
+        label: t("payMode"),
+        render: (r) => r.payMode || tCommon("dash"),
+      },
+      {
+        key: "desc",
+        label: t("descriptionOfExpense"),
+        wrap: "wide",
+        render: (r) => r.description?.trim() || tCommon("dash"),
+      },
+      {
+        key: "billNumber",
+        label: t("billNumber"),
+        wrap: true,
+        render: (r) => r.billNumber?.trim() || tCommon("dash"),
+      },
+      {
+        key: "billDate",
+        label: t("billDate"),
+        render: (r) => formatDisplayDate(isoDate(r.date)),
+      },
+      {
+        key: "expenses",
+        label: t("expenses"),
+        align: "right",
+        render: (r) => formatINR(Number(r.amount)),
+      },
+      {
+        key: "contractor",
+        label: t("contractorSalary"),
+        align: "right",
+        render: (r) => formatINR(Number(r.contractorSalary)),
+      },
+      {
+        key: "supervisor",
+        label: t("supervisorSalary"),
+        align: "right",
+        render: (r) => formatINR(Number(r.supervisorSalary)),
+      },
+      {
+        key: "total",
+        label: t("total"),
+        align: "right",
+        render: (r) => formatINR(rowTotal(r)),
+      },
+    ],
+    [page, t, tCommon],
   );
-
-  const columns: ReportColumn<PettyCashRow>[] = [
-    {
-      key: "s",
-      label: "S No.",
-      compact: true,
-      render: (_r, index) => String((index ?? 0) + 1),
-    },
-    {
-      key: "payMode",
-      label: "Pay mode",
-      render: (r) => r.payMode || "—",
-    },
-    {
-      key: "desc",
-      label: "Description of expense",
-      wrap: "wide",
-      render: (r) => r.description?.trim() || "—",
-    },
-    {
-      key: "billNumber",
-      label: "Bill number",
-      wrap: true,
-      render: (r) => r.billNumber?.trim() || "—",
-    },
-    {
-      key: "billDate",
-      label: "Bill date",
-      render: (r) => formatDisplayDate(isoDate(r.date)),
-    },
-    {
-      key: "expenses",
-      label: "Expenses",
-      align: "right",
-      render: (r) => formatINR(Number(r.amount)),
-    },
-    {
-      key: "contractor",
-      label: "Contractor salary",
-      align: "right",
-      render: (r) => formatINR(Number(r.contractorSalary)),
-    },
-    {
-      key: "supervisor",
-      label: "Supervisor salary",
-      align: "right",
-      render: (r) => formatINR(Number(r.supervisorSalary)),
-    },
-    {
-      key: "total",
-      label: "Total",
-      align: "right",
-      render: (r) => formatINR(rowTotal(r)),
-    },
-  ];
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">Petty cash expense details</h3>
+      <h3 className="pnl-report-panel__title">{t("pettyCashTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={columns}
         rows={rows}
         loading={loading}
         variant="register"
-        emptyLabel="No petty cash entries in this date range."
+        emptyLabel={t("noPettyCash")}
       />
-      {rows.length > 0 ? (
+      <Pagination
+        page={page}
+        pageSize={REPORT_PAGE_SIZE}
+        total={total}
+        onPageChange={setPage}
+      />
+      {total > 0 && totals ? (
         <dl className="pnl-report-totals">
           <div>
-            <dt>Expenses</dt>
+            <dt>{t("expenses")}</dt>
             <dd>{formatINR(totals.expenses)}</dd>
           </div>
           <div>
-            <dt>Contractor salary</dt>
-            <dd>{formatINR(totals.contractor)}</dd>
+            <dt>{t("contractorSalary")}</dt>
+            <dd>{formatINR(totals.contractorSalary)}</dd>
           </div>
           <div>
-            <dt>Supervisor salary</dt>
-            <dd>{formatINR(totals.supervisor)}</dd>
+            <dt>{t("supervisorSalary")}</dt>
+            <dd>{formatINR(totals.supervisorSalary)}</dd>
           </div>
           <div className="is-grand">
-            <dt>Total</dt>
+            <dt>{t("total")}</dt>
             <dd>{formatINR(totals.total)}</dd>
           </div>
         </dl>

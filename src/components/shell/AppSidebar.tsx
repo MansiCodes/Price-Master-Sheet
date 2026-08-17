@@ -2,9 +2,42 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import type { AppHeaderUser } from "./AppHeader";
 import type { NavIconName, NavSection } from "./nav-config";
 import { PlantSwitcher, type PlantSwitcherPlant } from "./PlantSwitcher";
+
+function navSectionTitle(
+  t: ReturnType<typeof useTranslations<"nav">>,
+  key: string,
+) {
+  if (key === "work" || key === "reports" || key === "admin") {
+    return t(key);
+  }
+  return key;
+}
+
+function navItemLabel(
+  t: ReturnType<typeof useTranslations<"nav">>,
+  key: string,
+) {
+  switch (key) {
+    case "dashboard":
+      return t("dashboard");
+    case "pnl":
+      return t("pnl");
+    case "price-sheet":
+      return t("priceSheet");
+    case "users":
+      return t("users");
+    case "integrations":
+      return t("integrations");
+    case "audit":
+      return t("audit");
+    default:
+      return key;
+  }
+}
 
 /** Minimal stroke-icon set (24x24) — no extra icon dependency. */
 const ICON_PATHS: Record<NavIconName, string> = {
@@ -100,14 +133,19 @@ function SidebarNav({
   showLabels: boolean;
   onNavigate?: () => void;
 }) {
+  const tNav = useTranslations("nav");
+
   return (
     <nav className="dash-sidebar__nav" aria-label="Main">
       {navSections.map((section) => (
         <div className="dash-sidebar__section" key={section.key}>
           {showLabels ? (
-            <div className="dash-sidebar__section-title">{section.title}</div>
+            <div className="dash-sidebar__section-title">
+              {navSectionTitle(tNav, section.key)}
+            </div>
           ) : null}
           {section.items.map((item) => {
+            const label = navItemLabel(tNav, item.key);
             const active =
               item.href === "/"
                 ? pathname === "/"
@@ -119,12 +157,12 @@ function SidebarNav({
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
                 className="dash-sidebar__link"
-                title={showLabels ? undefined : item.label}
+                title={showLabels ? undefined : label}
               >
                 <span className="dash-sidebar__icon">
                   <NavIcon name={item.icon} />
                 </span>
-                <span className="dash-sidebar__label">{item.label}</span>
+                <span className="dash-sidebar__label">{label}</span>
               </Link>
             );
           })}

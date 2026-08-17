@@ -1,8 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  REPORT_PAGE_SIZE,
+  usePaginatedReport,
+} from "@/components/pnl/usePaginatedReport";
 
 type PurchaseRow = {
   id: string;
@@ -60,41 +65,17 @@ export function PurchaseReport({
   from: string;
   to: string;
 }) {
-  const [rows, setRows] = useState<PurchaseRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=500`,
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Failed to load purchases");
-        setRows([]);
-        return;
-      }
-      setRows(json.rows ?? []);
-    } catch {
-      setError("Network error");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [plantId, from, to]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const t = useTranslations("pnl");
+  const baseUrl = `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const { rows, page, total, loading, error, setPage } =
+    usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
 
   const columns: ReportColumn<PurchaseRow>[] = [
     {
       key: "sno",
       label: "S No.",
-      render: (_r, index) => String((index ?? 0) + 1),
+      render: (_r, index) =>
+        String((page - 1) * REPORT_PAGE_SIZE + (index ?? 0) + 1),
     },
     {
       key: "supplier",
@@ -171,13 +152,19 @@ export function PurchaseReport({
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">Purchase</h3>
+      <h3 className="pnl-report-panel__title">{t("purchaseTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={columns}
         rows={rows}
         loading={loading}
         variant="register"
+      />
+      <Pagination
+        page={page}
+        pageSize={REPORT_PAGE_SIZE}
+        total={total}
+        onPageChange={setPage}
       />
     </section>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Pagination } from "@/components/ui/Pagination";
 import { ROLE_LABEL, ROLES, userInitials, type UserRow } from "./types";
 
@@ -17,7 +18,7 @@ type UsersTableProps = {
 
 export function UsersTable({
   rows,
-  emptyMessage = "No users found.",
+  emptyMessage,
   onEdit,
   onToggleActive,
   togglingId = null,
@@ -26,27 +27,30 @@ export function UsersTable({
   total,
   onPageChange,
 }: UsersTableProps) {
+  const t = useTranslations("admin");
+  const tCommon = useTranslations("common");
+
   return (
     <section className="users-table-card">
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Plants</th>
-              <th>Credit score</th>
-              <th>Price Sheet</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th>{t("name")}</th>
+              <th>{t("email")}</th>
+              <th>{t("role")}</th>
+              <th>{t("plantsCol")}</th>
+              <th>{t("creditScore")}</th>
+              <th>{t("priceSheet")}</th>
+              <th>{t("status")}</th>
+              <th>{t("actions")}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={8} className="empty">
-                  {emptyMessage}
+                  {emptyMessage ?? t("noUsers")}
                 </td>
               </tr>
             ) : (
@@ -57,7 +61,7 @@ export function UsersTable({
                       <span className="users-avatar" aria-hidden>
                         {userInitials(u.name, u.email)}
                       </span>
-                      <span>{u.name || "—"}</span>
+                      <span>{u.name || tCommon("dash")}</span>
                     </div>
                   </td>
                   <td>{u.email}</td>
@@ -69,22 +73,25 @@ export function UsersTable({
                   </td>
                   <td>
                     {u.globalRole === "SUPER_ADMIN" ? (
-                      <span className="users-pill">All plants</span>
+                      <span className="users-pill">{t("allPlants")}</span>
                     ) : (
                       <span className="users-plants-cell">
-                        {(u.plantRoles ?? []).map((role) => role.plant.name).join(", ") ||
-                          "—"}
+                        {(u.plantRoles ?? [])
+                          .map((role) => role.plant.name)
+                          .join(", ") || tCommon("dash")}
                       </span>
                     )}
                   </td>
-                  <td>{u.creditScore ?? "—"}</td>
+                  <td>{u.creditScore ?? tCommon("dash")}</td>
                   <td>
                     <span
                       className={`users-pill ${
-                        u.canViewPriceSheet ? "users-pill--yes" : "users-pill--no"
+                        u.canViewPriceSheet
+                          ? "users-pill--yes"
+                          : "users-pill--no"
                       }`}
                     >
-                      {u.canViewPriceSheet ? "Yes" : "No"}
+                      {u.canViewPriceSheet ? t("yes") : t("no")}
                     </span>
                   </td>
                   <td>
@@ -93,20 +100,6 @@ export function UsersTable({
                       className={`users-switch${u.isActive ? " is-on" : ""}`}
                       role="switch"
                       aria-checked={u.isActive}
-                      aria-label={
-                        u.globalRole === "SUPER_ADMIN"
-                          ? "Super Admin cannot be deactivated"
-                          : u.isActive
-                            ? `Deactivate ${u.name || u.email}`
-                            : `Activate ${u.name || u.email}`
-                      }
-                      title={
-                        u.globalRole === "SUPER_ADMIN"
-                          ? "Super Admin cannot be deactivated"
-                          : u.isActive
-                            ? "Deactivate user"
-                            : "Activate user"
-                      }
                       disabled={
                         u.globalRole === "SUPER_ADMIN" || togglingId === u.id
                       }
@@ -114,7 +107,7 @@ export function UsersTable({
                     >
                       <span className="users-switch__knob" aria-hidden />
                       <span className="users-switch__label">
-                        {u.isActive ? "Active" : "Inactive"}
+                        {u.isActive ? t("active") : t("inactive")}
                       </span>
                     </button>
                   </td>
@@ -129,7 +122,7 @@ export function UsersTable({
                       }}
                       onClick={() => onEdit(u)}
                     >
-                      Edit
+                      {t("edit")}
                     </button>
                   </td>
                 </tr>

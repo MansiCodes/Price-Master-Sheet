@@ -1,3 +1,4 @@
+import { getTranslations, getLocale } from "next-intl/server";
 import { WeekCompareChart } from "@/components/dashboard/Charts";
 import { formatMoney, KpiCard } from "@/components/dashboard/KpiKra";
 import {
@@ -5,17 +6,18 @@ import {
   type ShiftModulesMap,
 } from "@/components/today/TodayHub";
 import type { DashboardMetrics } from "@/lib/dashboard/metrics";
+import { localeToBcp47, type AppLocale } from "@/i18n/config";
 
-function formatDay(dateStr: string): string {
+function formatDay(dateStr: string, locale: AppLocale): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
-  return d.toLocaleDateString("en-IN", {
+  return d.toLocaleDateString(localeToBcp47(locale), {
     day: "2-digit",
     month: "short",
     timeZone: "UTC",
   });
 }
 
-export function DashboardHome({
+export async function DashboardHome({
   metrics,
   dateStr,
   canEnter,
@@ -36,58 +38,68 @@ export function DashboardHome({
   showCreditScore: boolean;
   creditScore: number | null;
 }) {
+  const t = await getTranslations("dashboard");
+  const tCommon = await getTranslations("common");
+  const locale = (await getLocale()) as AppLocale;
+
   const kpiHint =
     scope === "plant" && plant
-      ? `${plant.name} · month to date`
-      : "Month to date";
+      ? t("monthToDatePlant", { plant: plant.name })
+      : t("monthToDate");
 
   return (
     <div className="dashboard mis dash-merged">
       <section
         className="mis-kpi-grid mis-kpi-grid--six"
-        aria-label="Month metrics"
+        aria-label={t("ariaMonthMetrics")}
       >
         <KpiCard
-          label="Sales"
+          label={t("sales")}
           value={formatMoney(metrics.mtdSales)}
           tone="teal"
           hint={kpiHint}
           icon="sales"
         />
         <KpiCard
-          label="Purchases"
+          label={t("purchases")}
           value={formatMoney(metrics.mtdPurchases)}
           tone="teal"
           hint={kpiHint}
           icon="purchases"
         />
         <KpiCard
-          label="Stock value"
+          label={t("stockValue")}
           value={formatMoney(metrics.mtdStockValue)}
           tone="teal"
-          hint={scope === "plant" ? "Closing checks · this plant" : "Closing checks"}
+          hint={
+            scope === "plant" ? t("closingChecksPlant") : t("closingChecks")
+          }
           icon="stock"
         />
         <KpiCard
-          label="Production"
-          value={`${metrics.mtdProductionQty.toLocaleString("en-IN")} units`}
+          label={t("production")}
+          value={t("units", {
+            count: metrics.mtdProductionQty.toLocaleString(
+              localeToBcp47(locale),
+            ),
+          })}
           tone="teal"
-          hint={scope === "plant" ? "Logged qty · this plant" : "Logged qty"}
+          hint={scope === "plant" ? t("loggedQtyPlant") : t("loggedQty")}
           icon="production"
         />
         <KpiCard
-          label="Expenses"
+          label={t("expenses")}
           value={formatMoney(metrics.mtdExpenses)}
           tone="teal"
-          hint={scope === "plant" ? "Misc / petty · this plant" : "Misc / petty"}
+          hint={kpiHint}
           icon="expenses"
         />
         {showNet ? (
           <KpiCard
-            label="Net profit"
+            label={t("netProfit")}
             value={formatMoney(metrics.mtdNetProfit ?? 0)}
             tone="teal"
-            hint={scope === "plant" ? "Live P&L · this plant" : "Live P&L"}
+            hint={kpiHint}
             icon="profit"
           />
         ) : null}
@@ -107,9 +119,9 @@ export function DashboardHome({
             />
           ) : (
             <section className="mis-panel">
-              <h2 className="section-label">Today&apos;s report</h2>
+              <h2 className="section-label">{tCommon("todaysEntry")}</h2>
               <p className="page-sub" style={{ margin: 0 }}>
-                No plant assigned to your account yet.
+                —
               </p>
             </section>
           )}
@@ -118,27 +130,24 @@ export function DashboardHome({
         <div className="dash-merged__side">
           {showCreditScore ? (
             <section className="mis-panel credit-score-panel">
-              <h2 className="section-label">Credit score</h2>
+              <h2 className="section-label">{t("creditScore")}</h2>
               <p className="credit-score-panel__value">
-                {creditScore != null ? creditScore : "—"}
-              </p>
-              <p className="credit-score-panel__hint">
-                {creditScore != null && creditScore > 0
-                  ? "+100 points each time you complete all five forms in one shift."
-                  : "Complete all five forms in the same shift (day or night) to earn 100."}
+                {creditScore != null ? creditScore : tCommon("dash")}
               </p>
             </section>
           ) : null}
 
           <section className="mis-panel">
-            <h2 className="section-label">Daily report status</h2>
+            <h2 className="section-label">{t("weekCompare")}</h2>
             <ul className="mis-day-list">
               {metrics.dailyReportRows.map((row) => (
                 <li
                   key={row.date}
                   className={`mis-day-row${row.allComplete ? " is-done" : ""}`}
                 >
-                  <span className="mis-day-row__date">{formatDay(row.date)}</span>
+                  <span className="mis-day-row__date">
+                    {formatDay(row.date, locale)}
+                  </span>
                   <span className="mis-day-row__score">
                     <span className="mis-day-row__shift">
                       D{row.dayShift.completed}/{row.dayShift.total}
@@ -166,13 +175,18 @@ export function DashboardHome({
       <div className="dash-merged__pair">
         <section className="mis-panel week-panel">
           <div className="dash-panel__head">
-            <h2 className="section-label">Sales vs purchase</h2>
+            <h2 className="section-label">
+              {t("sales")} vs {t("purchases")}
+            </h2>
             <div className="dash-panel__head-meta">
               <div className="legend">
-                <span className="legend__item legend__item--teal">Sales</span>
-                <span className="legend__item legend__item--coral">Purchases</span>
+                <span className="legend__item legend__item--teal">
+                  {t("sales")}
+                </span>
+                <span className="legend__item legend__item--coral">
+                  {t("purchases")}
+                </span>
               </div>
-              <span className="week-range">Last 7 days</span>
             </div>
           </div>
           <WeekCompareChart points={metrics.weekSeries} />

@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
+import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import { todayLocalISO } from "@/lib/client-forms";
 import {
   requestOpenTodayEntry,
   storeEntryDate,
 } from "@/lib/today-entry";
+import { localeToBcp47, type AppLocale } from "@/i18n/config";
 import { findActiveNavItem, type NavSection } from "./nav-config";
 
 function MenuIcon({ collapsed }: { collapsed: boolean }) {
@@ -43,9 +46,9 @@ function PlusIcon() {
   );
 }
 
-function formatHeaderDate(iso: string, withYear: boolean): string {
+function formatHeaderDate(iso: string, withYear: boolean, locale: AppLocale): string {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", {
+  return d.toLocaleDateString(localeToBcp47(locale), {
     day: "2-digit",
     month: "short",
     ...(withYear ? { year: "numeric" as const } : {}),
@@ -73,10 +76,39 @@ export function AppHeader({
 }: AppHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("common");
+  const tNav = useTranslations("nav");
+  const locale = useLocale() as AppLocale;
   const activeItem = findActiveNavItem(pathname, navSections);
   const today = useMemo(() => todayLocalISO(), []);
-  const dateLabel = useMemo(() => formatHeaderDate(today, true), [today]);
-  const dateShort = useMemo(() => formatHeaderDate(today, false), [today]);
+  const dateLabel = useMemo(
+    () => formatHeaderDate(today, true, locale),
+    [today, locale],
+  );
+  const dateShort = useMemo(
+    () => formatHeaderDate(today, false, locale),
+    [today, locale],
+  );
+
+  const contextLabel = (() => {
+    if (!activeItem) return null;
+    switch (activeItem.key) {
+      case "dashboard":
+        return tNav("dashboard");
+      case "pnl":
+        return tNav("pnl");
+      case "price-sheet":
+        return tNav("priceSheet");
+      case "users":
+        return tNav("users");
+      case "integrations":
+        return tNav("integrations");
+      case "audit":
+        return tNav("audit");
+      default:
+        return activeItem.label;
+    }
+  })();
 
   function onAddTodayEntry() {
     storeEntryDate(today);
@@ -93,19 +125,21 @@ export function AppHeader({
         type="button"
         className="dash-header__hamburger"
         onClick={onMenuClick}
-        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-label={
+          sidebarCollapsed ? t("expandSidebar") : t("collapseSidebar")
+        }
         aria-pressed={sidebarCollapsed}
       >
         <MenuIcon collapsed={sidebarCollapsed} />
       </button>
 
       <Link href="/" className="dash-header__brand">
-        <span>Cable</span>
-        <span>Junction</span>
+        <span>{t("brandCable")}</span>
+        <span>{t("brandJunction")}</span>
       </Link>
 
-      {activeItem ? (
-        <span className="dash-header__context">{activeItem.label}</span>
+      {contextLabel ? (
+        <span className="dash-header__context">{contextLabel}</span>
       ) : null}
 
       <div className="dash-header__spacer" />
@@ -118,7 +152,7 @@ export function AppHeader({
             onClick={onAddTodayEntry}
           >
             <PlusIcon />
-            <span>Today&apos;s Entry</span>
+            <span>{t("todaysEntry")}</span>
           </button>
 
           <time className="dash-header__date" dateTime={today}>
@@ -131,6 +165,7 @@ export function AppHeader({
         </div>
       ) : null}
 
+      <LanguageSwitcher compact />
       <LogoutButton />
     </header>
   );

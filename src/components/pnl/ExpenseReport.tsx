@@ -1,8 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { Pagination } from "@/components/ui/Pagination";
+import {
+  REPORT_PAGE_SIZE,
+  usePaginatedReport,
+} from "@/components/pnl/usePaginatedReport";
 
 type ExpenseRow = {
   id: string;
@@ -37,73 +43,63 @@ export function ExpenseReport({
   from: string;
   to: string;
 }) {
-  const [rows, setRows] = useState<ExpenseRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const t = useTranslations("pnl");
+  const tCommon = useTranslations("common");
+  const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const { rows, page, total, loading, error, setPage } =
+    usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&pageSize=200`,
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? "Failed to load expenses");
-        setRows([]);
-        return;
-      }
-      setRows(json.rows ?? []);
-    } catch {
-      setError("Network error");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [plantId, from, to]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const columns: ReportColumn<ExpenseRow>[] = [
-    { key: "date", label: "Date", render: (r) => isoDate(r.date) },
-    { key: "shift", label: "Shift", render: (r) => r.shift },
-    { key: "head", label: "Category", render: (r) => r.expenseHead },
-    {
-      key: "desc",
-      label: "Remarks / notes",
-      wrap: "wide",
-      render: (r) => r.description || "—",
-    },
-    {
-      key: "opening",
-      label: "Opening reading",
-      align: "right",
-      render: (r) =>
-        r.openingReading == null ? "—" : String(r.openingReading),
-    },
-    {
-      key: "closing",
-      label: "Closing reading",
-      align: "right",
-      render: (r) =>
-        r.closingReading == null ? "—" : String(r.closingReading),
-    },
-    {
-      key: "amount",
-      label: "Amount",
-      align: "right",
-      render: (r) => formatINR(totalAmount(r)),
-    },
-  ];
+  const columns: ReportColumn<ExpenseRow>[] = useMemo(
+    () => [
+      { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
+      { key: "shift", label: t("shift"), render: (r) => r.shift },
+      { key: "head", label: t("category"), render: (r) => r.expenseHead },
+      {
+        key: "desc",
+        label: t("remarksNotes"),
+        wrap: "wide",
+        render: (r) => r.description || tCommon("dash"),
+      },
+      {
+        key: "opening",
+        label: t("openingReading"),
+        align: "right",
+        render: (r) =>
+          r.openingReading == null ? tCommon("dash") : String(r.openingReading),
+      },
+      {
+        key: "closing",
+        label: t("closingReading"),
+        align: "right",
+        render: (r) =>
+          r.closingReading == null ? tCommon("dash") : String(r.closingReading),
+      },
+      {
+        key: "amount",
+        label: t("amount"),
+        align: "right",
+        render: (r) => formatINR(totalAmount(r)),
+      },
+    ],
+    [t, tCommon],
+  );
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">Expense</h3>
+      <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
-      <ReportTable columns={columns} rows={rows} loading={loading} />
+      <ReportTable
+        columns={columns}
+        rows={rows}
+        loading={loading}
+        emptyLabel={t("noRecords")}
+      />
+      <Pagination
+        page={page}
+        pageSize={REPORT_PAGE_SIZE}
+        total={total}
+        onPageChange={setPage}
+      />
     </section>
   );
 }

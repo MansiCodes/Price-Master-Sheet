@@ -60,14 +60,37 @@ export async function GET(
       ? (requestedType as PettyCashKind)
       : null;
 
-  const entries = await prisma.pettyCashEntry.findMany({
-    where: { plantId, ...filter, ...(entryType ? { entryType } : {}) },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-  });
+  const where = { plantId, ...filter, ...(entryType ? { entryType } : {}) };
+  const [entries, aggregate] = await Promise.all([
+    prisma.pettyCashEntry.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.pettyCashEntry.aggregate({
+      where,
+      _sum: {
+        amount: true,
+        contractorSalary: true,
+        supervisorSalary: true,
+      },
+    }),
+  ]);
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+  const expenses = Number(aggregate._sum.amount ?? 0);
+  const contractorSalary = Number(aggregate._sum.contractorSalary ?? 0);
+  const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
 
-  return NextResponse.json({ rows: slice, ...pageInfo });
+  return NextResponse.json({
+    rows: slice,
+    ...pageInfo,
+    totals: {
+      expenses,
+      contractorSalary,
+      supervisorSalary,
+      total: expenses + contractorSalary + supervisorSalary,
+    },
+  });
 }
 
 export async function POST(
