@@ -284,32 +284,6 @@ textarea {
   outline: none;
 }
 
-.dash-header__password {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--stone);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.dash-header__password:hover,
-.dash-header__password:active,
-.dash-header__password:focus-visible {
-  background: var(--teal-soft);
-  color: var(--teal-ink);
-  border-color: var(--teal);
-  outline: none;
-}
-
 .lang-switch {
   display: inline-flex;
   align-items: center;
@@ -739,11 +713,6 @@ textarea {
     font-size: 0.78rem;
   }
 
-  .dash-header__password {
-    width: 32px;
-    height: 32px;
-  }
-
   /* Language lives in the mobile menu instead, keeping the bar uncrowded. */
   .dash-header .lang-switch {
     display: none;
@@ -1008,34 +977,25 @@ textarea {
   color: var(--fg-muted);
 }
 
-.pagination__page-size select {
-  appearance: none;
+.pagination__page-size-select {
+  width: auto;
+  min-width: 4.6rem;
+}
+
+.pagination__page-size-select .select-menu__trigger {
   height: 2.1rem;
-  min-width: 4.4rem;
-  padding: 0 1.9rem 0 0.65rem;
-  border: 1px solid var(--border-strong);
+  min-height: 0;
+  padding: 0 0.6rem;
   border-radius: 8px;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6b66' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.5rem center;
-  background-size: 0.9rem;
+  background: #fff;
   color: var(--stone);
-  font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.pagination__page-size select:hover {
+.pagination__page-size-select .select-menu__trigger:hover:not(:disabled) {
   border-color: var(--teal);
-}
-
-.pagination__page-size select:focus-visible {
-  outline: none;
-  border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgb(13 148 136 / 18%);
 }
 
 .pagination button {

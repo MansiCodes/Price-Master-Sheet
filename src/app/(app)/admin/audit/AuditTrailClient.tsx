@@ -13,12 +13,6 @@ import {
 } from "@/components/admin/audit/types";
 import "@/components/admin/audit/audit.css";
 
-type Props = {
-  initialRows: AuditRow[];
-  initialTotal: number;
-  initialActors: string[];
-};
-
 type AuditPageResponse = {
   rows: AuditRow[];
   page: number;
@@ -28,27 +22,18 @@ type AuditPageResponse = {
   actors: string[];
 };
 
-export function AuditTrailClient({
-  initialRows,
-  initialTotal,
-  initialActors,
-}: Props) {
+export function AuditTrailClient() {
   const [bootstrapping, setBootstrapping] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [rows, setRows] = useState(initialRows);
-  const [total, setTotal] = useState(initialTotal);
-  const [actors, setActors] = useState(initialActors);
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<AuditRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [actors, setActors] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [actorFilter, setActorFilter] = useState("ALL");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setBootstrapping(false), 250);
-    return () => window.clearTimeout(t);
-  }, []);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -79,19 +64,6 @@ export function AuditTrailClient({
 
   useEffect(() => {
     let cancelled = false;
-    const isDefault =
-      page === 1 &&
-      !debouncedQuery &&
-      actorFilter === "ALL" &&
-      !dateFrom &&
-      !dateTo;
-
-    if (isDefault) {
-      setRows(initialRows);
-      setTotal(initialTotal);
-      setActors(initialActors);
-      return;
-    }
 
     setLoading(true);
     void fetchPage(page)
@@ -106,23 +78,15 @@ export function AuditTrailClient({
         if (!cancelled) setRows([]);
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        setLoading(false);
+        setBootstrapping(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [
-    actorFilter,
-    dateFrom,
-    dateTo,
-    debouncedQuery,
-    fetchPage,
-    initialActors,
-    initialRows,
-    initialTotal,
-    page,
-  ]);
+  }, [actorFilter, dateFrom, dateTo, debouncedQuery, fetchPage, page]);
 
   const activeFilterCount =
     (actorFilter !== "ALL" ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0);

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/auth";
-import { queryAuditLogs } from "@/lib/audit";
 import { isAdminOrHead } from "@/lib/rbac";
 import { AuditTrailClient } from "./AuditTrailClient";
 
@@ -19,13 +18,5 @@ export default async function AuditLogPage() {
     );
   }
 
-  const initial = await queryAuditLogs({ page: 1, pageSize: 10 });
-
-  return (
-    <AuditTrailClient
-      initialRows={initial.rows}
-      initialTotal={initial.total}
-      initialActors={initial.actors}
-    />
-  );
+  return <AuditTrailClient />;
 }

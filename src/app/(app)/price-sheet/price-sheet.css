@@ -97,9 +97,13 @@
 }
 
 .ps-icon-btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff8f1;
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%));
+  border-color: transparent;
+  color: #fff;
+}
+
+.ps-icon-btn-primary:hover:not(:disabled) {
+  background: var(--teal-fill-hover, linear-gradient(90deg, #0d9488 0%, #0e5a54 55%, #0a4742 100%));
 }
 
 .ps-icon-btn:disabled,
@@ -173,14 +177,26 @@
 }
 
 .ps-btn-primary {
-  background: var(--accent);
-  color: #fff8f1;
-  box-shadow: 0 8px 18px rgba(180, 83, 9, 0.2);
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%));
+  color: #fff;
+  box-shadow: 0 8px 18px rgb(13 148 136 / 22%);
+}
+
+.ps-btn-primary:hover:not(:disabled) {
+  background: var(--teal-fill-hover, linear-gradient(90deg, #0d9488 0%, #0e5a54 55%, #0a4742 100%));
 }
 
 .ps-btn-secondary {
-  background: rgba(26, 36, 33, 0.06);
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--teal-ink, #0e5a54);
+  border: 1px solid var(--teal, #127269);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ps-btn-secondary:hover:not(:disabled) {
+  border-color: var(--teal-ink, #0e5a54);
+  background: var(--teal-soft, #d8f3ef);
+  color: var(--teal-ink, #0e5a54);
 }
 
 .ps-btn-ghost {
@@ -261,7 +277,7 @@
 }
 
 .ps-rates-table tbody tr:hover {
-  background: rgba(180, 83, 9, 0.05);
+  background: rgba(13, 148, 136, 0.06);
 }
 
 .ps-col-sno { width: 6%; }
@@ -303,7 +319,7 @@
 }
 
 .ps-rates-table td.ps-price-primary {
-  color: var(--accent-deep);
+  color: var(--teal-ink, #0e5a54);
 }
 
 .ps-empty-row td {
@@ -395,7 +411,7 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, var(--accent), rgba(180, 83, 9, 0.35));
+  background: linear-gradient(180deg, #14b8a6, rgba(14, 90, 84, 0.35));
 }
 
 .ps-rate-card-top {
@@ -422,8 +438,8 @@
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--accent-deep);
-  background: var(--accent-soft);
+  color: var(--teal-ink, #0e5a54);
+  background: var(--teal-soft, #d8f3ef);
   border-radius: 999px;
   padding: 0.28rem 0.5rem;
 }
@@ -457,7 +473,7 @@
 }
 
 .ps-price-chip.is-primary {
-  background: var(--accent-soft);
+  background: var(--teal-soft, #d8f3ef);
 }
 
 .ps-price-chip span {
@@ -475,7 +491,7 @@
 }
 
 .ps-price-chip.is-primary strong {
-  color: var(--accent-deep);
+  color: var(--teal-ink, #0e5a54);
 }
 
 .ps-pagination {
@@ -536,12 +552,20 @@
   font-weight: 700;
   font-size: 0.82rem;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.ps-page-btn:hover:not(:disabled):not(.is-active) {
+  border-color: var(--teal, #127269);
+  background: var(--teal-soft, #d8f3ef);
+  color: var(--teal-ink, #0e5a54);
 }
 
 .ps-page-btn.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff8f1;
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 6px 14px rgb(13 148 136 / 22%);
 }
 
 .ps-page-ellipsis {

@@ -26,14 +26,7 @@
     "next": "Next",
     "pageOf": "Page {page} / {totalPages}",
     "rangeOf": "{start}–{end} of {total}",
-    "rowsPerPage": "Rows",
-    "changePassword": "Change password",
-    "currentPassword": "Current password",
-    "newPassword": "New password",
-    "confirmPassword": "Confirm new password",
-    "showPasswords": "Show passwords",
-    "passwordMismatch": "New passwords do not match",
-    "passwordUpdated": "Password updated successfully."
+    "rowsPerPage": "Rows"
   },
   "nav": {
     "work": "Work",

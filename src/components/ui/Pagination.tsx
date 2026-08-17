@@ -1,7 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import { REPORT_PAGE_SIZE_OPTIONS } from "@/components/pnl/usePaginatedReport";
+
+const PAGE_SIZE_LABELS = REPORT_PAGE_SIZE_OPTIONS.map(String);
 
 type PaginationProps = {
   page: number;
@@ -32,20 +35,15 @@ export function Pagination({
           {t("rangeOf", { start, end, total })}
         </span>
         {onPageSizeChange ? (
-          <label className="pagination__page-size">
+          <div className="pagination__page-size">
             <span>{t("rowsPerPage")}</span>
-            <select
-              value={pageSize}
-              onChange={(event) => onPageSizeChange(Number(event.target.value))}
-              aria-label={t("rowsPerPage")}
-            >
-              {REPORT_PAGE_SIZE_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+            <SelectMenu
+              className="pagination__page-size-select"
+              value={String(pageSize)}
+              options={PAGE_SIZE_LABELS}
+              onChange={(next) => onPageSizeChange(Number(next))}
+            />
+          </div>
         ) : null}
       </div>
       <div className="pagination__controls">

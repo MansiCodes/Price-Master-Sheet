@@ -31,7 +31,18 @@ function resolveDatabaseUrl(): string {
     );
   }
 
-  return raw;
+  // pg v8 warns that sslmode=require/prefer/verify-ca currently alias verify-full.
+  // Prefer the explicit mode so Neon connections stay secure without the console noise.
+  try {
+    const url = new URL(raw);
+    const mode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
+    if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
+      url.searchParams.set("sslmode", "verify-full");
+    }
+    return url.toString();
+  } catch {
+    return raw;
+  }
 }
 
 function createPrismaClient() {
