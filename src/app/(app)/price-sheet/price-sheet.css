@@ -518,18 +518,27 @@
   font-weight: 700;
 }
 
-.ps-page-size-wrap select {
+.ps-page-size-select {
+  width: auto;
+  min-width: 76px;
+}
+
+.ps-page-size-select .select-menu__trigger {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
-  padding: 0.45rem 0.75rem;
+  padding: 0 0.85rem;
   font: inherit;
   font-weight: 700;
   color: var(--ink);
   min-height: 38px;
-  min-width: 72px;
-  outline: none;
+  height: 38px;
   cursor: pointer;
+}
+
+.ps-page-size-select .select-menu__trigger:hover:not(:disabled) {
+  border-color: var(--teal, #127269);
+  color: var(--teal-ink, #0e5a54);
 }
 
 .ps-page-numbers {
@@ -726,9 +735,14 @@
     display: none;
   }
 
-  .ps-page-size-wrap select {
-    min-width: 62px;
+  .ps-page-size-select {
+    min-width: 66px;
+  }
+
+  .ps-page-size-select .select-menu__trigger {
     min-height: 36px;
+    height: 36px;
+    padding: 0 0.7rem;
     font-size: 0.8rem;
   }
 

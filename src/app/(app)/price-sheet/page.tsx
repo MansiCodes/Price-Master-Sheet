@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { CableRate } from "@/lib/sheets/types";
 import "./price-sheet.css";
 
 const PAGE_SIZES = [10, 20, 50, 100, 200] as const;
+const PAGE_SIZE_LABELS = PAGE_SIZES.map(String);
 const AUTO_SYNC_MS = 60_000;
 
 function formatPrice(value: number): string {
@@ -417,22 +419,21 @@ export default function PriceSheetPage() {
         </main>
 
         <nav className="ps-pagination" aria-label="Rates pagination">
-          <label className="ps-page-size-wrap">
+          <div className="ps-page-size-wrap">
             <span className="ps-field-label">Per page</span>
-            <select
-              aria-label="Rows per page"
-              value={pageSize}
-              onChange={(e) => {
-                const next = Number(e.target.value);
-                setPageSize(PAGE_SIZES.includes(next as (typeof PAGE_SIZES)[number]) ? next : 10);
+            <SelectMenu
+              className="ps-page-size-select"
+              value={String(pageSize)}
+              options={PAGE_SIZE_LABELS}
+              onChange={(next) => {
+                const size = Number(next);
+                setPageSize(
+                  PAGE_SIZES.includes(size as (typeof PAGE_SIZES)[number]) ? size : 10,
+                );
                 setCurrentPage(1);
               }}
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
 
           <button
             type="button"
