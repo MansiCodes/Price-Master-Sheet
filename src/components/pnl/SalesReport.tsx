@@ -101,19 +101,6 @@ export function SalesReport({
       render: (r) => r.billNumber?.trim() || "—",
     },
     {
-      key: "billDate",
-      label: "Bill date",
-      render: (r) => formatBillDate(r.billDate || r.date),
-    },
-    {
-      key: "photos",
-      label: "Bill",
-      compact: true,
-      render: (r) => (
-        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
-      ),
-    },
-    {
       key: "product",
       label: "Product name",
       wrap: true,
@@ -144,6 +131,19 @@ export function SalesReport({
       label: "Goods value",
       align: "right",
       render: (r) => formatINR(goodsValue(r)),
+    },
+    {
+      key: "billDate",
+      label: "Bill date",
+      render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "photos",
+      label: "Bill",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+      ),
     },
   ];
 

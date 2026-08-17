@@ -93,19 +93,6 @@ export function PettyCashReport({
         render: (r) => r.billNumber?.trim() || tCommon("dash"),
       },
       {
-        key: "billDate",
-        label: t("billDate"),
-        render: (r) => formatDisplayDate(isoDate(r.date)),
-      },
-      {
-        key: "photos",
-        label: "Bill",
-        compact: true,
-        render: (r) => (
-          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
-        ),
-      },
-      {
         key: "expenses",
         label: t("expenses"),
         align: "right",
@@ -128,6 +115,19 @@ export function PettyCashReport({
         label: t("total"),
         align: "right",
         render: (r) => formatINR(rowTotal(r)),
+      },
+      {
+        key: "billDate",
+        label: t("billDate"),
+        render: (r) => formatDisplayDate(isoDate(r.date)),
+      },
+      {
+        key: "photos",
+        label: "Bill",
+        compact: true,
+        render: (r) => (
+          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+        ),
       },
     ],
     [page, pageSize, t, tCommon],
