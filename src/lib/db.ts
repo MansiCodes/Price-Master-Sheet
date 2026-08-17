@@ -5,13 +5,38 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
+/** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
+function resolveDatabaseUrl(): string {
+  let raw = process.env.DATABASE_URL?.trim() ?? "";
+  if (!raw) {
     throw new Error("DATABASE_URL is not set");
   }
 
-  const adapter = new PrismaPg(connectionString);
+  // Pasted as: DATABASE_URL=postgresql://...
+  if (raw.toUpperCase().startsWith("DATABASE_URL=")) {
+    raw = raw.slice("DATABASE_URL=".length).trim();
+  }
+
+  // Pasted with wrapping quotes
+  if (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
+    raw = raw.slice(1, -1).trim();
+  }
+
+  if (!/^postgres(ql)?:\/\//i.test(raw)) {
+    throw new Error(
+      `DATABASE_URL must start with postgresql:// (got length=${raw.length}, prefix=${JSON.stringify(raw.slice(0, 24))})`,
+    );
+  }
+
+  return raw;
+}
+
+function createPrismaClient() {
+  const connectionString = resolveDatabaseUrl();
+  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],

@@ -3,10 +3,7 @@
 import { useTranslations } from "next-intl";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type ProductionRow = {
   id: string;
@@ -33,7 +30,7 @@ export function ProductionReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/production?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, setPage } =
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
     usePaginatedReport<ProductionRow>(baseUrl, t("networkError"));
 
   const columns: ReportColumn<ProductionRow>[] = [
@@ -55,9 +52,10 @@ export function ProductionReport({
       <ReportTable columns={columns} rows={rows} loading={loading} />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </section>
   );

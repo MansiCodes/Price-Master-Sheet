@@ -19,10 +19,6 @@ export async function selectPlantAction(plantId: string) {
 
   await setSelectedPlantCookie(plantId);
 
-  if (isSuperAdmin(session.user.globalRole)) {
-    redirect("/");
-  }
-
   redirect("/welcome");
 }
 

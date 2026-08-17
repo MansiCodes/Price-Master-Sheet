@@ -2,12 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
+import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type StockRow = {
   id: string;
@@ -17,6 +15,8 @@ type StockRow = {
   quantity: string | number;
   unit: string;
   closingValue: string | number;
+  photoUrl?: string | null;
+  photoUrls?: string[];
 };
 
 function isoDate(value: string | Date) {
@@ -35,7 +35,7 @@ export function StockReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, setPage } =
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
     usePaginatedReport<StockRow>(baseUrl, t("networkError"));
 
   const columns: ReportColumn<StockRow>[] = [
@@ -54,6 +54,14 @@ export function StockReport({
       align: "right",
       render: (r) => formatINR(r.closingValue),
     },
+    {
+      key: "photos",
+      label: "Image",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.photoUrls} fallbackUrl={r.photoUrl} />
+      ),
+    },
   ];
 
   return (
@@ -63,9 +71,10 @@ export function StockReport({
       <ReportTable columns={columns} rows={rows} loading={loading} />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </section>
   );

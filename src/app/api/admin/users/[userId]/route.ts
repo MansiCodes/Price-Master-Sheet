@@ -78,21 +78,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       { status: 400 },
     );
   }
-  if (
-    parsed.data.globalRole === GlobalRole.SUPER_ADMIN &&
-    existing.globalRole !== GlobalRole.SUPER_ADMIN
-  ) {
-    const superCount = await prisma.user.count({
-      where: { globalRole: GlobalRole.SUPER_ADMIN },
-    });
-    if (superCount > 0) {
-      return NextResponse.json(
-        { ok: false, message: "Only one Super Admin is allowed" },
-        { status: 400 },
-      );
-    }
-  }
-
   const data = parsed.data;
   if (data.phone) {
     const phoneTaken = await prisma.user.findFirst({

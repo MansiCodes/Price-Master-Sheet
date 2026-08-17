@@ -25,7 +25,15 @@
     "previous": "Previous",
     "next": "Next",
     "pageOf": "Page {page} / {totalPages}",
-    "rangeOf": "{start}–{end} of {total}"
+    "rangeOf": "{start}–{end} of {total}",
+    "rowsPerPage": "Rows",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm new password",
+    "showPasswords": "Show passwords",
+    "passwordMismatch": "New passwords do not match",
+    "passwordUpdated": "Password updated successfully."
   },
   "nav": {
     "work": "Work",
@@ -176,6 +184,7 @@
     "purchaseTitle": "Purchase",
     "productionTitle": "Production",
     "stockTitle": "Stock",
+    "noUploadedImage": "No uploaded image",
     "sNo": "S No.",
     "remarks": "Remarks",
     "invoiceNo": "Invoice no.",

@@ -25,7 +25,15 @@
     "previous": "पिछला",
     "next": "अगला",
     "pageOf": "पेज {page} / {totalPages}",
-    "rangeOf": "{start}–{end}, कुल {total}"
+    "rangeOf": "{start}–{end}, कुल {total}",
+    "rowsPerPage": "पंक्तियाँ",
+    "changePassword": "पासवर्ड बदलें",
+    "currentPassword": "मौजूदा पासवर्ड",
+    "newPassword": "नया पासवर्ड",
+    "confirmPassword": "नया पासवर्ड दोबारा",
+    "showPasswords": "पासवर्ड दिखाएँ",
+    "passwordMismatch": "नए पासवर्ड मेल नहीं खा रहे हैं",
+    "passwordUpdated": "पासवर्ड सफलतापूर्वक बदल दिया गया।"
   },
   "nav": {
     "work": "काम",
@@ -176,6 +184,7 @@
     "purchaseTitle": "परचेज़",
     "productionTitle": "प्रोडक्शन",
     "stockTitle": "स्टॉक",
+    "noUploadedImage": "कोई इमेज अपलोड नहीं है",
     "sNo": "क्र.",
     "remarks": "टिप्पणी",
     "invoiceNo": "इनवॉइस नंबर",

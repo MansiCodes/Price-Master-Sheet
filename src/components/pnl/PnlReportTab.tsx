@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PlantPnlStatement } from "@/lib/pnl/types";
-import { PnlStatement } from "@/components/pnl/PnlStatement";
+import {
+  PnlStatement,
+  PnlStatementSkeleton,
+} from "@/components/pnl/PnlStatement";
 
 export function PnlReportTab({
   plantId,
@@ -47,14 +50,13 @@ export function PnlReportTab({
   return (
     <div>
       {error ? <div className="alert alert--error">{error}</div> : null}
-      {pnl ? (
+      {loading ? (
+        <PnlStatementSkeleton />
+      ) : pnl ? (
         <PnlStatement
           trading={pnl.trading}
           indirect={pnl.indirect}
-          loading={loading}
         />
-      ) : loading ? (
-        <p className="page-sub">Loading P&amp;L…</p>
       ) : null}
     </div>
   );

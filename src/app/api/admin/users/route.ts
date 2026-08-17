@@ -125,18 +125,6 @@ export async function POST(request: Request) {
   }
 
   const role = parsed.data.globalRole;
-  if (role === GlobalRole.SUPER_ADMIN) {
-    const superCount = await prisma.user.count({
-      where: { globalRole: GlobalRole.SUPER_ADMIN },
-    });
-    if (superCount > 0) {
-      return NextResponse.json(
-        { ok: false, message: "Only one Super Admin is allowed" },
-        { status: 400 },
-      );
-    }
-  }
-
   if (role !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
     return NextResponse.json(
       { ok: false, message: "Assign at least one plant for this user" },

@@ -111,7 +111,11 @@ export default function AdminIntegrationsPage() {
       {ok ? <div className="alert alert--ok">{ok}</div> : null}
 
       {loading ? (
-        <p className="page-sub">Loading…</p>
+        <div className="integrations-skeleton" aria-busy="true" aria-label="Loading integrations">
+          {Array.from({ length: 9 }, (_, index) => (
+            <span key={index} />
+          ))}
+        </div>
       ) : (
         <form className="integrations-card" onSubmit={onSubmit}>
           <h2>AiSensy WhatsApp</h2>

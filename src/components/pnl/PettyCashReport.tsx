@@ -4,12 +4,10 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { formatDisplayDate } from "@/components/pnl/types";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type PettyCashRow = {
   id: string;
@@ -20,6 +18,8 @@ type PettyCashRow = {
   amount: string | number;
   contractorSalary: string | number;
   supervisorSalary: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 type PettyCashTotals = {
@@ -52,7 +52,17 @@ export function PettyCashReport({
   const t = useTranslations("pnl");
   const tCommon = useTranslations("common");
   const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, response, setPage } =
+  const {
+    rows,
+    page,
+    pageSize,
+    total,
+    loading,
+    error,
+    response,
+    setPage,
+    setPageSize,
+  } =
     usePaginatedReport<PettyCashRow>(baseUrl, t("failedPettyCash"));
   const totals = response?.totals as PettyCashTotals | undefined;
 
@@ -63,7 +73,7 @@ export function PettyCashReport({
         label: t("sNo"),
         compact: true,
         render: (_r, index) =>
-          String((page - 1) * REPORT_PAGE_SIZE + (index ?? 0) + 1),
+          String((page - 1) * pageSize + (index ?? 0) + 1),
       },
       {
         key: "payMode",
@@ -86,6 +96,14 @@ export function PettyCashReport({
         key: "billDate",
         label: t("billDate"),
         render: (r) => formatDisplayDate(isoDate(r.date)),
+      },
+      {
+        key: "photos",
+        label: "Bill",
+        compact: true,
+        render: (r) => (
+          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+        ),
       },
       {
         key: "expenses",
@@ -112,7 +130,7 @@ export function PettyCashReport({
         render: (r) => formatINR(rowTotal(r)),
       },
     ],
-    [page, t, tCommon],
+    [page, pageSize, t, tCommon],
   );
 
   return (
@@ -128,9 +146,10 @@ export function PettyCashReport({
       />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
       {total > 0 && totals ? (
         <dl className="pnl-report-totals">

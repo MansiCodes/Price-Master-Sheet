@@ -131,3 +131,32 @@ export function PnlStatement({
     </article>
   );
 }
+
+export function PnlStatementSkeleton() {
+  return (
+    <article className="pnl-stmt pnl-stmt--skeleton" aria-label="Loading P&L">
+      {[0, 1].map((section) => (
+        <section className="pnl-stmt__section" key={section}>
+          <div className="pnl-stmt__grid">
+            {[0, 1].map((side) => (
+              <div className="pnl-stmt__side" key={side}>
+                <div className="pnl-stmt__col-head">
+                  <span>Particulars</span><span>Amount</span><span>Ratio %</span>
+                </div>
+                <div className="pnl-stmt__lines">
+                  {Array.from({ length: 6 }, (_, row) => (
+                    <div className="pnl-stmt__line" key={row}>
+                      <span className="pnl-skeleton-line" />
+                      <span className="pnl-skeleton-line" />
+                      <span className="pnl-skeleton-line" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </article>
+  );
+}

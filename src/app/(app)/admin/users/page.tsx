@@ -34,7 +34,8 @@ export default function AdminUsersPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const pageSize = 10;
 
-  const allowSuperAdmin = !users.some((u) => u.globalRole === "SUPER_ADMIN");
+  // This page/API is restricted to Super Admins, who may create peer admins.
+  const allowSuperAdmin = true;
 
   const load = useCallback(async () => {
     setLoading(true);

@@ -4,11 +4,9 @@ import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type ExpenseRow = {
   id: string;
@@ -21,6 +19,8 @@ type ExpenseRow = {
   amount: string | number;
   contractorSalary: string | number;
   supervisorSalary: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 function isoDate(value: string | Date) {
@@ -46,7 +46,7 @@ export function ExpenseReport({
   const t = useTranslations("pnl");
   const tCommon = useTranslations("common");
   const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, setPage } =
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
     usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
 
   const columns: ReportColumn<ExpenseRow>[] = useMemo(
@@ -80,6 +80,14 @@ export function ExpenseReport({
         align: "right",
         render: (r) => formatINR(totalAmount(r)),
       },
+      {
+        key: "photos",
+        label: "Bill",
+        compact: true,
+        render: (r) => (
+          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+        ),
+      },
     ],
     [t, tCommon],
   );
@@ -96,9 +104,10 @@ export function ExpenseReport({
       />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </section>
   );

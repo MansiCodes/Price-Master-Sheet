@@ -198,7 +198,7 @@ export default function LoginPage() {
         setError(t("invalidOtp"));
         return;
       }
-      router.replace("/select-plant");
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));
@@ -222,7 +222,7 @@ export default function LoginPage() {
         setError(t("invalidEmailPassword"));
         return;
       }
-      router.replace("/select-plant");
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));

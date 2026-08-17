@@ -61,8 +61,7 @@ export function ReportTable<T extends { id: string }>({
       .join(" ");
   }
 
-  const emptyState = loading ? "Loading…" : emptyLabel;
-  const showEmpty = loading || rows.length === 0;
+  const showEmpty = !loading && rows.length === 0;
 
   return (
     <div
@@ -79,10 +78,23 @@ export function ReportTable<T extends { id: string }>({
           </tr>
         </thead>
         <tbody>
-          {showEmpty ? (
+          {loading ? (
+            Array.from({ length: 8 }, (_, rowIndex) => (
+              <tr key={`skeleton-${rowIndex}`} className="pnl-report-skeleton-row">
+                {columns.map((col, columnIndex) => (
+                  <td key={col.key} className={cellClass(col) || undefined}>
+                    <span
+                      className="pnl-skeleton-line"
+                      style={{ width: `${55 + ((rowIndex + columnIndex) % 4) * 10}%` }}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : showEmpty ? (
             <tr>
               <td colSpan={columns.length} className="is-muted">
-                {emptyState}
+                {emptyLabel}
               </td>
             </tr>
           ) : (

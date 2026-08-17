@@ -3,11 +3,9 @@
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type PurchaseRow = {
   id: string;
@@ -24,6 +22,8 @@ type PurchaseRow = {
   gstPercent: string | number;
   gstAmount: string | number;
   invoiceValue: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 function isoDate(value: string | Date | null | undefined) {
@@ -67,7 +67,7 @@ export function PurchaseReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, setPage } =
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
     usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
 
   const columns: ReportColumn<PurchaseRow>[] = [
@@ -75,7 +75,7 @@ export function PurchaseReport({
       key: "sno",
       label: "S No.",
       render: (_r, index) =>
-        String((page - 1) * REPORT_PAGE_SIZE + (index ?? 0) + 1),
+        String((page - 1) * pageSize + (index ?? 0) + 1),
     },
     {
       key: "supplier",
@@ -98,6 +98,14 @@ export function PurchaseReport({
       key: "billDate",
       label: "Bill date",
       render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "photos",
+      label: "Bill",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+      ),
     },
     {
       key: "unit",
@@ -162,9 +170,10 @@ export function PurchaseReport({
       />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </section>
   );

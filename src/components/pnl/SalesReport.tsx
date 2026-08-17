@@ -3,11 +3,9 @@
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
+import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
-import {
-  REPORT_PAGE_SIZE,
-  usePaginatedReport,
-} from "@/components/pnl/usePaginatedReport";
+import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 
 type SaleRow = {
   id: string;
@@ -21,6 +19,8 @@ type SaleRow = {
   unit: string;
   rate: string | number;
   salesValue: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 function isoDate(value: string | Date | null | undefined) {
@@ -79,7 +79,7 @@ export function SalesReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, total, loading, error, setPage } =
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
     usePaginatedReport<SaleRow>(baseUrl, t("failedSales"));
 
   const columns: ReportColumn<SaleRow>[] = [
@@ -87,7 +87,7 @@ export function SalesReport({
       key: "s",
       label: "S No.",
       render: (_r, index) =>
-        String((page - 1) * REPORT_PAGE_SIZE + (index ?? 0) + 1),
+        String((page - 1) * pageSize + (index ?? 0) + 1),
     },
     {
       key: "remarks",
@@ -104,6 +104,14 @@ export function SalesReport({
       key: "billDate",
       label: "Bill date",
       render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "photos",
+      label: "Bill",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+      ),
     },
     {
       key: "product",
@@ -151,9 +159,10 @@ export function SalesReport({
       />
       <Pagination
         page={page}
-        pageSize={REPORT_PAGE_SIZE}
+        pageSize={pageSize}
         total={total}
         onPageChange={setPage}
+        onPageSizeChange={setPageSize}
       />
     </section>
   );

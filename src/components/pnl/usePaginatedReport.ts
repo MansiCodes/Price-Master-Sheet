@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-export const REPORT_PAGE_SIZE = 10;
+export const DEFAULT_REPORT_PAGE_SIZE = 10;
+export const REPORT_PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 type PaginatedResponse<T> = {
   rows?: T[];
@@ -18,6 +19,7 @@ export function usePaginatedReport<T>(
 ) {
   const [rows, setRows] = useState<T[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_REPORT_PAGE_SIZE);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function usePaginatedReport<T>(
       try {
         const separator = baseUrl.includes("?") ? "&" : "?";
         const res = await fetch(
-          `${baseUrl}${separator}page=${page}&pageSize=${REPORT_PAGE_SIZE}`,
+          `${baseUrl}${separator}page=${page}&pageSize=${pageSize}`,
         );
         const json = (await res.json()) as PaginatedResponse<T>;
         if (!res.ok) {
@@ -72,7 +74,22 @@ export function usePaginatedReport<T>(
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, fallbackError, page]);
+  }, [baseUrl, fallbackError, page, pageSize]);
 
-  return { rows, page, total, loading, error, response, setPage };
+  function changePageSize(nextPageSize: number) {
+    setPage(1);
+    setPageSize(nextPageSize);
+  }
+
+  return {
+    rows,
+    page,
+    pageSize,
+    total,
+    loading,
+    error,
+    response,
+    setPage,
+    setPageSize: changePageSize,
+  };
 }
