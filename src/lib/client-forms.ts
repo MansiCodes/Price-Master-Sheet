@@ -33,3 +33,37 @@ export async function postJson<T>(
     return { ok: false, error: "Network error" };
   }
 }
+
+async function sendJson<T>(
+  url: string,
+  method: "PATCH" | "DELETE",
+  body?: unknown,
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      error?: string;
+    };
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: json.error ?? `Request failed (${res.status})`,
+      };
+    }
+    return { ok: true, data: json as T };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
+export function patchJson<T>(url: string, body: unknown) {
+  return sendJson<T>(url, "PATCH", body);
+}
+
+export function deleteJson<T>(url: string, body?: unknown) {
+  return sendJson<T>(url, "DELETE", body);
+}

@@ -5,6 +5,9 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type ProductionRow = {
   id: string;
@@ -30,9 +33,10 @@ export function ProductionReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/production?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<ProductionRow>(baseUrl, t("networkError"));
   const totals = response?.totals as { quantity?: number } | undefined;
+  const crud = useReportCrud<ProductionRow>(`/api/plants/${plantId}/production`, reload);
 
   const columns: ReportColumn<ProductionRow>[] = [
     { key: "date", label: "Date", render: (r) => isoDate(r.date) },
@@ -43,6 +47,24 @@ export function ProductionReport({
       label: "Quantity",
       align: "right",
       render: (r) => `${Number(r.quantity)} ${r.unit}`,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      compact: true,
+      render: (r) => (
+        <ReportRowActions
+          onEdit={() =>
+            crud.openEdit(r, {
+              date: toYmd(r.date),
+              productName: r.productName ?? "",
+              quantity: String(r.quantity ?? ""),
+              unit: r.unit ?? "",
+            })
+          }
+          onDelete={() => void crud.remove(r.id)}
+        />
+      ),
     },
   ];
 
@@ -67,6 +89,30 @@ export function ProductionReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit production"
+        fields={[
+          { name: "date", label: "Date", type: "date", required: true },
+          { name: "productName", label: "Product", required: true },
+          { name: "quantity", label: "Quantity", type: "number", required: true },
+          { name: "unit", label: "Unit", required: true },
+        ]}
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            productName: crud.values.productName,
+            quantity: Number(crud.values.quantity),
+            unit: crud.values.unit,
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

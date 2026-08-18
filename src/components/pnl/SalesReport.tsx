@@ -8,6 +8,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type SaleRow = {
   id: string;
@@ -73,11 +76,39 @@ export function SalesReport({
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<SaleRow>(baseUrl, t("failedSales"));
   const totals = response?.totals as
     | { salesValue?: number; quantity?: number }
     | undefined;
+  const crud = useReportCrud<SaleRow>(`/api/plants/${plantId}/sales`, reload);
+
+  const actionCol: ReportColumn<SaleRow> = {
+    key: "actions",
+    label: "Actions",
+    compact: true,
+    width: "8.75rem",
+    render: (r) => (
+      <ReportRowActions
+        onEdit={() =>
+          crud.openEdit(r, {
+            date: toYmd(r.billDate || r.date),
+            customerName: r.customerName ?? "",
+            billNumber: r.billNumber ?? "",
+            itemDescription: r.itemDescription ?? "",
+            quantity: String(r.quantity ?? ""),
+            unit: r.unit ?? "",
+            rate: String(r.rate ?? ""),
+            inMeter: r.inMeter == null ? "" : String(r.inMeter),
+            qtyMtr: r.qtyMtr == null ? "" : String(r.qtyMtr),
+            meterUnit: r.meterUnit ?? "",
+            notes: r.notes ?? "",
+          })
+        }
+        onDelete={() => void crud.remove(r.id)}
+      />
+    ),
+  };
 
   const pvcColumns: ReportColumn<SaleRow>[] = [
     {
@@ -227,7 +258,7 @@ export function SalesReport({
       <h3 className="pnl-report-panel__title">{t("salesTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={cat6 ? cat6Columns : pvcColumns}
+        columns={[...(cat6 ? cat6Columns : pvcColumns), actionCol]}
         rows={rows}
         loading={loading}
         variant="register"
@@ -252,6 +283,57 @@ export function SalesReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit sale"
+        fields={
+          cat6
+            ? [
+                { name: "date", label: "Bill Date", type: "date", required: true },
+                { name: "customerName", label: "Customer Name", required: true },
+                { name: "billNumber", label: "Bill Number" },
+                { name: "itemDescription", label: "Item Details", required: true },
+                { name: "quantity", label: "Quantity", type: "number", required: true },
+                { name: "unit", label: "Unit", required: true },
+                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "inMeter", label: "In Meter", type: "number" },
+                { name: "qtyMtr", label: "QTY-MTR", type: "number" },
+                { name: "meterUnit", label: "Unit (MTR)" },
+              ]
+            : [
+                { name: "date", label: "Bill date", type: "date", required: true },
+                { name: "customerName", label: "Customer", required: true },
+                { name: "billNumber", label: "Invoice no." },
+                { name: "itemDescription", label: "Product name", required: true },
+                { name: "quantity", label: "Qty", type: "number", required: true },
+                { name: "unit", label: "Unit", required: true },
+                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "notes", label: "Remarks" },
+              ]
+        }
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            billDate: crud.values.date || null,
+            customerName: crud.values.customerName,
+            billNumber: crud.values.billNumber || null,
+            itemDescription: crud.values.itemDescription,
+            quantity: Number(crud.values.quantity),
+            unit: crud.values.unit,
+            rate: Number(crud.values.rate),
+            inMeter: crud.values.inMeter ? Number(crud.values.inMeter) : null,
+            qtyMtr: crud.values.qtyMtr ? Number(crud.values.qtyMtr) : null,
+            meterUnit: crud.values.meterUnit || null,
+            notes: crud.values.notes || null,
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

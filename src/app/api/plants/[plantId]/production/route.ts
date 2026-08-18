@@ -3,6 +3,7 @@ import { ManpowerRole, ManpowerShift } from "@prisma/client";
 import { z } from "zod";
 import {
   requireCanEnter,
+  requireDeleteConfirmation,
   requirePlantAccess,
   requireSession,
   round2,
@@ -186,4 +187,112 @@ export async function POST(
   await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
 
   return NextResponse.json({ production, manpowerEntries }, { status: 201 });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = productionSchema
+    .omit({ manpower: true })
+    .partial()
+    .extend({ id: z.string().min(1) })
+    .safeParse(body);
+  if (!parsed.success) return zodErrorResponse(parsed.error);
+
+  const data = parsed.data;
+  const existing = await prisma.productionEntry.findFirst({
+    where: { id: data.id, plantId },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Production entry not found" }, { status: 404 });
+  }
+
+  const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
+
+  const production = await prisma.productionEntry.update({
+    where: { id: existing.id },
+    data: {
+      date: data.date ? parseDateOnly(data.date) : undefined,
+      shift: data.shift,
+      productName: data.productName,
+      quantity: data.quantity,
+      unit: data.unit,
+      notes: data.notes,
+      isBackdated: isBackdated(dateStr),
+    },
+  });
+
+  await writeAuditLog({
+    entityType: "ProductionEntry",
+    entityId: production.id,
+    field: "update",
+    oldValue: existing,
+    newValue: production,
+    actorId: session.user.id,
+    plantId,
+    isBackdated: production.isBackdated,
+  });
+
+  return NextResponse.json({ production });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  const unconfirmed = await requireDeleteConfirmation(request);
+  if (unconfirmed) return unconfirmed;
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  const existing = await prisma.productionEntry.findFirst({
+    where: { id, plantId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Production entry not found" }, { status: 404 });
+  }
+
+  await prisma.productionEntry.delete({ where: { id } });
+  await writeAuditLog({
+    entityType: "ProductionEntry",
+    entityId: id,
+    field: "delete",
+    oldValue: { id },
+    actorId: session.user.id,
+    plantId,
+  });
+
+  return NextResponse.json({ ok: true });
 }

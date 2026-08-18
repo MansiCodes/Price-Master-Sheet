@@ -25,6 +25,7 @@ export function usePaginatedReport<T>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<PaginatedResponse<T> | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setPage(1);
@@ -75,7 +76,7 @@ export function usePaginatedReport<T>(
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, fallbackError, page, pageSize]);
+  }, [baseUrl, fallbackError, page, pageSize, reloadKey]);
 
   function changePageSize(nextPageSize: number) {
     setPage(1);
@@ -90,6 +91,7 @@ export function usePaginatedReport<T>(
     loading,
     error,
     response,
+    reload: () => setReloadKey((n) => n + 1),
     setPage,
     setPageSize: changePageSize,
   };

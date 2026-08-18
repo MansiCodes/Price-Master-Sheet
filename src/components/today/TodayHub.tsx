@@ -21,7 +21,10 @@ import { PRODUCT_UNITS } from "@/lib/units";
 import {
   DEFAULT_PURCHASE_GOODS,
   STOCK_CATEGORIES,
+  getCat6PettyCatalog,
+  getCustomerCatalog,
   getPurchaseCatalog,
+  getSalesCatalog,
   getStockCatalog,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, mapCat6PettyNature } from "@/lib/plant-layout";
@@ -122,6 +125,9 @@ type LineItem = {
   quantity: string;
   rate: string;
   gstPercent: string;
+  inMeter?: string;
+  qtyMtr?: string;
+  meterUnit?: string;
 };
 
 const CUSTOMERS = [
@@ -241,6 +247,18 @@ export function TodayHub({
     [plantCode],
   );
   const isPvc = plantCode.toUpperCase() === "PVC";
+  const isCat6 = isCat6Plant(plantCode);
+  const saleProducts = useMemo(() => getSalesCatalog(plantCode), [plantCode]);
+  const customers = useMemo(() => getCustomerCatalog(plantCode), [plantCode]);
+  const pettyCatalog = useMemo(() => getCat6PettyCatalog(), []);
+  const cat6SupplierOptions = useMemo(
+    () => [...purchaseCatalog.suppliers, "Other"],
+    [purchaseCatalog.suppliers],
+  );
+  const cat6CustomerOptions = useMemo(
+    () => [...customers, "Other"],
+    [customers],
+  );
   const stockParticulars = [...stockCatalog.particulars, "Others"];
 
   const entryOptions = useMemo(
@@ -1294,7 +1312,6 @@ export function TodayHub({
                     rows={3}
                   />
                 </div>
-                )}
                 <BillUpload
                   label="Upload stock images"
                   urls={stockPhotos}

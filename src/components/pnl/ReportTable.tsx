@@ -49,7 +49,12 @@ export function ReportTable<T extends { id: string }>({
   }
 
   function cellClass(col: ReportColumn<T>) {
-    return [alignClass(col.align), wrapClass(col.wrap), col.compact ? "is-compact" : ""]
+    return [
+      alignClass(col.align),
+      wrapClass(col.wrap),
+      col.compact ? "is-compact" : "",
+      col.key === "actions" ? "is-actions" : "",
+    ]
       .filter(Boolean)
       .join(" ");
   }
@@ -59,6 +64,7 @@ export function ReportTable<T extends { id: string }>({
       alignClass(col.headerAlign ?? col.align),
       wrapClass(col.wrap),
       col.compact ? "is-compact" : "",
+      col.key === "actions" ? "is-actions" : "",
     ]
       .filter(Boolean)
       .join(" ");

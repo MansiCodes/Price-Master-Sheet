@@ -100,6 +100,12 @@ export function getStockCatalog(plantCode: string): {
   particulars: readonly string[];
   defaultUnit: string;
 } {
+  if (isCat6Plant(plantCode)) {
+    return {
+      particulars: [...CAT6_STOCK_ITEMS, ...CAT6_PURCHASE_GOODS],
+      defaultUnit: "NOS",
+    };
+  }
   if (plantCode.toUpperCase() === "PVC") {
     return {
       particulars: PVC_STOCK_PARTICULARS,
@@ -145,16 +151,6 @@ export function getSalesCatalog(plantCode: string): readonly string[] {
     "PVC Compound",
     "SPOOL",
   ];
-}
-
-export function getStockCatalog(plantCode: string): readonly string[] {
-  if (isCat6Plant(plantCode)) {
-    return [...CAT6_STOCK_ITEMS, ...CAT6_PURCHASE_GOODS, "Others"];
-  }
-  if (plantCode.toUpperCase() === "PVC") {
-    return [...PVC_PURCHASE_GOODS, "Others"];
-  }
-  return [...DEFAULT_PURCHASE_GOODS, "Others"];
 }
 
 export function getCat6PettyCatalog(): {

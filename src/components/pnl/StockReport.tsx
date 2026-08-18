@@ -7,6 +7,10 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
+import { isCat6Plant } from "@/lib/plant-layout";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type StockRow = {
   id: string;
@@ -51,9 +55,33 @@ export function StockReport({
 }) {
   const t = useTranslations("pnl");
   const isPvc = plantCode?.toUpperCase() === "PVC";
+  const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${isPvc ? "&snapshot=1" : ""}`;
-  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, reload, setPage, setPageSize } =
     usePaginatedReport<StockRow>(baseUrl, t("networkError"), isPvc ? 20 : 10);
+  const crud = useReportCrud<StockRow>(`/api/plants/${plantId}/stock`, reload);
+
+  const actionCol: ReportColumn<StockRow> = {
+    key: "actions",
+    label: "Actions",
+    compact: true,
+    render: (r) => (
+      <ReportRowActions
+        onEdit={() =>
+          crud.openEdit(r, {
+            date: toYmd(r.date),
+            itemName: r.itemName ?? "",
+            quantity: String(r.quantity ?? ""),
+            unit: r.unit ?? "",
+            rate: String(r.rate ?? ""),
+            value: String(r.closingValue ?? ""),
+            notes: r.notes ?? "",
+          })
+        }
+        onDelete={() => void crud.remove(r.id)}
+      />
+    ),
+  };
 
   const pvcColumns: ReportColumn<StockRow>[] = [
     {
@@ -207,10 +235,13 @@ export function StockReport({
       </h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={isPvc ? pvcColumns : defaultColumns}
+        columns={[
+          ...(isPvc ? pvcColumns : cat6 ? cat6Columns : defaultColumns),
+          actionCol,
+        ]}
         rows={rows}
         loading={loading}
-        variant={isPvc ? "register" : undefined}
+        variant={isPvc || cat6 ? "register" : undefined}
       />
       <Pagination
         page={page}
@@ -219,6 +250,36 @@ export function StockReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit stock"
+        fields={[
+          { name: "date", label: "Date", type: "date", required: true },
+          { name: "itemName", label: isPvc ? "Particulars" : "Item Name", required: true },
+          { name: "quantity", label: isPvc ? "Closing Stock" : "QTY", type: "number", required: true },
+          { name: "unit", label: "Unit", required: true },
+          { name: "rate", label: "Rate", type: "number" },
+          { name: "value", label: isPvc ? "Closing Value" : "Value", type: "number", required: true },
+          { name: "notes", label: "Notes", type: "textarea" },
+        ]}
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            itemName: crud.values.itemName,
+            quantity: Number(crud.values.quantity),
+            unit: crud.values.unit,
+            rate: crud.values.rate ? Number(crud.values.rate) : undefined,
+            value: Number(crud.values.value),
+            notes: crud.values.notes || null,
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

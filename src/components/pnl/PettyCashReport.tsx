@@ -9,6 +9,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type PettyCashRow = {
   id: string;
@@ -63,11 +66,13 @@ export function PettyCashReport({
     loading,
     error,
     response,
+    reload,
     setPage,
     setPageSize,
   } =
     usePaginatedReport<PettyCashRow>(baseUrl, t("failedPettyCash"));
   const totals = response?.totals as PettyCashTotals | undefined;
+  const crud = useReportCrud<PettyCashRow>(`/api/plants/${plantId}/petty-cash`, reload);
 
   const columns: ReportColumn<PettyCashRow>[] = useMemo(
     () => [
@@ -141,7 +146,32 @@ export function PettyCashReport({
       <h3 className="pnl-report-panel__title">{t("pettyCashTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={columns}
+        columns={[
+          ...columns,
+          {
+            key: "actions",
+            label: "Actions",
+            compact: true,
+            render: (r) => (
+              <ReportRowActions
+                onEdit={() =>
+                  crud.openEdit(r, {
+                    date: toYmd(r.date),
+                    payMode: r.payMode ?? "",
+                    nature: r.nature ?? "",
+                    description: r.description ?? "",
+                    location: r.location ?? "",
+                    amount: String(r.amount ?? ""),
+                    contractorSalary: String(r.contractorSalary ?? "0"),
+                    supervisorSalary: String(r.supervisorSalary ?? "0"),
+                    billNumber: r.billNumber ?? "",
+                  })
+                }
+                onDelete={() => void crud.remove(r.id)}
+              />
+            ),
+          },
+        ]}
         rows={rows}
         loading={loading}
         variant="register"
@@ -170,6 +200,49 @@ export function PettyCashReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit petty cash"
+        fields={
+          cat6
+            ? [
+                { name: "date", label: "Date", type: "date", required: true },
+                { name: "amount", label: "Output Amt", type: "number", required: true },
+                { name: "nature", label: "Nature of Expense" },
+                { name: "description", label: "Expense Description", type: "textarea" },
+                { name: "payMode", label: "Person", required: true },
+                { name: "location", label: "Location" },
+              ]
+            : [
+                { name: "date", label: t("billDate"), type: "date", required: true },
+                { name: "payMode", label: t("payMode"), required: true },
+                { name: "description", label: t("descriptionOfExpense"), type: "textarea" },
+                { name: "billNumber", label: t("billNumber") },
+                { name: "amount", label: t("expenses"), type: "number", required: true },
+                { name: "contractorSalary", label: t("contractorSalary"), type: "number" },
+                { name: "supervisorSalary", label: t("supervisorSalary"), type: "number" },
+              ]
+        }
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            payMode: crud.values.payMode,
+            nature: crud.values.nature || null,
+            description: crud.values.description || null,
+            location: crud.values.location || null,
+            amount: Number(crud.values.amount),
+            contractorSalary: Number(crud.values.contractorSalary || 0),
+            supervisorSalary: Number(crud.values.supervisorSalary || 0),
+            billNumber: crud.values.billNumber || null,
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

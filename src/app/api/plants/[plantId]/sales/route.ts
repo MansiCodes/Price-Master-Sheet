@@ -3,6 +3,7 @@ import { ManpowerShift, SaleType } from "@prisma/client";
 import { z } from "zod";
 import {
   requireCanEnter,
+  requireDeleteConfirmation,
   requirePlantAccess,
   requireSession,
   round2,
@@ -268,4 +269,127 @@ export async function POST(
   );
 
   return NextResponse.json({ sale }, { status: 201 });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = saleSingleSchema
+    .partial()
+    .extend({ id: z.string().min(1) })
+    .safeParse(body);
+  if (!parsed.success) return zodErrorResponse(parsed.error);
+
+  const data = parsed.data;
+  const existing = await prisma.sale.findFirst({
+    where: { id: data.id, plantId },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Sale not found" }, { status: 404 });
+  }
+
+  const quantity = data.quantity ?? Number(existing.quantity);
+  const rate = data.rate ?? Number(existing.rate);
+  const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
+
+  const sale = await prisma.sale.update({
+    where: { id: existing.id },
+    data: {
+      date: data.date ? parseDateOnly(data.date) : undefined,
+      type: data.type,
+      typeOther: data.typeOther,
+      customerName: data.customerName,
+      billNumber: data.billNumber,
+      billDate:
+        data.billDate === undefined
+          ? undefined
+          : data.billDate
+            ? parseDateOnly(data.billDate)
+            : null,
+      notes: data.notes,
+      itemDescription: data.itemDescription,
+      unit: data.unit,
+      quantity: data.quantity,
+      rate: data.rate,
+      salesValue: round2(quantity * rate),
+      inMeter: data.inMeter,
+      qtyMtr: data.qtyMtr,
+      meterUnit: data.meterUnit,
+      isBackdated: isBackdated(dateStr),
+    },
+  });
+
+  await writeAuditLog({
+    entityType: "Sale",
+    entityId: sale.id,
+    field: "update",
+    oldValue: existing,
+    newValue: sale,
+    actorId: session.user.id,
+    plantId,
+    isBackdated: sale.isBackdated,
+  });
+
+  return NextResponse.json({ sale });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  const unconfirmed = await requireDeleteConfirmation(request);
+  if (unconfirmed) return unconfirmed;
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  const existing = await prisma.sale.findFirst({
+    where: { id, plantId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Sale not found" }, { status: 404 });
+  }
+
+  await prisma.sale.delete({ where: { id } });
+  await writeAuditLog({
+    entityType: "Sale",
+    entityId: id,
+    field: "delete",
+    oldValue: { id },
+    actorId: session.user.id,
+    plantId,
+  });
+
+  return NextResponse.json({ ok: true });
 }

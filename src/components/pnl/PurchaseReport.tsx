@@ -8,6 +8,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type PurchaseRow = {
   id: string;
@@ -60,11 +63,37 @@ export function PurchaseReport({
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
   const totals = response?.totals as
     | { basicValue?: number; invoiceValue?: number }
     | undefined;
+  const crud = useReportCrud<PurchaseRow>(`/api/plants/${plantId}/purchases`, reload);
+
+  const actionCol: ReportColumn<PurchaseRow> = {
+    key: "actions",
+    label: "Actions",
+    compact: true,
+    render: (r) => (
+      <ReportRowActions
+        onEdit={() =>
+          crud.openEdit(r, {
+            date: toYmd(r.billDate || r.date),
+            vendorName: r.vendorName ?? "",
+            billNumber: r.billNumber ?? "",
+            gstin: r.gstin ?? "",
+            itemDescription: r.itemDescription ?? "",
+            quantity: String(r.quantity ?? ""),
+            unit: r.unit ?? "",
+            rate: String(r.rate ?? ""),
+            gstPercent: String(r.gstPercent ?? "0"),
+            notes: r.notes ?? "",
+          })
+        }
+        onDelete={() => void crud.remove(r.id)}
+      />
+    ),
+  };
 
   const pvcColumns: ReportColumn<PurchaseRow>[] = [
     {
@@ -242,7 +271,7 @@ export function PurchaseReport({
       <h3 className="pnl-report-panel__title">{t("purchaseTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={cat6 ? cat6Columns : pvcColumns}
+        columns={[...(cat6 ? cat6Columns : pvcColumns), actionCol]}
         rows={rows}
         loading={loading}
         variant="register"
@@ -267,6 +296,57 @@ export function PurchaseReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit purchase"
+        fields={
+          cat6
+            ? [
+                { name: "date", label: "Bill Date", type: "date", required: true },
+                { name: "gstin", label: "GSTIN/GST No" },
+                { name: "vendorName", label: "Vendor's Name", required: true },
+                { name: "billNumber", label: "Bill Number" },
+                { name: "itemDescription", label: "Item Details", required: true },
+                { name: "quantity", label: "Item QTY", type: "number", required: true },
+                { name: "unit", label: "Unit", required: true },
+                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "notes", label: "Notes", type: "textarea" },
+              ]
+            : [
+                { name: "date", label: "Bill date", type: "date", required: true },
+                { name: "vendorName", label: "Supplier name", required: true },
+                { name: "billNumber", label: "Bill no." },
+                { name: "itemDescription", label: "Description", required: true },
+                { name: "quantity", label: "Qty", type: "number", required: true },
+                { name: "unit", label: "Unit", required: true },
+                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "gstPercent", label: "GST %", type: "number" },
+                { name: "notes", label: "Remarks" },
+              ]
+        }
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            billDate: crud.values.date || null,
+            booksDate: crud.values.date || null,
+            vendorName: crud.values.vendorName,
+            billNumber: crud.values.billNumber || null,
+            gstin: crud.values.gstin || null,
+            itemDescription: crud.values.itemDescription,
+            quantity: Number(crud.values.quantity),
+            unit: crud.values.unit,
+            rate: Number(crud.values.rate),
+            gstPercent: Number(crud.values.gstPercent || 0),
+            notes: crud.values.notes || null,
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

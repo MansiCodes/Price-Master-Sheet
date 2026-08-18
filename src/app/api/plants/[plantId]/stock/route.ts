@@ -3,6 +3,7 @@ import { ManpowerShift, StockCategory } from "@prisma/client";
 import { z } from "zod";
 import {
   requireCanEnter,
+  requireDeleteConfirmation,
   requirePlantAccess,
   requireSession,
   round2,
@@ -240,4 +241,117 @@ export async function POST(
   await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
 
   return NextResponse.json({ entry }, { status: 201 });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = stockSingleSchema
+    .partial()
+    .extend({ id: z.string().min(1) })
+    .safeParse(body);
+  if (!parsed.success) return zodErrorResponse(parsed.error);
+
+  const data = parsed.data;
+  const existing = await prisma.stockEntry.findFirst({
+    where: { id: data.id, plantId },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
+  }
+
+  const quantity = data.quantity ?? Number(existing.quantity);
+  const rate = data.rate ?? Number(existing.rate);
+  const value = data.value ?? Number(existing.closingValue);
+  const amounts = lineAmounts(quantity, data.rate ?? rate, data.value ?? value);
+  const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
+
+  const entry = await prisma.stockEntry.update({
+    where: { id: existing.id },
+    data: {
+      date: data.date ? parseDateOnly(data.date) : undefined,
+      itemName: data.itemName,
+      category: data.category,
+      unit: data.unit,
+      quantity: amounts.quantity,
+      rate: amounts.rate,
+      closingValue: amounts.closingValue,
+      notes: data.notes,
+      isBackdated: isBackdated(dateStr),
+    },
+  });
+
+  await writeAuditLog({
+    entityType: "StockEntry",
+    entityId: entry.id,
+    field: "update",
+    oldValue: existing,
+    newValue: entry,
+    actorId: session.user.id,
+    plantId,
+    isBackdated: entry.isBackdated,
+  });
+
+  return NextResponse.json({ entry });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  context: RouteContext,
+) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const enterDenied = requireCanEnter(session.user.globalRole);
+  if (enterDenied) return enterDenied;
+
+  const { plantId } = await context.params;
+  const denied = await requirePlantAccess(session.user.id, plantId);
+  if (denied) return denied;
+
+  const unconfirmed = await requireDeleteConfirmation(request);
+  if (unconfirmed) return unconfirmed;
+
+  const id = request.nextUrl.searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  }
+
+  const existing = await prisma.stockEntry.findFirst({
+    where: { id, plantId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
+  }
+
+  await prisma.stockEntry.delete({ where: { id } });
+  await writeAuditLog({
+    entityType: "StockEntry",
+    entityId: id,
+    field: "delete",
+    oldValue: { id },
+    actorId: session.user.id,
+    plantId,
+  });
+
+  return NextResponse.json({ ok: true });
 }

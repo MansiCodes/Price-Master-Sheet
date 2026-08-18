@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { canAccessPlant, canEnterData } from "@/lib/rbac";
@@ -56,6 +56,34 @@ export function requireCanEnter(
 
 export function jsonError(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
+}
+
+function isDeleteConfirmed(value: unknown): boolean {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+/** Rejects DELETE unless the client sends confirm=true after the user chooses Yes. */
+export async function requireDeleteConfirmation(
+  request: NextRequest,
+): Promise<NextResponse | null> {
+  const fromQuery = request.nextUrl.searchParams.get("confirm");
+  let fromBody: unknown = false;
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    try {
+      const json = (await request.json()) as { confirm?: unknown };
+      fromBody = json?.confirm;
+    } catch {
+      fromBody = false;
+    }
+  }
+  if (isDeleteConfirmed(fromQuery) || isDeleteConfirmed(fromBody)) {
+    return null;
+  }
+  return jsonError(
+    "Delete was not confirmed. Choose Yes to delete this data.",
+    400,
+  );
 }
 
 export function zodErrorResponse(error: {

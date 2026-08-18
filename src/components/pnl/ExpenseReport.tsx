@@ -9,6 +9,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type ExpenseRow = {
   id: string;
@@ -62,9 +65,10 @@ export function ExpenseReport({
   const tCommon = useTranslations("common");
   const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
   const totals = response?.totals as { total?: number } | undefined;
+  const crud = useReportCrud<ExpenseRow>(`/api/plants/${plantId}/petty-cash`, reload);
 
   const columns: ReportColumn<ExpenseRow>[] = useMemo(
     () =>
@@ -165,7 +169,29 @@ export function ExpenseReport({
       <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={columns}
+        columns={[
+          ...columns,
+          {
+            key: "actions",
+            label: "Actions",
+            compact: true,
+            render: (r) => (
+              <ReportRowActions
+                onEdit={() =>
+                  crud.openEdit(r, {
+                    date: toYmd(r.date),
+                    expenseHead: r.expenseHead ?? "",
+                    description: r.description ?? "",
+                    amount: String(r.amount ?? ""),
+                    contractorSalary: String(r.contractorSalary ?? "0"),
+                    supervisorSalary: String(r.supervisorSalary ?? "0"),
+                  })
+                }
+                onDelete={() => void crud.remove(r.id)}
+              />
+            ),
+          },
+        ]}
         rows={rows}
         loading={loading}
         emptyLabel={t("noRecords")}
@@ -184,6 +210,30 @@ export function ExpenseReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit expense"
+        fields={[
+          { name: "date", label: cat6 ? "Months" : "Date", type: "date", required: true },
+          { name: "expenseHead", label: t("category"), required: true },
+          { name: "description", label: cat6 ? "Remarks" : t("remarksNotes"), type: "textarea" },
+          { name: "amount", label: cat6 ? "Salary Amt" : t("amount"), type: "number", required: true },
+        ]}
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            expenseHead: crud.values.expenseHead,
+            description: crud.values.description || null,
+            amount: Number(crud.values.amount),
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }
