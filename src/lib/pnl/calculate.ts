@@ -1,4 +1,4 @@
-import { PurchaseType, Prisma } from "@prisma/client";
+import { PettyCashKind, PurchaseType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 import type {
@@ -491,6 +491,7 @@ async function buildDynamic(
   const [
     salesAgg,
     purchaseAgg,
+    purchaseQtyAgg,
     manpowerAgg,
     pettyEntries,
     electricityRows,
@@ -511,6 +512,10 @@ async function buildDynamic(
       },
       _sum: { basicValue: true },
     }),
+    prisma.purchase.aggregate({
+      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      _sum: { quantity: true },
+    }),
     prisma.manpowerEntry.aggregate({
       where: { plantId, ...byUser, date: { gte: from, lte: to } },
       _sum: { totalCost: true },
@@ -522,6 +527,9 @@ async function buildDynamic(
         amount: true,
         contractorSalary: true,
         supervisorSalary: true,
+        expenseHead: true,
+        payMode: true,
+        description: true,
       },
     }),
     scoped
@@ -553,39 +561,74 @@ async function buildDynamic(
   const purchases = round2(toNumber(purchaseAgg._sum.basicValue));
   const openingStock = round2(openingStockRaw);
   const closingStock = round2(closingStockRaw);
-  const cogs = round2(openingStock + purchases - closingStock);
-  const pettyCash = round2(
-    pettyEntries.reduce((sum, row) => {
-      if (row.entryType !== "PETTY_CASH") return sum;
-      return (
-        sum +
-        toNumber(row.amount) +
-        toNumber(row.contractorSalary) +
-        toNumber(row.supervisorSalary)
-      );
-    }, 0),
-  );
-
-  const manpowerFromSalary = round2(
-    pettyEntries.reduce((sum, row) => {
-      if (row.entryType !== "EXPENSE") return sum;
-      return (
-        sum +
-        toNumber(row.amount) +
-        toNumber(row.contractorSalary) +
-        toNumber(row.supervisorSalary)
-      );
-    }, 0),
-  );
-
-  const manpower = round2(toNumber(manpowerAgg._sum.totalCost)) + manpowerFromSalary;
-
-  const electricity = round2(
+  const electricityRentAmount = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
   );
-  const rent = round2(
+  const rentFromElectricityRent = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.rentAmount), 0),
   );
+
+  // Electricity can be available in two places depending on how the DB was seeded:
+  // 1) `electricityRent` table (preferred)
+  // 2) legacy import into `pettyCashEntry` with `entryType=EXPENSE` & `expenseHead="Electricity"`
+  const electricityFromPettyCash = round2(
+    pettyEntries
+      .filter(
+        (r) =>
+          r.entryType === PettyCashKind.EXPENSE &&
+          (r.expenseHead.trim().toLowerCase() === "electricity" ||
+            r.payMode.trim().toLowerCase() === "electricity"),
+      )
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const rentFromPettyCash = round2(
+    pettyEntries
+      .filter(
+        (r) =>
+          r.entryType === PettyCashKind.EXPENSE &&
+          /rent/i.test(String(r.description ?? "")) &&
+          toNumber(r.amount) > 0,
+      )
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const electricity = electricityRentAmount > 0 ? electricityRentAmount : electricityFromPettyCash;
+  const rent = rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
+
+  // Unloading = (Total Purchase Qty in KGS ÷ 1000) × Unloading Rate per MT
+  const totalPurchaseQtyKgs = round2(toNumber(purchaseQtyAgg._sum.quantity));
+  // Excel hardcode: G156 = 70 ₹ per MT.
+  // We hardcode it here to avoid runtime crashes when DB schema isn't yet updated.
+  const unloadingRatePerMT = 70;
+  const unloadingExpense = round2((totalPurchaseQtyKgs / 1000) * unloadingRatePerMT);
+
+  const pettyCashRows = pettyEntries.filter(
+    (r) => r.entryType === PettyCashKind.PETTY_CASH,
+  );
+
+  const pettyCashExp = round2(
+    pettyCashRows.reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  // Your screenshot splits salaries into:
+  // - Direct: "LABOUR CONTRACTOR" (contractorSalary)
+  // - Indirect: "SALARY EXPENSES" (supervisorSalary)
+  const contractorSalary = round2(
+    pettyCashRows.reduce((sum, row) => sum + toNumber(row.contractorSalary), 0),
+  );
+  const supervisorSalary = round2(
+    pettyCashRows.reduce((sum, row) => sum + toNumber(row.supervisorSalary), 0),
+  );
+
+  const manpowerFromEntries = round2(toNumber(manpowerAgg._sum.totalCost));
+  const manpower = manpowerFromEntries + contractorSalary;
+
+  const directExpenses = round2(electricity + unloadingExpense + manpower);
+  const cogs = round2(openingStock + purchases + directExpenses - closingStock);
+
+  const grossProfit = round2(salesRevenue - cogs);
+  const financialCost = 0; // Not present in DB currently; keep line for screenshot parity.
 
   const depreciation = round2(
     fixedAssets.reduce((sum, asset) => {
@@ -595,9 +638,14 @@ async function buildDynamic(
     }, 0),
   );
 
-  const grossProfit = round2(salesRevenue - cogs);
+  // Trading account already contains direct expenses; indirect section should subtract only indirect expenses.
   const profitBeforeTax = round2(
-    grossProfit - manpower - electricity - rent - pettyCash - depreciation,
+    grossProfit -
+      rent -
+      pettyCashExp -
+      supervisorSalary -
+      depreciation -
+      financialCost,
   );
   const incomeTax =
     profitBeforeTax > 0 ? round2(profitBeforeTax * INCOME_TAX_RATE) : 0;
@@ -611,9 +659,30 @@ async function buildDynamic(
     line("Purchase from Vendor", purchases || null, null, "item"),
     line("Total Purchases", purchases || null, purchases ? ratioOf(purchases, salesBase) : null, "subtotal"),
     line("DIRECT EXPENSES", null, null, "header"),
-    line("FUEL & POWER EXP.", electricity || null, electricity ? ratioOf(electricity, salesBase) : null, "item"),
-    line("LABOUR / MANPOWER", manpower || null, manpower ? ratioOf(manpower, salesBase) : null, "item"),
-    line("GROSS PROFIT", grossProfit > 0 ? grossProfit : null, grossProfit > 0 ? ratioOf(grossProfit, salesBase) : null, "profit"),
+    line(
+      "FUEL & POWER EXP.",
+      electricity || null,
+      electricity ? ratioOf(electricity, salesBase) : null,
+      "item",
+    ),
+    line(
+      "UNLOADING EXP.",
+      unloadingExpense || null,
+      unloadingExpense ? ratioOf(unloadingExpense, salesBase) : null,
+      "item",
+    ),
+    line(
+      "LABOUR CONTRACTOR",
+      manpower || null,
+      manpower ? ratioOf(manpower, salesBase) : null,
+      "item",
+    ),
+    line(
+      "GROSS PROFIT",
+      grossProfit > 0 ? grossProfit : null,
+      grossProfit > 0 ? ratioOf(grossProfit, salesBase) : null,
+      "profit",
+    ),
   ];
 
   const tradingCredit: PnlStatementLine[] = [
@@ -624,18 +693,58 @@ async function buildDynamic(
     line("GROSS LOSS", grossProfit < 0 ? Math.abs(grossProfit) : null, grossProfit < 0 ? ratioOf(Math.abs(grossProfit), salesBase) : null, "profit"),
   ];
 
-  const tradingTotal = round2(
-    openingStock + purchases + electricity + manpower + (grossProfit > 0 ? grossProfit : 0),
-  );
+  const tradingTotal = round2(salesRevenue + closingStock);
 
   const indirectDebit: PnlStatementLine[] = [
     line("INDIRECT EXPENSES", null, null, "header"),
-    line("PETTY CASH EXP", pettyCash || null, pettyCash ? ratioOf(pettyCash, salesBase) : null, "item"),
-    line("DEPRECIATION", depreciation || null, depreciation ? ratioOf(depreciation, salesBase) : null, "item"),
-    line("FACTORY RENT", rent || null, rent ? ratioOf(rent, salesBase) : null, "item"),
-    line(`INCOME TAX PAYABLE (${Math.round(profitBeforeTax)}×25%)`, incomeTax || null, incomeTax ? ratioOf(incomeTax, salesBase) : null, "tax"),
-    line("NET PROFIT", netProfit > 0 ? netProfit : null, netProfit > 0 ? ratioOf(netProfit, salesBase) : null, "profit"),
-    line("NET LOSS", netProfit < 0 ? Math.abs(netProfit) : null, netProfit < 0 ? ratioOf(Math.abs(netProfit), salesBase) : null, "profit"),
+    line(
+      "PETTY CASH EXP",
+      pettyCashExp || null,
+      pettyCashExp ? ratioOf(pettyCashExp, salesBase) : null,
+      "item",
+    ),
+    line(
+      "SALARY EXPENSES",
+      supervisorSalary || null,
+      supervisorSalary ? ratioOf(supervisorSalary, salesBase) : null,
+      "item",
+    ),
+    line(
+      "DEPRECIATION",
+      depreciation || null,
+      depreciation ? ratioOf(depreciation, salesBase) : null,
+      "item",
+    ),
+    line(
+      "FINANCIAL COST",
+      financialCost || null,
+      financialCost ? ratioOf(financialCost, salesBase) : null,
+      "item",
+    ),
+    line(
+      "FACTORY RENT",
+      rent || null,
+      rent ? ratioOf(rent, salesBase) : null,
+      "item",
+    ),
+    line(
+      `INCOME TAX PAYABLE (${Math.round(profitBeforeTax)}×25%)`,
+      incomeTax || null,
+      incomeTax ? ratioOf(incomeTax, salesBase) : null,
+      "tax",
+    ),
+    line(
+      "NET PROFIT",
+      netProfit > 0 ? netProfit : null,
+      netProfit > 0 ? ratioOf(netProfit, salesBase) : null,
+      "profit",
+    ),
+    line(
+      "NET LOSS",
+      netProfit < 0 ? Math.abs(netProfit) : null,
+      netProfit < 0 ? ratioOf(Math.abs(netProfit), salesBase) : null,
+      "profit",
+    ),
   ];
 
   const indirectCredit: PnlStatementLine[] = [
@@ -644,9 +753,7 @@ async function buildDynamic(
     line("INDIRECT INCOME", null, null, "header"),
   ];
 
-  const indirectTotal = round2(
-    (grossProfit > 0 ? grossProfit : 0),
-  );
+  const indirectTotal = round2(Math.abs(grossProfit));
 
   return {
     salesRevenue,
@@ -654,7 +761,7 @@ async function buildDynamic(
     manpower,
     electricity,
     rent,
-    pettyCash,
+    pettyCash: pettyCashExp,
     depreciation,
     grossProfit,
     netProfit,

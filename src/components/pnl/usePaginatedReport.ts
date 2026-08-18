@@ -16,10 +16,11 @@ type PaginatedResponse<T> = {
 export function usePaginatedReport<T>(
   baseUrl: string,
   fallbackError: string,
+  initialPageSize = DEFAULT_REPORT_PAGE_SIZE,
 ) {
   const [rows, setRows] = useState<T[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_REPORT_PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -7,6 +7,7 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
 
 type ExpenseRow = {
@@ -25,13 +26,14 @@ type ExpenseRow = {
 };
 
 function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
+  return formatDayMonthYear(value);
 }
 
 function formatMonth(value: string | Date) {
   const iso = isoDate(value);
-  const d = new Date(`${iso}T00:00:00Z`);
+  if (!iso || iso === "—") return "—";
+  const d = new Date(`${String(iso).slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-GB", {
     month: "short",
     year: "numeric",

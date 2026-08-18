@@ -48,5 +48,11 @@ export default async function PlantPnlPage({ params }: PageProps) {
     );
   }
 
-  return <PnlReportsShell plantId={plant.id} plantName={plant.name} plantCode={plant.code} />;
+  return (
+    <PnlReportsShell
+      plantId={plant.id}
+      plantName={plant.name}
+      plantCode={plant.code}
+    />
+  );
 }

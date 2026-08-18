@@ -92,12 +92,14 @@ export async function GET(
     select: { code: true },
   });
   const cat6 = isCat6Plant(plant?.code);
+  const snapshot = sp.get("snapshot") === "1";
 
   const entries = await prisma.stockEntry.findMany({
     where: {
       plantId,
       ...filter,
       ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
+      ...(snapshot ? { notes: { startsWith: "Closing stock" } } : {}),
     },
     orderBy: cat6
       ? [{ date: "asc" }, { createdAt: "asc" }]

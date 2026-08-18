@@ -20,10 +20,8 @@ import { BillUpload } from "@/components/today/BillUpload";
 import { PRODUCT_UNITS } from "@/lib/units";
 import {
   DEFAULT_PURCHASE_GOODS,
-  getCat6PettyCatalog,
-  getCustomerCatalog,
+  STOCK_CATEGORIES,
   getPurchaseCatalog,
-  getSalesCatalog,
   getStockCatalog,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, mapCat6PettyNature } from "@/lib/plant-layout";
@@ -124,10 +122,28 @@ type LineItem = {
   quantity: string;
   rate: string;
   gstPercent: string;
-  inMeter?: string;
-  qtyMtr?: string;
-  meterUnit?: string;
 };
+
+const CUSTOMERS = [
+  "Noto Fire",
+  "Wirelux",
+  "Samriddhii Automation Haridwar",
+  "Samriddhi Automation Noida",
+  "Railway PO ATC",
+  "Hamsa India",
+  "Peak Star Networking",
+  "Glow Right",
+  "Ayansh Infocom",
+  "Qlo Networks",
+  "Anu Exterprises",
+  "Digamber Telecom",
+  "Naitik Infotex",
+  "Bharat Cable Industries",
+  "Goa Shipping Yard",
+  "Reliable securities",
+  "Chrome Infra",
+  "Epsillon Cable",
+] as const;
 
 const SALE_TYPES = [
   { value: "FINISHED_GOOD", label: "Finished Good" },
@@ -169,6 +185,10 @@ const PRODUCTS = [
   { name: "PVC Compound", unit: "KGS" },
   { name: "SPOOL", unit: "NOS" },
 ] as const;
+
+const PRODUCT_NAMES = PRODUCTS.map((p) => p.name);
+
+const STOCK_CATEGORIES_OPTIONS = [...STOCK_CATEGORIES] as const;
 
 function newLine(unit = "Kg", itemDescription = ""): LineItem {
   return {
@@ -216,40 +236,12 @@ export function TodayHub({
     () => getPurchaseCatalog(plantCode),
     [plantCode],
   );
-  const saleProducts = useMemo(() => getSalesCatalog(plantCode), [plantCode]);
-  const stockItems = useMemo(() => getStockCatalog(plantCode), [plantCode]);
-  const customers = useMemo(() => getCustomerCatalog(plantCode), [plantCode]);
-  const isCat6 = isCat6Plant(plantCode);
-  const pettyCatalog = useMemo(() => getCat6PettyCatalog(), []);
-  const cat6SupplierOptions = useMemo(
-    () =>
-      isCat6
-        ? [...purchaseCatalog.suppliers, "Other"].filter(
-            (value, index, arr) => arr.indexOf(value) === index,
-          )
-        : purchaseCatalog.suppliers,
-    [isCat6, purchaseCatalog.suppliers],
+  const stockCatalog = useMemo(
+    () => getStockCatalog(plantCode),
+    [plantCode],
   );
-  const cat6CustomerOptions = useMemo(
-    () =>
-      isCat6
-        ? [...customers, "Other"].filter(
-            (value, index, arr) => arr.indexOf(value) === index,
-          )
-        : customers,
-    [customers, isCat6],
-  );
-
-  useEffect(() => {
-    setCustomerName(customers[0] ?? "");
-    setStockItem(stockItems[0] ?? DEFAULT_PURCHASE_GOODS[0]);
-    setSaleLines([newLine("PCS", saleProducts[0] ?? PRODUCTS[0].name)]);
-    setProductName(saleProducts[0] ?? PRODUCTS[0].name);
-    if (isCat6) {
-      setExpenseHead("Miscellaneous");
-      setExpenseDesc("Salary");
-    }
-  }, [customers, saleProducts, stockItems, isCat6]);
+  const isPvc = plantCode.toUpperCase() === "PVC";
+  const stockParticulars = [...stockCatalog.particulars, "Others"];
 
   const entryOptions = useMemo(
     () =>
@@ -298,16 +290,23 @@ export function TodayHub({
   ]);
 
   // Stock
+  const [stockCategory, setStockCategory] =
+    useState<(typeof STOCK_CATEGORIES)[number]>("RM");
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
   const [stockItemOther, setStockItemOther] = useState("");
   const [stockQty, setStockQty] = useState("");
-  const [stockUnit, setStockUnit] = useState<(typeof PRODUCT_UNITS)[number]>("ROLL");
+  const [stockUnit, setStockUnit] = useState("KGS");
   const [stockRate, setStockRate] = useState("");
   const [stockValue, setStockValue] = useState("");
   const [stockNotes, setStockNotes] = useState("");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
+
+  useEffect(() => {
+    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
+    setStockUnit(stockCatalog.defaultUnit);
+  }, [stockCatalog]);
 
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
@@ -400,11 +399,12 @@ export function TodayHub({
     setInvoiceNo("");
     setSaleRemarks("");
     setInvoicePhotos([]);
-    setSaleLines([newLine(PRODUCTS[0].unit, saleProducts[0] ?? PRODUCTS[0].name)]);
-    setStockItem(stockItems[0] ?? DEFAULT_PURCHASE_GOODS[0]);
+    setSaleLines([newLine(PRODUCTS[0].unit, PRODUCTS[0].name)]);
+    setStockCategory("RM");
+    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
     setStockItemOther("");
     setStockQty("");
-    setStockUnit("ROLL");
+    setStockUnit(stockCatalog.defaultUnit);
     setStockRate("");
     setStockValue("");
     setStockNotes("");
@@ -599,39 +599,45 @@ export function TodayHub({
     } else if (kind === "stock") {
       const resolvedItem =
         stockItem === "Others" ? stockItemOther.trim() : stockItem.trim();
+      const closingQty = Number(stockQty);
+      const closingRate = Number(stockRate);
+      const closingValue =
+        stockValue === ""
+          ? closingQty * closingRate
+          : Number(stockValue);
       if (
         !resolvedItem ||
         stockQty === "" ||
-        (isCat6 ? stockRate === "" && stockValue === "" : stockValue === "")
+        (isPvc ? stockRate === "" : stockValue === "")
       ) {
         fail(
           stockItem === "Others" && !stockItemOther.trim()
             ? "Enter the other item name."
-            : isCat6
-              ? "Enter item, quantity, and rate."
+            : isPvc
+              ? "Enter particulars, closing stock, unit, and rate."
               : "Enter item, quantity, and value.",
         );
         return;
       }
-      const qtyNum = Number(stockQty);
-      const rateNum = Number(stockRate) || 0;
-      const valueNum = isCat6
-        ? Number(stockValue) || qtyNum * rateNum
-        : Number(stockValue);
-      if (!(qtyNum >= 0) || !(valueNum >= 0)) {
-        fail("Quantity and value must be zero or more.");
+      if (
+        !(closingQty >= 0) ||
+        (isPvc ? !(closingRate >= 0) : !(closingValue >= 0))
+      ) {
+        fail("Quantity, rate, and value must be zero or more.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/stock`, {
         date: entryDate,
         shift,
         itemName: resolvedItem,
-        category: isCat6 ? "FG" : "RM",
-        unit: isCat6 ? stockUnit : "kg",
-        quantity: qtyNum,
-        rate: isCat6 ? rateNum : undefined,
-        value: valueNum,
-        notes: stockNotes.trim() || null,
+        category: stockCategory,
+        unit: isPvc ? stockUnit || "KGS" : "kg",
+        quantity: closingQty,
+        rate: isPvc ? closingRate : undefined,
+        value: isPvc ? closingQty * closingRate : closingValue,
+        notes: isPvc
+          ? stockNotes.trim() || `Closing stock as on ${entryDate}`
+          : stockNotes.trim() || null,
         photoUrls: stockPhotos,
       });
     } else if (kind === "production") {
@@ -1159,12 +1165,28 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
+                {isPvc ? (
+                  <div className="field">
+                    <label htmlFor="st-category">Stock</label>
+                    <SelectMenu
+                      id="st-category"
+                      value={stockCategory}
+                      options={STOCK_CATEGORIES_OPTIONS}
+                      required
+                      onChange={(next) =>
+                        setStockCategory(next as (typeof STOCK_CATEGORIES)[number])
+                      }
+                    />
+                  </div>
+                ) : null}
                 <div className="field">
-                  <label htmlFor="st-item">{isCat6 ? "Item Name" : "Item"}</label>
+                  <label htmlFor="st-item">
+                    {isPvc ? "Particulars" : "Item"}
+                  </label>
                   <SelectMenu
                     id="st-item"
-                    value={stockItem || stockItems[0] || DEFAULT_PURCHASE_GOODS[0]}
-                    options={stockItems}
+                    value={stockItem || stockParticulars[0]}
+                    options={stockParticulars}
                     required
                     onChange={(next) => {
                       setStockItem(next);
@@ -1174,11 +1196,15 @@ export function TodayHub({
                 </div>
                 {stockItem === "Others" ? (
                   <div className="field">
-                    <label htmlFor="st-item-other">Other item</label>
+                    <label htmlFor="st-item-other">
+                      {isPvc ? "Other particulars" : "Other item"}
+                    </label>
                     <input
                       id="st-item-other"
                       required
-                      placeholder="Enter item name"
+                      placeholder={
+                        isPvc ? "Enter particulars" : "Enter item name"
+                      }
                       value={stockItemOther}
                       onChange={(e) => setStockItemOther(e.target.value)}
                     />
@@ -1186,68 +1212,79 @@ export function TodayHub({
                 ) : null}
                 <div className="prod-fields__row">
                   <div className="field">
-                    <label htmlFor="st-qty">{isCat6 ? "QTY" : "Quantity"}</label>
+                    <label htmlFor="st-qty">
+                      {isPvc ? "Closing Stock" : "Quantity"}
+                    </label>
                     <DecimalInput
                       id="st-qty"
                       required
                       value={stockQty}
                       onChange={(next) => {
                         setStockQty(next);
-                        if (isCat6 && stockRate) {
-                          const qty = Number(next);
-                          const rate = Number(stockRate);
+                        const qty = Number(next);
+                        const rate = Number(stockRate);
+                        if (isPvc && Number.isFinite(qty) && Number.isFinite(rate)) {
+                          setStockValue((qty * rate).toFixed(2));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="field">
+                    <label htmlFor="st-unit">Unit</label>
+                    {isPvc ? (
+                      <SelectMenu
+                        id="st-unit"
+                        value={stockUnit}
+                        options={PRODUCT_UNITS}
+                        required
+                        onChange={setStockUnit}
+                      />
+                    ) : (
+                      <input id="st-unit" value="kg" readOnly />
+                    )}
+                  </div>
+                </div>
+                {isPvc ? (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="st-rate">Rate</label>
+                      <DecimalInput
+                        id="st-rate"
+                        required
+                        value={stockRate}
+                        onChange={(next) => {
+                          setStockRate(next);
+                          const qty = Number(stockQty);
+                          const rate = Number(next);
                           if (Number.isFinite(qty) && Number.isFinite(rate)) {
-                            setStockValue(String(qty * rate));
+                            setStockValue((qty * rate).toFixed(2));
                           }
-                        }
-                      }}
-                    />
+                        }}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="st-value">Closing Value</label>
+                      <DecimalInput
+                        id="st-value"
+                        required
+                        value={stockValue}
+                        onChange={setStockValue}
+                      />
+                    </div>
                   </div>
-                  {isCat6 ? (
-                  <div className="field">
-                    <label htmlFor="st-unit">UNIT</label>
-                    <SelectMenu
-                      id="st-unit"
-                      value={stockUnit}
-                      options={PRODUCT_UNITS}
-                      required
-                      onChange={(next) =>
-                        setStockUnit(next as (typeof PRODUCT_UNITS)[number])
-                      }
-                    />
+                ) : (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="st-value">Value</label>
+                      <DecimalInput
+                        id="st-value"
+                        required
+                        value={stockValue}
+                        onChange={setStockValue}
+                      />
+                    </div>
                   </div>
-                  ) : null}
-                </div>
-                <div className="prod-fields__row">
-                  {isCat6 ? (
-                  <div className="field">
-                    <label htmlFor="st-rate">RATE</label>
-                    <DecimalInput
-                      id="st-rate"
-                      required
-                      value={stockRate}
-                      onChange={(next) => {
-                        setStockRate(next);
-                        const qty = Number(stockQty);
-                        const rate = Number(next);
-                        if (Number.isFinite(qty) && Number.isFinite(rate)) {
-                          setStockValue(String(qty * rate));
-                        }
-                      }}
-                    />
-                  </div>
-                  ) : null}
-                  <div className="field">
-                    <label htmlFor="st-value">Value</label>
-                    <DecimalInput
-                      id="st-value"
-                      required={!isCat6}
-                      value={stockValue}
-                      onChange={setStockValue}
-                    />
-                  </div>
-                </div>
-                {isCat6 ? null : (
+                )}
                 <div className="field expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea

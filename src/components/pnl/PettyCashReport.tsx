@@ -5,9 +5,9 @@ import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
-import { formatDisplayDate } from "@/components/pnl/types";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
 
 type PettyCashRow = {
@@ -33,11 +33,6 @@ type PettyCashTotals = {
   supervisorSalary: number;
   total: number;
 };
-
-function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
-}
 
 function rowTotal(r: PettyCashRow) {
   return (
@@ -75,138 +70,70 @@ export function PettyCashReport({
   const totals = response?.totals as PettyCashTotals | undefined;
 
   const columns: ReportColumn<PettyCashRow>[] = useMemo(
-    () =>
-      cat6
-        ? [
-            {
-              key: "s",
-              label: "S.No",
-              compact: true,
-              render: (_r, index) =>
-                String((page - 1) * pageSize + (index ?? 0) + 1),
-            },
-            {
-              key: "date",
-              label: "Date",
-              render: (r) => formatDisplayDate(isoDate(r.date)),
-            },
-            {
-              key: "amount",
-              label: "Output Amt",
-              align: "right",
-              render: (r) => formatINR(Number(r.amount)),
-            },
-            {
-              key: "nature",
-              label: "Nature of Expense",
-              wrap: true,
-              render: (r) => r.nature?.trim() || tCommon("dash"),
-            },
-            {
-              key: "desc",
-              label: "Expense Description",
-              wrap: "wide",
-              render: (r) => r.description?.trim() || tCommon("dash"),
-            },
-            {
-              key: "person",
-              label: "Person",
-              render: (r) => r.payMode || tCommon("dash"),
-            },
-            {
-              key: "location",
-              label: "Location",
-              render: (r) => r.location?.trim() || tCommon("dash"),
-            },
-            {
-              key: "checked",
-              label: "Check by",
-              render: (r) => r.checkedBy?.trim() || tCommon("dash"),
-            },
-            {
-              key: "approved",
-              label: "Approved By",
-              render: (r) => r.approvedBy?.trim() || tCommon("dash"),
-            },
-            {
-              key: "photos",
-              label: "Bill",
-              compact: true,
-              render: (r) => (
-                <BillPhotosCell
-                  urls={r.billPhotoUrls}
-                  fallbackUrl={r.billPhotoUrl}
-                />
-              ),
-            },
-          ]
-        : [
-            {
-              key: "s",
-              label: t("sNo"),
-              compact: true,
-              render: (_r, index) =>
-                String((page - 1) * pageSize + (index ?? 0) + 1),
-            },
-            {
-              key: "payMode",
-              label: t("payMode"),
-              render: (r) => r.payMode || tCommon("dash"),
-            },
-            {
-              key: "desc",
-              label: t("descriptionOfExpense"),
-              wrap: "wide",
-              render: (r) => r.description?.trim() || tCommon("dash"),
-            },
-            {
-              key: "billNumber",
-              label: t("billNumber"),
-              wrap: true,
-              render: (r) => r.billNumber?.trim() || tCommon("dash"),
-            },
-            {
-              key: "expenses",
-              label: t("expenses"),
-              align: "right",
-              render: (r) => formatINR(Number(r.amount)),
-            },
-            {
-              key: "contractor",
-              label: t("contractorSalary"),
-              align: "right",
-              render: (r) => formatINR(Number(r.contractorSalary)),
-            },
-            {
-              key: "supervisor",
-              label: t("supervisorSalary"),
-              align: "right",
-              render: (r) => formatINR(Number(r.supervisorSalary)),
-            },
-            {
-              key: "total",
-              label: t("total"),
-              align: "right",
-              render: (r) => formatINR(rowTotal(r)),
-            },
-            {
-              key: "billDate",
-              label: t("billDate"),
-              render: (r) => formatDisplayDate(isoDate(r.date)),
-            },
-            {
-              key: "photos",
-              label: "Bill",
-              compact: true,
-              render: (r) => (
-                <BillPhotosCell
-                  urls={r.billPhotoUrls}
-                  fallbackUrl={r.billPhotoUrl}
-                />
-              ),
-            },
-          ],
-    [cat6, page, pageSize, t, tCommon],
+    () => [
+      {
+        key: "s",
+        label: t("sNo"),
+        compact: true,
+        render: (_r, index) =>
+          String((page - 1) * pageSize + (index ?? 0) + 1),
+      },
+      {
+        key: "payMode",
+        label: t("payMode"),
+        render: (r) => r.payMode || tCommon("dash"),
+      },
+      {
+        key: "desc",
+        label: t("descriptionOfExpense"),
+        wrap: "wide",
+        render: (r) => r.description?.trim() || tCommon("dash"),
+      },
+      {
+        key: "billNumber",
+        label: t("billNumber"),
+        wrap: true,
+        render: (r) => r.billNumber?.trim() || tCommon("dash"),
+      },
+      {
+        key: "expenses",
+        label: t("expenses"),
+        align: "right",
+        render: (r) => formatINR(Number(r.amount)),
+      },
+      {
+        key: "contractor",
+        label: t("contractorSalary"),
+        align: "right",
+        render: (r) => formatINR(Number(r.contractorSalary)),
+      },
+      {
+        key: "supervisor",
+        label: t("supervisorSalary"),
+        align: "right",
+        render: (r) => formatINR(Number(r.supervisorSalary)),
+      },
+      {
+        key: "total",
+        label: t("total"),
+        align: "right",
+        render: (r) => formatINR(rowTotal(r)),
+      },
+      {
+        key: "billDate",
+        label: t("billDate"),
+        render: (r) => formatDayMonthYear(r.date),
+      },
+      {
+        key: "photos",
+        label: "Bill",
+        compact: true,
+        render: (r) => (
+          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+        ),
+      },
+    ],
+    [page, pageSize, t, tCommon],
   );
 
   return (

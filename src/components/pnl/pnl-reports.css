@@ -424,6 +424,14 @@
   color: var(--fg-muted, #5b6b66);
 }
 
+.pnl-report-panel__title--plain {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--fg, #10221c);
+}
+
 .pnl-report-totals {
   display: flex;
   flex-wrap: wrap;
@@ -489,8 +497,9 @@
 }
 
 .pnl-report-table-wrap--register .pnl-report-table {
-  width: max-content;
+  width: 100%;
   min-width: 100%;
+  table-layout: fixed;
 }
 
 .pnl-report-table th,
@@ -565,17 +574,17 @@
   white-space: normal;
   overflow-wrap: break-word;
   word-break: break-word;
-  vertical-align: top;
+  vertical-align: middle;
   min-width: 7.5rem;
-  max-width: 11rem;
+  max-width: none;
   line-height: 1.35;
 }
 
-/* Remarks / long notes — wider, as many lines as needed */
+/* Remarks / long notes — remaining width in a fixed table */
 .pnl-report-table--register th.is-wrap-wide,
 .pnl-report-table--register td.is-wrap-wide {
-  min-width: 12rem;
-  max-width: 18rem;
+  min-width: 8rem;
+  max-width: none;
 }
 
 .pnl-report-table .is-right {
@@ -630,29 +639,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  /* DOM order: P&L, Sales, Purchase, Production, Stock, Expense, Petty Cash */
-  .pnl-tab-nav button:nth-child(1) {
-    order: 1; /* P&L */
-  }
-  .pnl-tab-nav button:nth-child(2) {
-    order: 3; /* Sales */
-  }
-  .pnl-tab-nav button:nth-child(3) {
-    order: 5; /* Purchase */
-  }
-  .pnl-tab-nav button:nth-child(4) {
-    order: 6; /* Production */
-  }
-  .pnl-tab-nav button:nth-child(5) {
-    order: 2; /* Stock */
-  }
-  .pnl-tab-nav button:nth-child(6) {
-    order: 7; /* Expense */
-  }
-  .pnl-tab-nav button:nth-child(7) {
-    order: 4; /* Petty Cash */
   }
 
   .pnl-reports__actions {

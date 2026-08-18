@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { canAccessPlant, canEnterData } from "@/lib/rbac";
+import { toIsoDateString } from "@/lib/dates";
 
 type Ctx = { params: Promise<{ plantId: string }> };
 
@@ -14,6 +15,8 @@ const upsertSchema = z.object({
   consumedUnits: z.number().nullable().optional(),
   billAmount: z.number().nonnegative().optional(),
   rentAmount: z.number().nonnegative().optional(),
+  coveredAreaSqft: z.number().nonnegative().nullable().optional(),
+  rentRatePerSqft: z.number().nonnegative().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
 });
 
@@ -37,12 +40,23 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
 
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
   const rows = await prisma.electricityRent.findMany({
     where: { plantId },
-    orderBy: { month: "desc" },
+    orderBy: { month: "asc" },
   });
 
-  return NextResponse.json({ ok: true, rows });
+  return NextResponse.json({
+    ok: true,
+    plantCode: plant?.code ?? null,
+    rows: rows.map((row) => ({
+      ...row,
+      month: toIsoDateString(row.month),
+    })),
+  });
 }
 
 export async function POST(request: Request, context: Ctx) {
@@ -82,13 +96,51 @@ export async function POST(request: Request, context: Ctx) {
     );
   }
 
+  const existing = await prisma.electricityRent.findUnique({
+    where: { plantId_month: { plantId, month } },
+  });
+
+  const toNum = (value: unknown): number | null => {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const coveredAreaSqft =
+    parsed.data.coveredAreaSqft !== undefined
+      ? parsed.data.coveredAreaSqft
+      : toNum(existing?.coveredAreaSqft);
+  const rentRatePerSqft =
+    parsed.data.rentRatePerSqft !== undefined
+      ? parsed.data.rentRatePerSqft
+      : toNum(existing?.rentRatePerSqft);
+  const computedRent =
+    coveredAreaSqft != null && rentRatePerSqft != null
+      ? Math.round(coveredAreaSqft * rentRatePerSqft * 100) / 100
+      : parsed.data.rentAmount !== undefined
+        ? parsed.data.rentAmount
+        : toNum(existing?.rentAmount) ?? 0;
+
   const data = {
-    openingReading: parsed.data.openingReading ?? null,
-    closingReading: parsed.data.closingReading ?? null,
-    consumedUnits: parsed.data.consumedUnits ?? null,
-    billAmount: parsed.data.billAmount ?? 0,
-    rentAmount: parsed.data.rentAmount ?? 0,
-    notes: parsed.data.notes ?? null,
+    openingReading:
+      parsed.data.openingReading !== undefined
+        ? parsed.data.openingReading
+        : toNum(existing?.openingReading),
+    closingReading:
+      parsed.data.closingReading !== undefined
+        ? parsed.data.closingReading
+        : toNum(existing?.closingReading),
+    consumedUnits:
+      parsed.data.consumedUnits !== undefined
+        ? parsed.data.consumedUnits
+        : toNum(existing?.consumedUnits),
+    billAmount:
+      parsed.data.billAmount ?? toNum(existing?.billAmount) ?? 0,
+    rentAmount: computedRent,
+    coveredAreaSqft,
+    rentRatePerSqft,
+    notes:
+      parsed.data.notes !== undefined ? parsed.data.notes : existing?.notes ?? null,
   };
 
   const row = await prisma.electricityRent.upsert({

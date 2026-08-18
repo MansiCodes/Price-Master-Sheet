@@ -9,6 +9,7 @@ import {
   dateOnlyRegex,
   parseDateOnly,
   todayDateString,
+  formatMonthLabel,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { canViewPnl, isAdminOrHead } from "@/lib/rbac";
@@ -23,8 +24,15 @@ type ExportKind =
   | "purchase"
   | "production"
   | "stock"
+  | "electricityRent"
+  | "factoryRent"
+  | "fixedAssets"
   | "expense"
   | "pettyCash";
+
+function startOfUtcMonth(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
 
 function toNum(v: unknown): number {
   if (v == null) return 0;
@@ -82,7 +90,13 @@ export async function GET(
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Cable Junction";
-  const sheet = workbook.addWorksheet(kind.toUpperCase());
+  const sheetName =
+    kind === "factoryRent"
+      ? "Factory Rent"
+      : kind === "electricityRent"
+        ? "Electricity"
+        : kind.toUpperCase();
+  const sheet = workbook.addWorksheet(sheetName);
 
   if (kind === "pnl") {
     if (!canViewPnl(session.user.globalRole)) {
@@ -267,43 +281,163 @@ export async function GET(
       });
     });
   } else if (kind === "stock") {
+    const isPvc = plant.code.toUpperCase() === "PVC";
     const rows = await prisma.stockEntry.findMany({
       where: {
         plantId,
         date: { gte: from, lte: to },
-        ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
+        ...(isPvc ? { notes: { startsWith: "Closing stock" } } : {}),
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = cat6
-      ? [
-          { header: "S.No", key: "sno", width: 8 },
-          { header: "Item Name", key: "item", width: 36 },
-          { header: "QTY", key: "qty", width: 12 },
-          { header: "UNIT", key: "unit", width: 10 },
-          { header: "RATE", key: "rate", width: 12 },
-          { header: "Value", key: "value", width: 14 },
-        ]
-      : [
-          { header: "sNo.", key: "sno", width: 8 },
-          { header: "Date", key: "date", width: 12 },
-          { header: "Shift", key: "shift", width: 10 },
-          { header: "Item", key: "item", width: 22 },
-          { header: "Unit", key: "unit", width: 10 },
-          { header: "Qty", key: "qty", width: 12 },
-          { header: "Value", key: "value", width: 14 },
-        ];
+    if (isPvc) {
+      sheet.columns = [
+        { header: "S.No.", key: "sno", width: 8 },
+        { header: "Stock", key: "stock", width: 10 },
+        { header: "Particulars", key: "particulars", width: 28 },
+        { header: "Closing Stock", key: "qty", width: 16 },
+        { header: "Unit", key: "unit", width: 10 },
+        { header: "Rate", key: "rate", width: 12 },
+        { header: "Closing Value", key: "value", width: 16 },
+      ];
+      styleHeader(sheet.getRow(1));
+      rows.forEach((r, i) => {
+        sheet.addRow({
+          sno: i + 1,
+          stock: r.category,
+          particulars: r.itemName,
+          qty: toNum(r.quantity),
+          unit: r.unit,
+          rate: toNum(r.rate),
+          value: toNum(r.closingValue),
+        });
+      });
+    } else {
+      sheet.columns = [
+        { header: "sNo.", key: "sno", width: 8 },
+        { header: "Date", key: "date", width: 12 },
+        { header: "Item", key: "item", width: 22 },
+        { header: "Unit", key: "unit", width: 10 },
+        { header: "Qty", key: "qty", width: 12 },
+        { header: "Value", key: "value", width: 14 },
+      ];
+      styleHeader(sheet.getRow(1));
+      rows.forEach((r, i) => {
+        sheet.addRow({
+          sno: i + 1,
+          date: iso(r.date),
+          item: r.itemName,
+          unit: r.unit,
+          qty: toNum(r.quantity),
+          value: toNum(r.closingValue),
+        });
+      });
+    }
+  } else if (kind === "electricityRent" || kind === "factoryRent") {
+    const fromMonth = startOfUtcMonth(from);
+    const toMonth = startOfUtcMonth(to);
+    const rentOnly = kind === "factoryRent";
+    const isPvc = plant.code.toUpperCase() === "PVC";
+    const rows = await prisma.electricityRent.findMany({
+      where: rentOnly
+        ? { plantId }
+        : { plantId, month: { gte: fromMonth, lte: toMonth } },
+      orderBy: { month: "asc" },
+    });
+    sheet.columns =
+      rentOnly
+        ? [
+            { header: "S.No", key: "sno", width: 8 },
+            { header: "Months", key: "month", width: 14 },
+            { header: "Covered Area", key: "area", width: 16 },
+            { header: "Rate", key: "rentRate", width: 12 },
+            { header: "Rent Exp", key: "rent", width: 14 },
+          ]
+        : isPvc
+          ? [
+              { header: "S.No.", key: "sno", width: 8 },
+              { header: "Months", key: "month", width: 14 },
+              { header: "Opening Reading", key: "opening", width: 16 },
+              { header: "Closing Reading", key: "closing", width: 16 },
+              { header: "Consumed Reading", key: "consumed", width: 16 },
+              { header: "Avg rate", key: "avg", width: 12 },
+              { header: "Amount of electricity bill", key: "bill", width: 22 },
+              { header: "Notes / Remark", key: "notes", width: 28 },
+            ]
+          : [
+              { header: "S.No.", key: "sno", width: 8 },
+              { header: "Month", key: "month", width: 14 },
+              { header: "Opening", key: "opening", width: 14 },
+              { header: "Closing", key: "closing", width: 14 },
+              { header: "Consumed", key: "consumed", width: 14 },
+              { header: "Avg rate", key: "avg", width: 12 },
+              { header: "Electricity Bill", key: "bill", width: 18 },
+              { header: "Rent Expense", key: "rent", width: 16 },
+              { header: "Notes", key: "notes", width: 22 },
+            ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({
         sno: i + 1,
-        date: iso(r.date),
-        shift: r.shift,
-        item: r.itemName,
-        unit: r.unit,
-        qty: toNum(r.quantity),
-        rate: toNum(r.rate),
-        value: toNum(r.closingValue),
+        month: formatMonthLabel(r.month),
+        opening: r.openingReading == null ? "" : toNum(r.openingReading),
+        closing: r.closingReading == null ? "" : toNum(r.closingReading),
+        consumed: r.consumedUnits == null ? "" : toNum(r.consumedUnits),
+        avg:
+          r.consumedUnits != null && toNum(r.consumedUnits) > 0 && toNum(r.billAmount) > 0
+            ? toNum(r.billAmount) / toNum(r.consumedUnits)
+            : "",
+        bill: toNum(r.billAmount),
+        area:
+          r.coveredAreaSqft == null
+            ? ""
+            : `${toNum(r.coveredAreaSqft)} SQFT`,
+        rentRate: r.rentRatePerSqft == null ? "" : toNum(r.rentRatePerSqft),
+        rent: toNum(r.rentAmount),
+        notes: r.notes ?? "",
+      });
+    });
+  } else if (kind === "fixedAssets") {
+    const periodDays = (() => {
+      const start = Date.UTC(
+        from.getUTCFullYear(),
+        from.getUTCMonth(),
+        from.getUTCDate(),
+      );
+      const end = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+      const ms = end - start;
+      return Math.max(1, Math.floor(ms / 86_400_000) + 1);
+    })();
+
+    const rows = await prisma.fixedAsset.findMany({
+      where: { plantId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    sheet.columns = [
+      { header: "S.No.", key: "sno", width: 8 },
+      { header: "Asset", key: "asset", width: 36 },
+      { header: "Vendor", key: "vendor", width: 20 },
+      { header: "Cost", key: "cost", width: 14 },
+      { header: "Dep %", key: "depPct", width: 12 },
+      { header: "Depreciation Amt", key: "depAmt", width: 18 },
+      { header: "Bill no.", key: "bill", width: 16 },
+      { header: "Bill date", key: "billDate", width: 12 },
+    ];
+    styleHeader(sheet.getRow(1));
+
+    rows.forEach((r, i) => {
+      const annual = Number(r.cost) * (Number(r.depreciationPercent) / 100);
+      const depAmt = (annual * periodDays) / 365;
+      sheet.addRow({
+        sno: i + 1,
+        asset: r.assetDescription,
+        vendor: r.vendor ?? "",
+        cost: toNum(r.cost),
+        depPct: Number(r.depreciationPercent),
+        depAmt,
+        bill: r.billNumber ?? "",
+        billDate: iso(r.billDate),
       });
     });
   } else if (kind === "pettyCash") {

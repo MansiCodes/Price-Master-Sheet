@@ -1484,6 +1484,15 @@ textarea {
   vertical-align: middle;
 }
 
+.table-wrap .is-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table-wrap .is-center {
+  text-align: center;
+}
+
 .table-wrap th {
   background: #fafaf9;
   font-size: 0.72rem;
@@ -1599,6 +1608,7 @@ textarea {
   color: var(--fg-muted);
   font-size: 0.95rem;
   padding: 1rem 0;
+  text-align: center;
 }
 
 [data-sonner-toaster] {

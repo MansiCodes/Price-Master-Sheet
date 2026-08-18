@@ -6,29 +6,36 @@ import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { formatDayMonthYear } from "@/lib/dates";
 
 type StockRow = {
   id: string;
   date: string;
-  shift: string;
+  notes?: string | null;
   itemName: string;
+  category?: string | null;
   quantity: string | number;
   unit: string;
-  rate?: string | number;
+  rate?: string | number | null;
   closingValue: string | number;
   photoUrl?: string | null;
   photoUrls?: string[];
 };
 
-function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
+function isoDate(value: string | Date | null | undefined) {
+  return formatDayMonthYear(value);
 }
 
-function num(value: string | number | undefined) {
+function num(value: string | number | null | undefined) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function formatQty(value: string | number, digits = 2) {
+  return num(value).toLocaleString("en-IN", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 export function StockReport({
@@ -43,15 +50,80 @@ export function StockReport({
   to: string;
 }) {
   const t = useTranslations("pnl");
-  const cat6 = isCat6Plant(plantCode);
-  const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
-    usePaginatedReport<StockRow>(baseUrl, t("networkError"));
-  const totals = response?.totals as { closingValue?: number } | undefined;
+  const isPvc = plantCode?.toUpperCase() === "PVC";
+  const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${isPvc ? "&snapshot=1" : ""}`;
+  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
+    usePaginatedReport<StockRow>(baseUrl, t("networkError"), isPvc ? 20 : 10);
 
   const pvcColumns: ReportColumn<StockRow>[] = [
+    {
+      key: "sno",
+      label: "S.No.",
+      align: "center",
+      compact: true,
+      width: "4.5rem",
+      render: (_r, index) =>
+        String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "stock",
+      label: "Stock",
+      align: "center",
+      compact: true,
+      width: "5rem",
+      render: (r) => r.category || "RM",
+    },
+    {
+      key: "particulars",
+      label: "Particulars",
+      wrap: true,
+      render: (r) => r.itemName,
+    },
+    {
+      key: "closingStock",
+      label: "Closing Stock",
+      align: "right",
+      width: "9rem",
+      render: (r) => formatQty(r.quantity, 3),
+    },
+    {
+      key: "unit",
+      label: "Unit",
+      align: "center",
+      compact: true,
+      width: "5rem",
+      render: (r) => r.unit || "KGS",
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      width: "7rem",
+      render: (r) => formatQty(num(r.rate)),
+    },
+    {
+      key: "closingValue",
+      label: "Closing Value",
+      align: "right",
+      width: "10rem",
+      render: (r) =>
+        formatINR(num(r.closingValue) || num(r.quantity) * num(r.rate)),
+    },
+    {
+      key: "photos",
+      label: "Image",
+      align: "center",
+      compact: true,
+      width: "5.5rem",
+      render: (r) => (
+        <BillPhotosCell urls={r.photoUrls} fallbackUrl={r.photoUrl} />
+      ),
+    },
+  ];
+
+  const defaultColumns: ReportColumn<StockRow>[] = [
     { key: "date", label: "Date", render: (r) => isoDate(r.date) },
-    { key: "shift", label: "Shift", render: (r) => r.shift },
     { key: "item", label: "Item", render: (r) => r.itemName },
     {
       key: "qty",
@@ -130,20 +202,15 @@ export function StockReport({
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">{t("stockTitle")}</h3>
+      <h3 className="pnl-report-panel__title">
+        {isPvc ? "PVC Plant - Closing Stock" : t("stockTitle")}
+      </h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={cat6 ? cat6Columns : pvcColumns}
+        columns={isPvc ? pvcColumns : defaultColumns}
         rows={rows}
         loading={loading}
-        footer={
-          totals
-            ? {
-                item: "TOTAL",
-                value: formatINR(totals.closingValue ?? 0),
-              }
-            : undefined
-        }
+        variant={isPvc ? "register" : undefined}
       />
       <Pagination
         page={page}
