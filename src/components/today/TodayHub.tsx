@@ -20,7 +20,9 @@ import { BillUpload } from "@/components/today/BillUpload";
 import { PRODUCT_UNITS } from "@/lib/units";
 import {
   DEFAULT_PURCHASE_GOODS,
+  STOCK_CATEGORIES,
   getPurchaseCatalog,
+  getStockCatalog,
 } from "@/lib/plant-catalogs";
 import "./today-hub.css";
 
@@ -121,8 +123,6 @@ type LineItem = {
   gstPercent: string;
 };
 
-const STOCK_ITEMS = [...DEFAULT_PURCHASE_GOODS, "Others"] as const;
-
 const CUSTOMERS = [
   "Noto Fire",
   "Wirelux",
@@ -187,6 +187,8 @@ const PRODUCTS = [
 
 const PRODUCT_NAMES = PRODUCTS.map((p) => p.name);
 
+const STOCK_CATEGORIES_OPTIONS = [...STOCK_CATEGORIES] as const;
+
 function newLine(unit = "Kg", itemDescription = ""): LineItem {
   return {
     id: crypto.randomUUID(),
@@ -230,6 +232,12 @@ export function TodayHub({
     () => getPurchaseCatalog(plantCode),
     [plantCode],
   );
+  const stockCatalog = useMemo(
+    () => getStockCatalog(plantCode),
+    [plantCode],
+  );
+  const isPvc = plantCode.toUpperCase() === "PVC";
+  const stockParticulars = [...stockCatalog.particulars, "Others"];
 
   const entryOptions = useMemo(
     () =>
@@ -274,14 +282,23 @@ export function TodayHub({
   ]);
 
   // Stock
+  const [stockCategory, setStockCategory] =
+    useState<(typeof STOCK_CATEGORIES)[number]>("RM");
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
   const [stockItemOther, setStockItemOther] = useState("");
   const [stockQty, setStockQty] = useState("");
+  const [stockUnit, setStockUnit] = useState("KGS");
+  const [stockRate, setStockRate] = useState("");
   const [stockValue, setStockValue] = useState("");
   const [stockNotes, setStockNotes] = useState("");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
+
+  useEffect(() => {
+    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
+    setStockUnit(stockCatalog.defaultUnit);
+  }, [stockCatalog]);
 
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
@@ -366,9 +383,12 @@ export function TodayHub({
     setSaleRemarks("");
     setInvoicePhotos([]);
     setSaleLines([newLine(PRODUCTS[0].unit, PRODUCTS[0].name)]);
-    setStockItem(DEFAULT_PURCHASE_GOODS[0]);
+    setStockCategory("RM");
+    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
     setStockItemOther("");
     setStockQty("");
+    setStockUnit(stockCatalog.defaultUnit);
+    setStockRate("");
     setStockValue("");
     setStockNotes("");
     setStockPhotos([]);
@@ -543,27 +563,45 @@ export function TodayHub({
     } else if (kind === "stock") {
       const resolvedItem =
         stockItem === "Others" ? stockItemOther.trim() : stockItem.trim();
-      if (!resolvedItem || stockQty === "" || stockValue === "") {
+      const closingQty = Number(stockQty);
+      const closingRate = Number(stockRate);
+      const closingValue =
+        stockValue === ""
+          ? closingQty * closingRate
+          : Number(stockValue);
+      if (
+        !resolvedItem ||
+        stockQty === "" ||
+        (isPvc ? stockRate === "" : stockValue === "")
+      ) {
         fail(
           stockItem === "Others" && !stockItemOther.trim()
             ? "Enter the other item name."
-            : "Enter item, quantity, and value.",
+            : isPvc
+              ? "Enter particulars, closing stock, unit, and rate."
+              : "Enter item, quantity, and value.",
         );
         return;
       }
-      if (!(Number(stockQty) >= 0) || !(Number(stockValue) >= 0)) {
-        fail("Quantity and value must be zero or more.");
+      if (
+        !(closingQty >= 0) ||
+        (isPvc ? !(closingRate >= 0) : !(closingValue >= 0))
+      ) {
+        fail("Quantity, rate, and value must be zero or more.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/stock`, {
         date: entryDate,
         shift,
         itemName: resolvedItem,
-        category: "RM",
-        unit: "kg",
-        quantity: Number(stockQty),
-        value: Number(stockValue),
-        notes: stockNotes.trim() || null,
+        category: stockCategory,
+        unit: isPvc ? stockUnit || "KGS" : "kg",
+        quantity: closingQty,
+        rate: isPvc ? closingRate : undefined,
+        value: isPvc ? closingQty * closingRate : closingValue,
+        notes: isPvc
+          ? stockNotes.trim() || `Closing stock as on ${entryDate}`
+          : stockNotes.trim() || null,
         photoUrls: stockPhotos,
       });
     } else if (kind === "production") {
@@ -981,12 +1019,28 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
+                {isPvc ? (
+                  <div className="field">
+                    <label htmlFor="st-category">Stock</label>
+                    <SelectMenu
+                      id="st-category"
+                      value={stockCategory}
+                      options={STOCK_CATEGORIES_OPTIONS}
+                      required
+                      onChange={(next) =>
+                        setStockCategory(next as (typeof STOCK_CATEGORIES)[number])
+                      }
+                    />
+                  </div>
+                ) : null}
                 <div className="field">
-                  <label htmlFor="st-item">Item</label>
+                  <label htmlFor="st-item">
+                    {isPvc ? "Particulars" : "Item"}
+                  </label>
                   <SelectMenu
                     id="st-item"
-                    value={stockItem || DEFAULT_PURCHASE_GOODS[0]}
-                    options={STOCK_ITEMS}
+                    value={stockItem || stockParticulars[0]}
+                    options={stockParticulars}
                     required
                     onChange={(next) => {
                       setStockItem(next);
@@ -996,11 +1050,15 @@ export function TodayHub({
                 </div>
                 {stockItem === "Others" ? (
                   <div className="field">
-                    <label htmlFor="st-item-other">Other item</label>
+                    <label htmlFor="st-item-other">
+                      {isPvc ? "Other particulars" : "Other item"}
+                    </label>
                     <input
                       id="st-item-other"
                       required
-                      placeholder="Enter item name"
+                      placeholder={
+                        isPvc ? "Enter particulars" : "Enter item name"
+                      }
                       value={stockItemOther}
                       onChange={(e) => setStockItemOther(e.target.value)}
                     />
@@ -1008,24 +1066,79 @@ export function TodayHub({
                 ) : null}
                 <div className="prod-fields__row">
                   <div className="field">
-                    <label htmlFor="st-qty">Quantity</label>
+                    <label htmlFor="st-qty">
+                      {isPvc ? "Closing Stock" : "Quantity"}
+                    </label>
                     <DecimalInput
                       id="st-qty"
                       required
                       value={stockQty}
-                      onChange={setStockQty}
+                      onChange={(next) => {
+                        setStockQty(next);
+                        const qty = Number(next);
+                        const rate = Number(stockRate);
+                        if (isPvc && Number.isFinite(qty) && Number.isFinite(rate)) {
+                          setStockValue((qty * rate).toFixed(2));
+                        }
+                      }}
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="st-value">Value</label>
-                    <DecimalInput
-                      id="st-value"
-                      required
-                      value={stockValue}
-                      onChange={setStockValue}
-                    />
+                    <label htmlFor="st-unit">Unit</label>
+                    {isPvc ? (
+                      <SelectMenu
+                        id="st-unit"
+                        value={stockUnit}
+                        options={PRODUCT_UNITS}
+                        required
+                        onChange={setStockUnit}
+                      />
+                    ) : (
+                      <input id="st-unit" value="kg" readOnly />
+                    )}
                   </div>
                 </div>
+                {isPvc ? (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="st-rate">Rate</label>
+                      <DecimalInput
+                        id="st-rate"
+                        required
+                        value={stockRate}
+                        onChange={(next) => {
+                          setStockRate(next);
+                          const qty = Number(stockQty);
+                          const rate = Number(next);
+                          if (Number.isFinite(qty) && Number.isFinite(rate)) {
+                            setStockValue((qty * rate).toFixed(2));
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="st-value">Closing Value</label>
+                      <DecimalInput
+                        id="st-value"
+                        required
+                        value={stockValue}
+                        onChange={setStockValue}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="st-value">Value</label>
+                      <DecimalInput
+                        id="st-value"
+                        required
+                        value={stockValue}
+                        onChange={setStockValue}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="field expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea

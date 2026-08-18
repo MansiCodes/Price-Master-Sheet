@@ -12,6 +12,7 @@ export type ReportColumn<T> = {
   wrap?: boolean | "wide";
   /** Keep this column compact (unit / qty / rate). */
   compact?: boolean;
+  width?: string;
   render: (row: T, index?: number) => ReactNode;
 };
 
@@ -71,7 +72,11 @@ export function ReportTable<T extends { id: string }>({
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key} className={headerClass(col) || undefined}>
+              <th
+                key={col.key}
+                className={headerClass(col) || undefined}
+                style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+              >
                 {col.label}
               </th>
             ))}
@@ -101,7 +106,11 @@ export function ReportTable<T extends { id: string }>({
             rows.map((row, index) => (
               <tr key={row.id}>
                 {columns.map((col) => (
-                  <td key={col.key} className={cellClass(col) || undefined}>
+                  <td
+                    key={col.key}
+                    className={cellClass(col) || undefined}
+                    style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                  >
                     {col.render(row, index)}
                   </td>
                 ))}

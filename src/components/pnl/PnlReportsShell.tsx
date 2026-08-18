@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PnlTabNav } from "@/components/pnl/PnlTabNav";
 import { PnlDateFilter } from "@/components/pnl/PnlDateFilter";
 import { PnlExportButton } from "@/components/pnl/PnlExportButton";
@@ -11,6 +11,8 @@ import { ProductionReport } from "@/components/pnl/ProductionReport";
 import { StockReport } from "@/components/pnl/StockReport";
 import { ExpenseReport } from "@/components/pnl/ExpenseReport";
 import { PettyCashReport } from "@/components/pnl/PettyCashReport";
+import { ElectricityRentReport } from "@/components/pnl/ElectricityRentReport";
+import { FixedAssetsReport } from "@/components/pnl/FixedAssetsReport";
 import { useReportRange } from "@/components/pnl/useReportRange";
 import type { ReportTab } from "@/components/pnl/types";
 import "@/components/pnl/pnl-reports.css";
@@ -18,12 +20,43 @@ import "@/components/pnl/pnl-reports.css";
 export function PnlReportsShell({
   plantId,
   plantName,
+  plantCode,
 }: {
   plantId: string;
   plantName?: string;
+  plantCode?: string;
 }) {
   const [tab, setTab] = useState<ReportTab>("pnl");
   const { from, to, setFrom, setTo } = useReportRange();
+
+  const allowedTabs = useMemo<ReportTab[]>(
+    () =>
+      plantCode?.toUpperCase() === "PVC"
+        ? [
+            "pnl",
+            "sales",
+            "purchase",
+            "stock",
+            "electricityRent",
+            "factoryRent",
+            "pettyCash",
+            "fixedAssets",
+          ]
+        : [
+            "pnl",
+            "sales",
+            "purchase",
+            "production",
+            "stock",
+            "expense",
+            "pettyCash",
+          ],
+    [plantCode],
+  );
+
+  useEffect(() => {
+    if (!allowedTabs.includes(tab)) setTab("pnl");
+  }, [allowedTabs, tab]);
 
   return (
     <div className="pnl-reports">
@@ -32,20 +65,22 @@ export function PnlReportsShell({
       ) : null}
       <div className="pnl-reports__toolbar">
         <div className="pnl-reports__tabs">
-          <PnlTabNav active={tab} onChange={setTab} />
+          <PnlTabNav active={tab} onChange={setTab} tabs={allowedTabs} />
         </div>
         <div className="pnl-reports__actions">
-          <PnlDateFilter
-            from={from}
-            to={to}
-            onFromChange={setFrom}
-            onToChange={setTo}
-          />
+          {tab === "factoryRent" ? null : (
+            <PnlDateFilter
+              from={from}
+              to={to}
+              onFromChange={setFrom}
+              onToChange={setTo}
+            />
+          )}
           <PnlExportButton
             plantId={plantId}
             kind={tab}
-            from={from}
-            to={to}
+            from={tab === "factoryRent" ? "2026-01-01" : from}
+            to={tab === "factoryRent" ? "2027-03-31" : to}
           />
         </div>
       </div>
@@ -64,13 +99,39 @@ export function PnlReportsShell({
           <ProductionReport plantId={plantId} from={from} to={to} />
         ) : null}
         {tab === "stock" ? (
-          <StockReport plantId={plantId} from={from} to={to} />
+          <StockReport
+            plantId={plantId}
+            plantCode={plantCode}
+            from={from}
+            to={to}
+          />
+        ) : null}
+        {tab === "electricityRent" ? (
+          <ElectricityRentReport
+            plantId={plantId}
+            plantCode={plantCode}
+            from={from}
+            to={to}
+            section={plantCode?.toUpperCase() === "PVC" ? "electricity" : "combined"}
+          />
+        ) : null}
+        {tab === "factoryRent" ? (
+          <ElectricityRentReport
+            plantId={plantId}
+            plantCode={plantCode}
+            from={from}
+            to={to}
+            section="factoryRent"
+          />
         ) : null}
         {tab === "expense" ? (
           <ExpenseReport plantId={plantId} from={from} to={to} />
         ) : null}
         {tab === "pettyCash" ? (
           <PettyCashReport plantId={plantId} from={from} to={to} />
+        ) : null}
+        {tab === "fixedAssets" ? (
+          <FixedAssetsReport plantId={plantId} from={from} to={to} />
         ) : null}
       </div>
     </div>

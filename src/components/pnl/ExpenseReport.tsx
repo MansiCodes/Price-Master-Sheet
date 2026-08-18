@@ -7,6 +7,7 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 
 type ExpenseRow = {
   id: string;
@@ -24,8 +25,7 @@ type ExpenseRow = {
 };
 
 function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
+  return formatDayMonthYear(value);
 }
 
 function totalAmount(r: ExpenseRow) {

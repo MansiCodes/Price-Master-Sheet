@@ -5,9 +5,9 @@ import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
-import { formatDisplayDate } from "@/components/pnl/types";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 
 type PettyCashRow = {
   id: string;
@@ -28,11 +28,6 @@ type PettyCashTotals = {
   supervisorSalary: number;
   total: number;
 };
-
-function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
-}
 
 function rowTotal(r: PettyCashRow) {
   return (
@@ -119,7 +114,7 @@ export function PettyCashReport({
       {
         key: "billDate",
         label: t("billDate"),
-        render: (r) => formatDisplayDate(isoDate(r.date)),
+        render: (r) => formatDayMonthYear(r.date),
       },
       {
         key: "photos",

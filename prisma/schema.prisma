@@ -86,6 +86,7 @@ model Plant {
   name             String                @unique
   code             String                @unique
   isActive         Boolean               @default(true)
+  unloadingRatePerMT Decimal             @db.Decimal(18, 2) @default(70)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
   userRoles        UserPlantRole[]
@@ -280,6 +281,8 @@ model ElectricityRent {
   consumedUnits  Decimal? @db.Decimal(18, 2)
   billAmount     Decimal  @db.Decimal(18, 2) @default(0)
   rentAmount     Decimal  @db.Decimal(18, 2) @default(0)
+  coveredAreaSqft Decimal? @db.Decimal(18, 2)
+  rentRatePerSqft Decimal? @db.Decimal(18, 4)
   notes          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

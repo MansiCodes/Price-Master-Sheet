@@ -1,9 +1,14 @@
+import { formatDayMonthYear } from "@/lib/dates";
+
 export type ReportTab =
   | "pnl"
   | "sales"
   | "purchase"
   | "production"
   | "stock"
+  | "electricityRent"
+  | "factoryRent"
+  | "fixedAssets"
   | "expense"
   | "pettyCash";
 
@@ -13,6 +18,9 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "purchase", label: "Purchase" },
   { key: "production", label: "Production" },
   { key: "stock", label: "Stock" },
+  { key: "electricityRent", label: "Electricity" },
+  { key: "factoryRent", label: "Factory Rent" },
+  { key: "fixedAssets", label: "FAR" },
   { key: "expense", label: "Expense" },
   { key: "pettyCash", label: "Petty Cash" },
 ];
@@ -25,13 +33,7 @@ export function toISODate(d: Date): string {
 }
 
 export function formatDisplayDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    timeZone: "UTC",
-  });
+  return formatDayMonthYear(iso);
 }
 
 export function formatAmount(value: number | null | undefined): string {

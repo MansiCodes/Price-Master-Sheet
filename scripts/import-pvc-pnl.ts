@@ -7,8 +7,6 @@ import {
   ManpowerShift,
   PettyCashKind,
   Prisma,
-  PurchaseType,
-  SaleType,
 } from "@prisma/client";
 import ExcelJS, { type CellValue, type Worksheet } from "exceljs";
 import { prisma } from "../src/lib/db";
@@ -17,6 +15,89 @@ const WORKBOOK_PATH =
   process.env.PVC_PNL_WORKBOOK_PATH ??
   "C:/Users/Admin/Downloads/ATCL_PVC Plant P&L-V1.xlsx";
 const SOURCE_PREFIX = "xlsx:pvc-pnl-v1:";
+
+const DEPRECIATION_ASSET_DESC = "PVC Plant Assets (Dep - Company Act)";
+
+type ElectricityRentSeed = {
+  month: string; // YYYY-MM
+  billAmount: number;
+  rentAmount: number;
+  openingReading?: number | null;
+  closingReading?: number | null;
+  consumedUnits?: number | null;
+  notes?: string | null;
+};
+
+const ELECTRICITY_RENT_SEED: ElectricityRentSeed[] = [
+  { month: "2026-01", billAmount: 0, rentAmount: 0, notes: "0 SQFT @ 12.00" },
+  {
+    month: "2026-02",
+    billAmount: 0,
+    rentAmount: 24_000,
+    notes: "Electricity meter for the PVC plant was installed late on 11 Mar",
+  },
+  {
+    month: "2026-03",
+    billAmount: 309_825.37,
+    rentAmount: 24_000,
+    notes:
+      "Power supply is presently functioning on a provisional basis. 11 Mar–31 Mar meter 14,028 units on 59,463 kg = 0.236 kWh/kg. Total production till 31-03-26 148,733 kg → provisional 35,087.81 units × 8.83 = 309,825.37",
+  },
+  {
+    month: "2026-04",
+    billAmount: 172_430.38,
+    rentAmount: 24_000,
+    openingReading: 22_375,
+    closingReading: 39_180,
+    consumedUnits: 16_805,
+    notes: null,
+  },
+  {
+    month: "2026-05",
+    billAmount: 192_225,
+    rentAmount: 24_000,
+    openingReading: 39_180,
+    closingReading: 56_655,
+    consumedUnits: 17_475,
+    notes: "Provisional Rate",
+  },
+  {
+    month: "2026-06",
+    billAmount: 219_285,
+    rentAmount: 24_000,
+    openingReading: 56_655,
+    closingReading: 76_590,
+    consumedUnits: 19_935,
+    notes: null,
+  },
+  {
+    month: "2026-07",
+    billAmount: 265_023,
+    rentAmount: 24_000,
+    openingReading: 76_590,
+    closingReading: 100_683,
+    consumedUnits: 24_093,
+    notes: null,
+  },
+  {
+    month: "2026-08",
+    billAmount: 32_494,
+    rentAmount: 24_000,
+    openingReading: 100_683,
+    closingReading: 103_637,
+    consumedUnits: 2_954,
+    notes: "Till 05-08-26",
+  },
+];
+
+function parseMonthToUtcDate(month: string): Date {
+  // YYYY-MM -> first day of month (UTC)
+  const m = /^(\d{4})-(\d{2})$/.exec(month.trim());
+  if (!m) throw new Error(`Invalid month seed: ${month}`);
+  const year = Number(m[1]);
+  const mm = Number(m[2]);
+  return new Date(Date.UTC(year, mm - 1, 1));
+}
 
 function resultValue(value: CellValue): unknown {
   if (
@@ -73,10 +154,7 @@ async function main() {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(WORKBOOK_PATH);
 
-  const salesSheet = requiredSheet(workbook, "Sales");
-  const purchaseSheet = requiredSheet(workbook, "Purchase");
   const pettyCashSheet = requiredSheet(workbook, "Petty Cash");
-  const electricitySheet = requiredSheet(workbook, "Electricity");
 
   const plant = await prisma.plant.findUnique({
     where: { code: "PVC" },
@@ -91,91 +169,8 @@ async function main() {
   });
   if (!actor) throw new Error("Active Super Admin does not exist");
 
-  const sales: Prisma.SaleCreateManyInput[] = [];
-  for (let row = 4; row <= 188; row += 1) {
-    const date = dateAt(salesSheet, `E${row}`);
-    const quantity = numberAt(salesSheet, `H${row}`);
-    const rate = numberAt(salesSheet, `I${row}`);
-    const salesValue = numberAt(salesSheet, `J${row}`);
-    const itemDescription = textAt(salesSheet, `F${row}`);
-    if (
-      !date ||
-      quantity == null ||
-      rate == null ||
-      salesValue == null ||
-      !itemDescription ||
-      salesValue === 0
-    ) {
-      continue;
-    }
-
-    sales.push({
-      sourceKey: `${SOURCE_PREFIX}sales:${row}`,
-      plantId: plant.id,
-      date,
-      shift: ManpowerShift.DAY,
-      type: SaleType.FINISHED_GOOD,
-      typeOther: null,
-      customerName: "ATCL",
-      billNumber: textAt(salesSheet, `D${row}`),
-      billDate: date,
-      itemDescription,
-      unit: textAt(salesSheet, `G${row}`) ?? "KGS",
-      quantity,
-      rate,
-      salesValue,
-      notes: textAt(salesSheet, `C${row}`),
-      enteredById: actor.id,
-      isBackdated: true,
-    });
-  }
-
-  const purchases: Prisma.PurchaseCreateManyInput[] = [];
-  for (let row = 4; row <= 132; row += 1) {
-    const date = dateAt(purchaseSheet, `F${row}`);
-    const vendorName = textAt(purchaseSheet, `C${row}`);
-    const itemDescription = textAt(purchaseSheet, `D${row}`);
-    const quantity = numberAt(purchaseSheet, `H${row}`);
-    const rate = numberAt(purchaseSheet, `I${row}`);
-    const basicValue = numberAt(purchaseSheet, `J${row}`);
-    const gstAmount = numberAt(purchaseSheet, `K${row}`);
-    const invoiceValue = numberAt(purchaseSheet, `L${row}`);
-    if (
-      !date ||
-      !vendorName ||
-      !itemDescription ||
-      quantity == null ||
-      rate == null ||
-      basicValue == null ||
-      gstAmount == null ||
-      invoiceValue == null
-    ) {
-      continue;
-    }
-
-    purchases.push({
-      sourceKey: `${SOURCE_PREFIX}purchase:${row}`,
-      plantId: plant.id,
-      date,
-      shift: ManpowerShift.DAY,
-      type: PurchaseType.RAW_MATERIAL,
-      typeOther: null,
-      vendorName,
-      billNumber: textAt(purchaseSheet, `E${row}`),
-      billDate: date,
-      itemDescription,
-      unit: textAt(purchaseSheet, `G${row}`) ?? "KGS",
-      quantity,
-      rate,
-      basicValue,
-      gstPercent: 18,
-      gstAmount,
-      invoiceValue,
-      notes: textAt(purchaseSheet, `M${row}`),
-      enteredById: actor.id,
-      isBackdated: true,
-    });
-  }
+  // Sales/purchases are seeded from the plant registers:
+  // scripts/seed-pvc-sales.ts and scripts/seed-pvc-purchases.ts
 
   const expenses: Prisma.PettyCashEntryCreateManyInput[] = [];
   for (let row = 4; row <= 93; row += 1) {
@@ -207,64 +202,63 @@ async function main() {
     });
   }
 
-  for (let row = 4; row <= 8; row += 1) {
-    const date = dateAt(electricitySheet, `C${row}`);
-    const amount = numberAt(electricitySheet, `H${row}`);
-    if (!date || amount == null || amount === 0) continue;
-
-    const openingReading = numberAt(electricitySheet, `D${row}`);
-    const closingReading = numberAt(electricitySheet, `E${row}`);
-    const readingNote =
-      textAt(electricitySheet, `I${row}`) ??
-      (openingReading == null ? textAt(electricitySheet, `D${row}`) : null);
-
-    expenses.push({
-      sourceKey: `${SOURCE_PREFIX}electricity:${row}`,
-      plantId: plant.id,
-      date,
-      shift: ManpowerShift.DAY,
-      entryType: PettyCashKind.EXPENSE,
-      payMode: "Electricity",
-      expenseHead: "Electricity",
-      description: readingNote,
-      openingReading,
-      closingReading,
-      billNumber: null,
-      amount,
-      contractorSalary: 0,
-      supervisorSalary: 0,
-      enteredById: actor.id,
-      isBackdated: true,
-    });
-  }
-
   await prisma.$transaction(async (tx) => {
-    await tx.sale.deleteMany({
-      where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
-    });
-    await tx.purchase.deleteMany({
-      where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
-    });
     await tx.pettyCashEntry.deleteMany({
       where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
     });
 
-    await tx.sale.createMany({ data: sales });
-    await tx.purchase.createMany({ data: purchases });
     await tx.pettyCashEntry.createMany({ data: expenses });
   });
 
-  const [salesCheck, purchaseCheck, expenseCheck] = await Promise.all([
-    prisma.sale.aggregate({
-      where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
-      _count: true,
-      _sum: { salesValue: true },
-    }),
-    prisma.purchase.aggregate({
-      where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
-      _count: true,
-      _sum: { basicValue: true, gstAmount: true, invoiceValue: true },
-    }),
+  // Seed: Electricity/Rent (electricityRent table)
+  await prisma.$transaction(async (tx) => {
+    await tx.electricityRent.deleteMany({
+      where: {
+        plantId: plant.id,
+        month: { in: ELECTRICITY_RENT_SEED.map((r) => parseMonthToUtcDate(r.month)) },
+      },
+    });
+
+    await tx.electricityRent.createMany({
+      data: ELECTRICITY_RENT_SEED.map((r) => {
+        const monthDate = parseMonthToUtcDate(r.month);
+        return {
+          plantId: plant.id,
+          month: monthDate,
+          openingReading: r.openingReading ?? null,
+          closingReading: r.closingReading ?? null,
+          consumedUnits: r.consumedUnits ?? null,
+          billAmount: r.billAmount,
+          rentAmount: r.rentAmount,
+          notes: r.notes ?? null,
+        };
+      }),
+    });
+  });
+
+  // Stock is seeded from the inward + closing registers via scripts/seed-pvc-stock-rent.ts.
+
+  // Seed: Depreciation (fixed assets)
+  await prisma.$transaction(async (tx) => {
+    await tx.fixedAsset.deleteMany({
+      where: { plantId: plant.id, assetDescription: DEPRECIATION_ASSET_DESC },
+    });
+
+    await tx.fixedAsset.create({
+      data: {
+        plantId: plant.id,
+        assetDescription: DEPRECIATION_ASSET_DESC,
+        vendor: null,
+        billNumber: null,
+        billDate: null,
+        cost: 1_918_113.0,
+        gst: 0,
+        depreciationPercent: 18.10,
+      },
+    });
+  });
+
+  const [expenseCheck] = await Promise.all([
     prisma.pettyCashEntry.aggregate({
       where: { plantId: plant.id, sourceKey: { startsWith: SOURCE_PREFIX } },
       _count: true,
@@ -291,39 +285,11 @@ async function main() {
   });
 
   console.log(`Imported workbook into ${plant.name} as ${actor.email}`);
-  console.log("Sales:", salesCheck);
-  console.log("Purchases:", purchaseCheck);
   console.log("Expenses:", expenseCheck);
   console.log("Petty cash only:", pettyCashCheck);
 
   const checks: Array<[string, number, number, number]> = [
-    ["sales rows", salesCheck._count, 184, 0],
-    [
-      "sales value",
-      Number(salesCheck._sum.salesValue),
-      22_683_087,
-      0.001,
-    ],
-    ["purchase rows", purchaseCheck._count, 129, 0],
-    [
-      "purchase basic value",
-      Number(purchaseCheck._sum.basicValue),
-      17_590_855.09,
-      0.001,
-    ],
-    [
-      "purchase GST",
-      Number(purchaseCheck._sum.gstAmount),
-      3_166_353.94,
-      0.001,
-    ],
-    [
-      "purchase invoice value",
-      Number(purchaseCheck._sum.invoiceValue),
-      20_757_208,
-      0.001,
-    ],
-    ["expense rows", expenseCheck._count, 95, 0],
+    ["expense rows", expenseCheck._count, expenses.length, 0],
     [
       "petty cash rows",
       pettyCashCheck._count,
@@ -343,9 +309,9 @@ async function main() {
       0.001,
     ],
     [
-      "expense and electricity amount",
+      "petty cash amount",
       Number(expenseCheck._sum.amount),
-      1_166_038.7557,
+      expenses.reduce((sum, e) => sum + Number(e.amount ?? 0), 0),
       0.0001,
     ],
     [

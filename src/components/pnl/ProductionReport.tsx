@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 
 type ProductionRow = {
   id: string;
@@ -15,8 +16,7 @@ type ProductionRow = {
 };
 
 function isoDate(value: string | Date) {
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
+  return formatDayMonthYear(value);
 }
 
 export function ProductionReport({

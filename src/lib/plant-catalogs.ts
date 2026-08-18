@@ -89,6 +89,42 @@ const PVC_PURCHASE_GOODS = [
   "S. CLEAR / GREEN PIPE",
 ] as const;
 
+export const PVC_STOCK_PARTICULARS = [
+  "CPW",
+  "Thermal",
+  "Calcium",
+  "Titanium Di Oxide",
+  "WAX/MOM",
+  "Carbon",
+  "Other Colors (Red)",
+  "Other Colors (Blue)",
+  "Pani Pipe",
+  "Green Pipe",
+  "S. Cilies",
+  "Lump+Cable",
+  "H. Cilies",
+  "JHAL Plastic Scrap",
+] as const;
+
+export const STOCK_CATEGORIES = ["RM", "WIP", "FG"] as const;
+
+export function getStockCatalog(plantCode: string): {
+  particulars: readonly string[];
+  defaultUnit: string;
+} {
+  if (plantCode.toUpperCase() === "PVC") {
+    return {
+      particulars: PVC_STOCK_PARTICULARS,
+      defaultUnit: "KGS",
+    };
+  }
+
+  return {
+    particulars: DEFAULT_PURCHASE_GOODS,
+    defaultUnit: "kg",
+  };
+}
+
 export function getPurchaseCatalog(plantCode: string): {
   suppliers: readonly string[];
   goods: readonly string[];

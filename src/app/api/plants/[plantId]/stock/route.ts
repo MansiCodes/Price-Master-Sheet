@@ -86,8 +86,13 @@ export async function GET(
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
 
+  const snapshot = sp.get("snapshot") === "1";
   const entries = await prisma.stockEntry.findMany({
-    where: { plantId, ...filter },
+    where: {
+      plantId,
+      ...filter,
+      ...(snapshot ? { notes: { startsWith: "Closing stock" } } : {}),
+    },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 

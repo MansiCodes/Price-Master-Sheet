@@ -6,6 +6,7 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { formatDayMonthYear } from "@/lib/dates";
 
 type PurchaseRow = {
   id: string;
@@ -26,22 +27,8 @@ type PurchaseRow = {
   billPhotoUrls?: string[];
 };
 
-function isoDate(value: string | Date | null | undefined) {
-  if (!value) return "—";
-  if (typeof value === "string") return value.slice(0, 10);
-  return value.toISOString().slice(0, 10);
-}
-
 function formatBillDate(value: string | Date | null | undefined) {
-  const iso = isoDate(value);
-  if (iso === "—") return "—";
-  const d = new Date(`${iso}T00:00:00Z`);
-  return d.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    timeZone: "UTC",
-  });
+  return formatDayMonthYear(value);
 }
 
 function num(value: string | number) {
