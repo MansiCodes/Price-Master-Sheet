@@ -66,8 +66,15 @@ export async function GET(
   });
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+  const totals = entries.reduce(
+    (acc, row) => {
+      acc.quantity += Number(row.quantity) || 0;
+      return acc;
+    },
+    { quantity: 0 },
+  );
 
-  return NextResponse.json({ rows: slice, ...pageInfo });
+  return NextResponse.json({ rows: slice, ...pageInfo, totals });
 }
 
 export async function POST(

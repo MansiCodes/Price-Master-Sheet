@@ -78,7 +78,9 @@ export function SlideOver({ open, onClose, title, children, footer }: SlideOverP
             ✕
           </button>
         </div>
-        <div className="slide-over__body">{children}</div>
+        <div className="slide-over__body">
+          <div className="slide-over__content">{children}</div>
+        </div>
         {footer ? <div className="slide-over__footer">{footer}</div> : null}
       </div>
     </>

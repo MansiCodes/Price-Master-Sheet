@@ -5,6 +5,8 @@ export const PRODUCT_UNITS = [
   "NOS",
   "KM",
   "MTR",
+  "COIL",
+  "ROLL",
 ] as const;
 
 export type ProductUnit = (typeof PRODUCT_UNITS)[number];

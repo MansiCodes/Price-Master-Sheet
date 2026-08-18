@@ -100,6 +100,28 @@ model Plant {
   manpowerRates     ManpowerRateSetting[]
   dailyStatuses     DailyEntryStatus[]
   creditScoreAwards CreditScoreAward[]
+  pnlOverrides      PlantPnlOverride[]
+}
+
+model PlantPnlOverride {
+  id              String   @id @default(cuid())
+  plantId         String
+  plant           Plant    @relation(fields: [plantId], references: [id])
+  periodFrom      DateTime @db.Date
+  periodTo        DateTime @db.Date
+  openingStock    Decimal  @default(0) @db.Decimal(18,2)
+  closingStock    Decimal  @default(0) @db.Decimal(18,2)
+  purchases       Decimal  @default(0) @db.Decimal(18,2)
+  sales           Decimal  @default(0) @db.Decimal(18,2)
+  pettyCash       Decimal  @default(0) @db.Decimal(18,2)
+  wagesSalary     Decimal  @default(0) @db.Decimal(18,2)
+  depreciation    Decimal  @default(0) @db.Decimal(18,2)
+  interestOnTl    Decimal  @default(0) @db.Decimal(18,2)
+  variableCost    Decimal  @default(0) @db.Decimal(18,2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([plantId, periodFrom, periodTo])
 }
 
 model UserPlantRole {
@@ -134,6 +156,8 @@ model Purchase {
   gstPercent      Decimal       @db.Decimal(5, 2) @default(0)
   gstAmount       Decimal       @db.Decimal(18, 2) @default(0)
   invoiceValue    Decimal       @db.Decimal(18, 2)
+  gstin           String?
+  booksDate       DateTime?     @db.Date
   notes           String?
   billPhotoUrl    String?
   billPhotoUrls   String[]      @default([])
@@ -164,6 +188,9 @@ model Sale {
   quantity        Decimal       @db.Decimal(18, 4)
   rate            Decimal       @db.Decimal(18, 4)
   salesValue      Decimal       @db.Decimal(18, 2)
+  inMeter         Decimal?      @db.Decimal(18, 4)
+  qtyMtr          Decimal?      @db.Decimal(18, 4)
+  meterUnit       String?
   notes           String?
   billPhotoUrl    String?
   billPhotoUrls   String[]      @default([])
@@ -250,7 +277,11 @@ model PettyCashEntry {
   entryType         PettyCashKind     @default(EXPENSE)
   payMode           String
   expenseHead       String
+  nature            String?
   description       String?
+  location          String?
+  checkedBy         String?
+  approvedBy        String?
   openingReading    Decimal?          @db.Decimal(18, 2)
   closingReading    Decimal?          @db.Decimal(18, 2)
   billNumber        String?

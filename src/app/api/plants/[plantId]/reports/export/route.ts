@@ -13,6 +13,7 @@ import {
 import { prisma } from "@/lib/db";
 import { canViewPnl, isAdminOrHead } from "@/lib/rbac";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
+import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -77,6 +78,7 @@ export async function GET(
   if (!plant) {
     return NextResponse.json({ error: "Plant not found" }, { status: 404 });
   }
+  const cat6 = isCat6Plant(plant.code);
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Cable Junction";
@@ -130,24 +132,48 @@ export async function GET(
     }
   } else if (kind === "sales") {
     const rows = await prisma.sale.findMany({
-      where: { plantId, date: { gte: from, lte: to } },
-      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      where: {
+        plantId,
+        date: { gte: from, lte: to },
+        ...(cat6
+          ? { NOT: { sourceKey: { endsWith: "sales-online:excel" } } }
+          : {}),
+      },
+      orderBy: cat6
+        ? [{ date: "asc" }, { createdAt: "asc" }]
+        : [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = [
-      { header: "sNo.", key: "sno", width: 8 },
-      { header: "Remarks", key: "notes", width: 24 },
-      { header: "Invoice no.", key: "invoice", width: 16 },
-      { header: "Bill date", key: "billDate", width: 12 },
-      { header: "Product name", key: "product", width: 28 },
-      { header: "Unit", key: "unit", width: 10 },
-      { header: "Qty", key: "qty", width: 12 },
-      { header: "Rate", key: "rate", width: 12 },
-      { header: "Goods value", key: "goods", width: 14 },
-    ];
+    sheet.columns = cat6
+      ? [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Customer Name", key: "customer", width: 28 },
+          { header: "Bill Number", key: "invoice", width: 18 },
+          { header: "Bill Date", key: "billDate", width: 12 },
+          { header: "Item Details", key: "product", width: 32 },
+          { header: "Quantity", key: "qty", width: 12 },
+          { header: "Unit", key: "unit", width: 10 },
+          { header: "Rate", key: "rate", width: 12 },
+          { header: "Sales Value", key: "goods", width: 14 },
+          { header: "In Meter", key: "inMeter", width: 12 },
+          { header: "QTY-MTR", key: "qtyMtr", width: 12 },
+          { header: "Unit (MTR)", key: "meterUnit", width: 10 },
+        ]
+      : [
+          { header: "sNo.", key: "sno", width: 8 },
+          { header: "Remarks", key: "notes", width: 24 },
+          { header: "Invoice no.", key: "invoice", width: 16 },
+          { header: "Bill date", key: "billDate", width: 12 },
+          { header: "Product name", key: "product", width: 28 },
+          { header: "Unit", key: "unit", width: 10 },
+          { header: "Qty", key: "qty", width: 12 },
+          { header: "Rate", key: "rate", width: 12 },
+          { header: "Goods value", key: "goods", width: 14 },
+        ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({
         sno: i + 1,
+        customer: r.customerName,
         notes: r.notes ?? "",
         invoice: r.billNumber ?? "",
         billDate: iso(r.billDate ?? r.date),
@@ -156,6 +182,9 @@ export async function GET(
         qty: toNum(r.quantity),
         rate: toNum(r.rate),
         goods: toNum(r.salesValue),
+        inMeter: r.inMeter == null ? "" : toNum(r.inMeter),
+        qtyMtr: r.qtyMtr == null ? "" : toNum(r.qtyMtr),
+        meterUnit: r.meterUnit ?? "",
       });
     });
   } else if (kind === "purchase") {
@@ -163,25 +192,42 @@ export async function GET(
       where: { plantId, date: { gte: from, lte: to } },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = [
-      { header: "sNo.", key: "sno", width: 8 },
-      { header: "Supplier name", key: "supplier", width: 26 },
-      { header: "Description", key: "description", width: 22 },
-      { header: "Bill no.", key: "billNo", width: 14 },
-      { header: "Bill date", key: "billDate", width: 12 },
-      { header: "Unit", key: "unit", width: 10 },
-      { header: "Qty", key: "qty", width: 12 },
-      { header: "Rate", key: "rate", width: 12 },
-      { header: "Basic value", key: "basic", width: 14 },
-      { header: "GST %", key: "gstPct", width: 10 },
-      { header: "GST amount", key: "gstAmt", width: 12 },
-      { header: "Invoice value", key: "invoice", width: 14 },
-      { header: "Remarks", key: "notes", width: 20 },
-    ];
+    sheet.columns = cat6
+      ? [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Books", key: "books", width: 12 },
+          { header: "GSTIN/GST No", key: "gstin", width: 20 },
+          { header: "Vendor's Name", key: "supplier", width: 26 },
+          { header: "Bill Number", key: "billNo", width: 16 },
+          { header: "Bill Date", key: "billDate", width: 12 },
+          { header: "Item Details", key: "description", width: 26 },
+          { header: "Item QTY", key: "qty", width: 12 },
+          { header: "Unit", key: "unit", width: 10 },
+          { header: "Rate", key: "rate", width: 12 },
+          { header: "Purchase Amt", key: "basic", width: 14 },
+          { header: "Notes", key: "notes", width: 20 },
+        ]
+      : [
+          { header: "sNo.", key: "sno", width: 8 },
+          { header: "Supplier name", key: "supplier", width: 26 },
+          { header: "Description", key: "description", width: 22 },
+          { header: "Bill no.", key: "billNo", width: 14 },
+          { header: "Bill date", key: "billDate", width: 12 },
+          { header: "Unit", key: "unit", width: 10 },
+          { header: "Qty", key: "qty", width: 12 },
+          { header: "Rate", key: "rate", width: 12 },
+          { header: "Basic value", key: "basic", width: 14 },
+          { header: "GST %", key: "gstPct", width: 10 },
+          { header: "GST amount", key: "gstAmt", width: 12 },
+          { header: "Invoice value", key: "invoice", width: 14 },
+          { header: "Remarks", key: "notes", width: 20 },
+        ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({
         sno: i + 1,
+        books: iso(r.booksDate),
+        gstin: r.gstin ?? "",
         supplier: r.vendorName,
         description: r.itemDescription,
         billNo: r.billNumber ?? "",
@@ -222,18 +268,31 @@ export async function GET(
     });
   } else if (kind === "stock") {
     const rows = await prisma.stockEntry.findMany({
-      where: { plantId, date: { gte: from, lte: to } },
+      where: {
+        plantId,
+        date: { gte: from, lte: to },
+        ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
+      },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = [
-      { header: "sNo.", key: "sno", width: 8 },
-      { header: "Date", key: "date", width: 12 },
-      { header: "Shift", key: "shift", width: 10 },
-      { header: "Item", key: "item", width: 22 },
-      { header: "Unit", key: "unit", width: 10 },
-      { header: "Qty", key: "qty", width: 12 },
-      { header: "Value", key: "value", width: 14 },
-    ];
+    sheet.columns = cat6
+      ? [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Item Name", key: "item", width: 36 },
+          { header: "QTY", key: "qty", width: 12 },
+          { header: "UNIT", key: "unit", width: 10 },
+          { header: "RATE", key: "rate", width: 12 },
+          { header: "Value", key: "value", width: 14 },
+        ]
+      : [
+          { header: "sNo.", key: "sno", width: 8 },
+          { header: "Date", key: "date", width: 12 },
+          { header: "Shift", key: "shift", width: 10 },
+          { header: "Item", key: "item", width: 22 },
+          { header: "Unit", key: "unit", width: 10 },
+          { header: "Qty", key: "qty", width: 12 },
+          { header: "Value", key: "value", width: 14 },
+        ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({
@@ -243,6 +302,7 @@ export async function GET(
         item: r.itemName,
         unit: r.unit,
         qty: toNum(r.quantity),
+        rate: toNum(r.rate),
         value: toNum(r.closingValue),
       });
     });
@@ -255,23 +315,39 @@ export async function GET(
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = [
-      { header: "S.No", key: "sno", width: 8 },
-      { header: "Pay Mode", key: "payMode", width: 16 },
-      { header: "Description of Expense", key: "desc", width: 44 },
-      { header: "Bill Number", key: "billNumber", width: 22 },
-      { header: "Bill Date", key: "date", width: 12 },
-      { header: "Expenses", key: "amount", width: 14 },
-      { header: "Contractor Salary", key: "contractorSalary", width: 18 },
-      { header: "Supervisor Salary", key: "supervisorSalary", width: 18 },
-      { header: "Total", key: "total", width: 14 },
-    ];
+    sheet.columns = cat6
+      ? [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Date", key: "date", width: 12 },
+          { header: "Output Amt", key: "amount", width: 14 },
+          { header: "Nature of Expense", key: "nature", width: 28 },
+          { header: "Expense Description", key: "desc", width: 44 },
+          { header: "Person", key: "payMode", width: 16 },
+          { header: "Location", key: "location", width: 18 },
+          { header: "Check by", key: "checkedBy", width: 16 },
+          { header: "Approved By", key: "approvedBy", width: 16 },
+        ]
+      : [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Pay Mode", key: "payMode", width: 16 },
+          { header: "Description of Expense", key: "desc", width: 44 },
+          { header: "Bill Number", key: "billNumber", width: 22 },
+          { header: "Bill Date", key: "date", width: 12 },
+          { header: "Expenses", key: "amount", width: 14 },
+          { header: "Contractor Salary", key: "contractorSalary", width: 18 },
+          { header: "Supervisor Salary", key: "supervisorSalary", width: 18 },
+          { header: "Total", key: "total", width: 14 },
+        ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({
         sno: i + 1,
         payMode: r.payMode,
+        nature: r.nature ?? "",
         desc: r.description ?? "",
+        location: r.location ?? "",
+        checkedBy: r.checkedBy ?? "",
+        approvedBy: r.approvedBy ?? "",
         billNumber: r.billNumber ?? "",
         date: iso(r.date),
         amount: toNum(r.amount),
@@ -292,16 +368,24 @@ export async function GET(
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
-    sheet.columns = [
-      { header: "sNo.", key: "sno", width: 8 },
-      { header: "Date", key: "date", width: 12 },
-      { header: "Shift", key: "shift", width: 10 },
-      { header: "Category", key: "head", width: 18 },
-      { header: "Remarks / notes", key: "desc", width: 36 },
-      { header: "Opening reading", key: "opening", width: 16 },
-      { header: "Closing reading", key: "closing", width: 16 },
-      { header: "Amount", key: "amount", width: 14 },
-    ];
+    sheet.columns = cat6
+      ? [
+          { header: "S.No", key: "sno", width: 8 },
+          { header: "Months", key: "date", width: 12 },
+          { header: "Category", key: "head", width: 18 },
+          { header: "Remarks", key: "desc", width: 24 },
+          { header: "Salary Amt", key: "amount", width: 14 },
+        ]
+      : [
+          { header: "sNo.", key: "sno", width: 8 },
+          { header: "Date", key: "date", width: 12 },
+          { header: "Shift", key: "shift", width: 10 },
+          { header: "Category", key: "head", width: 18 },
+          { header: "Remarks / notes", key: "desc", width: 36 },
+          { header: "Opening reading", key: "opening", width: 16 },
+          { header: "Closing reading", key: "closing", width: 16 },
+          { header: "Amount", key: "amount", width: 14 },
+        ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
       sheet.addRow({

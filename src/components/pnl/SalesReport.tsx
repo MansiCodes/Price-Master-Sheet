@@ -6,6 +6,7 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { isCat6Plant } from "@/lib/plant-layout";
 
 type SaleRow = {
   id: string;
@@ -19,6 +20,9 @@ type SaleRow = {
   unit: string;
   rate: string | number;
   salesValue: string | number;
+  inMeter?: string | number | null;
+  qtyMtr?: string | number | null;
+  meterUnit?: string | null;
   billPhotoUrl?: string | null;
   billPhotoUrls?: string[];
 };
@@ -70,19 +74,25 @@ function goodsValue(row: SaleRow) {
 
 export function SalesReport({
   plantId,
+  plantCode,
   from,
   to,
 }: {
   plantId: string;
+  plantCode?: string;
   from: string;
   to: string;
 }) {
   const t = useTranslations("pnl");
+  const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
     usePaginatedReport<SaleRow>(baseUrl, t("failedSales"));
+  const totals = response?.totals as
+    | { salesValue?: number; quantity?: number }
+    | undefined;
 
-  const columns: ReportColumn<SaleRow>[] = [
+  const pvcColumns: ReportColumn<SaleRow>[] = [
     {
       key: "s",
       label: "S No.",
@@ -147,15 +157,106 @@ export function SalesReport({
     },
   ];
 
+  const cat6Columns: ReportColumn<SaleRow>[] = [
+    {
+      key: "s",
+      label: "S.No",
+      render: (_r, index) =>
+        String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "customer",
+      label: "Customer Name",
+      wrap: true,
+      render: (r) => r.customerName,
+    },
+    {
+      key: "billNo",
+      label: "Bill Number",
+      render: (r) => r.billNumber?.trim() || "—",
+    },
+    {
+      key: "billDate",
+      label: "Bill Date",
+      render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "item",
+      label: "Item Details",
+      wrap: true,
+      render: (r) => r.itemDescription,
+    },
+    {
+      key: "qty",
+      label: "Quantity",
+      align: "right",
+      compact: true,
+      render: (r) => formatQty(r.quantity),
+    },
+    {
+      key: "unit",
+      label: "Unit",
+      compact: true,
+      render: (r) => r.unit || "—",
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      render: (r) => formatRate(r.rate),
+    },
+    {
+      key: "sales",
+      label: "Sales Value",
+      align: "right",
+      render: (r) => formatINR(Number(r.salesValue) || goodsValue(r)),
+    },
+    {
+      key: "inMeter",
+      label: "In Meter",
+      align: "right",
+      compact: true,
+      render: (r) =>
+        r.inMeter == null ? "—" : formatQty(r.inMeter),
+    },
+    {
+      key: "qtyMtr",
+      label: "QTY-MTR",
+      align: "right",
+      compact: true,
+      render: (r) => (r.qtyMtr == null ? "—" : formatQty(r.qtyMtr)),
+    },
+    {
+      key: "meterUnit",
+      label: "Unit (MTR)",
+      compact: true,
+      render: (r) => r.meterUnit?.trim() || "—",
+    },
+  ];
+
   return (
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">{t("salesTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={columns}
+        columns={cat6 ? cat6Columns : pvcColumns}
         rows={rows}
         loading={loading}
         variant="register"
+        footer={
+          totals
+            ? cat6
+              ? {
+                  customer: "TOTAL",
+                  sales: formatINR(totals.salesValue ?? 0),
+                }
+              : {
+                  remarks: "TOTAL",
+                  goods: formatINR(totals.salesValue ?? 0),
+                }
+            : undefined
+        }
       />
       <Pagination
         page={page}

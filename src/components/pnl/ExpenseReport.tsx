@@ -7,6 +7,7 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
+import { isCat6Plant } from "@/lib/plant-layout";
 
 type ExpenseRow = {
   id: string;
@@ -28,6 +29,16 @@ function isoDate(value: string | Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function formatMonth(value: string | Date) {
+  const iso = isoDate(value);
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString("en-GB", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 function totalAmount(r: ExpenseRow) {
   return (
     Number(r.amount) + Number(r.contractorSalary) + Number(r.supervisorSalary)
@@ -36,60 +47,115 @@ function totalAmount(r: ExpenseRow) {
 
 export function ExpenseReport({
   plantId,
+  plantCode,
   from,
   to,
 }: {
   plantId: string;
+  plantCode?: string;
   from: string;
   to: string;
 }) {
   const t = useTranslations("pnl");
   const tCommon = useTranslations("common");
+  const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
     usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
+  const totals = response?.totals as { total?: number } | undefined;
 
   const columns: ReportColumn<ExpenseRow>[] = useMemo(
-    () => [
-      { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
-      { key: "shift", label: t("shift"), render: (r) => r.shift },
-      { key: "head", label: t("category"), render: (r) => r.expenseHead },
-      {
-        key: "desc",
-        label: t("remarksNotes"),
-        wrap: "wide",
-        render: (r) => r.description || tCommon("dash"),
-      },
-      {
-        key: "opening",
-        label: t("openingReading"),
-        align: "right",
-        render: (r) =>
-          r.openingReading == null ? tCommon("dash") : String(r.openingReading),
-      },
-      {
-        key: "closing",
-        label: t("closingReading"),
-        align: "right",
-        render: (r) =>
-          r.closingReading == null ? tCommon("dash") : String(r.closingReading),
-      },
-      {
-        key: "amount",
-        label: t("amount"),
-        align: "right",
-        render: (r) => formatINR(totalAmount(r)),
-      },
-      {
-        key: "photos",
-        label: "Bill",
-        compact: true,
-        render: (r) => (
-          <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
-        ),
-      },
-    ],
-    [t, tCommon],
+    () =>
+      cat6
+        ? [
+            {
+              key: "s",
+              label: "S.No",
+              compact: true,
+              render: (_r, index) =>
+                String((page - 1) * pageSize + (index ?? 0) + 1),
+            },
+            {
+              key: "month",
+              label: "Months",
+              render: (r) => formatMonth(r.date),
+            },
+            {
+              key: "head",
+              label: t("category"),
+              render: (r) => r.expenseHead,
+            },
+            {
+              key: "desc",
+              label: "Remarks",
+              wrap: "wide",
+              render: (r) => r.description || tCommon("dash"),
+            },
+            {
+              key: "amount",
+              label: "Salary Amt",
+              align: "right",
+              render: (r) => formatINR(totalAmount(r)),
+            },
+            {
+              key: "photos",
+              label: "Bill",
+              compact: true,
+              render: (r) => (
+                <BillPhotosCell
+                  urls={r.billPhotoUrls}
+                  fallbackUrl={r.billPhotoUrl}
+                />
+              ),
+            },
+          ]
+        : [
+            { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
+            { key: "shift", label: t("shift"), render: (r) => r.shift },
+            { key: "head", label: t("category"), render: (r) => r.expenseHead },
+            {
+              key: "desc",
+              label: t("remarksNotes"),
+              wrap: "wide",
+              render: (r) => r.description || tCommon("dash"),
+            },
+            {
+              key: "opening",
+              label: t("openingReading"),
+              align: "right",
+              render: (r) =>
+                r.openingReading == null
+                  ? tCommon("dash")
+                  : String(r.openingReading),
+            },
+            {
+              key: "closing",
+              label: t("closingReading"),
+              align: "right",
+              render: (r) =>
+                r.closingReading == null
+                  ? tCommon("dash")
+                  : String(r.closingReading),
+            },
+            {
+              key: "amount",
+              label: t("amount"),
+              align: "right",
+              render: (r) => formatINR(totalAmount(r)),
+            },
+            {
+              key: "photos",
+              label: "Bill",
+              compact: true,
+              render: (r) => (
+                <BillPhotosCell
+                  urls={r.billPhotoUrls}
+                  fallbackUrl={r.billPhotoUrl}
+                />
+              ),
+            },
+          ],
+    [cat6, page, pageSize, t, tCommon],
   );
 
   return (
@@ -101,6 +167,13 @@ export function ExpenseReport({
         rows={rows}
         loading={loading}
         emptyLabel={t("noRecords")}
+        footer={
+          totals
+            ? cat6
+              ? { month: "TOTAL", amount: formatINR(totals.total ?? 0) }
+              : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
+            : undefined
+        }
       />
       <Pagination
         page={page}

@@ -3,7 +3,11 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaClientGen: number | undefined;
 };
+
+/** Bump when Prisma schema fields change so the cached client is rebuilt. */
+const PRISMA_CLIENT_GEN = 4;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {
@@ -56,8 +60,12 @@ function createPrismaClient() {
 
 /** Lazy Prisma accessor — avoids crashing Next.js build when DATABASE_URL is absent. */
 export function getPrisma(): PrismaClient {
-  if (!globalForPrisma.prisma) {
+  if (
+    !globalForPrisma.prisma ||
+    globalForPrisma.prismaClientGen !== PRISMA_CLIENT_GEN
+  ) {
     globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaClientGen = PRISMA_CLIENT_GEN;
   }
   return globalForPrisma.prisma;
 }

@@ -15,6 +15,7 @@ import { maybeAwardCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
+import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -86,14 +87,34 @@ export async function GET(
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
 
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  const cat6 = isCat6Plant(plant?.code);
+
   const entries = await prisma.stockEntry.findMany({
-    where: { plantId, ...filter },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    where: {
+      plantId,
+      ...filter,
+      ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
+    },
+    orderBy: cat6
+      ? [{ date: "asc" }, { createdAt: "asc" }]
+      : [{ date: "desc" }, { createdAt: "desc" }],
   });
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+  const totals = entries.reduce(
+    (acc, row) => {
+      acc.quantity += Number(row.quantity) || 0;
+      acc.closingValue += Number(row.closingValue) || 0;
+      return acc;
+    },
+    { quantity: 0, closingValue: 0 },
+  );
 
-  return NextResponse.json({ rows: slice, ...pageInfo });
+  return NextResponse.json({ rows: slice, ...pageInfo, totals });
 }
 
 export async function POST(

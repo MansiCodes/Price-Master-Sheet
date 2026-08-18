@@ -37,7 +37,7 @@ export default async function PlantPnlPage({ params }: PageProps) {
 
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, code: true },
   });
 
   if (!plant) {
@@ -48,5 +48,5 @@ export default async function PlantPnlPage({ params }: PageProps) {
     );
   }
 
-  return <PnlReportsShell plantId={plant.id} plantName={plant.name} />;
+  return <PnlReportsShell plantId={plant.id} plantName={plant.name} plantCode={plant.code} />;
 }

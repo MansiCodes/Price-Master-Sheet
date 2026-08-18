@@ -242,6 +242,22 @@
   to { background-position: -200% 0; }
 }
 
+.pnl-stmt--cat6 .pnl-stmt__col-head,
+.pnl-stmt--cat6 .pnl-stmt__line,
+.pnl-stmt--cat6 .pnl-stmt__total-bar {
+  grid-template-columns: minmax(0, 1fr) minmax(5.5rem, 8rem);
+}
+
+.pnl-stmt--cat6 .pnl-stmt__col-head span:nth-child(2),
+.pnl-stmt--cat6 .pnl-stmt__amount,
+.pnl-stmt--cat6 .pnl-stmt__total-bar span:nth-child(2) {
+  text-align: right;
+}
+
+.pnl-stmt--cat6 .pnl-stmt__line--item .pnl-stmt__label {
+  padding-left: 1.25rem;
+}
+
 .pnl-stmt__section {
   border-bottom: 2px solid #1f2937;
 }
@@ -512,6 +528,16 @@
 
 .pnl-report-table--register tbody tr:hover td {
   background: rgba(13, 148, 136, 0.07);
+}
+
+.pnl-report-table tfoot td,
+.pnl-report-table--register tfoot td {
+  font-weight: 800;
+  background: rgba(13, 148, 136, 0.14);
+  border-top: 2px solid rgba(13, 148, 136, 0.35);
+  border-bottom: 0;
+  color: var(--teal-ink, #115e59);
+  white-space: nowrap;
 }
 
 .pnl-report-table--register tbody tr:last-child td {

@@ -14,8 +14,9 @@ import { maybeAwardCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
-import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
+import { isCat6Plant } from "@/lib/plant-layout";
 import { paginate } from "@/lib/ui/paginate";
+import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 
 const saleHeaderFields = {
   date: z.string().regex(dateOnlyRegex),
@@ -35,6 +36,9 @@ const saleItemSchema = z.object({
   unit: z.string().min(1),
   quantity: z.coerce.number().positive(),
   rate: z.coerce.number().nonnegative(),
+  inMeter: z.coerce.number().nonnegative().optional().nullable(),
+  qtyMtr: z.coerce.number().nonnegative().optional().nullable(),
+  meterUnit: z.string().optional().nullable(),
 });
 
 const saleSingleSchema = z.object({
@@ -43,6 +47,9 @@ const saleSingleSchema = z.object({
   unit: z.string().min(1),
   quantity: z.coerce.number().positive(),
   rate: z.coerce.number().nonnegative(),
+  inMeter: z.coerce.number().nonnegative().optional().nullable(),
+  qtyMtr: z.coerce.number().nonnegative().optional().nullable(),
+  meterUnit: z.string().optional().nullable(),
 });
 
 const saleBatchSchema = z.object({
@@ -71,14 +78,38 @@ export async function GET(
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
 
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  const cat6 = isCat6Plant(plant?.code);
+
   const sales = await prisma.sale.findMany({
-    where: { plantId, ...filter },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    where: {
+      plantId,
+      ...filter,
+      ...(cat6
+        ? { NOT: { sourceKey: { endsWith: "sales-online:excel" } } }
+        : {}),
+    },
+    orderBy: cat6
+      ? [{ date: "asc" }, { createdAt: "asc" }]
+      : [{ date: "desc" }, { createdAt: "desc" }],
   });
 
   const { slice, ...pageInfo } = paginate(sales, page, pageSize);
+  const totals = sales.reduce(
+    (acc, row) => {
+      acc.salesValue += Number(row.salesValue) || 0;
+      acc.quantity += Number(row.quantity) || 0;
+      acc.inMeter += Number(row.inMeter) || 0;
+      acc.qtyMtr += Number(row.qtyMtr) || 0;
+      return acc;
+    },
+    { salesValue: 0, quantity: 0, inMeter: 0, qtyMtr: 0 },
+  );
 
-  return NextResponse.json({ rows: slice, ...pageInfo });
+  return NextResponse.json({ rows: slice, ...pageInfo, totals });
 }
 
 export async function POST(
@@ -141,6 +172,9 @@ export async function POST(
             quantity: item.quantity,
             rate: item.rate,
             salesValue,
+            inMeter: item.inMeter ?? null,
+            qtyMtr: item.qtyMtr ?? null,
+            meterUnit: item.meterUnit?.trim() || null,
             billPhotoUrl: photos.billPhotoUrl,
             billPhotoUrls: photos.billPhotoUrls,
             enteredById: session.user.id,
@@ -200,6 +234,9 @@ export async function POST(
       quantity: data.quantity,
       rate: data.rate,
       salesValue,
+      inMeter: data.inMeter ?? null,
+      qtyMtr: data.qtyMtr ?? null,
+      meterUnit: data.meterUnit?.trim() || null,
       billPhotoUrl: photos.billPhotoUrl,
       billPhotoUrls: photos.billPhotoUrls,
       enteredById: session.user.id,

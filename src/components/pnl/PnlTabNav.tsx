@@ -6,15 +6,20 @@ import { REPORT_TABS, type ReportTab } from "@/components/pnl/types";
 export function PnlTabNav({
   active,
   onChange,
+  hideProduction = false,
 }: {
   active: ReportTab;
   onChange: (tab: ReportTab) => void;
+  hideProduction?: boolean;
 }) {
   const t = useTranslations("pnl");
+  const tabs = hideProduction
+    ? REPORT_TABS.filter((tab) => tab.key !== "production")
+    : REPORT_TABS;
 
   return (
     <div className="pnl-tab-nav" role="tablist" aria-label="Report type">
-      {REPORT_TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.key}
           type="button"

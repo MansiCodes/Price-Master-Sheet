@@ -22,7 +22,11 @@ const pettyCashSchema = z.object({
   entryType: z.enum(PettyCashKind).default(PettyCashKind.EXPENSE),
   payMode: z.string().min(1),
   expenseHead: z.string().min(1),
+  nature: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  checkedBy: z.string().optional().nullable(),
+  approvedBy: z.string().optional().nullable(),
   openingReading: z.coerce.number().nonnegative().optional().nullable(),
   closingReading: z.coerce.number().nonnegative().optional().nullable(),
   billNumber: z.string().optional().nullable(),
@@ -82,7 +86,13 @@ export async function GET(
   const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
 
   return NextResponse.json({
-    rows: slice,
+    rows: slice.map((entry) => ({
+      ...entry,
+      nature: entry.nature,
+      location: entry.location,
+      checkedBy: entry.checkedBy,
+      approvedBy: entry.approvedBy,
+    })),
     ...pageInfo,
     totals: {
       expenses,
@@ -129,7 +139,11 @@ export async function POST(
       entryType: data.entryType,
       payMode: data.payMode,
       expenseHead: data.expenseHead,
+      nature: data.nature?.trim() || null,
       description: data.description ?? null,
+      location: data.location?.trim() || null,
+      checkedBy: data.checkedBy?.trim() || null,
+      approvedBy: data.approvedBy?.trim() || null,
       openingReading:
         data.expenseHead === "Electricity"
           ? (data.openingReading ?? null)

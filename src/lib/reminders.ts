@@ -1,6 +1,6 @@
-import { GlobalRole } from "@prisma/client";
+import { GlobalRole, Prisma } from "@prisma/client";
 import {
-  isPastNinePmIst,
+  reminderShiftForNow,
   startOfUtcDay,
   todayIstAsUtcDate,
 } from "@/lib/dates";
@@ -10,9 +10,6 @@ import {
   sendShiftReminderWhatsApp,
 } from "@/lib/aisensy";
 import { toIndiaPhoneE164 } from "@/lib/phone";
-
-const AUDIENCES = ["accountant", "manager", "admin"] as const;
-type Audience = (typeof AUDIENCES)[number];
 
 type ReminderRecipient = {
   name: string;
@@ -29,38 +26,43 @@ function formatReminderDate(day: Date): string {
   });
 }
 
-async function alreadyLogged(
+function reminderClaimId(
   plantId: string,
-  date: Date,
-  audience: Audience,
+  isoDate: string,
   shift: "DAY" | "NIGHT",
-): Promise<boolean> {
-  const existing = await prisma.reminderLog.findFirst({
-    where: {
-      plantId,
-      date,
-      audience,
-      message: { contains: shift === "DAY" ? "Day shift" : "Night shift" },
-    },
-    select: { id: true },
-  });
-  return Boolean(existing);
+): string {
+  return `shift-reminder:${plantId}:${isoDate}:${shift}`;
+}
+
+function uniqueRecipients(
+  recipients: ReminderRecipient[],
+): ReminderRecipient[] {
+  const seen = new Set<string>();
+  const unique: ReminderRecipient[] = [];
+  for (const recipient of recipients) {
+    const phone = recipient.phone?.replace(/\D/g, "") ?? "";
+    const key = phone || recipient.email.toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(recipient);
+  }
+  return unique;
 }
 
 /**
- * After 9PM IST cutoff: for each active plant/shift whose status is not
- * allComplete, send AiSensy shift-reminder WhatsApp (when configured) and
- * write ReminderLog entries.
+ * 10 minutes before the 9:00 IST shift start, send one WhatsApp per person
+ * for the upcoming Day (08:50) or Night (20:50) shift.
  */
 export async function runDailyReminders(now: Date = new Date()) {
   const day = todayIstAsUtcDate(now);
   const dateLabel = formatReminderDate(day);
   const isoDate = day.toISOString().slice(0, 10);
+  const shift = reminderShiftForNow(now);
 
-  if (!isPastNinePmIst(now)) {
+  if (!shift) {
     return {
       skipped: true as const,
-      reason: "before_cutoff",
+      reason: "outside_shift_reminder_window",
       date: isoDate,
       remindersCreated: 0,
       whatsappSent: 0,
@@ -75,124 +77,123 @@ export async function runDailyReminders(now: Date = new Date()) {
 
   let remindersCreated = 0;
   let whatsappSent = 0;
-  const shifts = ["DAY", "NIGHT"] as const;
+  const shiftLabel = shift === "DAY" ? "Day" : "Night";
 
   for (const plant of plants) {
-    for (const shift of shifts) {
-      const status = await prisma.dailyEntryStatus.findUnique({
-        where: {
-          plantId_date_shift: {
-            plantId: plant.id,
-            date: startOfUtcDay(day),
-            shift,
-          },
+    const status = await prisma.dailyEntryStatus.findUnique({
+      where: {
+        plantId_date_shift: {
+          plantId: plant.id,
+          date: startOfUtcDay(day),
+          shift,
         },
-      });
+      },
+    });
 
-      if (status?.allComplete) continue;
+    if (status?.allComplete) continue;
 
-      const shiftLabel = shift === "DAY" ? "Day" : "Night";
+    const claimed = await claimReminder(plant.id, day, isoDate, shift);
+    if (!claimed) continue;
 
-      for (const audience of AUDIENCES) {
-        if (await alreadyLogged(plant.id, day, audience, shift)) continue;
+    const recipients = uniqueRecipients(
+      await resolvePlantRecipients(plant.id),
+    );
+    const sendResults: string[] = [];
 
-        const recipients = await resolveAudienceRecipients(plant.id, audience);
-        const sendResults: string[] = [];
+    for (const recipient of recipients) {
+      const displayName =
+        recipient.name.trim() || recipient.email.split("@")[0] || "there";
 
-        for (const recipient of recipients) {
-          const displayName =
-            recipient.name.trim() || recipient.email.split("@")[0] || "there";
-
-          if (whatsappReady && recipient.phone) {
-            const result = await sendShiftReminderWhatsApp({
-              destination: recipient.phone,
-              userName: displayName,
-              shiftLabel,
-              plantName: plant.name,
-              dateLabel,
-            });
-            if (result.ok) {
-              whatsappSent += 1;
-              sendResults.push(`${recipient.phone}: sent`);
-            } else {
-              sendResults.push(
-                `${recipient.phone}: failed (${result.message ?? "error"})`,
-              );
-            }
-          } else if (!recipient.phone) {
-            sendResults.push(`${recipient.email}: no phone`);
-          } else {
-            sendResults.push(`${recipient.phone}: stub (campaign not configured)`);
-          }
-        }
-
-        const channel =
-          whatsappReady && recipients.some((r) => r.phone)
-            ? "whatsapp"
-            : "in_app";
-
-        const summary =
-          sendResults.length > 0
-            ? sendResults.join("; ")
-            : `no ${audience} recipients found`;
-
-        const message = `${shiftLabel} shift reminder for ${plant.name} on ${dateLabel}. ${summary}`;
-
-        await prisma.reminderLog.create({
-          data: {
-            plantId: plant.id,
-            date: day,
-            channel,
-            audience,
-            message,
-          },
+      if (whatsappReady && recipient.phone) {
+        const result = await sendShiftReminderWhatsApp({
+          destination: recipient.phone,
+          userName: displayName,
+          shiftLabel,
+          plantName: plant.name,
+          dateLabel,
         });
-        remindersCreated += 1;
-        console.log(`[reminders] ${audience} plant=${plant.id} ${shift}: ${message}`);
+        if (result.ok) {
+          whatsappSent += 1;
+          sendResults.push(`${recipient.phone}: sent`);
+        } else {
+          sendResults.push(
+            `${recipient.phone}: failed (${result.message ?? "error"})`,
+          );
+        }
+      } else if (!recipient.phone) {
+        sendResults.push(`${recipient.email}: no phone`);
+      } else {
+        sendResults.push(`${recipient.phone}: stub (campaign not configured)`);
       }
     }
+
+    const channel =
+      whatsappReady && recipients.some((r) => r.phone)
+        ? "whatsapp"
+        : "in_app";
+    const summary =
+      sendResults.length > 0
+        ? sendResults.join("; ")
+        : "no recipients found";
+    const message = `${shiftLabel} shift reminder for ${plant.name} on ${dateLabel}. ${summary}`;
+
+    await prisma.reminderLog.update({
+      where: { id: claimed.id },
+      data: { channel, message },
+    });
+    remindersCreated += 1;
+    console.log(`[reminders] plant=${plant.id} ${shift}: ${message}`);
   }
 
   return {
     skipped: false as const,
     date: isoDate,
+    shift,
     remindersCreated,
     whatsappSent,
   };
 }
 
-async function resolveAudienceRecipients(
+async function claimReminder(
   plantId: string,
-  audience: Audience,
-): Promise<ReminderRecipient[]> {
-  if (audience === "admin") {
-    const admins = await prisma.user.findMany({
-      where: {
-        isActive: true,
-        globalRole: {
-          in: [GlobalRole.SUPER_ADMIN, GlobalRole.BUSINESS_HEAD],
-        },
+  date: Date,
+  isoDate: string,
+  shift: "DAY" | "NIGHT",
+) {
+  const id = reminderClaimId(plantId, isoDate, shift);
+  try {
+    return await prisma.reminderLog.create({
+      data: {
+        id,
+        plantId,
+        date,
+        channel: "pending",
+        audience: "plant",
+        message: `${shift} reminder claimed`,
       },
-      select: { name: true, email: true, phone: true },
+      select: { id: true },
     });
-    return admins.map((u) => ({
-      name: u.name ?? "",
-      email: u.email,
-      phone: u.phone ? toIndiaPhoneE164(u.phone) : null,
-    }));
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return null;
+    }
+    throw error;
   }
+}
 
-  const role =
-    audience === "accountant"
-      ? GlobalRole.ACCOUNTANT
-      : GlobalRole.PLANT_MANAGER;
-
+async function resolvePlantRecipients(
+  plantId: string,
+): Promise<ReminderRecipient[]> {
   const users = await prisma.user.findMany({
     where: {
       isActive: true,
+      NOT: { globalRole: GlobalRole.SUPER_ADMIN },
       OR: [
-        { globalRole: role, plantRoles: { some: { plantId } } },
-        { plantRoles: { some: { plantId, role } } },
+        { globalRole: GlobalRole.BUSINESS_HEAD },
+        { plantRoles: { some: { plantId } } },
       ],
     },
     select: { name: true, email: true, phone: true },

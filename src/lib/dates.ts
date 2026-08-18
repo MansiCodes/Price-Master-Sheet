@@ -69,6 +69,39 @@ export function isPastNinePmIst(now: Date = new Date()): boolean {
   return now.getTime() >= ninePmIstOnDate(todayIstAsUtcDate(now)).getTime();
 }
 
+export function getIstHoursMinutes(now: Date = new Date()): {
+  hour: number;
+  minute: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return { hour, minute };
+}
+
+/**
+ * Shifts run 9:00–21:00 (Day) and 21:00–09:00 (Night) IST.
+ * Reminders go out ~10 minutes before the matching start.
+ */
+export function reminderShiftForNow(
+  now: Date = new Date(),
+): "DAY" | "NIGHT" | null {
+  const { hour, minute } = getIstHoursMinutes(now);
+  const minutes = hour * 60 + minute;
+  const morningStart = 8 * 60;
+  const morningEnd = 10 * 60;
+  const eveningStart = 20 * 60;
+  const eveningEnd = 22 * 60 + 30;
+  if (minutes >= morningStart && minutes < morningEnd) return "DAY";
+  if (minutes >= eveningStart && minutes < eveningEnd) return "NIGHT";
+  return null;
+}
+
 /** Start of calendar day as UTC midnight (matches Prisma `@db.Date` usage). */
 export function startOfUtcDay(date: Date): Date {
   return new Date(

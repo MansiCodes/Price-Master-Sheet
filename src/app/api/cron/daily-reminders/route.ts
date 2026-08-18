@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { awardCoinsForDate } from "@/lib/coins";
-import { todayIstAsUtcDate } from "@/lib/dates";
+import { isPastNinePmIst, todayIstAsUtcDate } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { runDailyReminders } from "@/lib/reminders";
 
@@ -21,17 +21,18 @@ export async function GET(request: Request) {
   const day = todayIstAsUtcDate();
   const reminders = await runDailyReminders();
 
-  const plants = await prisma.plant.findMany({
-    where: { isActive: true },
-    select: { id: true },
-  });
-
   const coins = [];
-  for (const plant of plants) {
-    coins.push({
-      plantId: plant.id,
-      ...(await awardCoinsForDate(plant.id, day)),
+  if (isPastNinePmIst()) {
+    const plants = await prisma.plant.findMany({
+      where: { isActive: true },
+      select: { id: true },
     });
+    for (const plant of plants) {
+      coins.push({
+        plantId: plant.id,
+        ...(await awardCoinsForDate(plant.id, day)),
+      });
+    }
   }
 
   return NextResponse.json({

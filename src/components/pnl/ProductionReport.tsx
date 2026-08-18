@@ -30,8 +30,9 @@ export function ProductionReport({
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/production?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
-  const { rows, page, pageSize, total, loading, error, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
     usePaginatedReport<ProductionRow>(baseUrl, t("networkError"));
+  const totals = response?.totals as { quantity?: number } | undefined;
 
   const columns: ReportColumn<ProductionRow>[] = [
     { key: "date", label: "Date", render: (r) => isoDate(r.date) },
@@ -49,7 +50,16 @@ export function ProductionReport({
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">{t("productionTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
-      <ReportTable columns={columns} rows={rows} loading={loading} />
+      <ReportTable columns={columns} rows={rows} loading={loading} footer={
+          totals
+            ? {
+                product: "TOTAL",
+                qty: Number(totals.quantity ?? 0).toLocaleString("en-IN", {
+                  maximumFractionDigits: 2,
+                }),
+              }
+            : undefined
+        } />
       <Pagination
         page={page}
         pageSize={pageSize}

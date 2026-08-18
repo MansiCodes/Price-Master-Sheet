@@ -25,6 +25,8 @@ const purchaseHeaderFields = {
   vendorName: z.string().min(1),
   billNumber: z.string().optional().nullable(),
   billDate: z.string().regex(dateOnlyRegex).optional().nullable(),
+  gstin: z.string().optional().nullable(),
+  booksDate: z.string().regex(dateOnlyRegex).optional().nullable(),
   notes: z.string().optional().nullable(),
   billPhotoUrl: z.string().url().optional().nullable(),
   billPhotoUrls: z.array(z.string().url()).max(3).optional(),
@@ -87,8 +89,17 @@ export async function GET(
   });
 
   const { slice, ...pageInfo } = paginate(purchases, page, pageSize);
+  const totals = purchases.reduce(
+    (acc, row) => {
+      acc.quantity += Number(row.quantity) || 0;
+      acc.basicValue += Number(row.basicValue) || 0;
+      acc.invoiceValue += Number(row.invoiceValue) || 0;
+      return acc;
+    },
+    { quantity: 0, basicValue: 0, invoiceValue: 0 },
+  );
 
-  return NextResponse.json({ rows: slice, ...pageInfo });
+  return NextResponse.json({ rows: slice, ...pageInfo, totals });
 }
 
 export async function POST(
@@ -151,6 +162,8 @@ export async function POST(
             vendorName: data.vendorName,
             billNumber: data.billNumber ?? null,
             billDate: data.billDate ? parseDateOnly(data.billDate) : null,
+            gstin: data.gstin?.trim() || null,
+            booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
             notes: data.notes?.trim() || null,
             itemDescription: item.itemDescription,
             unit: item.unit,
@@ -220,6 +233,8 @@ export async function POST(
       vendorName: data.vendorName,
       billNumber: data.billNumber ?? null,
       billDate: data.billDate ? parseDateOnly(data.billDate) : null,
+      gstin: data.gstin?.trim() || null,
+      booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
       notes: data.notes?.trim() || null,
       itemDescription: data.itemDescription,
       unit: data.unit,

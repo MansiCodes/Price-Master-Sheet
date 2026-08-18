@@ -9,10 +9,12 @@ import {
 
 export function PnlReportTab({
   plantId,
+  plantCode,
   from,
   to,
 }: {
   plantId: string;
+  plantCode?: string;
   plantName?: string;
   from: string;
   to: string;
@@ -54,6 +56,7 @@ export function PnlReportTab({
         <PnlStatementSkeleton />
       ) : pnl ? (
         <PnlStatement
+          plantCode={plantCode}
           trading={pnl.trading}
           indirect={pnl.indirect}
         />

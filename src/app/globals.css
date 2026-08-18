@@ -1283,6 +1283,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
   padding: 0.7rem 1.05rem;

@@ -1,31 +1,19 @@
-export const DEFAULT_PURCHASE_GOODS = [
-  "INSU & OUT",
-  "TAPE",
-  "INSU",
-  "DHAGA",
-  "BOXES",
-  "IN-PVC",
-  "ALU",
-  "Spool",
-  "COPPER",
-  "MASTER BATCH",
-  "OT-PVC",
-] as const;
+import {
+  CAT6_CUSTOMERS,
+  CAT6_PETTY_APPROVED_BY,
+  CAT6_PETTY_CHECKED_BY,
+  CAT6_PETTY_LOCATIONS,
+  CAT6_PETTY_NATURES,
+  CAT6_PETTY_PERSONS,
+  CAT6_PURCHASE_GOODS,
+  CAT6_SALE_PRODUCTS,
+  CAT6_STOCK_ITEMS,
+  CAT6_SUPPLIERS,
+} from "@/lib/cat6-catalogs";
+import { isCat6Plant } from "@/lib/plant-layout";
 
-export const DEFAULT_SUPPLIERS = [
-  "3R Polymers Private Limited",
-  "Bells Insulations Private Ltd.",
-  "Cablemac Automations India Pvt. Ltd",
-  "Crown Trading C",
-  "Goel Packers",
-  "Hycount Cables Private Limited",
-  "Paramhans Wires Private Limited",
-  "Perfect Metals",
-  "Pryas Wire Industries",
-  "Sag Polymers Private Limited",
-  "SINGHAL PRINT PACK",
-  "Tirupati Plastics",
-] as const;
+export const DEFAULT_PURCHASE_GOODS = CAT6_PURCHASE_GOODS;
+export const DEFAULT_SUPPLIERS = CAT6_SUPPLIERS;
 
 const PVC_SUPPLIERS = [
   "S.S Industries",
@@ -104,4 +92,71 @@ export function getPurchaseCatalog(plantCode: string): {
     suppliers: DEFAULT_SUPPLIERS,
     goods: DEFAULT_PURCHASE_GOODS,
   };
+}
+
+export function getSalesCatalog(plantCode: string): readonly string[] {
+  if (isCat6Plant(plantCode)) return CAT6_SALE_PRODUCTS;
+  return [
+    "CAT6 Patch Cable Solid with Connectors",
+    "Aluminium Wire",
+    "CAT6 PATCH CABLE",
+    "Copper Wire Rod",
+    "Corrugated Box",
+    "HDPE Compound",
+    "MDPE Compound",
+    "Plastic Granuals",
+    "Polyster Yarn",
+    "PVC Compound",
+    "SPOOL",
+  ];
+}
+
+export function getStockCatalog(plantCode: string): readonly string[] {
+  if (isCat6Plant(plantCode)) {
+    return [...CAT6_STOCK_ITEMS, ...CAT6_PURCHASE_GOODS, "Others"];
+  }
+  if (plantCode.toUpperCase() === "PVC") {
+    return [...PVC_PURCHASE_GOODS, "Others"];
+  }
+  return [...DEFAULT_PURCHASE_GOODS, "Others"];
+}
+
+export function getCat6PettyCatalog(): {
+  natures: readonly string[];
+  persons: readonly string[];
+  locations: readonly string[];
+  checkedBy: readonly string[];
+  approvedBy: readonly string[];
+} {
+  return {
+    natures: CAT6_PETTY_NATURES,
+    persons: CAT6_PETTY_PERSONS,
+    locations: CAT6_PETTY_LOCATIONS,
+    checkedBy: CAT6_PETTY_CHECKED_BY,
+    approvedBy: CAT6_PETTY_APPROVED_BY,
+  };
+}
+
+export function getCustomerCatalog(plantCode: string): readonly string[] {
+  if (isCat6Plant(plantCode)) return CAT6_CUSTOMERS;
+  return [
+    "Noto Fire",
+    "Wirelux",
+    "Samriddhii Automation Haridwar",
+    "Samriddhi Automation Noida",
+    "Railway PO ATC",
+    "Hamsa India",
+    "Peak Star Networking",
+    "Glow Right",
+    "Ayansh Infocom",
+    "Qlo Networks",
+    "Anu Exterprises",
+    "Digamber Telecom",
+    "Naitik Infotex",
+    "Bharat Cable Industries",
+    "Goa Shipping Yard",
+    "Reliable securities",
+    "Chrome Infra",
+    "Epsillon Cable",
+  ];
 }

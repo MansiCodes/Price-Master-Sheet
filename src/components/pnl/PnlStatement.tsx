@@ -2,6 +2,7 @@
 
 import type { PnlStatementLine } from "@/lib/pnl/types";
 import { formatAmount, formatRatio } from "@/components/pnl/types";
+import { isCat6Plant } from "@/lib/plant-layout";
 
 function visibleLines(lines: PnlStatementLine[]): PnlStatementLine[] {
   return lines.filter((row) => {
@@ -33,17 +34,19 @@ function StatementSide({
   title,
   lines,
   total,
+  showRatio = true,
 }: {
   title: string;
   lines: PnlStatementLine[];
   total: number;
+  showRatio?: boolean;
 }) {
   return (
     <div className="pnl-stmt__side">
       <div className="pnl-stmt__col-head">
         <span>Particulars</span>
         <span>Amount</span>
-        <span>Ratio %</span>
+        {showRatio ? <span>Ratio %</span> : null}
       </div>
       <ul className="pnl-stmt__lines">
         {lines.map((row, index) => {
@@ -57,11 +60,13 @@ function StatementSide({
             >
               <span className="pnl-stmt__label">{row.label}</span>
               <span className="pnl-stmt__amount">
-                {row.kind === "header" && row.amount == null
+                {row.amount == null
                   ? ""
                   : formatAmount(row.amount)}
               </span>
-              <span className="pnl-stmt__ratio">{formatRatio(row.ratio)}</span>
+              {showRatio ? (
+                <span className="pnl-stmt__ratio">{formatRatio(row.ratio)}</span>
+              ) : null}
             </li>
           );
         })}
@@ -69,7 +74,7 @@ function StatementSide({
       <div className="pnl-stmt__total-bar">
         <span>{title} total</span>
         <span>{formatAmount(total)}</span>
-        <span />
+        {showRatio ? <span /> : null}
       </div>
     </div>
   );
@@ -80,18 +85,30 @@ function StatementSection({
   debit,
   credit,
   total,
+  showRatio = true,
 }: {
   label: string;
   debit: PnlStatementLine[];
   credit: PnlStatementLine[];
   total: number;
+  showRatio?: boolean;
 }) {
   const padded = padLines(debit, credit);
   return (
     <section className="pnl-stmt__section" aria-label={label}>
       <div className="pnl-stmt__grid">
-        <StatementSide title="Debit" lines={padded.debit} total={total} />
-        <StatementSide title="Credit" lines={padded.credit} total={total} />
+        <StatementSide
+          title="Debit"
+          lines={padded.debit}
+          total={total}
+          showRatio={showRatio}
+        />
+        <StatementSide
+          title="Credit"
+          lines={padded.credit}
+          total={total}
+          showRatio={showRatio}
+        />
       </div>
     </section>
   );
@@ -100,6 +117,7 @@ function StatementSection({
 export function PnlStatement({
   trading,
   indirect,
+  plantCode,
   loading,
 }: {
   trading: {
@@ -112,21 +130,25 @@ export function PnlStatement({
     credit: PnlStatementLine[];
     total: number;
   };
+  plantCode?: string;
   loading?: boolean;
 }) {
+  const cat6 = isCat6Plant(plantCode);
   return (
-    <article className={`pnl-stmt${loading ? " is-loading" : ""}`}>
+    <article className={`pnl-stmt${cat6 ? " pnl-stmt--cat6" : ""}${loading ? " is-loading" : ""}`}>
       <StatementSection
         label="Trading account"
         debit={trading.debit}
         credit={trading.credit}
         total={trading.total}
+        showRatio={!cat6}
       />
       <StatementSection
         label="Indirect account"
         debit={indirect.debit}
         credit={indirect.credit}
         total={indirect.total}
+        showRatio={!cat6}
       />
     </article>
   );
