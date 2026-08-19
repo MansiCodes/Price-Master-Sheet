@@ -17,8 +17,14 @@ export const authConfig = {
     signIn: "/login",
   },
   providers: [],
+  // Short session so user must re-login after a period (e.g. "next day").
+  // Using JWT strategy.
   session: {
     strategy: "jwt",
+    maxAge: 60 * 60 * 24, // 24 hours (in seconds)
+  },
+  jwt: {
+    maxAge: 60 * 60 * 24, // align JWT + cookie lifetime
   },
   cookies: {
     sessionToken: {
@@ -28,6 +34,7 @@ export const authConfig = {
         sameSite: "lax" as const,
         path: "/",
         secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24, // 24 hours (in seconds)
       },
     },
   },
