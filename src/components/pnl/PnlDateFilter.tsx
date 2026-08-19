@@ -2,6 +2,11 @@
 
 import { useTranslations } from "next-intl";
 
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function PnlDateFilter({
   from,
   to,
@@ -14,6 +19,7 @@ export function PnlDateFilter({
   onToChange: (value: string) => void;
 }) {
   const t = useTranslations("common");
+  const today = todayISO();
 
   return (
     <div className="pnl-date-filter" aria-label="Date range filter">
@@ -34,6 +40,7 @@ export function PnlDateFilter({
           type="date"
           value={to}
           min={from}
+          max={today}
           onChange={(e) => onToChange(e.target.value)}
         />
       </div>

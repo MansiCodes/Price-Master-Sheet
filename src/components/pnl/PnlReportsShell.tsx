@@ -43,13 +43,12 @@ export function PnlReportsShell({
   const pvc = plantCode?.toUpperCase() === "PVC";
 
   const userRange = todayMonthRange();
+  const todayStr = userRange.to;
   const { from, to, setFrom, setTo } = useReportRange(
     isSuperAdmin
       ? pvc ? "2026-01-01" : cat6 ? "2025-04-01" : undefined
       : userRange.from,
-    isSuperAdmin
-      ? pvc ? "2026-08-05" : cat6 ? "2026-05-22" : undefined
-      : userRange.to,
+    isSuperAdmin ? todayStr : userRange.to,
   );
 
   const allowedTabs = useMemo<ReportTab[]>(
