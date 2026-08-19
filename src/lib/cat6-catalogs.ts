@@ -173,6 +173,7 @@ export const CAT6_SALE_PRODUCTS = [
   "patch cable with connector Length 5mtr",
   "SY-CAT6 -SFTP 305M Cable(M)",
   "SY-CAT6 -UTP 305M",
+  "Other",
 ] as const;
 
 export const CAT6_SUPPLIERS = [
