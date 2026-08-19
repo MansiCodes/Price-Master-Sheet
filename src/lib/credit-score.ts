@@ -17,7 +17,7 @@ function formatCompleteDate(date: Date): string {
   });
 }
 
-/** True when the user has at least one entry in each daily form for plant/date/shift. */
+/** True when the user has at least one entry in ANY daily form for plant/date/shift. */
 export async function userShiftFormsComplete(
   userId: string,
   plantId: string,
@@ -36,15 +36,15 @@ export async function userShiftFormsComplete(
   ]);
 
   return (
-    purchaseN > 0 &&
-    saleN > 0 &&
-    stockN > 0 &&
-    productionN > 0 &&
+    purchaseN > 0 ||
+    saleN > 0 ||
+    stockN > 0 ||
+    productionN > 0 ||
     expenseN > 0
   );
 }
 
-/** True when all five forms are done in at least one shift for the day. */
+/** True when any form is done in at least one shift for the day. */
 export async function userDailyFormsComplete(
   userId: string,
   plantId: string,
@@ -207,7 +207,53 @@ async function awardShiftCreditScore(
 }
 
 /**
- * Add +100 credit when a non–Super Admin completes all five forms for a
+ * Revoke the +100 credit award for a plant/date/shift when all forms for
+ * that shift are deleted. Deducts 100 from the user's score and removes
+ * the CreditScoreAward row. Does nothing if any form entry still exists.
+ */
+export async function maybeRevokeCreditScore(
+  userId: string,
+  plantId: string,
+  date: Date,
+  shift: ManpowerShift,
+): Promise<{ revoked: boolean }> {
+  const day = startOfUtcDay(date);
+
+  // Check if an award exists for this slot
+  const award = await prisma.creditScoreAward.findUnique({
+    where: { userId_plantId_date_shift: { userId, plantId, date: day, shift } },
+    select: { id: true, points: true },
+  });
+  if (!award) return { revoked: false };
+
+  // If any form entry still exists, keep the award
+  const stillComplete = await userShiftFormsComplete(userId, plantId, day, shift);
+  if (stillComplete) return { revoked: false };
+
+  // All entries for this shift are gone — revoke
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { creditScore: true },
+  });
+  const currentScore = user?.creditScore ?? 0;
+  const newScore = Math.max(0, currentScore - (award.points ?? CREDIT_SCORE_COMPLETE));
+
+  try {
+    await prisma.$transaction([
+      prisma.creditScoreAward.delete({ where: { id: award.id } }),
+      prisma.user.update({ where: { id: userId }, data: { creditScore: newScore } }),
+    ]);
+  } catch (err) {
+    console.warn("[credit-score] revoke error", err);
+    return { revoked: false };
+  }
+
+  console.log(`[credit-score] revoked award user=${userId} shift=${shift} newScore=${newScore}`);
+  return { revoked: true };
+}
+
+/**
+ * Add +100 credit when a non–Super Admin fills ANY form for a
  * plant/date/shift. Awards once per shift; score accumulates (100, 200, …).
  * Sends forms-complete WhatsApp on each new award.
  */

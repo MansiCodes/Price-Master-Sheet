@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export const DEFAULT_REPORT_PAGE_SIZE = 10;
-export const REPORT_PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+export const REPORT_PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 type PaginatedResponse<T> = {
   rows?: T[];

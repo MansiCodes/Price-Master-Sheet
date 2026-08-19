@@ -20,10 +20,13 @@ import { BillUpload } from "@/components/today/BillUpload";
 import { PRODUCT_UNITS } from "@/lib/units";
 import {
   DEFAULT_PURCHASE_GOODS,
+  PVC_FAR_DEP_PERCENT,
+  PVC_FAR_VENDORS,
   STOCK_CATEGORIES,
   getCat6PettyCatalog,
   getCustomerCatalog,
   getPurchaseCatalog,
+  getPvcExpenseHeads,
   getSalesCatalog,
   getStockCatalog,
 } from "@/lib/plant-catalogs";
@@ -75,11 +78,10 @@ const MODULE_ICONS: Record<
   },
 };
 
-const MODULE_KIND: Record<TodayModuleKey, EntryKind> = {
+const MODULE_KIND: Partial<Record<TodayModuleKey, EntryKind>> = {
   purchaseFilled: "purchase",
   saleFilled: "sale",
   stockFilled: "stock",
-  productionFilled: "production",
   pettyCashFilled: "pettyCash",
 };
 
@@ -87,35 +89,35 @@ const KIND_TO_MODULE: Record<EntryKind, TodayModuleKey> = {
   purchase: "purchaseFilled",
   sale: "saleFilled",
   stock: "stockFilled",
-  production: "productionFilled",
   expense: "pettyCashFilled",
   pettyCash: "pettyCashFilled",
+  contactList: "purchaseFilled",
 };
 
 type EntryKind =
   | "purchase"
   | "sale"
   | "stock"
-  | "production"
   | "expense"
-  | "pettyCash";
+  | "pettyCash"
+  | "contactList";
 
 const ENTRY_KINDS: EntryKind[] = [
   "purchase",
   "sale",
   "stock",
-  "production",
   "expense",
   "pettyCash",
+  "contactList",
 ];
 
 const ENTRY_KIND_LABEL_KEY: Record<EntryKind, string> = {
   purchase: "purchase",
   sale: "sales",
   stock: "stock",
-  production: "production",
   expense: "expense",
   pettyCash: "pettyCash",
+  contactList: "contactList",
 };
 
 type LineItem = {
@@ -179,17 +181,8 @@ const EXPENSE_HEADS = [
 ] as const;
 
 const PRODUCTS = [
-  { name: "CAT6 Patch Cable Solid with Connectors", unit: "PCS" },
-  { name: "Aluminium Wire", unit: "KGS" },
-  { name: "CAT6 PATCH CABLE", unit: "PCS" },
-  { name: "Copper Wire Rod", unit: "KGS" },
-  { name: "Corrugated Box", unit: "NOS" },
-  { name: "HDPE Compound", unit: "KGS" },
-  { name: "MDPE Compound", unit: "KGS" },
-  { name: "Plastic Granuals", unit: "KGS" },
-  { name: "Polyster Yarn", unit: "KGS" },
-  { name: "PVC Compound", unit: "KGS" },
-  { name: "SPOOL", unit: "NOS" },
+  { name: "RDSO Black", unit: "KGS" },
+  { name: "RDSO Grey", unit: "KGS" },
 ] as const;
 
 const PRODUCT_NAMES = PRODUCTS.map((p) => p.name);
@@ -251,6 +244,8 @@ export function TodayHub({
   const saleProducts = useMemo(() => getSalesCatalog(plantCode), [plantCode]);
   const customers = useMemo(() => getCustomerCatalog(plantCode), [plantCode]);
   const pettyCatalog = useMemo(() => getCat6PettyCatalog(), []);
+  const pvcExpenseHeads = useMemo(() => [...getPvcExpenseHeads()], []);
+  const farVendorOptions = useMemo(() => [...PVC_FAR_VENDORS, "Other"], []);
   const cat6SupplierOptions = useMemo(
     () => [...purchaseCatalog.suppliers, "Other"],
     [purchaseCatalog.suppliers],
@@ -263,13 +258,13 @@ export function TodayHub({
 
   const entryOptions = useMemo(
     () =>
-      ENTRY_KINDS.filter((value) => !(isCat6 && value === "production")).map(
+      ENTRY_KINDS.map(
         (value) => ({
           value,
           label: t(ENTRY_KIND_LABEL_KEY[value] as "purchase"),
         }),
       ),
-    [isCat6, t],
+    [t],
   );
 
   const [open, setOpen] = useState(false);
@@ -349,6 +344,15 @@ export function TodayHub({
   const [expenseOpeningReading, setExpenseOpeningReading] = useState("");
   const [expenseClosingReading, setExpenseClosingReading] = useState("");
   const [expensePhotos, setExpensePhotos] = useState<string[]>([]);
+  const [expenseMonth, setExpenseMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [rentCoveredArea, setRentCoveredArea] = useState("");
+  const [rentRatePerSqft, setRentRatePerSqft] = useState("12");
+  const [farVendor, setFarVendor] = useState("");
+  const [farVendorOther, setFarVendorOther] = useState("");
+  const [farDescription, setFarDescription] = useState("");
+  const [farBillNumber, setFarBillNumber] = useState("");
+  const [farCost, setFarCost] = useState("");
+  const [farDepPercent, setFarDepPercent] = useState(String(PVC_FAR_DEP_PERCENT));
   const [pettyCashPayMode, setPettyCashPayMode] = useState("");
   const [pettyCashDescription, setPettyCashDescription] = useState("");
   const [pettyCashBillNumber, setPettyCashBillNumber] = useState("");
@@ -356,15 +360,17 @@ export function TodayHub({
   const [pettyCashContractorSalary, setPettyCashContractorSalary] = useState("");
   const [pettyCashSupervisorSalary, setPettyCashSupervisorSalary] = useState("");
   const [pettyCashPhotos, setPettyCashPhotos] = useState<string[]>([]);
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactCategory, setContactCategory] = useState("");
+  const [contactDesignation, setContactDesignation] = useState("");
   const [pettyNature, setPettyNature] = useState("");
   const [pettyPerson, setPettyPerson] = useState("");
   const [pettyLocation, setPettyLocation] = useState("");
   const [pettyCheckedBy, setPettyCheckedBy] = useState("");
   const [pettyApprovedBy, setPettyApprovedBy] = useState("");
 
-  const activeModules = isCat6
-    ? checklist[reportShift].filter((m) => m.key !== "productionFilled")
-    : checklist[reportShift];
+  const activeModules = checklist[reportShift].filter((m) => m.key !== "productionFilled");
   const activeCompleted = activeModules.filter((m) => m.filled).length;
 
   function openAdd(nextKind: EntryKind = "purchase", nextShift: ShiftKey = reportShift) {
@@ -441,6 +447,15 @@ export function TodayHub({
     setExpenseOpeningReading("");
     setExpenseClosingReading("");
     setExpensePhotos([]);
+    setExpenseMonth(entryDate.slice(0, 7) || today.slice(0, 7));
+    setRentCoveredArea("");
+    setRentRatePerSqft("12");
+    setFarVendor("");
+    setFarVendorOther("");
+    setFarDescription("");
+    setFarBillNumber("");
+    setFarCost("");
+    setFarDepPercent(String(PVC_FAR_DEP_PERCENT));
     setPettyCashPayMode("");
     setPettyCashDescription("");
     setPettyCashBillNumber("");
@@ -453,6 +468,10 @@ export function TodayHub({
     setPettyLocation("");
     setPettyCheckedBy("");
     setPettyApprovedBy("");
+    setContactName("");
+    setContactPhone("");
+    setContactCategory("");
+    setContactDesignation("");
   }
 
   useEffect(() => {
@@ -658,53 +677,87 @@ export function TodayHub({
           : stockNotes.trim() || null,
         photoUrls: stockPhotos,
       });
-    } else if (kind === "production") {
-      if (!productName.trim() || !(Number(prodQty) > 0)) {
-        fail(t("enterProductQty"));
-        return;
-      }
-      result = await postJson(`/api/plants/${plantId}/production`, {
-        date: entryDate,
-        shift,
-        productName: productName.trim(),
-        quantity: Number(prodQty),
-        unit: prodUnit,
-        manpower: {
-          manager: Number(mgr) || 0,
-          operator: Number(ops) || 0,
-          helper: Number(helpers) || 0,
-        },
-      });
     } else if (kind === "expense") {
-      const amount = Number(expenseAmount);
-      if (!(amount > 0) || !expenseHead) {
-        fail(t("enterCategoryAmount"));
+      if (isPvc && expenseHead === "Factory Rent") {
+        const area =
+          rentCoveredArea === "" ? null : Number(rentCoveredArea);
+        const rate = Number(rentRatePerSqft) || 12;
+        const rentAmount =
+          area != null && Number.isFinite(area)
+            ? area * rate
+            : Number(expenseAmount);
+        if (!(rentAmount > 0)) {
+          fail("Enter covered area × rate or a rent amount.");
+          return;
+        }
+        result = await postJson(`/api/plants/${plantId}/electricity`, {
+          month: expenseMonth || entryDate.slice(0, 7),
+          coveredAreaSqft: area,
+          rentRatePerSqft: rate,
+          rentAmount,
+          notes: expenseDesc.trim() || null,
+        });
+      } else if (isPvc && expenseHead === "FAR") {
+        const cost = Number(farCost);
+        const vendor =
+          farVendor === "Other"
+            ? farVendorOther.trim()
+            : farVendor.trim();
+        if (!farDescription.trim() || !(cost > 0)) {
+          fail("Enter asset description and actual cost.");
+          return;
+        }
+        result = await postJson(`/api/plants/${plantId}/assets`, {
+          assetDescription: farDescription.trim(),
+          vendor: vendor || null,
+          billNumber: farBillNumber.trim() || null,
+          billDate: entryDate || null,
+          cost,
+          gst: 0,
+          depreciationPercent: Number(farDepPercent) || PVC_FAR_DEP_PERCENT,
+        });
+      } else {
+        const amount = Number(expenseAmount);
+        if (!(amount > 0) || !expenseHead) {
+          fail(t("enterCategoryAmount"));
+          return;
+        }
+        result = await postJson(`/api/plants/${plantId}/petty-cash`, {
+          date: entryDate,
+          shift,
+          payMode: isCat6 ? "CASH" : paidTo.trim() || "CASH",
+          expenseHead: String(expenseHead),
+          description:
+            (isCat6
+              ? expenseDesc.trim() ||
+                (expenseHead === "Miscellaneous" ? "Salary" : "")
+              : [paidTo && `Paid to: ${paidTo}`, expenseDesc]
+                  .filter(Boolean)
+                  .join(" · ")) || null,
+          openingReading:
+            expenseHead === "Electricity" && expenseOpeningReading
+              ? Number(expenseOpeningReading)
+              : null,
+          closingReading:
+            expenseHead === "Electricity" && expenseClosingReading
+              ? Number(expenseClosingReading)
+              : null,
+          amount,
+          contractorSalary: 0,
+          supervisorSalary: 0,
+          billPhotoUrls: expensePhotos,
+        });
+      }
+    } else if (kind === "contactList") {
+      if (!contactName.trim()) {
+        fail("Enter contact name.");
         return;
       }
-      result = await postJson(`/api/plants/${plantId}/petty-cash`, {
-        date: entryDate,
-        shift,
-        payMode: "CASH",
-        expenseHead: String(expenseHead),
-        description:
-          (isCat6
-            ? expenseDesc.trim() ||
-              (expenseHead === "Miscellaneous" ? "Salary" : "")
-            : [paidTo && `Paid to: ${paidTo}`, expenseDesc]
-                .filter(Boolean)
-                .join(" · ")) || null,
-        openingReading:
-          expenseHead === "Electricity" && expenseOpeningReading
-            ? Number(expenseOpeningReading)
-            : null,
-        closingReading:
-          expenseHead === "Electricity" && expenseClosingReading
-            ? Number(expenseClosingReading)
-            : null,
-        amount,
-        contractorSalary: 0,
-        supervisorSalary: 0,
-        billPhotoUrls: expensePhotos,
+      result = await postJson(`/api/plants/${plantId}/contacts`, {
+        name: contactName.trim(),
+        phone: contactPhone.trim() || null,
+        category: contactCategory.trim() || null,
+        designation: contactDesignation.trim() || null,
       });
     } else if (isCat6) {
       const amount = Number(pettyCashExpense) || 0;
@@ -770,14 +823,14 @@ export function TodayHub({
       purchase: t("purchaseSaved"),
       sale: t("salesSaved"),
       stock: t("stockSaved"),
-      production: t("productionSaved"),
       expense: t("expenseSaved"),
       pettyCash: t("pettyCashSaved"),
+      contactList: "Contact saved",
     };
     toast.success(labels[kind]);
     closePanel();
     resetAll();
-    if (entryDate === date) {
+    if (kind !== "contactList" && entryDate === date) {
       markModuleFilled(KIND_TO_MODULE[kind], shift);
     }
     void syncChecklistFromServer();
@@ -909,6 +962,7 @@ export function TodayHub({
                   }}
                 />
               </div>
+              {kind !== "contactList" && (
               <div className="field">
                 <label htmlFor="entry-date">
                   {isCat6
@@ -927,7 +981,8 @@ export function TodayHub({
                   onChange={(e) => setEntryDate(e.target.value)}
                 />
               </div>
-              {isCat6 ? null : (
+              )}
+              {kind !== "contactList" && !isCat6 && (
               <div className="field">
                 <label>{t("shift")}</label>
                 <div className="shift-toggle">
@@ -986,24 +1041,13 @@ export function TodayHub({
                 ) : null}
                 </>
                 {isCat6 ? (
-                <div className="form-grid two">
-                  <div className="field">
-                    <label htmlFor="p-books">Books</label>
-                    <input
-                      id="p-books"
-                      type="date"
-                      value={purchaseBooksDate || entryDate}
-                      onChange={(e) => setPurchaseBooksDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="p-gstin">GSTIN/GST No</label>
-                    <input
-                      id="p-gstin"
-                      value={purchaseGstin}
-                      onChange={(e) => setPurchaseGstin(e.target.value)}
-                    />
-                  </div>
+                <div className="field">
+                  <label htmlFor="p-gstin">GSTIN/GST No</label>
+                  <input
+                    id="p-gstin"
+                    value={purchaseGstin}
+                    onChange={(e) => setPurchaseGstin(e.target.value)}
+                  />
                 </div>
                 ) : null}
                 <div className="form-grid two">
@@ -1024,7 +1068,7 @@ export function TodayHub({
                     />
                   </div>
                   <div className="field">
-                    <label htmlFor="p-bill">{isCat6 ? "Bill Number" : "Bill no."}</label>
+                    <label htmlFor="p-bill">{isCat6 ? "Bill Number" : "Invoice no. / Challan no."}</label>
                     <input
                       id="p-bill"
                       value={billNumber}
@@ -1154,7 +1198,7 @@ export function TodayHub({
                   lines={saleLines}
                   onChange={setSaleLines}
                   defaultUnit={PRODUCTS[0].unit}
-                  itemLabel={isCat6 ? "Item Details" : "Product name"}
+                  itemLabel="Item Details"
                   itemOptions={saleProducts}
                   unitOptions={PRODUCT_UNITS}
                   showCat6MeterFields={isCat6}
@@ -1280,20 +1324,11 @@ export function TodayHub({
                         }}
                       />
                     </div>
-                    <div className="field">
-                      <label htmlFor="st-value">Closing Value</label>
-                      <DecimalInput
-                        id="st-value"
-                        required
-                        value={stockValue}
-                        onChange={setStockValue}
-                      />
-                    </div>
                   </div>
                 ) : (
                   <div className="prod-fields__row">
                     <div className="field">
-                      <label htmlFor="st-value">Value</label>
+                      <label htmlFor="st-value">Rate</label>
                       <DecimalInput
                         id="st-value"
                         required
@@ -1320,89 +1355,6 @@ export function TodayHub({
               </>
             ) : null}
 
-            {kind === "production" && !isCat6 ? (
-              <>
-                <div className="prod-fields">
-                  <div className="field">
-                    <label htmlFor="prod-name">Product name</label>
-                    <SelectMenu
-                      id="prod-name"
-                      value={productName}
-                      options={saleProducts}
-                      required
-                      onChange={(next) => {
-                        const match = PRODUCTS.find((p) => p.name === next);
-                        setProductName(match?.name ?? next);
-                        if (match) setProdUnit(match.unit);
-                      }}
-                    />
-                  </div>
-                  <div className="prod-fields__row">
-                    <div className="field">
-                      <label htmlFor="prod-unit">Unit</label>
-                      <SelectMenu
-                        id="prod-unit"
-                        value={prodUnit}
-                        options={PRODUCT_UNITS}
-                        required
-                        onChange={(next) =>
-                          setProdUnit(next as (typeof PRODUCT_UNITS)[number])
-                        }
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="prod-qty">Quantity</label>
-                      <DecimalInput
-                        id="prod-qty"
-                        required
-                        value={prodQty}
-                        onChange={setProdQty}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <h3 className="today-card__title" style={{ marginTop: "0.35rem" }}>
-                  Manpower
-                </h3>
-                <div className="manpower-grid">
-                  <div className="field">
-                    <label htmlFor="m-mgr">Manager</label>
-                    <DecimalInput
-                      id="m-mgr"
-                      integer
-                      value={mgr}
-                      onChange={setMgr}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="m-ops">Operator</label>
-                    <DecimalInput
-                      id="m-ops"
-                      integer
-                      value={ops}
-                      onChange={setOps}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="m-help">Helper</label>
-                    <DecimalInput
-                      id="m-help"
-                      integer
-                      value={helpers}
-                      onChange={setHelpers}
-                    />
-                  </div>
-                </div>
-                <p className="cost-hint">
-                  Est. manpower cost{" "}
-                  <span className="cost-hint__amount">
-                    {formatINR(manpowerCost)}
-                  </span>{" "}
-                  (rates from plant settings)
-                </p>
-              </>
-            ) : null}
-
             {kind === "expense" ? (
               <>
                 <div className="field">
@@ -1410,7 +1362,7 @@ export function TodayHub({
                   <SelectMenu
                     id="e-head"
                     value={String(expenseHead)}
-                    options={EXPENSE_HEADS}
+                    options={isPvc ? pvcExpenseHeads : EXPENSE_HEADS}
                     required
                     onChange={(next) => {
                       setExpenseHead(next);
@@ -1424,6 +1376,119 @@ export function TodayHub({
                     }}
                   />
                 </div>
+                {isPvc && expenseHead === "Factory Rent" ? (
+                  <>
+                    <div className="field">
+                      <label htmlFor="e-month">Month</label>
+                      <input
+                        id="e-month"
+                        type="month"
+                        required
+                        value={expenseMonth}
+                        onChange={(e) => setExpenseMonth(e.target.value)}
+                      />
+                    </div>
+                    <div className="prod-fields__row">
+                      <div className="field">
+                        <label htmlFor="e-rent-area">Covered Area (sqft)</label>
+                        <DecimalInput
+                          id="e-rent-area"
+                          value={rentCoveredArea}
+                          onChange={setRentCoveredArea}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="e-rent-rate">Rate (₹/sqft)</label>
+                        <DecimalInput
+                          id="e-rent-rate"
+                          value={rentRatePerSqft}
+                          onChange={setRentRatePerSqft}
+                        />
+                      </div>
+                    </div>
+                    <p className="cost-hint">
+                      Rent amount{" "}
+                      <span className="cost-hint__amount">
+                        {formatINR(
+                          Number(rentCoveredArea) > 0
+                            ? Number(rentCoveredArea) *
+                                (Number(rentRatePerSqft) || 12)
+                            : Number(expenseAmount) || 0,
+                        )}
+                      </span>
+                    </p>
+                    <div className="field expense-desc">
+                      <label htmlFor="e-desc">{t("remarksNotes")}</label>
+                      <textarea
+                        id="e-desc"
+                        value={expenseDesc}
+                        onChange={(e) => setExpenseDesc(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </>
+                ) : isPvc && expenseHead === "FAR" ? (
+                  <>
+                    <div className="field">
+                      <label htmlFor="far-vendor">Supplier Name</label>
+                      <SelectMenu
+                        id="far-vendor"
+                        value={farVendor}
+                        options={farVendorOptions}
+                        required
+                        onChange={setFarVendor}
+                      />
+                    </div>
+                    {farVendor === "Other" ? (
+                      <div className="field">
+                        <label htmlFor="far-vendor-other">Supplier (other)</label>
+                        <input
+                          id="far-vendor-other"
+                          value={farVendorOther}
+                          onChange={(e) => setFarVendorOther(e.target.value)}
+                          required
+                        />
+                      </div>
+                    ) : null}
+                    <div className="field">
+                      <label htmlFor="far-desc">Assets Description</label>
+                      <input
+                        id="far-desc"
+                        required
+                        value={farDescription}
+                        onChange={(e) => setFarDescription(e.target.value)}
+                      />
+                    </div>
+                    <div className="prod-fields__row">
+                      <div className="field">
+                        <label htmlFor="far-bill">Bill Number</label>
+                        <input
+                          id="far-bill"
+                          value={farBillNumber}
+                          onChange={(e) => setFarBillNumber(e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="far-cost">Actual Cost (₹)</label>
+                        <DecimalInput
+                          id="far-cost"
+                          required
+                          value={farCost}
+                          onChange={setFarCost}
+                        />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="far-dep">Depreciation %</label>
+                      <DecimalInput
+                        id="far-dep"
+                        value={farDepPercent}
+                        onChange={setFarDepPercent}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
                 {expenseHead === "Electricity" && !isCat6 ? (
                   <div className="prod-fields__row">
                     <div className="field">
@@ -1475,6 +1540,8 @@ export function TodayHub({
                   />
                 </div>
                 <BillUpload urls={expensePhotos} onChange={setExpensePhotos} />
+                  </>
+                )}
               </>
             ) : null}
 
@@ -1627,6 +1694,27 @@ export function TodayHub({
                 />
               </>
               )
+            ) : null}
+
+            {kind === "contactList" ? (
+              <>
+                <div className="field">
+                  <label htmlFor="ct-name">Name</label>
+                  <input id="ct-name" required value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Contact name" />
+                </div>
+                <div className="field">
+                  <label htmlFor="ct-phone">Phone</label>
+                  <input id="ct-phone" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="Phone number" />
+                </div>
+                <div className="field">
+                  <label htmlFor="ct-category">Category</label>
+                  <input id="ct-category" value={contactCategory} onChange={(e) => setContactCategory(e.target.value)} placeholder="e.g. Pani Pipe" />
+                </div>
+                <div className="field">
+                  <label htmlFor="ct-designation">Designation</label>
+                  <input id="ct-designation" value={contactDesignation} onChange={(e) => setContactDesignation(e.target.value)} placeholder="e.g. Supplier" />
+                </div>
+              </>
             ) : null}
           </form>
       </SlideOver>

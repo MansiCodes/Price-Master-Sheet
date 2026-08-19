@@ -139,17 +139,8 @@ export function getPurchaseCatalog(plantCode: string): {
 export function getSalesCatalog(plantCode: string): readonly string[] {
   if (isCat6Plant(plantCode)) return CAT6_SALE_PRODUCTS;
   return [
-    "CAT6 Patch Cable Solid with Connectors",
-    "Aluminium Wire",
-    "CAT6 PATCH CABLE",
-    "Copper Wire Rod",
-    "Corrugated Box",
-    "HDPE Compound",
-    "MDPE Compound",
-    "Plastic Granuals",
-    "Polyster Yarn",
-    "PVC Compound",
-    "SPOOL",
+    "RDSO Black",
+    "RDSO Grey",
   ];
 }
 
@@ -191,4 +182,45 @@ export function getCustomerCatalog(plantCode: string): readonly string[] {
     "Chrome Infra",
     "Epsillon Cable",
   ];
+}
+
+/** PVC expense categories aligned with P&L indirect/direct lines. */
+export const PVC_EXPENSE_HEADS = [
+  "Electricity",
+  "Factory Rent",
+  "FAR",
+  "Transport",
+  "Maintenance",
+  "Office",
+  "Miscellaneous",
+] as const;
+
+export const PVC_FAR_VENDORS = [
+  "Choudhary Enterprises",
+  "Perfect Traders",
+] as const;
+
+export const PVC_FAR_DEP_PERCENT = 18.1;
+
+export function getPvcExpenseHeads(): readonly string[] {
+  return PVC_EXPENSE_HEADS;
+}
+
+/** Maps PVC expense category to the matching P&L line label. */
+export function pvcExpensePnlLine(head: string): string {
+  switch (head.trim()) {
+    case "Electricity":
+      return "FUEL & POWER EXP.";
+    case "Factory Rent":
+      return "FACTORY RENT";
+    case "FAR":
+      return "DEPRECIATION / FAR";
+    case "Transport":
+    case "Maintenance":
+    case "Office":
+    case "Miscellaneous":
+      return "INDIRECT EXP.";
+    default:
+      return head;
+  }
 }

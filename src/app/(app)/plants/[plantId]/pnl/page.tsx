@@ -48,11 +48,14 @@ export default async function PlantPnlPage({ params }: PageProps) {
     );
   }
 
+  const isSuperAdmin = session.user.globalRole === "SUPER_ADMIN";
+
   return (
     <PnlReportsShell
       plantId={plant.id}
       plantName={plant.name}
       plantCode={plant.code}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 }

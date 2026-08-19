@@ -102,6 +102,7 @@ model Plant {
   dailyStatuses     DailyEntryStatus[]
   creditScoreAwards CreditScoreAward[]
   pnlOverrides      PlantPnlOverride[]
+  contacts          PlantContact[]
 }
 
 model PlantPnlOverride {
@@ -331,6 +332,8 @@ model FixedAsset {
   billDate         DateTime? @db.Date
   cost             Decimal  @db.Decimal(18, 2)
   gst              Decimal  @db.Decimal(18, 2) @default(0)
+  /** Billing invoice value used for PVC financial-cost (interest) in P&L. */
+  invoiceValue     Decimal? @db.Decimal(18, 2)
   depreciationPercent Decimal @db.Decimal(5, 2) @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -406,7 +409,7 @@ model CoinsLedger {
   @@index([userId, createdAt])
 }
 
-/** One +100 credit award per user / plant / date / shift when all five forms are done. */
+/** One +100 credit award per user / plant / date / shift when any form is filled. */
 model CreditScoreAward {
   id        String        @id @default(cuid())
   userId    String
@@ -420,6 +423,20 @@ model CreditScoreAward {
 
   @@unique([userId, plantId, date, shift])
   @@index([userId, createdAt])
+}
+
+model PlantContact {
+  id          String  @id @default(cuid())
+  plantId     String
+  name        String
+  phone       String?
+  category    String?
+  designation String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plant       Plant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@index([plantId])
 }
 
 model ReminderLog {

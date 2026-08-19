@@ -11,11 +11,12 @@ import {
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshDailyStatus } from "@/lib/daily-status";
-import { maybeAwardCreditScore } from "@/lib/credit-score";
+import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { isAdminOrHead } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 
@@ -78,24 +79,40 @@ export async function GET(
   }
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
+  const register = sp.get("register") === "1";
 
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
     select: { code: true },
   });
   const cat6 = isCat6Plant(plant?.code);
+  const isPvc = plant?.code?.toUpperCase() === "PVC";
+  const ownOnly = !isAdminOrHead(session.user.globalRole);
 
   const sales = await prisma.sale.findMany({
     where: {
       plantId,
-      ...filter,
+      ...(ownOnly ? { enteredById: session.user.id } : {}),
+      ...(register && isPvc ? {} : filter),
       ...(cat6
-        ? { NOT: { sourceKey: { endsWith: "sales-online:excel" } } }
+        ? {
+            OR: [
+              // User-entered rows have `sourceKey = NULL`. In SQL, `NOT (cond)`
+              // with NULL inside becomes NULL/false, so we must explicitly allow NULL.
+              { sourceKey: null },
+              {
+                NOT: {
+                  OR: [
+                    { sourceKey: { endsWith: "sales-online:excel" } },
+                    { sourceKey: { contains: "sales-pnl-extra:" } },
+                  ],
+                },
+              },
+            ],
+          }
         : {}),
     },
-    orderBy: cat6
-      ? [{ date: "asc" }, { createdAt: "asc" }]
-      : [{ date: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
   const { slice, ...pageInfo } = paginate(sales, page, pageSize);
@@ -375,7 +392,7 @@ export async function DELETE(
 
   const existing = await prisma.sale.findFirst({
     where: { id, plantId },
-    select: { id: true },
+    select: { id: true, date: true, shift: true, enteredById: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Sale not found" }, { status: 404 });
@@ -390,6 +407,7 @@ export async function DELETE(
     actorId: session.user.id,
     plantId,
   });
+  await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

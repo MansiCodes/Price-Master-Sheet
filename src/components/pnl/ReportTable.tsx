@@ -23,6 +23,7 @@ export function ReportTable<T extends { id: string }>({
   emptyLabel = "No records in this date range.",
   variant = "default",
   footer,
+  secondaryFooter,
 }: {
   columns: ReportColumn<T>[];
   rows: T[];
@@ -30,6 +31,7 @@ export function ReportTable<T extends { id: string }>({
   emptyLabel?: string;
   variant?: "default" | "register";
   footer?: Record<string, ReactNode>;
+  secondaryFooter?: Record<string, ReactNode>;
 }) {
   const isRegister = variant === "register";
   const tableClass = isRegister
@@ -135,6 +137,15 @@ export function ReportTable<T extends { id: string }>({
                 </td>
               ))}
             </tr>
+            {secondaryFooter ? (
+              <tr className="pnl-report-table__subtotal">
+                {columns.map((col) => (
+                  <td key={col.key} className={cellClass(col) || undefined}>
+                    {secondaryFooter[col.key] ?? ""}
+                  </td>
+                ))}
+              </tr>
+            ) : null}
           </tfoot>
         ) : null}
       </table>

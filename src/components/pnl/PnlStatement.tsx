@@ -93,19 +93,18 @@ function StatementSection({
   total: number;
   showRatio?: boolean;
 }) {
-  const padded = padLines(debit, credit);
   return (
     <section className="pnl-stmt__section" aria-label={label}>
       <div className="pnl-stmt__grid">
         <StatementSide
           title="Debit"
-          lines={padded.debit}
+          lines={visibleLines(debit)}
           total={total}
           showRatio={showRatio}
         />
         <StatementSide
           title="Credit"
-          lines={padded.credit}
+          lines={visibleLines(credit)}
           total={total}
           showRatio={showRatio}
         />

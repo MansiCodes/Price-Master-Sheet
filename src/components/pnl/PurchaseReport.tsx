@@ -62,12 +62,22 @@ export function PurchaseReport({
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
-  const baseUrl = `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  // CAT6 Purchase tab mirrors Purchase sheet (vendor bills). ATC-to-NF is P&L-only.
+  const baseUrl = cat6
+    ? `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&excludeAtc=1`
+    : `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
   const totals = response?.totals as
-    | { basicValue?: number; invoiceValue?: number }
+    | {
+        quantity?: number;
+        basicValue?: number;
+        gstAmount?: number;
+        invoiceValue?: number;
+        unloadingExpense?: number;
+      }
     | undefined;
+  const isPvc = plantCode?.toUpperCase() === "PVC";
   const crud = useReportCrud<PurchaseRow>(`/api/plants/${plantId}/purchases`, reload);
 
   const actionCol: ReportColumn<PurchaseRow> = {
@@ -116,7 +126,7 @@ export function PurchaseReport({
     },
     {
       key: "billNo",
-      label: "Bill no.",
+      label: "Invoice no. / Challan no.",
       render: (r) => r.billNumber?.trim() || "—",
     },
     {
@@ -189,11 +199,6 @@ export function PurchaseReport({
       label: "S.No",
       render: (_r, index) =>
         String((page - 1) * pageSize + (index ?? 0) + 1),
-    },
-    {
-      key: "books",
-      label: "Books",
-      render: (r) => formatBillDate(r.booksDate),
     },
     {
       key: "gstin",
@@ -276,16 +281,38 @@ export function PurchaseReport({
         loading={loading}
         variant="register"
         footer={
-          totals
+          totals && rows.length > 0
             ? cat6
               ? {
                   vendor: "TOTAL",
+                  qty: formatQty(totals.quantity ?? 0),
                   amt: formatINR(totals.basicValue ?? 0),
                 }
-              : {
-                  supplier: "TOTAL",
-                  invoice: formatINR(totals.invoiceValue ?? 0),
-                }
+              : isPvc
+                ? {
+                    supplier: "Total Amount",
+                    qty: formatQty(totals.quantity ?? 0),
+                    basic: formatINR(totals.basicValue ?? 0),
+                    gst: formatINR(totals.gstAmount ?? 0),
+                    invoice: formatINR(totals.invoiceValue ?? 0),
+                    remarks: "—",
+                  }
+                : {
+                    supplier: "TOTAL",
+                    qty: formatQty(totals.quantity ?? 0),
+                    basic: formatINR(totals.basicValue ?? 0),
+                    gst: formatINR(totals.gstAmount ?? 0),
+                    invoice: formatINR(totals.invoiceValue ?? 0),
+                  }
+            : undefined
+        }
+        secondaryFooter={
+          totals && rows.length > 0 && isPvc
+            ? {
+                supplier: "Unloading/MT",
+                rate: "70",
+                qty: formatINR(totals.unloadingExpense ?? 0),
+              }
             : undefined
         }
       />
@@ -315,7 +342,7 @@ export function PurchaseReport({
             : [
                 { name: "date", label: "Bill date", type: "date", required: true },
                 { name: "vendorName", label: "Supplier name", required: true },
-                { name: "billNumber", label: "Bill no." },
+                { name: "billNumber", label: "Invoice no. / Challan no." },
                 { name: "itemDescription", label: "Description", required: true },
                 { name: "quantity", label: "Qty", type: "number", required: true },
                 { name: "unit", label: "Unit", required: true },

@@ -10,6 +10,7 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "import:pvc-pnl": "tsx scripts/import-pvc-pnl.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -22,6 +23,7 @@
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "next": "^15.5.23",
     "next-auth": "^5.0.0-beta.25",
     "next-intl": "^4.13.6",

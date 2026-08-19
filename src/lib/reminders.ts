@@ -50,8 +50,7 @@ function uniqueRecipients(
 }
 
 /**
- * 10 minutes before the 9:00 IST shift start, send one WhatsApp per person
- * for the upcoming Day (08:50) or Night (20:50) shift.
+ * Send one WhatsApp per person for the upcoming Day (08:30) or Night (20:50) shift.
  */
 export async function runDailyReminders(now: Date = new Date()) {
   const day = todayIstAsUtcDate(now);

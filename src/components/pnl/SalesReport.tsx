@@ -75,7 +75,11 @@ export function SalesReport({
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
-  const baseUrl = `/api/plants/${plantId}/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const isPvc = plantCode?.toUpperCase() === "PVC";
+  // CAT6 Sales tab mirrors Sales-NF sheet (SUM J3:J504). P&L adds online + extra rows separately.
+  const baseUrl = isPvc
+    ? `/api/plants/${plantId}/sales?register=1&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+    : `/api/plants/${plantId}/sales?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<SaleRow>(baseUrl, t("failedSales"));
   const totals = response?.totals as
@@ -130,7 +134,7 @@ export function SalesReport({
     },
     {
       key: "product",
-      label: "Product name",
+      label: "Item Details",
       wrap: true,
       render: (r) => r.itemDescription,
     },
@@ -304,7 +308,7 @@ export function SalesReport({
                 { name: "date", label: "Bill date", type: "date", required: true },
                 { name: "customerName", label: "Customer", required: true },
                 { name: "billNumber", label: "Invoice no." },
-                { name: "itemDescription", label: "Product name", required: true },
+                { name: "itemDescription", label: "Item Details", required: true },
                 { name: "quantity", label: "Qty", type: "number", required: true },
                 { name: "unit", label: "Unit", required: true },
                 { name: "rate", label: "Rate", type: "number", required: true },

@@ -9,6 +9,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { pvcExpensePnlLine } from "@/lib/plant-catalogs";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
@@ -64,6 +65,7 @@ export function ExpenseReport({
   const t = useTranslations("pnl");
   const tCommon = useTranslations("common");
   const cat6 = isCat6Plant(plantCode);
+  const pvc = plantCode?.toUpperCase() === "PVC";
   const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
@@ -115,7 +117,68 @@ export function ExpenseReport({
               ),
             },
           ]
-        : [
+        : pvc
+          ? [
+              {
+                key: "s",
+                label: "S.No",
+                compact: true,
+                render: (_r, index) =>
+                  String((page - 1) * pageSize + (index ?? 0) + 1),
+              },
+              { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
+              { key: "head", label: t("category"), render: (r) => r.expenseHead },
+              {
+                key: "pnlLine",
+                label: "P&L Line",
+                wrap: true,
+                render: (r) => pvcExpensePnlLine(r.expenseHead),
+              },
+              {
+                key: "desc",
+                label: t("remarksNotes"),
+                wrap: "wide",
+                render: (r) => r.description || tCommon("dash"),
+              },
+              {
+                key: "opening",
+                label: t("openingReading"),
+                align: "right",
+                compact: true,
+                render: (r) =>
+                  r.openingReading == null
+                    ? tCommon("dash")
+                    : String(r.openingReading),
+              },
+              {
+                key: "closing",
+                label: t("closingReading"),
+                align: "right",
+                compact: true,
+                render: (r) =>
+                  r.closingReading == null
+                    ? tCommon("dash")
+                    : String(r.closingReading),
+              },
+              {
+                key: "amount",
+                label: t("amount"),
+                align: "right",
+                render: (r) => formatINR(totalAmount(r)),
+              },
+              {
+                key: "photos",
+                label: "Bill",
+                compact: true,
+                render: (r) => (
+                  <BillPhotosCell
+                    urls={r.billPhotoUrls}
+                    fallbackUrl={r.billPhotoUrl}
+                  />
+                ),
+              },
+            ]
+          : [
             { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
             { key: "shift", label: t("shift"), render: (r) => r.shift },
             { key: "head", label: t("category"), render: (r) => r.expenseHead },
@@ -161,7 +224,7 @@ export function ExpenseReport({
               ),
             },
           ],
-    [cat6, page, pageSize, t, tCommon],
+    [cat6, pvc, page, pageSize, t, tCommon],
   );
 
   return (
@@ -195,11 +258,14 @@ export function ExpenseReport({
         rows={rows}
         loading={loading}
         emptyLabel={t("noRecords")}
+        variant={pvc ? "register" : undefined}
         footer={
           totals
             ? cat6
               ? { month: "TOTAL", amount: formatINR(totals.total ?? 0) }
-              : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
+              : pvc
+                ? { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
+                : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
             : undefined
         }
       />

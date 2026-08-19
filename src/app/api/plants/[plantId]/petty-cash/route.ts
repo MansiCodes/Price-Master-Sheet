@@ -10,10 +10,11 @@ import {
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshDailyStatus } from "@/lib/daily-status";
-import { maybeAwardCreditScore } from "@/lib/credit-score";
+import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
+import { isAdminOrHead } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -65,7 +66,13 @@ export async function GET(
       ? (requestedType as PettyCashKind)
       : null;
 
-  const where = { plantId, ...filter, ...(entryType ? { entryType } : {}) };
+  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const where = {
+    plantId,
+    ...(ownOnly ? { enteredById: session.user.id } : {}),
+    ...filter,
+    ...(entryType ? { entryType } : {}),
+  };
   const [entries, aggregate] = await Promise.all([
     prisma.pettyCashEntry.findMany({
       where,
@@ -287,7 +294,7 @@ export async function DELETE(
 
   const existing = await prisma.pettyCashEntry.findFirst({
     where: { id, plantId },
-    select: { id: true },
+    select: { id: true, date: true, shift: true, enteredById: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Entry not found" }, { status: 404 });
@@ -302,6 +309,7 @@ export async function DELETE(
     actorId: session.user.id,
     plantId,
   });
+  await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

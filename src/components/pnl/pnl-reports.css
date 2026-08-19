@@ -88,6 +88,46 @@
   box-shadow: var(--teal-fill-shadow, none);
 }
 
+/* Few tabs: shrink bar to content — no empty stretch on the right */
+.pnl-tab-nav--fit {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.pnl-tab-nav--fit button {
+  flex: 0 0 auto;
+  padding: 0 0.55rem;
+}
+
+/* Many tabs (e.g. PVC): keep one row; stack "Factory Rent" on two lines */
+.pnl-tab-nav--compact {
+  flex-wrap: nowrap;
+}
+
+.pnl-tab-nav--compact button {
+  flex: 1 1 0;
+  min-width: 0;
+  height: auto;
+  min-height: 2.35rem;
+  padding: 0.28rem 0.3rem;
+  font-size: 0.74rem;
+  line-height: 1.1;
+}
+
+.pnl-tab-nav__stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.06rem;
+  line-height: 1.05;
+  white-space: normal;
+}
+
+.pnl-tab-nav__stacked span {
+  display: block;
+}
+
 .pnl-date-filter {
   display: flex;
   flex-wrap: nowrap;
@@ -426,6 +466,40 @@
   color: var(--fg, #10221c);
 }
 
+.pnl-expense-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.65rem;
+}
+
+.pnl-expense-subnav button {
+  appearance: none;
+  border: 1px solid var(--border, #d7e0dc);
+  background: #f8faf9;
+  color: var(--fg-muted, #5b6b66);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.pnl-expense-subnav button.is-active {
+  background: var(--teal-fill);
+  border-color: transparent;
+  color: var(--teal-active-text, #fff);
+  box-shadow: var(--teal-fill-shadow, none);
+}
+
+.pnl-report-panel--expense .pnl-report-panel__title {
+  margin-bottom: 0.45rem;
+}
+
 .pnl-report-totals {
   display: flex;
   flex-wrap: wrap;
@@ -548,6 +622,16 @@
   border-bottom: 0;
   color: var(--teal-ink, #115e59);
   white-space: nowrap;
+  /* Footer totals should align tightly like Excel (less left/right padding). */
+  padding: 0.25rem 0.35rem;
+}
+
+.pnl-report-table tfoot tr.pnl-report-table__subtotal td,
+.pnl-report-table--register tfoot tr.pnl-report-table__subtotal td {
+  font-weight: 700;
+  font-size: 0.78rem;
+  background: rgba(13, 148, 136, 0.08);
+  border-top: 1px solid rgba(13, 148, 136, 0.2);
 }
 
 .pnl-report-table--register tbody tr:last-child td {
@@ -771,16 +855,16 @@
   cursor: pointer;
 }
 
-.pnl-row-actions__delete {
-  color: #b42318;
-  border-color: #f2c9c4;
+.pnl-row-actions .pnl-row-actions__delete {
+  color: #dc2626;
+  border-color: #fca5a5;
 }
 
 .pnl-row-actions button:hover:not(:disabled) {
   background: var(--teal-soft, #e7f4f2);
 }
 
-.pnl-row-actions__delete:hover:not(:disabled) {
+.pnl-row-actions .pnl-row-actions__delete:hover:not(:disabled) {
   background: #fef3f2;
 }
 

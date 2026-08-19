@@ -11,11 +11,13 @@ import {
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshDailyStatus } from "@/lib/daily-status";
-import { maybeAwardCreditScore } from "@/lib/credit-score";
+import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
+import { isCat6Plant } from "@/lib/plant-layout";
+import { isAdminOrHead } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 
 const purchaseHeaderFields = {
@@ -83,9 +85,30 @@ export async function GET(
   }
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
+  const excludeAtc = sp.get("excludeAtc") === "1";
+
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  const cat6 = isCat6Plant(plant?.code);
+  const ownOnly = !isAdminOrHead(session.user.globalRole);
 
   const purchases = await prisma.purchase.findMany({
-    where: { plantId, ...filter },
+    where: {
+      plantId,
+      ...(ownOnly ? { enteredById: session.user.id } : {}),
+      ...filter,
+      ...(cat6 && excludeAtc
+        ? {
+            OR: [
+              // Allow `sourceKey = NULL` rows (user-entered).
+              { sourceKey: null },
+              { NOT: { sourceKey: { contains: "purchase-atc" } } },
+            ],
+          }
+        : {}),
+    },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
@@ -94,13 +117,15 @@ export async function GET(
     (acc, row) => {
       acc.quantity += Number(row.quantity) || 0;
       acc.basicValue += Number(row.basicValue) || 0;
+      acc.gstAmount += Number(row.gstAmount) || 0;
       acc.invoiceValue += Number(row.invoiceValue) || 0;
       return acc;
     },
-    { quantity: 0, basicValue: 0, invoiceValue: 0 },
+    { quantity: 0, basicValue: 0, gstAmount: 0, invoiceValue: 0 },
   );
+  const unloadingExpense = round2((totals.quantity / 1000) * 70);
 
-  return NextResponse.json({ rows: slice, ...pageInfo, totals });
+  return NextResponse.json({ rows: slice, ...pageInfo, totals: { ...totals, unloadingExpense } });
 }
 
 export async function POST(
@@ -391,7 +416,7 @@ export async function DELETE(
 
   const existing = await prisma.purchase.findFirst({
     where: { id, plantId },
-    select: { id: true },
+    select: { id: true, date: true, shift: true, enteredById: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Purchase not found" }, { status: 404 });
@@ -406,6 +431,7 @@ export async function DELETE(
     actorId: session.user.id,
     plantId,
   });
+  await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

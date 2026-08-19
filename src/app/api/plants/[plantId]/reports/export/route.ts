@@ -87,6 +87,8 @@ export async function GET(
     return NextResponse.json({ error: "Plant not found" }, { status: 404 });
   }
   const cat6 = isCat6Plant(plant.code);
+  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const byUser = ownOnly ? { enteredById: session.user.id } : {};
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Cable Junction";
@@ -148,6 +150,7 @@ export async function GET(
     const rows = await prisma.sale.findMany({
       where: {
         plantId,
+        ...byUser,
         date: { gte: from, lte: to },
         ...(cat6
           ? { NOT: { sourceKey: { endsWith: "sales-online:excel" } } }
@@ -177,7 +180,7 @@ export async function GET(
           { header: "Remarks", key: "notes", width: 24 },
           { header: "Invoice no.", key: "invoice", width: 16 },
           { header: "Bill date", key: "billDate", width: 12 },
-          { header: "Product name", key: "product", width: 28 },
+          { header: "Item Details", key: "product", width: 28 },
           { header: "Unit", key: "unit", width: 10 },
           { header: "Qty", key: "qty", width: 12 },
           { header: "Rate", key: "rate", width: 12 },
@@ -203,7 +206,7 @@ export async function GET(
     });
   } else if (kind === "purchase") {
     const rows = await prisma.purchase.findMany({
-      where: { plantId, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to } },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
     sheet.columns = cat6
@@ -225,7 +228,7 @@ export async function GET(
           { header: "sNo.", key: "sno", width: 8 },
           { header: "Supplier name", key: "supplier", width: 26 },
           { header: "Description", key: "description", width: 22 },
-          { header: "Bill no.", key: "billNo", width: 14 },
+          { header: "Invoice no. / Challan no.", key: "billNo", width: 20 },
           { header: "Bill date", key: "billDate", width: 12 },
           { header: "Unit", key: "unit", width: 10 },
           { header: "Qty", key: "qty", width: 12 },
@@ -258,7 +261,7 @@ export async function GET(
     });
   } else if (kind === "production") {
     const rows = await prisma.productionEntry.findMany({
-      where: { plantId, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to } },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
     sheet.columns = [
@@ -285,6 +288,7 @@ export async function GET(
     const rows = await prisma.stockEntry.findMany({
       where: {
         plantId,
+        ...byUser,
         date: { gte: from, lte: to },
         ...(isPvc ? { notes: { startsWith: "Closing stock" } } : {}),
       },
@@ -444,6 +448,7 @@ export async function GET(
     const rows = await prisma.pettyCashEntry.findMany({
       where: {
         plantId,
+        ...byUser,
         date: { gte: from, lte: to },
         entryType: PettyCashKind.PETTY_CASH,
       },
@@ -497,6 +502,7 @@ export async function GET(
     const rows = await prisma.pettyCashEntry.findMany({
       where: {
         plantId,
+        ...byUser,
         date: { gte: from, lte: to },
         entryType: PettyCashKind.EXPENSE,
       },

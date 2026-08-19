@@ -57,8 +57,11 @@ export function StockReport({
   const isPvc = plantCode?.toUpperCase() === "PVC";
   const cat6 = isCat6Plant(plantCode);
   const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${isPvc ? "&snapshot=1" : ""}`;
-  const { rows, page, pageSize, total, loading, error, reload, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<StockRow>(baseUrl, t("networkError"), isPvc ? 20 : 10);
+  const totals = response?.totals as
+    | { closingValue?: number; quantity?: number }
+    | undefined;
   const crud = useReportCrud<StockRow>(`/api/plants/${plantId}/stock`, reload);
 
   const actionCol: ReportColumn<StockRow> = {
@@ -242,6 +245,18 @@ export function StockReport({
         rows={rows}
         loading={loading}
         variant={isPvc || cat6 ? "register" : undefined}
+        footer={
+          totals && rows.length > 0
+            ? isPvc
+              ? {
+                  particulars: "TOTAL",
+                  closingValue: formatINR(totals.closingValue ?? 0),
+                }
+              : cat6
+                ? { item: "TOTAL", value: formatINR(totals.closingValue ?? 0) }
+                : { item: "TOTAL", value: formatINR(totals.closingValue ?? 0) }
+            : undefined
+        }
       />
       <Pagination
         page={page}

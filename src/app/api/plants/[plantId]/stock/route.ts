@@ -12,11 +12,12 @@ import {
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
 import { refreshDailyStatus } from "@/lib/daily-status";
-import { maybeAwardCreditScore } from "@/lib/credit-score";
+import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import { isAdminOrHead } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -94,17 +95,17 @@ export async function GET(
   });
   const cat6 = isCat6Plant(plant?.code);
   const snapshot = sp.get("snapshot") === "1";
+  const ownOnly = !isAdminOrHead(session.user.globalRole);
 
   const entries = await prisma.stockEntry.findMany({
     where: {
       plantId,
+      ...(ownOnly ? { enteredById: session.user.id } : {}),
       ...filter,
       ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
       ...(snapshot ? { notes: { startsWith: "Closing stock" } } : {}),
     },
-    orderBy: cat6
-      ? [{ date: "asc" }, { createdAt: "asc" }]
-      : [{ date: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
@@ -337,7 +338,7 @@ export async function DELETE(
 
   const existing = await prisma.stockEntry.findFirst({
     where: { id, plantId },
-    select: { id: true },
+    select: { id: true, date: true, shift: true, enteredById: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
@@ -352,6 +353,7 @@ export async function DELETE(
     actorId: session.user.id,
     plantId,
   });
+  await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

@@ -104,24 +104,28 @@ export function PettyCashReport({
         key: "expenses",
         label: t("expenses"),
         align: "right",
+        width: "10.5rem",
         render: (r) => formatINR(Number(r.amount)),
       },
       {
         key: "contractor",
         label: t("contractorSalary"),
         align: "right",
+        width: "10.0rem",
         render: (r) => formatINR(Number(r.contractorSalary)),
       },
       {
         key: "supervisor",
         label: t("supervisorSalary"),
         align: "right",
+        width: "10.0rem",
         render: (r) => formatINR(Number(r.supervisorSalary)),
       },
       {
         key: "total",
         label: t("total"),
         align: "right",
+        width: "10.5rem",
         render: (r) => formatINR(rowTotal(r)),
       },
       {
@@ -180,11 +184,16 @@ export function PettyCashReport({
           totals
             ? cat6
               ? {
-                  date: "TOTAL",
-                  amount: formatINR(totals.expenses),
+                  // CAT6 uses the same table columns as PVC in this UI component.
+                  // Footer keys must match `columns[]` keys, otherwise values render in wrong/empty cells.
+                  desc: "Total Amount",
+                  expenses: formatINR(totals.expenses),
+                  contractor: formatINR(totals.contractorSalary),
+                  supervisor: formatINR(totals.supervisorSalary),
+                  total: formatINR(totals.total),
                 }
               : {
-                  desc: "TOTAL",
+                  desc: "Total Amount",
                   expenses: formatINR(totals.expenses),
                   contractor: formatINR(totals.contractorSalary),
                   supervisor: formatINR(totals.supervisorSalary),
