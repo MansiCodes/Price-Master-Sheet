@@ -46,6 +46,23 @@ function round4(n: number) {
   return Math.round(n * 10_000) / 10_000;
 }
 
+/** Sum all opening-stock entries (notes starting with "Opening stock") for a plant within a date range. */
+async function openingStockValue(
+  plantId: string,
+  from: Date,
+  to: Date,
+): Promise<number> {
+  const agg = await prisma.stockEntry.aggregate({
+    where: {
+      plantId,
+      date: { gte: from, lte: to },
+      notes: { startsWith: "Opening stock" },
+    },
+    _sum: { closingValue: true },
+  });
+  return toNumber(agg._sum.closingValue);
+}
+
 /** Sum explicit closing-stock snapshot rows (matches Excel Stock & Rent SUM(I5:I21)). */
 async function pvcClosingStockSnapshot(
   plantId: string,
@@ -97,6 +114,7 @@ async function buildPvcDynamic(
     electricityRows,
     fixedAssets,
     closingStockRaw,
+    openingStockRaw,
   ] = await Promise.all([
     // Excel P&L: Sales!J223 — entire outward register, not date-filtered.
     prisma.sale.aggregate({
@@ -152,9 +170,9 @@ async function buildPvcDynamic(
           },
         }),
     scoped ? Promise.resolve(0) : pvcClosingStockSnapshot(plantId, to),
+    scoped ? Promise.resolve(0) : openingStockValue(plantId, from, to),
   ]);
 
-  const openingStock = 0;
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
   // Excel Purchase!J155 = SUM(J5:J154) basic value column.
   const purchasesRaw = purchaseRows.reduce(
@@ -164,7 +182,12 @@ async function buildPvcDynamic(
   const purchases = Math.round(purchasesRaw * 100) / 100;
   const stockFromAtcl = round2(toNumber(stockInwardAgg._sum.closingValue));
   const totalPurchases = round2(purchasesRaw + stockFromAtcl);
-  const closingStock = round2(closingStockRaw);
+  // If opening stock entries exist, auto-calculate closing stock; else use snapshot.
+  const openingStock = round2(openingStockRaw);
+  const closingStockSnapshot = round2(closingStockRaw);
+  const closingStock = openingStock > 0
+    ? round2(openingStock + totalPurchases - salesRevenue)
+    : closingStockSnapshot;
 
   const electricityRentAmount = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
@@ -650,7 +673,7 @@ async function buildCat6Dynamic(
   const salesTo = isExcelCat6Period ? CAT6_EXCEL_SALES_TO : to;
   const purchasesTo = isExcelCat6Period ? CAT6_EXCEL_PURCHASES_TO : to;
 
-  const [salesAgg, purchaseAgg, pettyEntries, openingStockRow] =
+  const [salesAgg, purchaseAgg, pettyEntries, openingStockRow, openingStockEntered] =
     await Promise.all([
       prisma.sale.aggregate({
         where: { plantId, ...byUser, date: { gte: from, lte: salesTo } },
@@ -685,34 +708,45 @@ async function buildCat6Dynamic(
             orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             select: { closingValue: true },
           }),
+      scoped ? Promise.resolve(0) : openingStockValue(plantId, from, to),
     ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
   const purchases = round2(toNumber(purchaseAgg._sum.basicValue));
-  const openingStock = round2(toNumber(openingStockRow?.closingValue));
-  const latestClosingDateRow = scoped
+  const openingStockFromEntry = round2(toNumber(openingStockRow?.closingValue));
+  const openingStockManual = round2(openingStockEntered);
+  // If users have entered opening stock via the stock form, use auto-calculation;
+  // otherwise fall back to the legacy snapshot method.
+  const openingStock = openingStockManual > 0 ? openingStockManual : openingStockFromEntry;
+  const latestClosingDateRow = (scoped || openingStockManual > 0)
     ? null
     : await prisma.stockEntry.findFirst({
         where: {
           plantId,
           date: { lte: to },
           itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
+          NOT: { notes: { startsWith: "Opening stock" } },
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         select: { date: true },
       });
   const closingStockAgg =
-    scoped || !latestClosingDateRow
+    (scoped || openingStockManual > 0 || !latestClosingDateRow)
       ? { _sum: { closingValue: 0 } }
       : await prisma.stockEntry.aggregate({
           where: {
             plantId,
             date: latestClosingDateRow.date,
             itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
+            NOT: { notes: { startsWith: "Opening stock" } },
           },
           _sum: { closingValue: true },
         });
-  const closingStock = round2(toNumber(closingStockAgg._sum.closingValue));
+  const closingStockSnapshot = round2(toNumber(closingStockAgg._sum.closingValue));
+  // Auto-calculate if opening stock was entered by user
+  const closingStock = openingStockManual > 0
+    ? round2(openingStock + purchases - salesRevenue)
+    : closingStockSnapshot;
   const pettyCash = round2(
     pettyEntries.reduce((sum, row) => {
       if (row.entryType !== "PETTY_CASH") return sum;
@@ -833,6 +867,7 @@ async function buildDynamic(
     fixedAssets,
     openingStockRaw,
     closingStockRaw,
+    openingStockManualRaw,
   ] = await Promise.all([
     prisma.sale.aggregate({
       where: { plantId, ...byUser, date: { gte: from, lte: to } },
@@ -902,14 +937,20 @@ async function buildDynamic(
         }),
     scoped ? Promise.resolve(0) : stockValueAsOf(plantId, dayBeforeFrom),
     scoped ? Promise.resolve(0) : stockValueAsOf(plantId, to),
+    scoped ? Promise.resolve(0) : openingStockValue(plantId, from, to),
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
   const purchases = round2(toNumber(purchaseAgg._sum.basicValue));
   const stockFromAtcl = round2(toNumber(stockInwardAgg._sum.closingValue));
   const totalPurchases = round2(purchases + stockFromAtcl);
-  const openingStock = round2(openingStockRaw);
-  const closingStock = round2(closingStockRaw);
+  const openingStockManual = round2(openingStockManualRaw);
+  // If users have entered opening stock via the stock form, use auto-calculation;
+  // otherwise fall back to legacy stock snapshot values.
+  const openingStock = openingStockManual > 0 ? openingStockManual : round2(openingStockRaw);
+  const closingStock = openingStockManual > 0
+    ? round2(openingStock + totalPurchases - salesRevenue)
+    : round2(closingStockRaw);
   const electricityRentAmount = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
   );

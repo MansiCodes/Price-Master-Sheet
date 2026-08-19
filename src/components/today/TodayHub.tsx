@@ -314,6 +314,7 @@ export function TodayHub({
   const [stockRate, setStockRate] = useState("");
   const [stockValue, setStockValue] = useState("");
   const [stockNotes, setStockNotes] = useState("");
+  const [stockType, setStockType] = useState<"opening" | "closing">("closing");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
 
   useEffect(() => {
@@ -432,6 +433,7 @@ export function TodayHub({
     setStockRate("");
     setStockValue("");
     setStockNotes("");
+    setStockType("closing");
     setStockPhotos([]);
     setShift("DAY");
     setProductName(saleProducts[0] ?? PRODUCTS[0].name);
@@ -672,9 +674,10 @@ export function TodayHub({
         quantity: closingQty,
         rate: isPvc ? closingRate : undefined,
         value: isPvc ? closingQty * closingRate : closingValue,
-        notes: isPvc
-          ? stockNotes.trim() || `Closing stock as on ${entryDate}`
-          : stockNotes.trim() || null,
+        notes: stockNotes.trim() ||
+          (stockType === "opening"
+            ? `Opening stock as on ${entryDate}`
+            : `Closing stock as on ${entryDate}`),
         photoUrls: stockPhotos,
       });
     } else if (kind === "expense") {
@@ -1228,6 +1231,25 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
+                <div className="field">
+                  <label>Stock Type</label>
+                  <div className="shift-toggle">
+                    <button
+                      type="button"
+                      className={stockType === "opening" ? "active" : ""}
+                      onClick={() => setStockType("opening")}
+                    >
+                      Opening Stock
+                    </button>
+                    <button
+                      type="button"
+                      className={stockType === "closing" ? "active" : ""}
+                      onClick={() => setStockType("closing")}
+                    >
+                      Closing Stock
+                    </button>
+                  </div>
+                </div>
                 {isPvc ? (
                   <div className="field">
                     <label htmlFor="st-category">Stock</label>
