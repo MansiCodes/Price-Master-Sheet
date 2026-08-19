@@ -141,6 +141,7 @@ export function getSalesCatalog(plantCode: string): readonly string[] {
   return [
     "RDSO Black",
     "RDSO Grey",
+    "Other",
   ];
 }
 
