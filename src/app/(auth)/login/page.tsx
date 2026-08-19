@@ -163,7 +163,9 @@ export default function LoginPage() {
         setInfo(t("devOtpInfo"));
       } else {
         setDevOtp(null);
-        setInfo(t("otpSentInfo"));
+        // We already show a dedicated hint on the OTP screen (`otpSentWhatsapp`),
+        // so avoid rendering the same "OTP sent..." message twice.
+        setInfo(null);
       }
     } catch {
       setError(t("couldNotSendOtp"));
