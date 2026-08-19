@@ -674,10 +674,7 @@ export function TodayHub({
         quantity: closingQty,
         rate: isPvc ? closingRate : undefined,
         value: isPvc ? closingQty * closingRate : closingValue,
-        notes: stockNotes.trim() ||
-          (stockType === "opening"
-            ? `Opening stock as on ${entryDate}`
-            : `Closing stock as on ${entryDate}`),
+        notes: stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
     } else if (kind === "expense") {
@@ -1231,25 +1228,6 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
-                <div className="field">
-                  <label>Stock Type</label>
-                  <div className="shift-toggle">
-                    <button
-                      type="button"
-                      className={stockType === "opening" ? "active" : ""}
-                      onClick={() => setStockType("opening")}
-                    >
-                      Opening Stock
-                    </button>
-                    <button
-                      type="button"
-                      className={stockType === "closing" ? "active" : ""}
-                      onClick={() => setStockType("closing")}
-                    >
-                      Closing Stock
-                    </button>
-                  </div>
-                </div>
                 {isPvc ? (
                   <div className="field">
                     <label htmlFor="st-category">Stock</label>
