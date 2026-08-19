@@ -6,6 +6,7 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { writeAuditLog } from "@/lib/audit";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -76,6 +77,15 @@ export async function POST(
     },
   });
 
+  await writeAuditLog({
+    entityType: "PlantContact",
+    entityId: contact.id,
+    field: "create",
+    newValue: { name: contact.name, phone: contact.phone, category: contact.category, designation: contact.designation },
+    actorId: session.user.id,
+    plantId,
+  });
+
   return NextResponse.json({ contact }, { status: 201 });
 }
 
@@ -120,6 +130,16 @@ export async function PATCH(
     },
   });
 
+  await writeAuditLog({
+    entityType: "PlantContact",
+    entityId: contact.id,
+    field: "update",
+    oldValue: { name: existing.name, phone: existing.phone, category: existing.category, designation: existing.designation },
+    newValue: { name: contact.name, phone: contact.phone, category: contact.category, designation: contact.designation },
+    actorId: session.user.id,
+    plantId,
+  });
+
   return NextResponse.json({ contact });
 }
 
@@ -147,5 +167,15 @@ export async function DELETE(
   }
 
   await prisma.plantContact.delete({ where: { id } });
+
+  await writeAuditLog({
+    entityType: "PlantContact",
+    entityId: id,
+    field: "delete",
+    oldValue: { name: existing.name, phone: existing.phone, category: existing.category },
+    actorId: session.user.id,
+    plantId,
+  });
+
   return NextResponse.json({ ok: true });
 }

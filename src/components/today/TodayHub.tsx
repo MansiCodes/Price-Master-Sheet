@@ -977,6 +977,7 @@ export function TodayHub({
                   id="entry-date"
                   type="date"
                   required
+                  max={todayLocalISO()}
                   value={entryDate}
                   onChange={(e) => setEntryDate(e.target.value)}
                 />

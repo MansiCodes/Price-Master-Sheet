@@ -29,6 +29,7 @@ const ENTITY_LABEL: Record<string, string> = {
   ElectricityEntry: "Electricity",
   Asset: "Asset",
   Plant: "Plant",
+  PlantContact: "Contact",
 };
 
 const ROLE_LABEL: Record<string, string> = {
