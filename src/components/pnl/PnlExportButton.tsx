@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import type { ReportTab } from "@/components/pnl/types";
 
 type PnlLine = { label: string; amount: number | null; ratio: number | null; kind: string };
-type JDoc = InstanceType<Awaited<ReturnType<typeof import("jspdf")>>["jsPDF"]>;
+// jsPDF instance type — resolved at runtime via dynamic import
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JDoc = any;
 
 function fmt(n: number | null | undefined): string {
   if (n == null) return "";

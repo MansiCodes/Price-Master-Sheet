@@ -1078,7 +1078,7 @@ export function TodayHub({
                 </div>
                 {isCat6 && vendorName === "Other" ? (
                   <div className="field">
-                    <label htmlFor="p-vendor-other">Vendor's Name</label>
+                    <label htmlFor="p-vendor-other">Vendor&apos;s Name</label>
                     <input
                       id="p-vendor-other"
                       required
