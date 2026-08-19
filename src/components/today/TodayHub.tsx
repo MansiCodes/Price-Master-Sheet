@@ -1275,9 +1275,7 @@ export function TodayHub({
                 ) : null}
                 <div className="prod-fields__row">
                   <div className="field">
-                    <label htmlFor="st-qty">
-                      {isPvc ? "Closing Stock" : "Quantity"}
-                    </label>
+                    <label htmlFor="st-qty">Quantity</label>
                     <DecimalInput
                       id="st-qty"
                       required
