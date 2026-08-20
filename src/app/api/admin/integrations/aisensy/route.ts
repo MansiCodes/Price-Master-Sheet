@@ -36,9 +36,11 @@ export async function GET() {
       otpCampaignName: settings.otpCampaignName,
       reminderCampaignName: settings.reminderCampaignName,
       completeCampaignName: settings.completeCampaignName,
+      priceSheetCampaignName: settings.priceSheetCampaignName,
       otpReady: Boolean(settings.apiKey && settings.otpCampaignName),
       reminderReady: Boolean(settings.apiKey && settings.reminderCampaignName),
       completeReady: Boolean(settings.apiKey && settings.completeCampaignName),
+      priceSheetReady: Boolean(settings.apiKey && settings.priceSheetCampaignName),
     },
   });
 }
@@ -48,6 +50,7 @@ const patchSchema = z.object({
   otpCampaignName: z.string().max(200).optional().nullable(),
   reminderCampaignName: z.string().max(200).optional().nullable(),
   completeCampaignName: z.string().max(200).optional().nullable(),
+  priceSheetCampaignName: z.string().max(200).optional().nullable(),
 });
 
 export async function PATCH(request: Request) {
@@ -83,6 +86,9 @@ export async function PATCH(request: Request) {
   if (data.completeCampaignName !== undefined) {
     patch.completeCampaignName = data.completeCampaignName;
   }
+  if (data.priceSheetCampaignName !== undefined) {
+    patch.priceSheetCampaignName = data.priceSheetCampaignName;
+  }
   if (data.apiKey !== undefined && data.apiKey !== null && data.apiKey.trim()) {
     patch.apiKey = data.apiKey.trim();
   }
@@ -117,9 +123,11 @@ export async function PATCH(request: Request) {
       otpCampaignName: after.otpCampaignName,
       reminderCampaignName: after.reminderCampaignName,
       completeCampaignName: after.completeCampaignName,
+      priceSheetCampaignName: after.priceSheetCampaignName,
       otpReady: Boolean(after.apiKey && after.otpCampaignName),
       reminderReady: Boolean(after.apiKey && after.reminderCampaignName),
       completeReady: Boolean(after.apiKey && after.completeCampaignName),
+      priceSheetReady: Boolean(after.apiKey && after.priceSheetCampaignName),
     },
   });
 }

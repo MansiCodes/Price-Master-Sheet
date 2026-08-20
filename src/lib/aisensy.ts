@@ -246,3 +246,43 @@ export async function isAisensyCompleteConfigured(): Promise<boolean> {
   const settings = await getAisensySettings();
   return Boolean(settings.apiKey && settings.completeCampaignName);
 }
+
+/**
+ * Price sheet share template:
+ * Hi {{1}}, shared {{2}} cable rate(s) as of {{3}}:
+ * {{4}}
+ */
+export async function sendPriceSheetWhatsApp(params: {
+  destination: string;
+  userName: string;
+  itemCount: number;
+  dateLabel: string;
+  summary: string;
+}): Promise<SendCampaignResult> {
+  const settings = await getAisensySettings();
+  const campaignName = settings.priceSheetCampaignName;
+  if (!settings.apiKey || !campaignName) {
+    return {
+      ok: false,
+      message: "Price sheet share campaign is not configured in Integrations",
+    };
+  }
+
+  return sendAisensyCampaign({
+    campaignName,
+    destination: params.destination,
+    userName: params.userName,
+    templateParams: [
+      params.userName,
+      String(params.itemCount),
+      params.dateLabel,
+      params.summary,
+    ],
+    source: "Cable Junction price sheet share",
+  });
+}
+
+export async function isAisensyPriceSheetConfigured(): Promise<boolean> {
+  const settings = await getAisensySettings();
+  return Boolean(settings.apiKey && settings.priceSheetCampaignName);
+}

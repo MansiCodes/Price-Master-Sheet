@@ -30,12 +30,21 @@ function isStaleSessionCookie(name: string): boolean {
 }
 
 function expireCookie(res: NextResponse, name: string) {
-  res.cookies.set(name, "", {
+  const secure =
+    name.startsWith("__Secure-") ||
+    name.startsWith("__Host-") ||
+    process.env.NODE_ENV === "production";
+  const opts = {
     path: "/",
     maxAge: 0,
     httpOnly: true,
-    sameSite: "lax",
-  });
+    sameSite: "lax" as const,
+    secure,
+  };
+  res.cookies.set(name, "", opts);
+  for (let i = 0; i < 6; i += 1) {
+    res.cookies.set(`${name}.${i}`, "", opts);
+  }
 }
 
 function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
@@ -69,7 +78,7 @@ export default async function middleware(req: NextRequest) {
     .filter((c) => isStaleSessionCookie(c.name));
 
   if (stale.length > 0) {
-    const res = NextResponse.redirect(req.nextUrl);
+    const res = NextResponse.next();
     for (const cookie of stale) {
       expireCookie(res, cookie.name);
     }

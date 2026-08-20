@@ -7,6 +7,7 @@ export type AisensySettings = {
   otpCampaignName: string | null;
   reminderCampaignName: string | null;
   completeCampaignName: string | null;
+  priceSheetCampaignName: string | null;
 };
 
 function envFallbackKey(): string | null {
@@ -65,6 +66,7 @@ export async function getAisensySettings(): Promise<AisensySettings> {
     otpCampaignName,
     reminderCampaignName: row.reminderCampaignName?.trim() || null,
     completeCampaignName: row.completeCampaignName?.trim() || null,
+    priceSheetCampaignName: row.priceSheetCampaignName?.trim() || null,
   };
 }
 
@@ -88,6 +90,10 @@ export async function updateAisensySettings(
   if (input.completeCampaignName !== undefined) {
     const trimmed = input.completeCampaignName?.trim();
     data.completeCampaignName = trimmed || null;
+  }
+  if (input.priceSheetCampaignName !== undefined) {
+    const trimmed = input.priceSheetCampaignName?.trim();
+    data.priceSheetCampaignName = trimmed || null;
   }
 
   await prisma.aisensyConfig.upsert({

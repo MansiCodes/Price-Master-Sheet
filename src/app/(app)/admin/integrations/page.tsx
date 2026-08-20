@@ -10,9 +10,11 @@ type ConfigView = {
   otpCampaignName: string | null;
   reminderCampaignName: string | null;
   completeCampaignName: string | null;
+  priceSheetCampaignName: string | null;
   otpReady: boolean;
   reminderReady: boolean;
   completeReady: boolean;
+  priceSheetReady: boolean;
 };
 
 export default function AdminIntegrationsPage() {
@@ -22,6 +24,7 @@ export default function AdminIntegrationsPage() {
   const [otpCampaignName, setOtpCampaignName] = useState("");
   const [reminderCampaignName, setReminderCampaignName] = useState("");
   const [completeCampaignName, setCompleteCampaignName] = useState("");
+  const [priceSheetCampaignName, setPriceSheetCampaignName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +47,7 @@ export default function AdminIntegrationsPage() {
       setOtpCampaignName(data.config.otpCampaignName ?? "");
       setReminderCampaignName(data.config.reminderCampaignName ?? "");
       setCompleteCampaignName(data.config.completeCampaignName ?? "");
+      setPriceSheetCampaignName(data.config.priceSheetCampaignName ?? "");
       setApiKey("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -66,6 +70,7 @@ export default function AdminIntegrationsPage() {
         otpCampaignName: otpCampaignName.trim() || null,
         reminderCampaignName: reminderCampaignName.trim() || null,
         completeCampaignName: completeCampaignName.trim() || null,
+        priceSheetCampaignName: priceSheetCampaignName.trim() || null,
       };
   if (apiKey.trim()) {
         // Ignore accidental paste of masked display (••••ALrY)
@@ -158,6 +163,17 @@ export default function AdminIntegrationsPage() {
                 ? "Forms complete ready"
                 : "Forms complete needs API key + complete campaign"}
             </li>
+            <li
+              className={
+                config?.priceSheetReady
+                  ? "integrations-status integrations-status--ok"
+                  : "integrations-status integrations-status--warn"
+              }
+            >
+              {config?.priceSheetReady
+                ? "Price sheet share ready"
+                : "Price sheet share needs API key + share campaign"}
+            </li>
           </ul>
 
           <div className="field">
@@ -221,6 +237,20 @@ export default function AdminIntegrationsPage() {
             <p className="integrations-card__hint">
               Params: {"{{1}}"} name, {"{{2}}"} plant, {"{{3}}"} date, {"{{4}}"}{" "}
               credit score
+            </p>
+          </div>
+
+          <div className="field">
+            <label htmlFor="aisensy-price-sheet-campaign">Price sheet share campaign name</label>
+            <input
+              id="aisensy-price-sheet-campaign"
+              value={priceSheetCampaignName}
+              onChange={(e) => setPriceSheetCampaignName(e.target.value)}
+              placeholder="Cable Junction Price Sheet Share"
+            />
+            <p className="integrations-card__hint">
+              Params: {"{{1}}"} name, {"{{2}}"} item count, {"{{3}}"} date, {"{{4}}"}{" "}
+              rate summary
             </p>
           </div>
 

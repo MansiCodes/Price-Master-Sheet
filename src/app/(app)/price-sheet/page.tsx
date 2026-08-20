@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { CableRate } from "@/lib/sheets/types";
+import { rateRowKey } from "@/lib/price-sheet-share";
+import { PriceSheetShareModal } from "@/app/(app)/price-sheet/PriceSheetShareModal";
 import "./price-sheet.css";
+import "./price-sheet-share.css";
 
 const PAGE_SIZES = [10, 20, 50, 100, 200] as const;
 const PAGE_SIZE_LABELS = PAGE_SIZES.map(String);
@@ -73,6 +76,16 @@ function SyncIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+function ShareIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" x2="12" y1="2" y2="15" />
+    </svg>
+  );
+}
+
 export default function PriceSheetPage() {
   const [rates, setRates] = useState<CableRate[]>([]);
   const [query, setQuery] = useState("");
@@ -82,6 +95,8 @@ export default function PriceSheetPage() {
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCompact, setIsCompact] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [shareOpen, setShareOpen] = useState(false);
   const ratesCountRef = useRef(0);
 
   const filtered = useMemo(() => {
@@ -100,6 +115,40 @@ export default function PriceSheetPage() {
   const safePage = Math.min(currentPage, totalPages);
   const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const pageList = buildPageList(totalPages, safePage, isCompact);
+
+  const filteredKeys = useMemo(
+    () => filtered.map((row) => rateRowKey(row)),
+    [filtered],
+  );
+  const allFilteredSelected =
+    filteredKeys.length > 0 && filteredKeys.every((key) => selectedKeys.has(key));
+  const someFilteredSelected = filteredKeys.some((key) => selectedKeys.has(key));
+
+  const selectedRows = useMemo(
+    () => filtered.filter((row) => selectedKeys.has(rateRowKey(row))),
+    [filtered, selectedKeys],
+  );
+
+  function toggleRow(key: string) {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function toggleSelectAllFiltered() {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) {
+        for (const key of filteredKeys) next.delete(key);
+      } else {
+        for (const key of filteredKeys) next.add(key);
+      }
+      return next;
+    });
+  }
 
   const fetchRates = useCallback(async () => {
     const response = await fetch("/api/rates");
@@ -270,6 +319,16 @@ export default function PriceSheetPage() {
             <button
               type="button"
               className="ps-btn ps-btn-secondary ps-desktop-inline"
+              title="Share selected"
+              disabled={selectedRows.length === 0}
+              onClick={() => setShareOpen(true)}
+            >
+              <ShareIcon />
+              Share{selectedRows.length ? ` (${selectedRows.length})` : ""}
+            </button>
+            <button
+              type="button"
+              className="ps-btn ps-btn-secondary ps-desktop-inline"
               title="Export CSV"
               onClick={exportCsv}
             >
@@ -288,6 +347,16 @@ export default function PriceSheetPage() {
           </div>
 
           <div className="ps-header-actions ps-mobile-only">
+            <button
+              type="button"
+              className="ps-icon-btn"
+              title="Share selected"
+              aria-label="Share selected"
+              disabled={selectedRows.length === 0}
+              onClick={() => setShareOpen(true)}
+            >
+              <ShareIcon size={20} />
+            </button>
             <button
               type="button"
               className="ps-icon-btn"
@@ -316,6 +385,18 @@ export default function PriceSheetPage() {
               <table className="ps-rates-table">
                 <thead>
                   <tr>
+                    <th className="ps-col-check">
+                      <input
+                        type="checkbox"
+                        className="ps-row-check"
+                        aria-label="Select all filtered cables"
+                        checked={allFilteredSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected;
+                        }}
+                        onChange={toggleSelectAllFiltered}
+                      />
+                    </th>
                     <th className="ps-col-sno">S NO.</th>
                     <th className="ps-col-name">NAME</th>
                     <th className="ps-col-spec">SPEC</th>
@@ -330,6 +411,7 @@ export default function PriceSheetPage() {
                     ? Array.from({ length: skeletonRows }, (_, i) => (
                         <tr key={`sk-${i}`}>
                           <td><span className="ps-skeleton ps-sk-sno" /></td>
+                          <td><span className="ps-skeleton ps-sk-sno" /></td>
                           <td><span className="ps-skeleton ps-sk-name" /></td>
                           <td><span className="ps-skeleton ps-sk-spec" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
@@ -341,11 +423,22 @@ export default function PriceSheetPage() {
                     : pageItems.length === 0
                       ? (
                           <tr className="ps-empty-row">
-                            <td colSpan={7}>{emptyMessage}</td>
+                            <td colSpan={8}>{emptyMessage}</td>
                           </tr>
                         )
-                      : pageItems.map((row) => (
-                          <tr key={`${row.sNo ?? "x"}-${row.name}`}>
+                      : pageItems.map((row) => {
+                          const key = rateRowKey(row);
+                          return (
+                          <tr key={key}>
+                            <td className="ps-col-check">
+                              <input
+                                type="checkbox"
+                                className="ps-row-check"
+                                aria-label={`Select ${row.name}`}
+                                checked={selectedKeys.has(key)}
+                                onChange={() => toggleRow(key)}
+                              />
+                            </td>
                             <td className="ps-sno">{row.sNo ?? "—"}</td>
                             <td className="ps-name" title={row.name}>{row.name}</td>
                             <td
@@ -359,7 +452,8 @@ export default function PriceSheetPage() {
                             <td className="ps-price">{formatPrice(row.p15)}</td>
                             <td className="ps-price">{formatPrice(row.p20)}</td>
                           </tr>
-                        ))}
+                        );
+                      })}
                 </tbody>
               </table>
             </div>
@@ -381,8 +475,19 @@ export default function PriceSheetPage() {
                 ))
               : pageItems.length === 0
                 ? <p className="ps-mobile-empty">{emptyMessage}</p>
-                : pageItems.map((row) => (
-                    <article key={`m-${row.sNo ?? "x"}-${row.name}`} className="ps-rate-card">
+                : pageItems.map((row) => {
+                    const key = rateRowKey(row);
+                    return (
+                    <article key={`m-${key}`} className="ps-rate-card">
+                      <label className="ps-rate-card-select">
+                        <input
+                          type="checkbox"
+                          className="ps-row-check"
+                          checked={selectedKeys.has(key)}
+                          onChange={() => toggleRow(key)}
+                        />
+                        <span>Select</span>
+                      </label>
                       <div className="ps-rate-card-top">
                         <p className="ps-rate-card-name" title={row.name}>{row.name}</p>
                         <span className="ps-rate-card-sno">{row.sNo ?? "—"}</span>
@@ -414,7 +519,8 @@ export default function PriceSheetPage() {
                         </div>
                       </div>
                     </article>
-                  ))}
+                  );
+                  })}
           </div>
         </main>
 
@@ -482,6 +588,12 @@ export default function PriceSheetPage() {
           </button>
         </nav>
       </div>
+
+      <PriceSheetShareModal
+        open={shareOpen}
+        selectedRows={selectedRows}
+        onClose={() => setShareOpen(false)}
+      />
     </div>
   );
 }

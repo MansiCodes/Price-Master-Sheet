@@ -78,6 +78,7 @@ model User {
   auditLogs          AuditLog[]
   coinsLedger        CoinsLedger[]
   creditScoreAwards  CreditScoreAward[]
+  priceSheetRecipients PriceSheetRecipient[] @relation("PriceSheetRecipientsCreated")
   otpChallenges      OtpChallenge[]
 }
 
@@ -466,10 +467,22 @@ model OtpChallenge {
 
 /** Singleton WhatsApp / AiSensy integration settings (Super Admin only). */
 model AisensyConfig {
-  id                   String   @id @default("default")
-  apiKey               String?
-  otpCampaignName      String?
-  reminderCampaignName String?
-  completeCampaignName String?
-  updatedAt            DateTime @updatedAt
+  id                     String   @id @default("default")
+  apiKey                 String?
+  otpCampaignName        String?
+  reminderCampaignName   String?
+  completeCampaignName   String?
+  priceSheetCampaignName String?
+  updatedAt              DateTime @updatedAt
+}
+
+model PriceSheetRecipient {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  label       String?
+  createdById String
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation("PriceSheetRecipientsCreated", fields: [createdById], references: [id])
+
+  @@index([createdAt])
 }
