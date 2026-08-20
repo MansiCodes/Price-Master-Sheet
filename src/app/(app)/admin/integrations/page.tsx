@@ -236,7 +236,7 @@ export default function AdminIntegrationsPage() {
             />
             <p className="integrations-card__hint">
               Params: {"{{1}}"} name, {"{{2}}"} plant, {"{{3}}"} date, {"{{4}}"}{" "}
-              credit score
+              optional
             </p>
           </div>
 

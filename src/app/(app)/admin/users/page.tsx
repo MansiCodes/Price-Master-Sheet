@@ -227,7 +227,6 @@ export default function AdminUsersPage() {
         "Mobile",
         "Role",
         "Plants",
-        "Credit score",
         "Price Sheet",
         "Status",
       ],
@@ -239,7 +238,6 @@ export default function AdminUsersPage() {
         u.globalRole === "SUPER_ADMIN"
           ? "All plants"
           : (u.plantRoles ?? []).map((role) => role.plant.name).join(", "),
-        u.creditScore ?? "",
         u.canViewPriceSheet ? "Yes" : "No",
         u.isActive ? "Active" : "Inactive",
       ]),

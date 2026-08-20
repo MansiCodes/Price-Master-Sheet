@@ -14,7 +14,6 @@ import {
   resolveSelectedPlantId,
 } from "@/lib/selected-plant";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
-import { maybeAwardCreditScore } from "@/lib/credit-score";
 import {
   type TodayModuleStatus,
   type ShiftModulesMap,
@@ -85,16 +84,6 @@ export default async function DashboardPage() {
   const showPnl = canViewPnl(user.globalRole);
   const dateStr = todayDateString();
 
-  let creditScore: number | null = null;
-  if (!superAdmin && primary) {
-    await maybeAwardCreditScore(user.id, primary.id, parseDateOnly(dateStr));
-    const dbUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { creditScore: true },
-    });
-    creditScore = dbUser?.creditScore ?? null;
-  }
-
   const ownEntriesOnly = !isSuperAdmin(user.globalRole);
   const metrics = await getDashboardMetrics(scopedPlantIds, {
     includePnl: showPnl,
@@ -126,8 +115,6 @@ export default async function DashboardPage() {
       plant={primary}
       shiftModules={shiftModules}
       scope={primary ? "plant" : "org"}
-      showCreditScore={!superAdmin}
-      creditScore={creditScore}
     />
   );
 }

@@ -40,7 +40,6 @@ export function UsersTable({
               <th>{t("email")}</th>
               <th>{t("role")}</th>
               <th>{t("plantsCol")}</th>
-              <th>{t("creditScore")}</th>
               <th>{t("priceSheet")}</th>
               <th>{t("status")}</th>
               <th>{t("actions")}</th>
@@ -49,7 +48,7 @@ export function UsersTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="empty">
+                <td colSpan={7} className="empty">
                   {emptyMessage ?? t("noUsers")}
                 </td>
               </tr>
@@ -82,7 +81,6 @@ export function UsersTable({
                       </span>
                     )}
                   </td>
-                  <td>{u.creditScore ?? tCommon("dash")}</td>
                   <td>
                     <span
                       className={`users-pill ${
