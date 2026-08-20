@@ -1,4 +1,5 @@
 import { GlobalRole } from "@prisma/client";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
@@ -21,8 +22,11 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  const user = session?.user;
-  const role = user?.globalRole;
+  if (!session?.user) {
+    redirect("/login");
+  }
+  const user = session.user;
+  const role = user.globalRole;
   const superAdmin = role ? isSuperAdmin(role) : false;
   const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
   const selectedPlantId = user

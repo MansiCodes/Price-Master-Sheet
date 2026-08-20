@@ -3,8 +3,8 @@ import type { NextAuthConfig } from "next-auth";
 /** Session cookie name — bump version whenever AUTH_SECRET rotates so old JWTs are ignored. */
 export const SESSION_COOKIE =
   process.env.NODE_ENV === "production"
-    ? "__Secure-cj.session-token.v2"
-    : "cj.session-token.v2";
+    ? "__Secure-cj.session-token.v3"
+    : "cj.session-token.v3";
 
 /**
  * Edge-compatible Auth.js config used by middleware.
@@ -17,14 +17,15 @@ export const authConfig = {
     signIn: "/login",
   },
   providers: [],
-  // Short session so user must re-login after a period (e.g. "next day").
-  // Using JWT strategy.
+  // Browser-session cookie: closing the browser requires login again.
+  // JWT also expires after 8 hours if the tab is left open.
   session: {
     strategy: "jwt",
-    maxAge: 60 * 60 * 24, // 24 hours (in seconds)
+    maxAge: 60 * 60 * 8,
+    updateAge: 60 * 60 * 8,
   },
   jwt: {
-    maxAge: 60 * 60 * 24, // align JWT + cookie lifetime
+    maxAge: 60 * 60 * 8,
   },
   cookies: {
     sessionToken: {
@@ -34,7 +35,6 @@ export const authConfig = {
         sameSite: "lax" as const,
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24, // 24 hours (in seconds)
       },
     },
   },

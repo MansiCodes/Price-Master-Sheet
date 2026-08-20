@@ -16,10 +16,14 @@ const STALE_COOKIE_PREFIXES = [
   "next-auth.session-token",
   "__Secure-next-auth.session-token",
   "cj.session-token", // pre-v2 (exact + chunked .0/.1…)
+  "cj.session-token.v2",
+  "__Secure-cj.session-token.v2",
 ];
 
 function isStaleSessionCookie(name: string): boolean {
-  if (name === SESSION_COOKIE) return false;
+  if (name === SESSION_COOKIE || name.startsWith(`${SESSION_COOKIE}.`)) {
+    return false;
+  }
   return STALE_COOKIE_PREFIXES.some(
     (prefix) => name === prefix || name.startsWith(`${prefix}.`),
   );

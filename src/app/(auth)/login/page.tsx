@@ -62,6 +62,8 @@ function clearStaleAuthCookies() {
     "next-auth.session-token",
     "__Secure-next-auth.session-token",
     "cj.session-token",
+    "cj.session-token.v2",
+    "__Secure-cj.session-token.v2",
   ];
   for (const name of stale) {
     document.cookie = `${name}=; Max-Age=0; path=/`;
