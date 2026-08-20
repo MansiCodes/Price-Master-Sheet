@@ -584,7 +584,8 @@ export function TodayHub({
     setSaving(true);
     setError(null);
 
-    let result: { ok: true; data: unknown } | { ok: false; error: string };
+    let result: { ok: true; data: unknown } | { ok: false; error: string } | null =
+      null;
 
     if (kind === "purchase") {
       const resolvedVendorName =
@@ -933,11 +934,14 @@ export function TodayHub({
         category: contactCategory.trim() || null,
         designation: contactDesignation.trim() || null,
       });
+    } else {
+      fail("Unknown entry type.");
+      return;
     }
 
     setSaving(false);
-    if (!result.ok) {
-      fail(result.error);
+    if (!result || !result.ok) {
+      fail(result?.error || "Could not save entry.");
       return;
     }
 
