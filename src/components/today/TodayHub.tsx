@@ -28,6 +28,7 @@ import {
   PVC_ATCL_PURCHASE_NOTE_PREFIX,
   getExpenseHeads,
   getExpenseHeadsForSection,
+  usesExpenseSections,
   type PvcExpenseSection,
   STOCK_CATEGORIES,
   getCat6PettyCatalog,
@@ -106,7 +107,6 @@ type EntryKind =
   | "sale"
   | "stock"
   | "expense"
-  | "pettyCash"
   | "contactList";
 
 const ENTRY_KINDS: EntryKind[] = [
@@ -114,7 +114,6 @@ const ENTRY_KINDS: EntryKind[] = [
   "sale",
   "stock",
   "expense",
-  "pettyCash",
   "contactList",
 ];
 
@@ -123,7 +122,6 @@ const ENTRY_KIND_LABEL_KEY: Record<EntryKind, string> = {
   sale: "sales",
   stock: "stock",
   expense: "expense",
-  pettyCash: "pettyCash",
   contactList: "contactList",
 };
 
@@ -247,19 +245,18 @@ export function TodayHub({
   );
   const isPvc = plantCode.toUpperCase() === "PVC";
   const isCat6 = isCat6Plant(plantCode);
+  const hasExpenseSections = usesExpenseSections(plantCode);
   const saleProducts = useMemo(() => getSalesCatalog(plantCode), [plantCode]);
   const customers = useMemo(() => getCustomerCatalog(plantCode), [plantCode]);
   const pettyCatalog = useMemo(() => getCat6PettyCatalog(), []);
-  const [expenseSection, setExpenseSection] = useState<PvcExpenseSection>(
-    isCat6Plant(plantCode) ? "indirect" : "direct",
-  );
+  const [expenseSection, setExpenseSection] = useState<PvcExpenseSection>("direct");
   const [purchaseSource, setPurchaseSource] = useState<"vendor" | "atcl">("vendor");
   const expenseHeads = useMemo(
     () =>
-      isPvc || isCat6
+      hasExpenseSections
         ? [...getExpenseHeadsForSection(plantCode, expenseSection)]
         : [...getExpenseHeads(plantCode)],
-    [plantCode, isPvc, isCat6, expenseSection],
+    [plantCode, hasExpenseSections, expenseSection],
   );
   const farVendorOptions = useMemo(() => [...PVC_FAR_VENDORS, "Other"], []);
   const cat6SupplierOptions = useMemo(
@@ -837,6 +834,60 @@ export function TodayHub({
           supervisorSalary: amount,
           billPhotoUrls: expensePhotos,
         });
+      } else if (expenseHead === "Petty Cash") {
+        if (isCat6) {
+          const amount = Number(pettyCashExpense) || 0;
+          if (
+            !pettyNature.trim() ||
+            !pettyCashDescription.trim() ||
+            !pettyPerson.trim() ||
+            !(amount > 0)
+          ) {
+            fail("Enter nature, description, person, and output amount.");
+            return;
+          }
+          result = await postJson(`/api/plants/${plantId}/petty-cash`, {
+            date: entryDate,
+            shift,
+            entryType: "PETTY_CASH",
+            payMode: pettyPerson.trim(),
+            expenseHead: mapCat6PettyNature(pettyNature),
+            nature: pettyNature.trim(),
+            description: pettyCashDescription.trim(),
+            location: pettyLocation.trim() || null,
+            checkedBy: pettyCheckedBy.trim() || null,
+            approvedBy: pettyApprovedBy.trim() || null,
+            amount,
+            contractorSalary: 0,
+            supervisorSalary: 0,
+            billPhotoUrls: pettyCashPhotos,
+          });
+        } else {
+          const amount = Number(pettyCashExpense) || 0;
+          const contractorSalary = Number(pettyCashContractorSalary) || 0;
+          const supervisorSalary = Number(pettyCashSupervisorSalary) || 0;
+          if (
+            !pettyCashPayMode.trim() ||
+            !pettyCashDescription.trim() ||
+            amount + contractorSalary + supervisorSalary <= 0
+          ) {
+            fail(t("enterPettyCash"));
+            return;
+          }
+          result = await postJson(`/api/plants/${plantId}/petty-cash`, {
+            date: entryDate,
+            shift,
+            entryType: "PETTY_CASH",
+            payMode: pettyCashPayMode.trim(),
+            expenseHead: "Petty Cash",
+            description: pettyCashDescription.trim(),
+            billNumber: pettyCashBillNumber.trim() || null,
+            amount,
+            contractorSalary,
+            supervisorSalary,
+            billPhotoUrls: pettyCashPhotos,
+          });
+        }
       } else {
         const amount = Number(expenseAmount);
         if (!(amount > 0) || !expenseHead) {
@@ -882,58 +933,6 @@ export function TodayHub({
         category: contactCategory.trim() || null,
         designation: contactDesignation.trim() || null,
       });
-    } else if (isCat6) {
-      const amount = Number(pettyCashExpense) || 0;
-      if (
-        !pettyNature.trim() ||
-        !pettyCashDescription.trim() ||
-        !pettyPerson.trim() ||
-        !(amount > 0)
-      ) {
-        fail("Enter nature, description, person, and output amount.");
-        return;
-      }
-      result = await postJson(`/api/plants/${plantId}/petty-cash`, {
-        date: entryDate,
-        shift,
-        entryType: "PETTY_CASH",
-        payMode: pettyPerson.trim(),
-        expenseHead: mapCat6PettyNature(pettyNature),
-        nature: pettyNature.trim(),
-        description: pettyCashDescription.trim(),
-        location: pettyLocation.trim() || null,
-        checkedBy: pettyCheckedBy.trim() || null,
-        approvedBy: pettyApprovedBy.trim() || null,
-        amount,
-        contractorSalary: 0,
-        supervisorSalary: 0,
-        billPhotoUrls: pettyCashPhotos,
-      });
-    } else {
-      const amount = Number(pettyCashExpense) || 0;
-      const contractorSalary = Number(pettyCashContractorSalary) || 0;
-      const supervisorSalary = Number(pettyCashSupervisorSalary) || 0;
-      if (
-        !pettyCashPayMode.trim() ||
-        !pettyCashDescription.trim() ||
-        amount + contractorSalary + supervisorSalary <= 0
-      ) {
-        fail(t("enterPettyCash"));
-        return;
-      }
-      result = await postJson(`/api/plants/${plantId}/petty-cash`, {
-        date: entryDate,
-        shift,
-        entryType: "PETTY_CASH",
-        payMode: pettyCashPayMode.trim(),
-        expenseHead: "Petty Cash",
-        description: pettyCashDescription.trim(),
-        billNumber: pettyCashBillNumber.trim() || null,
-        amount,
-        contractorSalary,
-        supervisorSalary,
-        billPhotoUrls: pettyCashPhotos,
-      });
     }
 
     setSaving(false);
@@ -947,7 +946,6 @@ export function TodayHub({
       sale: t("salesSaved"),
       stock: t("stockSaved"),
       expense: t("expenseSaved"),
-      pettyCash: t("pettyCashSaved"),
       contactList: "Contact saved",
     };
     toast.success(labels[kind]);
@@ -1096,10 +1094,10 @@ export function TodayHub({
               <div className="field">
                 <label htmlFor="entry-date">
                   {isCat6
-                    ? kind === "pettyCash" || kind === "expense"
+                    ? kind === "expense"
                       ? "Date"
                       : "Bill Date"
-                    : kind === "pettyCash"
+                    : kind === "expense" && expenseHead === "Petty Cash"
                       ? t("billDate")
                       : t("date")}
                 </label>
@@ -1532,7 +1530,7 @@ export function TodayHub({
 
             {kind === "expense" ? (
               <>
-                {isPvc || isCat6 ? (
+                {hasExpenseSections ? (
                   <div className="field">
                     <label htmlFor="e-section">Expense section</label>
                     <SelectMenu
@@ -1588,9 +1586,9 @@ export function TodayHub({
                       }
                     }}
                   />
-                  {isCat6 && expenseSection === "direct" && expenseHeads.length === 0 ? (
+                  {isCat6 && expenseSection === "indirect" && expenseHeads.length === 0 ? (
                     <p className="field-hint">
-                      CAT-6 Direct has no categories. Switch to Indirect for Petty Cash, Salary & Wages, or Miscellaneous.
+                      No indirect categories. Use Direct for Petty Cash, or add Salary & Wages / Miscellaneous under Indirect.
                     </p>
                   ) : null}
                 </div>
@@ -1762,6 +1760,155 @@ export function TodayHub({
                     </div>
                     <BillUpload urls={expensePhotos} onChange={setExpensePhotos} />
                   </>
+                ) : expenseHead === "Petty Cash" ? (
+                  isCat6 ? (
+                    <>
+                      <div className="field">
+                        <label htmlFor="pc-amount">Output Amt</label>
+                        <DecimalInput
+                          id="pc-amount"
+                          required
+                          value={pettyCashExpense}
+                          onChange={setPettyCashExpense}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="pc-nature">Nature of Expense</label>
+                        <SelectMenu
+                          id="pc-nature"
+                          value={pettyNature}
+                          options={pettyCatalog.natures}
+                          required
+                          placeholder="Select nature"
+                          onChange={setPettyNature}
+                        />
+                      </div>
+                      <div className="field expense-desc">
+                        <label htmlFor="pc-description">Expense Description</label>
+                        <textarea
+                          id="pc-description"
+                          required
+                          value={pettyCashDescription}
+                          onChange={(e) => setPettyCashDescription(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+                      <div className="form-grid two">
+                        <div className="field">
+                          <label htmlFor="pc-person">Person</label>
+                          <SelectMenu
+                            id="pc-person"
+                            value={pettyPerson}
+                            options={pettyCatalog.persons}
+                            required
+                            placeholder="Select person"
+                            onChange={setPettyPerson}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="pc-location">Location</label>
+                          <SelectMenu
+                            id="pc-location"
+                            value={pettyLocation}
+                            options={pettyCatalog.locations}
+                            placeholder="Select location"
+                            onChange={setPettyLocation}
+                          />
+                        </div>
+                      </div>
+                      <div className="form-grid two">
+                        <div className="field">
+                          <label htmlFor="pc-checked">Check by</label>
+                          <SelectMenu
+                            id="pc-checked"
+                            value={pettyCheckedBy}
+                            options={pettyCatalog.checkedBy}
+                            placeholder="Select checker"
+                            onChange={setPettyCheckedBy}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="pc-approved">Approved By</label>
+                          <SelectMenu
+                            id="pc-approved"
+                            value={pettyApprovedBy}
+                            options={pettyCatalog.approvedBy}
+                            placeholder="Select approver"
+                            onChange={setPettyApprovedBy}
+                          />
+                        </div>
+                      </div>
+                      <BillUpload
+                        label={t("uploadBill")}
+                        urls={pettyCashPhotos}
+                        onChange={setPettyCashPhotos}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <div className="field">
+                        <label htmlFor="pc-pay-mode">{t("payMode")}</label>
+                        <input
+                          id="pc-pay-mode"
+                          required
+                          placeholder="e.g. ADV-Cash or ADV-Bank"
+                          value={pettyCashPayMode}
+                          onChange={(e) => setPettyCashPayMode(e.target.value)}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="pc-bill-number">{t("billNumber")}</label>
+                        <input
+                          id="pc-bill-number"
+                          value={pettyCashBillNumber}
+                          onChange={(e) => setPettyCashBillNumber(e.target.value)}
+                        />
+                      </div>
+                      <div className="field expense-desc">
+                        <label htmlFor="pc-description">
+                          {t("descriptionOfExpense")}
+                        </label>
+                        <textarea
+                          id="pc-description"
+                          required
+                          value={pettyCashDescription}
+                          onChange={(e) => setPettyCashDescription(e.target.value)}
+                          rows={4}
+                        />
+                      </div>
+                      <div className="prod-fields__row">
+                        <div className="field">
+                          <label htmlFor="pc-expense">{t("expenses")}</label>
+                          <DecimalInput
+                            id="pc-expense"
+                            value={pettyCashExpense}
+                            onChange={setPettyCashExpense}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="pc-contractor">{t("contractorSalary")}</label>
+                          <DecimalInput
+                            id="pc-contractor"
+                            value={pettyCashContractorSalary}
+                            onChange={setPettyCashContractorSalary}
+                          />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <label htmlFor="pc-supervisor">{t("supervisorSalary")}</label>
+                        <DecimalInput
+                          id="pc-supervisor"
+                          value={pettyCashSupervisorSalary}
+                          onChange={setPettyCashSupervisorSalary}
+                        />
+                      </div>
+                      <BillUpload
+                        label={t("uploadBill")}
+                        urls={pettyCashPhotos}
+                        onChange={setPettyCashPhotos}
+                      />
+                    </>
+                  )
                 ) : (
                   <>
                 {expenseHead === "Electricity" ||
@@ -1819,157 +1966,6 @@ export function TodayHub({
                   </>
                 )}
               </>
-            ) : null}
-
-            {kind === "pettyCash" ? (
-              isCat6 ? (
-              <>
-                <div className="field">
-                  <label htmlFor="pc-amount">Output Amt</label>
-                  <DecimalInput
-                    id="pc-amount"
-                    required
-                    value={pettyCashExpense}
-                    onChange={setPettyCashExpense}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="pc-nature">Nature of Expense</label>
-                  <SelectMenu
-                    id="pc-nature"
-                    value={pettyNature}
-                    options={pettyCatalog.natures}
-                    required
-                    placeholder="Select nature"
-                    onChange={setPettyNature}
-                  />
-                </div>
-                <div className="field expense-desc">
-                  <label htmlFor="pc-description">Expense Description</label>
-                  <textarea
-                    id="pc-description"
-                    required
-                    value={pettyCashDescription}
-                    onChange={(e) => setPettyCashDescription(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-                <div className="form-grid two">
-                  <div className="field">
-                    <label htmlFor="pc-person">Person</label>
-                    <SelectMenu
-                      id="pc-person"
-                      value={pettyPerson}
-                      options={pettyCatalog.persons}
-                      required
-                      placeholder="Select person"
-                      onChange={setPettyPerson}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="pc-location">Location</label>
-                    <SelectMenu
-                      id="pc-location"
-                      value={pettyLocation}
-                      options={pettyCatalog.locations}
-                      placeholder="Select location"
-                      onChange={setPettyLocation}
-                    />
-                  </div>
-                </div>
-                <div className="form-grid two">
-                  <div className="field">
-                    <label htmlFor="pc-checked">Check by</label>
-                    <SelectMenu
-                      id="pc-checked"
-                      value={pettyCheckedBy}
-                      options={pettyCatalog.checkedBy}
-                      placeholder="Select checker"
-                      onChange={setPettyCheckedBy}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="pc-approved">Approved By</label>
-                    <SelectMenu
-                      id="pc-approved"
-                      value={pettyApprovedBy}
-                      options={pettyCatalog.approvedBy}
-                      placeholder="Select approver"
-                      onChange={setPettyApprovedBy}
-                    />
-                  </div>
-                </div>
-                <BillUpload
-                  label={t("uploadBill")}
-                  urls={pettyCashPhotos}
-                  onChange={setPettyCashPhotos}
-                />
-              </>
-              ) : (
-              <>
-                <div className="field">
-                  <label htmlFor="pc-pay-mode">{t("payMode")}</label>
-                  <input
-                    id="pc-pay-mode"
-                    required
-                    placeholder="e.g. ADV-Cash or ADV-Bank"
-                    value={pettyCashPayMode}
-                    onChange={(e) => setPettyCashPayMode(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="pc-bill-number">{t("billNumber")}</label>
-                  <input
-                    id="pc-bill-number"
-                    value={pettyCashBillNumber}
-                    onChange={(e) => setPettyCashBillNumber(e.target.value)}
-                  />
-                </div>
-                <div className="field expense-desc">
-                  <label htmlFor="pc-description">
-                    {t("descriptionOfExpense")}
-                  </label>
-                  <textarea
-                    id="pc-description"
-                    required
-                    value={pettyCashDescription}
-                    onChange={(e) => setPettyCashDescription(e.target.value)}
-                    rows={4}
-                  />
-                </div>
-                <div className="prod-fields__row">
-                  <div className="field">
-                    <label htmlFor="pc-expense">{t("expenses")}</label>
-                    <DecimalInput
-                      id="pc-expense"
-                      value={pettyCashExpense}
-                      onChange={setPettyCashExpense}
-                    />
-                  </div>
-                  <div className="field">
-                    <label htmlFor="pc-contractor">{t("contractorSalary")}</label>
-                    <DecimalInput
-                      id="pc-contractor"
-                      value={pettyCashContractorSalary}
-                      onChange={setPettyCashContractorSalary}
-                    />
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="pc-supervisor">{t("supervisorSalary")}</label>
-                  <DecimalInput
-                    id="pc-supervisor"
-                    value={pettyCashSupervisorSalary}
-                    onChange={setPettyCashSupervisorSalary}
-                  />
-                </div>
-                <BillUpload
-                  label={t("uploadBill")}
-                  urls={pettyCashPhotos}
-                  onChange={setPettyCashPhotos}
-                />
-              </>
-              )
             ) : null}
 
             {kind === "contactList" ? (

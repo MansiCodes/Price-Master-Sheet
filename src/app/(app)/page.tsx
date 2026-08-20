@@ -67,7 +67,7 @@ export default async function DashboardPage() {
   }
 
   const selectedPlantId = await resolveSelectedPlantId(user.id, {
-    isSuperAdmin: false,
+    isSuperAdmin: superAdmin,
   });
 
   const scopedPlantIds = selectedPlantId ? [selectedPlantId] : plantIds;

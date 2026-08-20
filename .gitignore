@@ -45,6 +45,11 @@ coverage/
 # Vercel
 .vercel/
 
+# DB backups (contain production data — do not commit)
+backups/*.sql
+backups/*.dump
+!backups/run-pg-dump.sh
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

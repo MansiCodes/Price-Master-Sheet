@@ -14,6 +14,7 @@ import {
   cat6ExpensePnlLine,
   getExpenseHeadsForSection,
   pvcExpensePnlLine,
+  usesExpenseSections,
   type PvcExpenseSection,
 } from "@/lib/plant-catalogs";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
@@ -78,18 +79,16 @@ export function ExpenseReport({
   const tCommon = useTranslations("common");
   const cat6 = isCat6Plant(plantCode);
   const pvc = plantCode?.toUpperCase() === "PVC";
-  const usesSections = pvc || cat6;
+  const usesSections = usesExpenseSections(plantCode);
 
-  const [section, setSection] = useState<PvcExpenseSection>(
-    cat6 ? "indirect" : "direct",
-  );
+  const [section, setSection] = useState<PvcExpenseSection>("direct");
   const sectionHeads = useMemo(
     () => [...getExpenseHeadsForSection(plantCode, section)],
     [plantCode, section],
   );
   const [category, setCategory] = useState(
     () =>
-      getExpenseHeadsForSection(plantCode, cat6 ? "indirect" : "direct")[0] ??
+      getExpenseHeadsForSection(plantCode, "direct")[0] ??
       "Petty Cash",
   );
   const isPettyCategory = category === "Petty Cash";
@@ -306,13 +305,7 @@ export function ExpenseReport({
               ))}
             </div>
           ) : (
-            <p className="pnl-expense-empty-hint">
-              {section === "direct"
-                ? cat6
-                  ? "CAT-6 Direct has no separate entry categories. Enter Petty Cash, Salary & Wages, and Miscellaneous under Indirect."
-                  : "No categories in this section."
-                : "No categories in this section."}
-            </p>
+            <p className="pnl-expense-empty-hint">No categories in this section.</p>
           )}
         </>
       ) : null}
@@ -352,15 +345,7 @@ export function ExpenseReport({
         ]}
         rows={sectionHeads.length === 0 ? [] : rows}
         loading={loading}
-        emptyLabel={
-          sectionHeads.length === 0
-            ? section === "direct"
-              ? cat6
-                ? "Use Indirect → Petty Cash / Salary & Wages / Miscellaneous."
-                : t("noRecords")
-              : t("noRecords")
-            : t("noRecords")
-        }
+        emptyLabel={t("noRecords")}
         variant={pvc || cat6 ? "register" : undefined}
         footer={
           totals && rows.length > 0 && sectionHeads.length > 0

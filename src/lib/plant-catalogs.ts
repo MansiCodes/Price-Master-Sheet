@@ -247,6 +247,7 @@ export const PVC_DIRECT_EXPENSE_HEADS = [
   "Unloading of MT",
   "Labour Contractor",
   "Expense",
+  "Other",
 ] as const;
 
 /** Indirect expenses (P&L below gross profit). */
@@ -270,14 +271,12 @@ export const PVC_LEGACY_EXPENSE_HEADS = PVC_EXPENSE_HEADS;
 
 /**
  * CAT-6 expense UI mirrors Direct / Indirect.
- * Direct has no entry categories (trading-side PETTY CASH EXP comes from Indirect → Petty Cash).
- * Indirect Petty Cash → P&L PETTY CASH EXP.
- * Indirect Salary & Wages / Miscellaneous → WAGES & SALARY EXP (~70% of EXPENSE amounts).
+ * Direct Petty Cash → P&L PETTY CASH EXP (trading / direct side).
+ * Direct Other / Indirect Salary & Wages / Miscellaneous → WAGES & SALARY EXP.
  */
-export const CAT6_DIRECT_EXPENSE_HEADS = [] as const;
+export const CAT6_DIRECT_EXPENSE_HEADS = ["Petty Cash", "Other"] as const;
 
 export const CAT6_INDIRECT_EXPENSE_HEADS = [
-  "Petty Cash",
   "Salary & Wages",
   "Miscellaneous",
 ] as const;
@@ -287,7 +286,20 @@ export const CAT6_EXPENSE_HEADS = [
   ...CAT6_INDIRECT_EXPENSE_HEADS,
 ] as const;
 
-/** @deprecated prefer CAT6_INDIRECT_EXPENSE_HEADS / getExpenseHeadsForSection */
+/** LED Rope — same Direct/Indirect pattern as other plants. */
+export const LED_DIRECT_EXPENSE_HEADS = ["Other"] as const;
+
+export const LED_INDIRECT_EXPENSE_HEADS = [
+  "Salary & Wages",
+  "Miscellaneous",
+] as const;
+
+export const LED_EXPENSE_HEADS = [
+  ...LED_DIRECT_EXPENSE_HEADS,
+  ...LED_INDIRECT_EXPENSE_HEADS,
+] as const;
+
+/** @deprecated prefer plant-specific heads / getExpenseHeadsForSection */
 export const DEFAULT_EXPENSE_HEADS = CAT6_EXPENSE_HEADS;
 
 export const PVC_FAR_VENDORS = [
@@ -319,7 +331,21 @@ export function getExpenseHeadsForSection(
       ? CAT6_DIRECT_EXPENSE_HEADS
       : CAT6_INDIRECT_EXPENSE_HEADS;
   }
-  return section === "direct" ? [] : DEFAULT_EXPENSE_HEADS;
+  if (code === "LEDROPE") {
+    return section === "direct"
+      ? LED_DIRECT_EXPENSE_HEADS
+      : LED_INDIRECT_EXPENSE_HEADS;
+  }
+  return section === "direct"
+    ? LED_DIRECT_EXPENSE_HEADS
+    : LED_INDIRECT_EXPENSE_HEADS;
+}
+
+/** All plants use Direct / Indirect expense UI. */
+export function usesExpenseSections(
+  _plantCode?: string | null,
+): boolean {
+  return true;
 }
 
 export function pvcExpenseSection(head: string): PvcExpenseSection {
@@ -348,7 +374,16 @@ export function expenseSectionForPlant(
     }
     return "indirect";
   }
-  return "indirect";
+  if (code === "LEDROPE") {
+    const normalized = head.trim();
+    if (
+      (LED_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
+    ) {
+      return "direct";
+    }
+    return "indirect";
+  }
+  return head.trim() === "Other" ? "direct" : "indirect";
 }
 
 export function getPvcExpenseHeads(): readonly string[] {
@@ -360,6 +395,7 @@ export function getExpenseHeads(plantCode?: string | null): readonly string[] {
   const code = plantCode?.toUpperCase() ?? "";
   if (code === "PVC") return PVC_EXPENSE_HEADS;
   if (code === "CAT6") return CAT6_EXPENSE_HEADS;
+  if (code === "LEDROPE") return LED_EXPENSE_HEADS;
   return DEFAULT_EXPENSE_HEADS;
 }
 
@@ -382,6 +418,7 @@ export function pvcExpensePnlLine(head: string): string {
     case "Labour Contractor":
       return "LABOUR CONTRACTOR";
     case "Expense":
+    case "Other":
       return "DIRECT EXP.";
     case "Petty Cash":
       return "PETTY CASH EXP";
@@ -402,6 +439,7 @@ export function cat6ExpensePnlLine(head: string): string {
   switch (head.trim()) {
     case "Petty Cash":
       return "PETTY CASH EXP";
+    case "Other":
     case "Salary & Wages":
     case "Miscellaneous":
     case "Electricity":

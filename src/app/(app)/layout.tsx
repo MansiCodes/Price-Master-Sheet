@@ -30,7 +30,7 @@ export default async function AppLayout({
   const superAdmin = role ? isSuperAdmin(role) : false;
   const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
   const selectedPlantId = user
-    ? await resolveSelectedPlantId(user.id, { isSuperAdmin: false })
+    ? await resolveSelectedPlantId(user.id, { isSuperAdmin: superAdmin })
     : null;
   const primaryPlantId = selectedPlantId ?? plantIds[0] ?? null;
 

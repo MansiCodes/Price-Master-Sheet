@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { getAccessiblePlantIds } from "@/lib/rbac";
+import { getAccessiblePlantIds, isSuperAdmin } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { WelcomeRedirect } from "@/components/welcome/WelcomeRedirect";
 import "./welcome.css";
@@ -16,7 +16,9 @@ export default async function WelcomePage() {
     redirect("/select-plant");
   }
 
-  const selectedPlantId = await resolveSelectedPlantId(user.id);
+  const selectedPlantId = await resolveSelectedPlantId(user.id, {
+    isSuperAdmin: isSuperAdmin(user.globalRole),
+  });
   if (!selectedPlantId) {
     redirect("/select-plant");
   }
