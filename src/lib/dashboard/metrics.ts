@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { refreshDailyStatusForDate } from "@/lib/daily-status";
 import { calculatePlantPnl } from "@/lib/pnl/calculate";
+import {
+  REQUIRED_SHIFT_FORM_COUNT,
+  countRequiredShiftForms,
+} from "@/lib/shift-forms";
 
 export type DayPoint = { date: string; sales: number; purchases: number };
 
@@ -13,7 +17,7 @@ export const TODAY_MODULES = [
   { key: "pettyCashFilled" as const, label: "Expense", href: "today", color: "#ef6351" },
 ];
 
-export const TODAY_MODULE_COUNT = TODAY_MODULES.length;
+export const TODAY_MODULE_COUNT = REQUIRED_SHIFT_FORM_COUNT;
 
 export type PlantTodayModule = {
   key: (typeof TODAY_MODULES)[number]["key"];
@@ -191,10 +195,21 @@ export async function getDashboardMetrics(
 
   await Promise.all(
     plants.map(async (plant) => {
-      const existing = await prisma.dailyEntryStatus.findFirst({
+      // `dailyEntryStatus` is cached flags used by the dashboard (week compare dots).
+      // We must refresh when the cached value is missing OR previously incomplete,
+      // otherwise UI can show stale "not teal" dots even after forms are filled.
+      const existingRows = await prisma.dailyEntryStatus.findMany({
         where: { plantId: plant.id, date: todayDate },
+        select: { shift: true, allComplete: true },
       });
-      if (!existing) await refreshDailyStatusForDate(plant.id, todayDate);
+
+      const hasBothShifts = existingRows.some((r) => r.shift === "DAY")
+        && existingRows.some((r) => r.shift === "NIGHT");
+      const anyShiftNotComplete = existingRows.some((r) => !r.allComplete);
+
+      if (!hasBothShifts || anyShiftNotComplete) {
+        await refreshDailyStatusForDate(plant.id, todayDate, options.enteredById);
+      }
     }),
   );
 
@@ -332,74 +347,114 @@ export async function getDashboardMetrics(
   const pettyDays = new Set<string>();
   const saleDays = new Set<string>();
   const purchaseDays = new Set<string>();
+  const multiPlant = plants.length > 1;
 
-  if (scoped) {
-    const [
-      prodToday,
-      weekProd,
-      weekStock,
-      weekPetty,
-      weekSaleRows,
-      weekPurchaseRows,
-    ] = await Promise.all([
-      prisma.productionEntry.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: todayDate },
-        _count: true,
-      }),
-      prisma.productionEntry.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
-        _count: true,
-      }),
-      prisma.stockEntry.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
-        _count: true,
-      }),
-      prisma.pettyCashEntry.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
-        _count: true,
-      }),
-      prisma.sale.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
-        _count: true,
-      }),
-      prisma.purchase.groupBy({
-        by: ["date", "shift"],
-        where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
-        _count: true,
-      }),
-    ]);
-    todayProductionCount = prodToday.reduce((sum, row) => sum + row._count, 0);
-    for (const row of weekProd) {
-      if (row._count > 0) {
-        prodDays.add(`${row.date.toISOString().slice(0, 10)}:${row.shift}`);
-      }
-    }
-    for (const row of weekStock) {
-      if (row._count > 0) {
-        stockDays.add(`${row.date.toISOString().slice(0, 10)}:${row.shift}`);
-      }
-    }
-    for (const row of weekPetty) {
-      if (row._count > 0) {
-        pettyDays.add(`${row.date.toISOString().slice(0, 10)}:${row.shift}`);
-      }
-    }
-    for (const row of weekSaleRows) {
-      if (row._count > 0) {
-        saleDays.add(`${row.date.toISOString().slice(0, 10)}:${row.shift}`);
-      }
-    }
-    for (const row of weekPurchaseRows) {
-      if (row._count > 0) {
-        purchaseDays.add(`${row.date.toISOString().slice(0, 10)}:${row.shift}`);
-      }
+  function formSlotKey(
+    plantId: string | undefined,
+    dateStr: string,
+    shift: string,
+  ) {
+    return multiPlant && plantId
+      ? `${plantId}:${dateStr}:${shift}`
+      : `${dateStr}:${shift}`;
+  }
+
+  function addFormSlotsFromGroupBy(
+    set: Set<string>,
+    rows: { plantId?: string; date: Date; shift: string; _count: number }[],
+  ) {
+    for (const row of rows) {
+      if (row._count <= 0) continue;
+      set.add(
+        formSlotKey(
+          row.plantId,
+          row.date.toISOString().slice(0, 10),
+          row.shift,
+        ),
+      );
     }
   }
+
+  const formGroupBy = multiPlant
+    ? (["plantId", "date", "shift"] as const)
+    : (["date", "shift"] as const);
+
+  const [
+    prodToday,
+    weekProd,
+    weekStock,
+    weekPetty,
+    weekSaleRows,
+    weekPurchaseRows,
+  ] = await Promise.all([
+    prisma.productionEntry.groupBy({
+      by: [...formGroupBy],
+      where: { ...entryFilter, date: todayDate },
+      _count: true,
+    }),
+    prisma.productionEntry.groupBy({
+      by: [...formGroupBy],
+      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      _count: true,
+    }),
+    prisma.stockEntry.groupBy({
+      by: [...formGroupBy],
+      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      _count: true,
+    }),
+    prisma.pettyCashEntry.groupBy({
+      by: [...formGroupBy],
+      where: {
+        ...entryFilter,
+        date: { gte: weekStart, lte: todayDate },
+        entryType: "EXPENSE",
+      },
+      _count: true,
+    }),
+    prisma.sale.groupBy({
+      by: [...formGroupBy],
+      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      _count: true,
+    }),
+    prisma.purchase.groupBy({
+      by: [...formGroupBy],
+      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      _count: true,
+    }),
+  ]);
+
+  todayProductionCount = prodToday.reduce((sum, row) => sum + row._count, 0);
+  addFormSlotsFromGroupBy(prodDays, weekProd);
+  addFormSlotsFromGroupBy(stockDays, weekStock);
+  addFormSlotsFromGroupBy(pettyDays, weekPetty);
+  addFormSlotsFromGroupBy(saleDays, weekSaleRows);
+  addFormSlotsFromGroupBy(purchaseDays, weekPurchaseRows);
+
+  function shiftFilledForDate(date: string, shift: "DAY" | "NIGHT") {
+    if (!multiPlant) {
+      return [
+        purchaseDays.has(`${date}:${shift}`),
+        saleDays.has(`${date}:${shift}`),
+        stockDays.has(`${date}:${shift}`),
+        pettyDays.has(`${date}:${shift}`),
+      ].filter(Boolean).length;
+    }
+
+    let filled = 0;
+    for (const plant of plants) {
+      filled += [
+        purchaseDays.has(`${plant.id}:${date}:${shift}`),
+        saleDays.has(`${plant.id}:${date}:${shift}`),
+        stockDays.has(`${plant.id}:${date}:${shift}`),
+        pettyDays.has(`${plant.id}:${date}:${shift}`),
+      ].filter(Boolean).length;
+    }
+    return filled;
+  }
+
+  const perShiftFormTotal = multiPlant
+    ? plants.length * TODAY_MODULE_COUNT
+    : TODAY_MODULE_COUNT;
 
   const salesMap = new Map(
     weekSales.map((r) => [
@@ -461,7 +516,7 @@ export async function getDashboardMetrics(
   });
   const todayPettyRows = await prisma.pettyCashEntry.groupBy({
     by: ["shift"],
-    where: { ...entryFilter, date: todayDate },
+    where: { ...entryFilter, date: todayDate, entryType: "EXPENSE" },
     _count: true,
   });
   const todayProdRows = await prisma.productionEntry.groupBy({
@@ -506,7 +561,9 @@ export async function getDashboardMetrics(
           scopedTodayByShift.NIGHT[m.key as keyof typeof scopedTodayByShift.NIGHT]
         : Boolean(bucket?.DAY?.[m.key] || bucket?.NIGHT?.[m.key]),
     }));
-    const completed = modules.filter((m) => m.filled).length;
+    const completed = modules.filter(
+      (m) => m.filled && m.key !== "productionFilled",
+    ).length;
     const dayComplete = bucket?.DAY?.allComplete ?? false;
     const nightComplete = bucket?.NIGHT?.allComplete ?? false;
     return {
@@ -548,18 +605,21 @@ export async function getDashboardMetrics(
       Object.values(scopedTodayByShift.NIGHT).filter(Boolean).length;
   } else {
     for (const s of todayStatuses) {
-      formsFilled += [
-        s.purchaseFilled,
-        s.saleFilled,
-        s.stockFilled,
-        s.productionFilled,
-        s.pettyCashFilled,
-      ].filter(Boolean).length;
+      formsFilled += countStatusRequiredFilled(s);
     }
   }
   const formsTotal = scoped
     ? TODAY_MODULE_COUNT * 2
     : plants.length * TODAY_MODULE_COUNT * 2;
+
+  function countStatusRequiredFilled(status: {
+    purchaseFilled: boolean;
+    saleFilled: boolean;
+    stockFilled: boolean;
+    pettyCashFilled: boolean;
+  }) {
+    return countRequiredShiftForms(status);
+  }
 
   let statusSlots = 0;
   let statusFilled = 0;
@@ -567,13 +627,7 @@ export async function getDashboardMetrics(
   let daysWithPurchase = 0;
   for (const s of statuses) {
     statusSlots += TODAY_MODULE_COUNT;
-    statusFilled += [
-      s.purchaseFilled,
-      s.saleFilled,
-      s.stockFilled,
-      s.productionFilled,
-      s.pettyCashFilled,
-    ].filter(Boolean).length;
+    statusFilled += countStatusRequiredFilled(s);
   }
   for (const p of weekSeries) {
     if (p.sales > 0) daysWithSale += 1;
@@ -582,38 +636,10 @@ export async function getDashboardMetrics(
 
   const weekCompletion = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(weekStartStr, i);
-    const dayRows = statuses.filter(
-      (s) => s.date.toISOString().slice(0, 10) === date,
-    );
-    const slots = scoped ? 2 * TODAY_MODULE_COUNT : plants.length * 2 * TODAY_MODULE_COUNT;
+    const slots = perShiftFormTotal * 2;
     if (slots === 0) return 0;
-    let filled = 0;
-    for (const s of dayRows) {
-      filled += [
-        s.purchaseFilled,
-        s.saleFilled,
-        s.stockFilled,
-        s.productionFilled,
-        s.pettyCashFilled,
-      ].filter(Boolean).length;
-    }
-    if (scoped && dayRows.length === 0) {
-      const dayFilled = [
-        purchaseDays.has(`${date}:DAY`),
-        saleDays.has(`${date}:DAY`),
-        stockDays.has(`${date}:DAY`),
-        prodDays.has(`${date}:DAY`),
-        pettyDays.has(`${date}:DAY`),
-      ].filter(Boolean).length;
-      const nightFilled = [
-        purchaseDays.has(`${date}:NIGHT`),
-        saleDays.has(`${date}:NIGHT`),
-        stockDays.has(`${date}:NIGHT`),
-        prodDays.has(`${date}:NIGHT`),
-        pettyDays.has(`${date}:NIGHT`),
-      ].filter(Boolean).length;
-      filled = dayFilled + nightFilled;
-    }
+    const filled =
+      shiftFilledForDate(date, "DAY") + shiftFilledForDate(date, "NIGHT");
     return Math.round((filled / slots) * 100);
   });
 
@@ -629,87 +655,28 @@ export async function getDashboardMetrics(
     mtdNetProfit = pnls.reduce((sum, p) => sum + p.netProfit, 0);
   }
 
-  function shiftFilledForDate(date: string, shift: "DAY" | "NIGHT") {
-    return [
-      purchaseDays.has(`${date}:${shift}`),
-      saleDays.has(`${date}:${shift}`),
-      stockDays.has(`${date}:${shift}`),
-      prodDays.has(`${date}:${shift}`),
-      pettyDays.has(`${date}:${shift}`),
-    ].filter(Boolean).length;
-  }
-
   const dailyReportRows: DailyReportRow[] = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(today, -i);
-    if (scoped) {
-      const dayCompleted = shiftFilledForDate(date, "DAY");
-      const nightCompleted = shiftFilledForDate(date, "NIGHT");
-      return {
-        date,
-        completed: dayCompleted + nightCompleted,
-        total: TODAY_MODULE_COUNT * 2,
-        allComplete:
-          dayCompleted >= TODAY_MODULE_COUNT &&
-          nightCompleted >= TODAY_MODULE_COUNT,
-        dayShift: {
-          completed: dayCompleted,
-          total: TODAY_MODULE_COUNT,
-          allComplete: dayCompleted >= TODAY_MODULE_COUNT,
-        },
-        nightShift: {
-          completed: nightCompleted,
-          total: TODAY_MODULE_COUNT,
-          allComplete: nightCompleted >= TODAY_MODULE_COUNT,
-        },
-      };
-    }
-    const dayRows = statuses.filter(
-      (s) => s.date.toISOString().slice(0, 10) === date,
-    );
-    let dayCompleted = 0;
-    let nightCompleted = 0;
-    for (const plant of plants) {
-      const dayRow = dayRows.find((s) => s.plantId === plant.id && s.shift === "DAY");
-      const nightRow = dayRows.find(
-        (s) => s.plantId === plant.id && s.shift === "NIGHT",
-      );
-      dayCompleted += dayRow
-        ? [
-            dayRow.purchaseFilled,
-            dayRow.saleFilled,
-            dayRow.stockFilled,
-            dayRow.productionFilled,
-            dayRow.pettyCashFilled,
-          ].filter(Boolean).length
-        : 0;
-      nightCompleted += nightRow
-        ? [
-            nightRow.purchaseFilled,
-            nightRow.saleFilled,
-            nightRow.stockFilled,
-            nightRow.productionFilled,
-            nightRow.pettyCashFilled,
-          ].filter(Boolean).length
-        : 0;
-    }
-    const perShiftTotal = plants.length * TODAY_MODULE_COUNT;
+    const dayCompleted = shiftFilledForDate(date, "DAY");
+    const nightCompleted = shiftFilledForDate(date, "NIGHT");
     const completed = dayCompleted + nightCompleted;
-    const total = perShiftTotal * 2;
+    const total = perShiftFormTotal * 2;
     return {
       date,
       completed,
       total: Math.max(total, TODAY_MODULE_COUNT * 2),
       allComplete:
-        dayCompleted >= perShiftTotal && nightCompleted >= perShiftTotal,
+        dayCompleted >= perShiftFormTotal &&
+        nightCompleted >= perShiftFormTotal,
       dayShift: {
         completed: dayCompleted,
-        total: Math.max(perShiftTotal, TODAY_MODULE_COUNT),
-        allComplete: dayCompleted >= perShiftTotal,
+        total: Math.max(perShiftFormTotal, TODAY_MODULE_COUNT),
+        allComplete: dayCompleted >= perShiftFormTotal,
       },
       nightShift: {
         completed: nightCompleted,
-        total: Math.max(perShiftTotal, TODAY_MODULE_COUNT),
-        allComplete: nightCompleted >= perShiftTotal,
+        total: Math.max(perShiftFormTotal, TODAY_MODULE_COUNT),
+        allComplete: nightCompleted >= perShiftFormTotal,
       },
     };
   });

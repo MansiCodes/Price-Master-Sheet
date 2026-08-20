@@ -1,17 +1,12 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { CableRate } from "@/lib/sheets/types";
-import { indianMobileDigits, toIndiaPhoneE164 } from "@/lib/phone";
+import { fromStoredIndiaPhone, indianMobileDigits, toIndiaPhoneE164 } from "@/lib/phone";
 import "./price-sheet-share.css";
 
-type Recipient = {
+type SavedRecipient = {
   id: string;
-  phone: string;
-  label: string | null;
-};
-
-type SessionPhone = {
   phone: string;
   label: string | null;
 };
@@ -20,71 +15,70 @@ type ShareModalProps = {
   open: boolean;
   selectedRows: CableRate[];
   onClose: () => void;
+  onShared: () => void;
 };
 
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-      <polyline points="16 6 12 2 8 6" />
-      <line x1="12" x2="12" y1="2" y2="15" />
-    </svg>
-  );
-}
+const PREVIEW_LIMIT = 3;
 
 export function PriceSheetShareModal({
   open,
   selectedRows,
   onClose,
+  onShared,
 }: ShareModalProps) {
-  const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [selectedSaved, setSelectedSaved] = useState<Set<string>>(new Set());
-  const [sessionPhones, setSessionPhones] = useState<SessionPhone[]>([]);
+  const [saved, setSaved] = useState<SavedRecipient[]>([]);
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(() => new Set());
+  const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
-  const [newLabel, setNewLabel] = useState("");
-  const [saveForLater, setSaveForLater] = useState(false);
-  const [loadingRecipients, setLoadingRecipients] = useState(false);
-  const [sending, setSending] = useState(false);
+  const [loadingSaved, setLoadingSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const loadRecipients = useCallback(async () => {
-    setLoadingRecipients(true);
-    try {
-      const res = await fetch("/api/price-sheet/recipients");
-      const json = (await res.json()) as { rows?: Recipient[]; error?: string };
-      if (!res.ok) throw new Error(json.error || "Failed to load recipients");
-      setRecipients(json.rows ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load recipients");
-    } finally {
-      setLoadingRecipients(false);
-    }
-  }, []);
+  const [sending, setSending] = useState(false);
+  const [viewAll, setViewAll] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+
+    setSelectedPhones(new Set());
+    setNewName("");
+    setNewPhone("");
     setError(null);
     setSuccess(null);
-    setSelectedSaved(new Set());
-    setSessionPhones([]);
-    setNewPhone("");
-    setNewLabel("");
-    setSaveForLater(false);
-    void loadRecipients();
-  }, [open, loadRecipients]);
+    setSending(false);
+    setViewAll(false);
+    setLoadingSaved(true);
 
-  const selectedCount = selectedRows.length;
+    void (async () => {
+      try {
+        const response = await fetch("/api/price-sheet/recipients");
+        const payload = (await response.json()) as {
+          rows?: SavedRecipient[];
+          error?: string;
+        };
+        if (!response.ok) {
+          setError(payload.error || "Could not load contacts.");
+          setSaved([]);
+          return;
+        }
+        setSaved(Array.isArray(payload.rows) ? payload.rows : []);
+      } catch {
+        setError("Could not load contacts.");
+        setSaved([]);
+      } finally {
+        setLoadingSaved(false);
+      }
+    })();
+  }, [open]);
 
-  const phonesToSend = useMemo(() => {
-    const phones = new Set<string>();
-    for (const phone of selectedSaved) phones.add(phone);
-    for (const entry of sessionPhones) phones.add(entry.phone);
-    return [...phones];
-  }, [selectedSaved, sessionPhones]);
+  const hasMoreThanPreview = saved.length > PREVIEW_LIMIT;
+  const previewRows = useMemo(
+    () => (viewAll || !hasMoreThanPreview ? saved : saved.slice(0, PREVIEW_LIMIT)),
+    [saved, viewAll, hasMoreThanPreview],
+  );
+  const selectedCount = selectedPhones.size;
 
   function toggleSaved(phone: string) {
-    setSelectedSaved((prev) => {
+    setSelectedPhones((prev) => {
       const next = new Set(prev);
       if (next.has(phone)) next.delete(phone);
       else next.add(phone);
@@ -92,104 +86,127 @@ export function PriceSheetShareModal({
     });
   }
 
-  async function onAddNumber(e: FormEvent) {
+  function selectAll() {
+    setSelectedPhones(new Set(saved.map((row) => row.phone)));
+  }
+
+  function clearSelection() {
+    setSelectedPhones(new Set());
+  }
+
+  function onAddNumber(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const name = newName.trim() || "Customer";
     const e164 = toIndiaPhoneE164(newPhone);
     if (!e164) {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
-
-    const label = newLabel.trim() || null;
-    const alreadyAdded =
-      sessionPhones.some((p) => p.phone === e164) || selectedSaved.has(e164);
-    if (alreadyAdded) {
-      setError("This number is already added for this share.");
-      return;
-    }
-
-    if (saveForLater) {
-      try {
-        const res = await fetch("/api/price-sheet/recipients", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: e164, label }),
-        });
-        const json = (await res.json()) as { row?: Recipient; error?: string };
-        if (!res.ok || !json.row) {
-          throw new Error(json.error || "Could not save number");
-        }
-        setRecipients((prev) => {
-          const without = prev.filter((r) => r.phone !== json.row!.phone);
-          return [json.row!, ...without];
-        });
-        setSelectedSaved((prev) => new Set(prev).add(json.row!.phone));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not save number");
-        return;
+    setSelectedPhones((prev) => new Set(prev).add(e164));
+    setSaved((prev) => {
+      const existing = prev.find((row) => row.phone === e164);
+      if (existing) {
+        return prev.map((row) =>
+          row.phone === e164 ? { ...row, label: name } : row,
+        );
       }
-    } else {
-      setSessionPhones((prev) => [...prev, { phone: e164, label }]);
-    }
-
-    setNewPhone("");
-    setNewLabel("");
-    setSaveForLater(false);
-  }
-
-  function removeSessionPhone(phone: string) {
-    setSessionPhones((prev) => prev.filter((p) => p.phone !== phone));
-  }
-
-  async function onRemoveSaved(id: string, phone: string) {
-    await fetch(`/api/price-sheet/recipients?id=${encodeURIComponent(id)}`, {
-      method: "DELETE",
+      return [{ id: `new-${e164}`, phone: e164, label: name }, ...prev];
     });
-    setRecipients((prev) => prev.filter((r) => r.id !== id));
-    setSelectedSaved((prev) => {
+    setNewName("");
+    setNewPhone("");
+  }
+
+  async function removeSaved(id: string, phone: string) {
+    setSelectedPhones((prev) => {
       const next = new Set(prev);
       next.delete(phone);
       return next;
     });
+    setSaved((prev) => prev.filter((row) => row.id !== id));
+
+    if (!id.startsWith("new-")) {
+      await fetch(`/api/price-sheet/recipients?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      }).catch(() => null);
+    }
   }
 
   async function onShare() {
-    if (selectedCount === 0) {
-      setError("Select at least one cable row to share.");
+    if (selectedRows.length === 0) {
+      setError("Select at least one cable.");
       return;
     }
-    if (phonesToSend.length === 0) {
-      setError("Add a number or choose from saved contacts.");
+    if (selectedPhones.size === 0) {
+      setError("Select a contact.");
       return;
     }
+
+    const recipients = [...selectedPhones].map((phone) => {
+      const row = saved.find((r) => r.phone === phone);
+      return {
+        phone,
+        name: row?.label?.trim() || "Customer",
+      };
+    });
 
     setSending(true);
     setError(null);
     setSuccess(null);
+
     try {
-      const res = await fetch("/api/price-sheet/share", {
+      const response = await fetch("/api/price-sheet/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          phones: phonesToSend,
+          recipients,
           rows: selectedRows,
         }),
       });
-      const json = (await res.json()) as {
+
+      const payload = (await response.json()) as {
         ok?: boolean;
+        message?: string;
         sent?: number;
         failed?: number;
-        message?: string;
+        results?: { phone: string; ok: boolean; message?: string }[];
       };
-      if (!res.ok || !json.ok) {
-        throw new Error(json.message || "Share failed");
+
+      if (!response.ok || !payload.ok) {
+        const firstFail = payload.results?.find((r) => !r.ok)?.message;
+        setError(
+          firstFail ||
+            payload.message ||
+            "Could not send PDF. Check Integrations + Cloudinary.",
+        );
+        return;
       }
+
+      const sent = payload.sent ?? recipients.length;
+      const failed = payload.failed ?? 0;
+
       setSuccess(
-        `Sent to ${json.sent ?? 0} recipient(s)${json.failed ? ` (${json.failed} failed)` : ""}.`,
+        failed > 0
+          ? `Sent to ${sent}, ${failed} failed.`
+          : `Sent to ${sent}.`,
       );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Share failed");
+
+      try {
+        const savedRes = await fetch("/api/price-sheet/recipients");
+        const savedPayload = (await savedRes.json()) as { rows?: SavedRecipient[] };
+        if (savedRes.ok && Array.isArray(savedPayload.rows)) {
+          setSaved(savedPayload.rows);
+        }
+      } catch {
+        // ignore
+      }
+
+      window.setTimeout(() => {
+        onShared();
+        onClose();
+      }, 1200);
+    } catch {
+      setError("Could not send PDF. Try again.");
     } finally {
       setSending(false);
     }
@@ -200,136 +217,184 @@ export function PriceSheetShareModal({
   return (
     <div className="ps-share-backdrop" role="presentation" onClick={onClose}>
       <div
-        className="ps-share-modal"
+        className={`ps-share-modal${viewAll ? " ps-share-modal--view-all" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="ps-share-title"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="ps-share-head">
-          <div>
-            <h2 id="ps-share-title">Share price sheet</h2>
-            <p>
-              {selectedCount} cable{selectedCount === 1 ? "" : "s"} selected
-            </p>
-          </div>
-          <button type="button" className="ps-share-close" onClick={onClose} aria-label="Close">
-            ×
+          <h2 id="ps-share-title">{viewAll ? "Select contacts" : "Share PDF"}</h2>
+          <button
+            type="button"
+            className="ps-share-close"
+            onClick={() => {
+              if (viewAll) {
+                setViewAll(false);
+                return;
+              }
+              onClose();
+            }}
+            aria-label={viewAll ? "Back" : "Close"}
+          >
+            {viewAll ? "‹" : "×"}
           </button>
         </header>
 
         {error ? <div className="ps-share-alert ps-share-alert--error">{error}</div> : null}
         {success ? <div className="ps-share-alert ps-share-alert--ok">{success}</div> : null}
 
-        <section className="ps-share-section">
-          <h3>Add WhatsApp number</h3>
-          <p className="ps-share-hint">
-            Enter a number for this share. Nothing is selected until you add or choose contacts below.
-          </p>
-
+        {!viewAll ? (
           <form className="ps-share-add" onSubmit={onAddNumber}>
+            <input
+              type="text"
+              placeholder="Name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              maxLength={80}
+              disabled={sending}
+              aria-label="Name"
+            />
             <input
               type="tel"
               inputMode="numeric"
-              placeholder="Mobile number"
+              placeholder="Number (e.g. 9876543210)"
               value={newPhone}
-              onChange={(e) => setNewPhone(indianMobileDigits(e.target.value))}
-              maxLength={10}
+              onChange={(e) => setNewPhone(e.target.value)}
+              maxLength={16}
+              disabled={sending}
+              aria-label="Mobile number"
             />
-            <input
-              type="text"
-              placeholder="Name (optional)"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-            />
-            <button type="submit" className="ps-btn ps-btn-secondary">
+            <button type="submit" className="ps-btn ps-btn-secondary" disabled={sending}>
               Add
             </button>
           </form>
-
-          <label className="ps-share-save-later">
-            <input
-              type="checkbox"
-              checked={saveForLater}
-              onChange={(e) => setSaveForLater(e.target.checked)}
-            />
-            Save this number for future shares
-          </label>
-
-          {sessionPhones.length > 0 ? (
-            <div className="ps-share-chips" aria-label="Numbers for this share">
-              {sessionPhones.map((entry) => (
-                <span key={entry.phone} className="ps-share-chip">
-                  {entry.label || entry.phone}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${entry.label || entry.phone}`}
-                    onClick={() => removeSessionPhone(entry.phone)}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
+        ) : (
+          <div className="ps-share-bulk">
+            <p className="ps-share-bulk__hint">
+              {selectedCount} of {saved.length} selected
+            </p>
+            <div className="ps-share-bulk__actions">
+              <button
+                type="button"
+                className="ps-share-link-btn"
+                disabled={sending || saved.length === 0}
+                onClick={selectAll}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="ps-share-link-btn"
+                disabled={sending || selectedCount === 0}
+                onClick={clearSelection}
+              >
+                Clear
+              </button>
             </div>
-          ) : null}
-        </section>
+          </div>
+        )}
 
-        {recipients.length > 0 || loadingRecipients ? (
-          <section className="ps-share-section">
-            <h3>Saved contacts</h3>
-            <p className="ps-share-hint">Choose from numbers you saved earlier.</p>
-
-            <div className="ps-share-list" aria-busy={loadingRecipients}>
-              {loadingRecipients ? (
-                <p className="ps-share-empty">Loading contacts…</p>
-              ) : (
-                recipients.map((r) => (
-                  <label key={r.id} className="ps-share-recipient">
+        <div
+          className={`ps-share-list${viewAll ? " ps-share-list--all" : ""}`}
+          aria-label="Contacts"
+        >
+          {loadingSaved ? (
+            <p className="ps-share-empty">Loading…</p>
+          ) : saved.length === 0 ? (
+            <p className="ps-share-empty">Add name + number</p>
+          ) : (
+            previewRows.map((row) => {
+              const checked = selectedPhones.has(row.phone);
+              const phoneLabel = fromStoredIndiaPhone(row.phone);
+              return (
+                <div
+                  key={row.id}
+                  className={`ps-share-recipient${checked ? " is-selected" : ""}`}
+                >
+                  <label className="ps-share-recipient__main">
                     <input
                       type="checkbox"
-                      checked={selectedSaved.has(r.phone)}
-                      onChange={() => toggleSaved(r.phone)}
+                      className="ps-row-check"
+                      checked={checked}
+                      disabled={sending}
+                      onChange={() => toggleSaved(row.phone)}
                     />
-                    <span className="ps-share-recipient__meta">
-                      <strong>{r.label || r.phone}</strong>
-                      {r.label ? <span>{r.phone}</span> : null}
+                    <span className="ps-share-recipient__text">
+                      <span className="ps-share-recipient__name">
+                        {row.label?.trim() || "—"}
+                      </span>
+                      <span className="ps-share-recipient__phone">{phoneLabel}</span>
                     </span>
+                  </label>
+                  {!viewAll ? (
                     <button
                       type="button"
                       className="ps-share-recipient__remove"
-                      aria-label="Remove saved contact"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        void onRemoveSaved(r.id, r.phone);
-                      }}
+                      disabled={sending}
+                      aria-label={`Remove ${phoneLabel}`}
+                      onClick={() => void removeSaved(row.id, row.phone)}
                     >
-                      Remove
+                      ×
                     </button>
-                  </label>
-                ))
-              )}
-            </div>
-          </section>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {!viewAll && hasMoreThanPreview ? (
+          <div className="ps-share-view-all">
+            <span className="ps-share-view-all__meta">
+              Showing {PREVIEW_LIMIT} of {saved.length}
+              {selectedCount > 0 ? ` · ${selectedCount} selected` : ""}
+            </span>
+            <button
+              type="button"
+              className="ps-share-link-btn"
+              disabled={sending}
+              onClick={() => setViewAll(true)}
+            >
+              View all
+            </button>
+          </div>
         ) : null}
 
         <footer className="ps-share-foot">
-          <span className="ps-share-foot__count">
-            {phonesToSend.length} recipient{phonesToSend.length === 1 ? "" : "s"} selected
-          </span>
-          <div className="ps-share-foot__actions">
-            <button type="button" className="ps-btn ps-btn-ghost" onClick={onClose}>
-              Cancel
-            </button>
+          {viewAll ? (
             <button
               type="button"
               className="ps-btn ps-btn-primary"
-              disabled={sending || selectedCount === 0 || phonesToSend.length === 0}
-              onClick={() => void onShare()}
+              disabled={sending}
+              onClick={() => setViewAll(false)}
             >
-              <ShareIcon />
-              {sending ? "Sending…" : "Send on WhatsApp"}
+              Done
             </button>
-          </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="ps-btn ps-btn-ghost"
+                onClick={onClose}
+                disabled={sending}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary"
+                disabled={selectedRows.length === 0 || selectedPhones.size === 0 || sending}
+                onClick={() => void onShare()}
+              >
+                {sending
+                  ? "Sending PDF…"
+                  : selectedCount > 0
+                    ? `Share PDF (${selectedCount})`
+                    : "Share PDF"}
+              </button>
+            </>
+          )}
         </footer>
       </div>
     </div>

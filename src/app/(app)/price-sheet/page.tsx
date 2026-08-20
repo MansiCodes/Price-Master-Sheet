@@ -10,6 +10,7 @@ import "./price-sheet-share.css";
 
 const PAGE_SIZES = [10, 20, 50, 100, 200] as const;
 const PAGE_SIZE_LABELS = PAGE_SIZES.map(String);
+const BULK_SELECT_OPTIONS = ["Select All", "Deselect All"] as const;
 const AUTO_SYNC_MS = 60_000;
 
 function formatPrice(value: number): string {
@@ -96,6 +97,8 @@ export default function PriceSheetPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCompact, setIsCompact] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [bulkSelectValue, setBulkSelectValue] = useState("");
   const [shareOpen, setShareOpen] = useState(false);
   const ratesCountRef = useRef(0);
 
@@ -120,9 +123,6 @@ export default function PriceSheetPage() {
     () => filtered.map((row) => rateRowKey(row)),
     [filtered],
   );
-  const allFilteredSelected =
-    filteredKeys.length > 0 && filteredKeys.every((key) => selectedKeys.has(key));
-  const someFilteredSelected = filteredKeys.some((key) => selectedKeys.has(key));
 
   const selectedRows = useMemo(
     () => filtered.filter((row) => selectedKeys.has(rateRowKey(row))),
@@ -138,17 +138,57 @@ export default function PriceSheetPage() {
     });
   }
 
-  function toggleSelectAllFiltered() {
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    setSelectedKeys(new Set());
+  }
+
+  function handleShareClick() {
+    if (!selectionMode) {
+      setSelectionMode(true);
+      return;
+    }
+    if (selectedRows.length === 0) {
+      exitSelectionMode();
+      return;
+    }
+    setShareOpen(true);
+  }
+
+  function selectAllFiltered() {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (allFilteredSelected) {
-        for (const key of filteredKeys) next.delete(key);
-      } else {
-        for (const key of filteredKeys) next.add(key);
-      }
+      for (const key of filteredKeys) next.add(key);
       return next;
     });
   }
+
+  function deselectAllFiltered() {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const key of filteredKeys) next.delete(key);
+      return next;
+    });
+  }
+
+  function onSelectionMenuChange(value: string) {
+    if (value === "Select All") {
+      selectAllFiltered();
+    } else if (value === "Deselect All") {
+      deselectAllFiltered();
+    }
+    setBulkSelectValue("");
+  }
+
+  function handleShareComplete() {
+    exitSelectionMode();
+  }
+
+  const shareButtonLabel =
+    selectionMode && selectedRows.length > 0
+      ? `Share (${selectedRows.length})`
+      : "Share";
+  const tableColSpan = selectionMode ? 8 : 7;
 
   const fetchRates = useCallback(async () => {
     const response = await fetch("/api/rates");
@@ -316,44 +356,60 @@ export default function PriceSheetPage() {
               />
             </label>
 
-            <button
-              type="button"
-              className="ps-btn ps-btn-secondary ps-desktop-inline"
-              title="Share selected"
-              disabled={selectedRows.length === 0}
-              onClick={() => setShareOpen(true)}
-            >
-              <ShareIcon />
-              Share{selectedRows.length ? ` (${selectedRows.length})` : ""}
-            </button>
-            <button
-              type="button"
-              className="ps-btn ps-btn-secondary ps-desktop-inline"
-              title="Export CSV"
-              onClick={exportCsv}
-            >
-              <ExportIcon />
-              Export
-            </button>
-            <button
-              type="button"
-              className="ps-btn ps-btn-primary ps-desktop-inline"
-              disabled={syncing}
-              onClick={() => void syncFromSheet({ showSkeleton: true })}
-            >
-              <SyncIcon />
-              Sync
-            </button>
+            <div className="ps-toolbar-actions">
+              <button
+                type="button"
+                className="ps-btn ps-btn-primary ps-desktop-inline"
+                disabled={syncing}
+                onClick={() => void syncFromSheet({ showSkeleton: true })}
+              >
+                <SyncIcon />
+                Sync
+              </button>
+              <button
+                type="button"
+                className={`ps-btn ps-btn-secondary ps-desktop-inline${selectionMode ? " ps-btn-share-active" : ""}`}
+                title={
+                  selectionMode
+                    ? selectedRows.length
+                      ? "Add WhatsApp numbers and share"
+                      : "Select cables to share"
+                    : "Select cables to share"
+                }
+                onClick={handleShareClick}
+              >
+                <ShareIcon />
+                {shareButtonLabel}
+              </button>
+              <button
+                type="button"
+                className="ps-btn ps-btn-secondary ps-desktop-inline"
+                title="Export CSV"
+                onClick={exportCsv}
+              >
+                <ExportIcon />
+                Export
+              </button>
+            </div>
           </div>
 
           <div className="ps-header-actions ps-mobile-only">
             <button
               type="button"
-              className="ps-icon-btn"
+              className="ps-icon-btn ps-icon-btn-primary"
+              title="Sync Sheet"
+              aria-label="Sync Sheet"
+              disabled={syncing}
+              onClick={() => void syncFromSheet({ showSkeleton: true })}
+            >
+              <SyncIcon size={20} />
+            </button>
+            <button
+              type="button"
+              className={`ps-icon-btn${selectionMode ? " ps-btn-share-active" : ""}`}
               title="Share selected"
               aria-label="Share selected"
-              disabled={selectedRows.length === 0}
-              onClick={() => setShareOpen(true)}
+              onClick={handleShareClick}
             >
               <ShareIcon size={20} />
             </button>
@@ -366,16 +422,6 @@ export default function PriceSheetPage() {
             >
               <ExportIcon size={20} />
             </button>
-            <button
-              type="button"
-              className="ps-icon-btn ps-icon-btn-primary"
-              title="Sync Sheet"
-              aria-label="Sync Sheet"
-              disabled={syncing}
-              onClick={() => void syncFromSheet({ showSkeleton: true })}
-            >
-              <SyncIcon size={20} />
-            </button>
           </div>
         </header>
 
@@ -385,18 +431,21 @@ export default function PriceSheetPage() {
               <table className="ps-rates-table">
                 <thead>
                   <tr>
-                    <th className="ps-col-check">
-                      <input
-                        type="checkbox"
-                        className="ps-row-check"
-                        aria-label="Select all filtered cables"
-                        checked={allFilteredSelected}
-                        ref={(el) => {
-                          if (el) el.indeterminate = !allFilteredSelected && someFilteredSelected;
-                        }}
-                        onChange={toggleSelectAllFiltered}
-                      />
-                    </th>
+                    {selectionMode ? (
+                      <th className="ps-col-check">
+                        <label className="ps-sr-only" htmlFor="ps-select-action-desktop">
+                          Bulk select
+                        </label>
+                        <SelectMenu
+                          id="ps-select-action-desktop"
+                          className="ps-select-action"
+                          value={bulkSelectValue}
+                          options={BULK_SELECT_OPTIONS}
+                          placeholder="Select"
+                          onChange={onSelectionMenuChange}
+                        />
+                      </th>
+                    ) : null}
                     <th className="ps-col-sno">S NO.</th>
                     <th className="ps-col-name">NAME</th>
                     <th className="ps-col-spec">SPEC</th>
@@ -410,7 +459,7 @@ export default function PriceSheetPage() {
                   {loading
                     ? Array.from({ length: skeletonRows }, (_, i) => (
                         <tr key={`sk-${i}`}>
-                          <td><span className="ps-skeleton ps-sk-sno" /></td>
+                          {selectionMode ? <td><span className="ps-skeleton ps-sk-sno" /></td> : null}
                           <td><span className="ps-skeleton ps-sk-sno" /></td>
                           <td><span className="ps-skeleton ps-sk-name" /></td>
                           <td><span className="ps-skeleton ps-sk-spec" /></td>
@@ -423,22 +472,24 @@ export default function PriceSheetPage() {
                     : pageItems.length === 0
                       ? (
                           <tr className="ps-empty-row">
-                            <td colSpan={8}>{emptyMessage}</td>
+                            <td colSpan={tableColSpan}>{emptyMessage}</td>
                           </tr>
                         )
                       : pageItems.map((row) => {
                           const key = rateRowKey(row);
                           return (
                           <tr key={key}>
-                            <td className="ps-col-check">
-                              <input
-                                type="checkbox"
-                                className="ps-row-check"
-                                aria-label={`Select ${row.name}`}
-                                checked={selectedKeys.has(key)}
-                                onChange={() => toggleRow(key)}
-                              />
-                            </td>
+                            {selectionMode ? (
+                              <td className="ps-col-check">
+                                <input
+                                  type="checkbox"
+                                  className="ps-row-check"
+                                  aria-label={`Select ${row.name}`}
+                                  checked={selectedKeys.has(key)}
+                                  onChange={() => toggleRow(key)}
+                                />
+                              </td>
+                            ) : null}
                             <td className="ps-sno">{row.sNo ?? "—"}</td>
                             <td className="ps-name" title={row.name}>{row.name}</td>
                             <td
@@ -460,6 +511,21 @@ export default function PriceSheetPage() {
           </section>
 
           <div className="ps-mobile-list ps-mobile-only" aria-live="polite">
+            {selectionMode ? (
+              <div className="ps-mobile-select-bar">
+                <label className="ps-sr-only" htmlFor="ps-select-action-mobile">
+                  Bulk select
+                </label>
+                <SelectMenu
+                  id="ps-select-action-mobile"
+                  className="ps-select-action"
+                  value={bulkSelectValue}
+                  options={BULK_SELECT_OPTIONS}
+                  placeholder="Select"
+                  onChange={onSelectionMenuChange}
+                />
+              </div>
+            ) : null}
             {loading
               ? Array.from({ length: 10 }, (_, i) => (
                   <article key={`msk-${i}`} className="ps-skeleton-card">
@@ -479,15 +545,17 @@ export default function PriceSheetPage() {
                     const key = rateRowKey(row);
                     return (
                     <article key={`m-${key}`} className="ps-rate-card">
-                      <label className="ps-rate-card-select">
-                        <input
-                          type="checkbox"
-                          className="ps-row-check"
-                          checked={selectedKeys.has(key)}
-                          onChange={() => toggleRow(key)}
-                        />
-                        <span>Select</span>
-                      </label>
+                      {selectionMode ? (
+                        <label className="ps-rate-card-select">
+                          <input
+                            type="checkbox"
+                            className="ps-row-check"
+                            checked={selectedKeys.has(key)}
+                            onChange={() => toggleRow(key)}
+                          />
+                          <span>Select</span>
+                        </label>
+                      ) : null}
                       <div className="ps-rate-card-top">
                         <p className="ps-rate-card-name" title={row.name}>{row.name}</p>
                         <span className="ps-rate-card-sno">{row.sNo ?? "—"}</span>
@@ -541,26 +609,40 @@ export default function PriceSheetPage() {
             />
           </div>
 
-          <button
-            type="button"
-            className="ps-btn ps-btn-ghost ps-page-nav"
-            disabled={loading || safePage <= 1 || filtered.length === 0}
-            aria-label="Previous page"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-          >
-            <span className="ps-desktop-inline">Prev</span>
-            <span className="ps-mobile-only" aria-hidden="true">‹</span>
-          </button>
+          <div className="ps-pagination__nav">
+            <button
+              type="button"
+              className="ps-page-nav"
+              disabled={loading || safePage <= 1 || filtered.length === 0}
+              aria-label="Previous page"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            >
+              <span className="ps-desktop-inline">Prev</span>
+              <span className="ps-mobile-only" aria-hidden="true">
+                ‹
+              </span>
+            </button>
 
-          <div className="ps-page-numbers">
-            {!loading && filtered.length > 0
-              ? pageList.map((page, index) => {
-                  const prev = pageList[index - 1];
-                  const showEllipsis = prev !== undefined && page - prev > 1;
-                  return (
-                    <span key={page} style={{ display: "contents" }}>
-                      {showEllipsis ? <span className="ps-page-ellipsis">…</span> : null}
+            <div className="ps-page-numbers">
+              {!loading && filtered.length > 0
+                ? pageList.flatMap((page, index) => {
+                    const prev = pageList[index - 1];
+                    const showEllipsis = prev !== undefined && page - prev > 1;
+                    const items = [];
+                    if (showEllipsis) {
+                      items.push(
+                        <span
+                          key={`e-${page}`}
+                          className="ps-page-ellipsis"
+                          aria-hidden="true"
+                        >
+                          …
+                        </span>,
+                      );
+                    }
+                    items.push(
                       <button
+                        key={page}
                         type="button"
                         className={`ps-page-btn${page === safePage ? " is-active" : ""}`}
                         aria-label={`Page ${page}`}
@@ -569,23 +651,26 @@ export default function PriceSheetPage() {
                         onClick={() => setCurrentPage(page)}
                       >
                         {page}
-                      </button>
-                    </span>
-                  );
-                })
-              : null}
-          </div>
+                      </button>,
+                    );
+                    return items;
+                  })
+                : null}
+            </div>
 
-          <button
-            type="button"
-            className="ps-btn ps-btn-ghost ps-page-nav"
-            disabled={loading || safePage >= totalPages || filtered.length === 0}
-            aria-label="Next page"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-          >
-            <span className="ps-desktop-inline">Next</span>
-            <span className="ps-mobile-only" aria-hidden="true">›</span>
-          </button>
+            <button
+              type="button"
+              className="ps-page-nav"
+              disabled={loading || safePage >= totalPages || filtered.length === 0}
+              aria-label="Next page"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            >
+              <span className="ps-desktop-inline">Next</span>
+              <span className="ps-mobile-only" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          </div>
         </nav>
       </div>
 
@@ -593,6 +678,7 @@ export default function PriceSheetPage() {
         open={shareOpen}
         selectedRows={selectedRows}
         onClose={() => setShareOpen(false)}
+        onShared={handleShareComplete}
       />
     </div>
   );

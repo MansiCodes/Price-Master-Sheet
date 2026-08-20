@@ -140,9 +140,59 @@ async function awardShiftCreditScore(
         shift,
       },
     },
-    select: { id: true },
+    select: { id: true, whatsappSentAt: true },
   });
+
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { name: true },
+  });
+
+  const phone = user.phone ? toIndiaPhoneE164(user.phone) : null;
+  const displayName =
+    user.name?.trim() || user.email.split("@")[0] || "there";
+
+  async function sendCreditWhatsApp(score: number): Promise<boolean> {
+    if (!phone || !plant) {
+      console.warn(
+        `[credit-score] skipped WhatsApp (phone=${Boolean(phone)} plant=${Boolean(plant)}) user=${userId}`,
+      );
+      return false;
+    }
+
+    const result = await sendFormsCompleteWhatsApp({
+      destination: phone,
+      userName: displayName,
+      plantName: plant.name,
+      dateLabel: formatCompleteDate(day),
+      creditScore: score,
+    });
+
+    if (!result.ok) {
+      console.warn(
+        `[credit-score] WhatsApp forms-complete failed for user=${userId}: ${result.message}`,
+      );
+      return false;
+    }
+
+    console.log(
+      `[credit-score] WhatsApp forms-complete sent user=${userId} score=${score}`,
+    );
+    return true;
+  }
+
   if (existing) {
+    if (!existing.whatsappSentAt) {
+      const currentScore = user.creditScore ?? 0;
+      const sent = await sendCreditWhatsApp(currentScore);
+      if (sent) {
+        await prisma.creditScoreAward.update({
+          where: { id: existing.id },
+          data: { whatsappSentAt: new Date() },
+        });
+        return { awarded: false, whatsappSent: true, newScore: currentScore };
+      }
+    }
     return { awarded: false };
   }
 
@@ -169,38 +219,19 @@ async function awardShiftCreditScore(
     return { awarded: false };
   }
 
-  const plant = await prisma.plant.findUnique({
-    where: { id: plantId },
-    select: { name: true },
-  });
-
-  const phone = user.phone ? toIndiaPhoneE164(user.phone) : null;
-  const displayName =
-    user.name?.trim() || user.email.split("@")[0] || "there";
-
-  let whatsappSent = false;
-  if (phone && plant) {
-    const result = await sendFormsCompleteWhatsApp({
-      destination: phone,
-      userName: displayName,
-      plantName: plant.name,
-      dateLabel: formatCompleteDate(day),
-      creditScore: nextScore,
+  const whatsappSent = await sendCreditWhatsApp(nextScore);
+  if (whatsappSent) {
+    await prisma.creditScoreAward.update({
+      where: {
+        userId_plantId_date_shift: {
+          userId,
+          plantId,
+          date: day,
+          shift,
+        },
+      },
+      data: { whatsappSentAt: new Date() },
     });
-    whatsappSent = result.ok;
-    if (!result.ok) {
-      console.warn(
-        `[credit-score] WhatsApp forms-complete failed for user=${userId}: ${result.message}`,
-      );
-    } else {
-      console.log(
-        `[credit-score] WhatsApp forms-complete sent user=${userId} score=${nextScore}`,
-      );
-    }
-  } else {
-    console.warn(
-      `[credit-score] skipped WhatsApp (phone=${Boolean(phone)} plant=${Boolean(plant)}) user=${userId}`,
-    );
   }
 
   return { awarded: true, whatsappSent, newScore: nextScore };

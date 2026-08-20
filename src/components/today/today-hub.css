@@ -610,6 +610,10 @@
   max-width: none;
 }
 
+.today-hub--overlay-only {
+  display: contents;
+}
+
 @media (max-width: 560px) {
   .shift-toggle button,
   .prod-fields__row .field input,

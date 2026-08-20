@@ -17,6 +17,10 @@ import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import {
+  atclStockEntryFilter,
+  closingStockEntryFilter,
+} from "@/lib/plant-catalogs";
 import { isAdminOrHead } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
@@ -95,6 +99,7 @@ export async function GET(
   });
   const cat6 = isCat6Plant(plant?.code);
   const snapshot = sp.get("snapshot") === "1";
+  const atcl = sp.get("atcl") === "1";
   const ownOnly = !isAdminOrHead(session.user.globalRole);
 
   const entries = await prisma.stockEntry.findMany({
@@ -103,7 +108,8 @@ export async function GET(
       ...(ownOnly ? { enteredById: session.user.id } : {}),
       ...filter,
       ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
-      ...(snapshot ? { notes: { startsWith: "Closing stock" } } : {}),
+      ...(snapshot ? closingStockEntryFilter() : {}),
+      ...(atcl ? atclStockEntryFilter() : {}),
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
@@ -354,6 +360,7 @@ export async function DELETE(
     plantId,
   });
   await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
+  await refreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

@@ -13,6 +13,8 @@ export type SendCampaignParams = {
   userName: string;
   templateParams: string[];
   source: string;
+  /** Public media URL for document/image template headers (AiSensy media object). */
+  media?: { url: string; filename: string };
   /** Required for Authentication OTP templates with Copy code button. */
   buttons?: Array<{
     type: string;
@@ -32,13 +34,14 @@ function providerErrorMessage(
   providerResponse: unknown,
   fallback: string,
 ): string {
-  if (
-    typeof providerResponse === "object" &&
-    providerResponse !== null &&
-    "message" in providerResponse &&
-    typeof (providerResponse as { message: unknown }).message === "string"
-  ) {
-    return (providerResponse as { message: string }).message;
+  if (typeof providerResponse === "object" && providerResponse !== null) {
+    const resp = providerResponse as Record<string, unknown>;
+    if (typeof resp.message === "string" && resp.message.trim()) return resp.message;
+    if (typeof resp.error === "string" && resp.error.trim()) return resp.error;
+    if (typeof resp.msg === "string" && resp.msg.trim()) return resp.msg;
+    if (Array.isArray(resp.errors) && resp.errors.length > 0) {
+      return String(resp.errors[0]);
+    }
   }
   return fallback;
 }
@@ -57,16 +60,28 @@ export async function sendAisensyCampaign(
     return { ok: false, message: "AiSensy campaign name is missing" };
   }
 
+  // AiSensy expects digits with country code (e.g. 91XXXXXXXXXX), not +91…
+  const destination = params.destination.replace(/\D/g, "");
+  if (destination.length < 10) {
+    return { ok: false, message: "Invalid WhatsApp destination number" };
+  }
+
   const body: Record<string, unknown> = {
     apiKey,
-    campaignName: params.campaignName,
-    destination: params.destination,
+    campaignName: params.campaignName.trim(),
+    destination,
     userName: params.userName,
     templateParams: params.templateParams,
     source: params.source,
   };
   if (params.buttons?.length) {
     body.buttons = params.buttons;
+  }
+  if (params.media?.url) {
+    body.media = {
+      url: params.media.url,
+      filename: params.media.filename || "document.pdf",
+    };
   }
 
   try {
@@ -97,12 +112,17 @@ export async function sendAisensyCampaign(
       };
     }
 
-    if (
+    const isSuccessFalse =
       typeof providerResponse === "object" &&
       providerResponse !== null &&
       "success" in providerResponse &&
-      (providerResponse as { success: unknown }).success === false
-    ) {
+      (
+        (providerResponse as { success: unknown }).success === false ||
+        (providerResponse as { success: unknown }).success === "false" ||
+        String((providerResponse as { success: unknown }).success).toLowerCase() === "false"
+      );
+
+    if (isSuccessFalse) {
       return {
         ok: false,
         message: providerErrorMessage(
@@ -115,7 +135,8 @@ export async function sendAisensyCampaign(
 
     console.log("[AiSensy] campaign accepted", {
       campaignName: params.campaignName,
-      destination: params.destination,
+      destination,
+      hasMedia: Boolean(params.media?.url),
       providerResponse,
     });
 
@@ -248,16 +269,18 @@ export async function isAisensyCompleteConfigured(): Promise<boolean> {
 }
 
 /**
- * Price sheet share template:
- * Hi {{1}}, shared {{2}} cable rate(s) as of {{3}}:
- * {{4}}
+ * Price sheet share — sends WhatsApp template with attached PDF media.
+ * Campaign must use a DOCUMENT (file) header template for the PDF to appear
+ * as an attachment. TEXT-only templates ignore media and only send body text.
+ * Body params: {{1}} name, {{2}} item count, {{3}} date, {{4}} PDF link.
  */
 export async function sendPriceSheetWhatsApp(params: {
   destination: string;
   userName: string;
   itemCount: number;
   dateLabel: string;
-  summary: string;
+  mediaUrl: string;
+  mediaFilename: string;
 }): Promise<SendCampaignResult> {
   const settings = await getAisensySettings();
   const campaignName = settings.priceSheetCampaignName;
@@ -276,8 +299,13 @@ export async function sendPriceSheetWhatsApp(params: {
       params.userName,
       String(params.itemCount),
       params.dateLabel,
-      params.summary,
+      // Fallback when campaign is TEXT-only: link still opens the PDF
+      params.mediaUrl,
     ],
+    media: {
+      url: params.mediaUrl,
+      filename: params.mediaFilename,
+    },
     source: "Cable Junction price sheet share",
   });
 }

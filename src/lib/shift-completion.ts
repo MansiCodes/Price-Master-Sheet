@@ -1,6 +1,10 @@
 import type { ManpowerShift } from "@prisma/client";
 import { startOfUtcDay } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import {
+  REQUIRED_SHIFT_FORM_COUNT,
+  REQUIRED_SHIFT_FORM_KEYS,
+} from "@/lib/shift-forms";
 
 export type ShiftKey = "DAY" | "NIGHT";
 
@@ -46,7 +50,9 @@ export async function computeShiftCompletion(params: {
     prisma.sale.count({ where }),
     prisma.stockEntry.count({ where }),
     prisma.productionEntry.count({ where }),
-    prisma.pettyCashEntry.count({ where }),
+    prisma.pettyCashEntry.count({
+      where: { ...where, entryType: "EXPENSE" },
+    }),
   ]);
 
   const flags: Record<ShiftModuleKey, boolean> = {
@@ -63,13 +69,16 @@ export async function computeShiftCompletion(params: {
     filled: flags[mod.key],
   }));
 
-  const completed = modules.filter((m) => m.filled).length;
+  const requiredModules = modules.filter((mod) =>
+    (REQUIRED_SHIFT_FORM_KEYS as readonly string[]).includes(mod.key),
+  );
+  const completed = requiredModules.filter((m) => m.filled).length;
 
   return {
     modules,
     completed,
-    total: SHIFT_MODULE_DEFS.length,
-    allComplete: completed === SHIFT_MODULE_DEFS.length,
+    total: REQUIRED_SHIFT_FORM_COUNT,
+    allComplete: completed === REQUIRED_SHIFT_FORM_COUNT,
   };
 }
 

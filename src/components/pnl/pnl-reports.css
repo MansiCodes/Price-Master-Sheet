@@ -496,6 +496,74 @@
   box-shadow: var(--teal-fill-shadow, none);
 }
 
+/* CAT-6: 5 categories on one row */
+.pnl-expense-subnav--cat6 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.pnl-expense-subnav--cat6 button {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.15;
+  padding: 0.4rem 0.35rem;
+}
+
+.pnl-expense-empty-hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  color: var(--fg-muted, #5b6b66);
+}
+
+/* Direct / Indirect — same segmented track as main P&L tabs */
+.pnl-expense-type-nav {
+  margin: 0 0 0.55rem;
+}
+
+.pnl-expense-type-nav button {
+  padding: 0 0.95rem;
+  font-size: 0.82rem;
+}
+
+/* Category options — one row; column count matches number of buttons */
+.pnl-expense-cat-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  margin: 0 0 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: visible;
+}
+
+.pnl-expense-cat-nav--cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.pnl-expense-cat-nav--cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pnl-expense-cat-nav--cols-7 {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.pnl-expense-cat-nav button {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 2.35rem;
+  padding: 0.35rem 0.4rem;
+  white-space: normal;
+  line-height: 1.15;
+  overflow: visible;
+  text-overflow: unset;
+}
+
 .pnl-report-panel--expense .pnl-report-panel__title {
   margin-bottom: 0.45rem;
 }
@@ -624,6 +692,17 @@
   white-space: nowrap;
   /* Footer totals should align tightly like Excel (less left/right padding). */
   padding: 0.25rem 0.35rem;
+  text-align: left;
+}
+
+.pnl-report-table tfoot td.is-right,
+.pnl-report-table--register tfoot td.is-right {
+  text-align: right;
+}
+
+.pnl-report-table tfoot td.is-center,
+.pnl-report-table--register tfoot td.is-center {
+  text-align: center;
 }
 
 .pnl-report-table tfoot tr.pnl-report-table__subtotal td,
@@ -736,6 +815,61 @@
     white-space: nowrap;
   }
 
+  /* Expense Direct/Indirect: keep pill track (not 4-col main tab grid) */
+  .pnl-expense-type-nav {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    grid-template-columns: none;
+  }
+
+  .pnl-expense-type-nav button {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 2.35rem;
+    padding: 0 0.55rem;
+    font-size: 0.78rem;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .pnl-expense-cat-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.25rem;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: visible;
+  }
+
+  .pnl-expense-cat-nav--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Indirect (7): two rows — 4 + 3 */
+  .pnl-expense-cat-nav--cols-7 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .pnl-expense-cat-nav button {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    min-height: 2.35rem;
+    padding: 0.35rem 0.3rem;
+    font-size: 0.7rem;
+    white-space: normal;
+    line-height: 1.15;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .pnl-expense-cat-nav--cols-7 button {
+    font-size: 0.68rem;
+    padding: 0.32rem 0.25rem;
+  }
+
   .pnl-reports__actions {
     flex: none;
     width: 100%;
@@ -818,6 +952,32 @@
     font-size: 0.65rem;
     letter-spacing: 0;
     padding: 0 0.1rem;
+  }
+
+  .pnl-expense-type-nav button {
+    font-size: 0.72rem;
+    padding: 0 0.4rem;
+  }
+
+  .pnl-expense-cat-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pnl-expense-cat-nav--cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .pnl-expense-cat-nav--cols-7 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .pnl-expense-cat-nav button {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.2rem;
+  }
+
+  .pnl-expense-cat-nav--cols-7 button {
+    font-size: 0.62rem;
   }
 
   .pnl-date-filter {

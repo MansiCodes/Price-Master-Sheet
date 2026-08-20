@@ -278,7 +278,7 @@ export async function DELETE(
 
   const existing = await prisma.productionEntry.findFirst({
     where: { id, plantId },
-    select: { id: true },
+    select: { id: true, date: true, shift: true, enteredById: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Production entry not found" }, { status: 404 });
@@ -293,6 +293,7 @@ export async function DELETE(
     actorId: session.user.id,
     plantId,
   });
+  await refreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,7 @@ import { requirePlantAccess, requireSession } from "@/lib/api";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { parseDateOnly, toIsoDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { normalizePvcExpenseHead } from "@/lib/plant-catalogs";
 import { paginate } from "@/lib/ui/paginate";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -88,7 +89,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     prisma.pettyCashEntry.findMany({
       where: {
         plantId,
-        entryType: PettyCashKind.EXPENSE,
         ...filter,
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -116,10 +116,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .join(" · ");
       unified.push({
         id: `elec-bill-${row.id}`,
-        expenseLabel: "Electricity",
+        expenseLabel: "Fuel & Power",
         sortDate: monthIso,
         periodLabel: monthLabel(monthIso),
-        description: "Electricity bill",
+        description: "Fuel & power / electricity bill",
         details: details || row.notes,
         amount: bill,
         source: "electricityRent",
@@ -149,22 +149,81 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
   for (const row of pettyRows) {
     const dateIso = toIsoDateString(row.date);
-    const head = row.expenseHead.trim() || "Expense";
+    const head = normalizePvcExpenseHead(row.expenseHead.trim() || "Expense");
+
+    if (row.entryType === PettyCashKind.PETTY_CASH) {
+      const contractor = Number(row.contractorSalary) || 0;
+      const supervisor = Number(row.supervisorSalary) || 0;
+      const cashAmount = Number(row.amount) || 0;
+
+      if (contractor > 0) {
+        unified.push({
+          id: `labour-${row.id}`,
+          expenseLabel: "Labour Contractor",
+          sortDate: dateIso,
+          periodLabel: formatDay(dateIso),
+          description: row.description?.trim() || "Labour contractor",
+          details: row.payMode?.trim() || null,
+          amount: contractor,
+          source: "pettyCash",
+        });
+      }
+      if (supervisor > 0) {
+        unified.push({
+          id: `salary-${row.id}`,
+          expenseLabel: "Salary Expenses",
+          sortDate: dateIso,
+          periodLabel: formatDay(dateIso),
+          description: row.description?.trim() || "Salary expenses",
+          details: row.payMode?.trim() || null,
+          amount: supervisor,
+          source: "pettyCash",
+        });
+      }
+      if (cashAmount > 0) {
+        unified.push({
+          id: `petty-${row.id}`,
+          expenseLabel: "Petty Cash",
+          sortDate: dateIso,
+          periodLabel: formatDay(dateIso),
+          description: row.description?.trim() || "Petty cash",
+          details: row.nature?.trim() || row.payMode?.trim() || null,
+          amount: cashAmount,
+          source: "pettyCash",
+        });
+      }
+      continue;
+    }
+
     unified.push({
       id: `petty-${row.id}`,
       expenseLabel: head,
       sortDate: dateIso,
       periodLabel: formatDay(dateIso),
       description: row.description?.trim() || head,
-      details:
-        row.openingReading != null || row.closingReading != null
-          ? [
-              row.openingReading != null ? `Opening ${row.openingReading}` : null,
-              row.closingReading != null ? `Closing ${row.closingReading}` : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          : null,
+      details: (() => {
+        const isUnload = /unloading/i.test(head);
+        if (isUnload && (row.openingReading != null || row.closingReading != null)) {
+          const qty =
+            row.openingReading != null ? Number(row.openingReading) : null;
+          const rate =
+            row.closingReading != null ? Number(row.closingReading) : null;
+          if (qty != null && rate != null) {
+            return `${qty.toLocaleString("en-IN")} MT @ ₹${rate.toLocaleString("en-IN")}`;
+          }
+          if (qty != null) return `${qty.toLocaleString("en-IN")} MT`;
+          if (rate != null) return `₹${rate.toLocaleString("en-IN")}/MT`;
+        }
+        if (row.openingReading != null || row.closingReading != null) {
+          return [
+            row.openingReading != null ? `Opening ${row.openingReading}` : null,
+            row.closingReading != null ? `Closing ${row.closingReading}` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ");
+        }
+        return null;
+      })(),
       amount: Number(row.amount) || 0,
       source: "pettyCash",
     });
@@ -182,7 +241,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     unified.push({
       id: `far-${row.id}`,
-      expenseLabel: "FAR",
+      expenseLabel: "Depreciation (FAR)",
       sortDate: dateIso,
       periodLabel: formatDay(dateIso),
       description: row.assetDescription,
@@ -199,7 +258,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
   });
 
   const filtered = category
-    ? unified.filter((row) => row.expenseLabel === category)
+    ? unified.filter((row) => {
+        const label = normalizePvcExpenseHead(row.expenseLabel);
+        const want = normalizePvcExpenseHead(category);
+        return label === want;
+      })
     : unified;
 
   const totals = filtered.reduce(

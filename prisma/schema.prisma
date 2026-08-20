@@ -418,6 +418,7 @@ model CreditScoreAward {
   date      DateTime      @db.Date
   shift     ManpowerShift
   points    Int           @default(100)
+  whatsappSentAt DateTime?
   createdAt DateTime      @default(now())
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   plant     Plant         @relation(fields: [plantId], references: [id], onDelete: Cascade)

@@ -9,7 +9,6 @@ import { SalesReport } from "@/components/pnl/SalesReport";
 import { PurchaseReport } from "@/components/pnl/PurchaseReport";
 import { StockReport } from "@/components/pnl/StockReport";
 import { ExpenseReport } from "@/components/pnl/ExpenseReport";
-import { PettyCashReport } from "@/components/pnl/PettyCashReport";
 import { ElectricityRentReport } from "@/components/pnl/ElectricityRentReport";
 import { FixedAssetsReport } from "@/components/pnl/FixedAssetsReport";
 import { PvcExpenseRegisterReport } from "@/components/pnl/PvcExpenseRegisterReport";
@@ -54,26 +53,10 @@ export function PnlReportsShell({
   const allowedTabs = useMemo<ReportTab[]>(
     () =>
       pvc
-        ? [
-            "pnl",
-            "sales",
-            "purchase",
-            "stock",
-            "expense",
-            "pettyCash",
-            "contactList",
-          ]
+        ? ["pnl", "sales", "purchase", "stock", "expense", "contactList"]
         : cat6
-          ? ["pnl", "sales", "purchase", "stock", "expense", "pettyCash", "contactList"]
-          : [
-              "pnl",
-              "sales",
-              "purchase",
-              "stock",
-              "expense",
-              "pettyCash",
-              "contactList",
-            ],
+          ? ["pnl", "sales", "purchase", "stock", "expense", "fixedAssets", "contactList"]
+          : ["pnl", "sales", "purchase", "stock", "expense", "contactList"],
     [cat6, pvc],
   );
 
@@ -146,9 +129,6 @@ export function PnlReportsShell({
             to={to}
             section="combined"
           />
-        ) : null}
-        {tab === "pettyCash" ? (
-          <PettyCashReport plantId={plantId} plantCode={plantCode} from={from} to={to} />
         ) : null}
         {tab === "fixedAssets" ? (
           <FixedAssetsReport plantId={plantId} from={from} to={to} />

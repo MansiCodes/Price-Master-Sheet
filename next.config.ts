@@ -10,6 +10,8 @@ const authSecret = process.env.AUTH_SECRET ?? "";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  // Smaller Docker/ECS image (copies .next/standalone + static assets).
+  output: "standalone",
   // Force AUTH_SECRET into Edge middleware (fixes JWT "no matching decryption secret").
   env: {
     AUTH_SECRET: authSecret,

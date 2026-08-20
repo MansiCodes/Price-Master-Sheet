@@ -47,7 +47,7 @@ export default async function AppLayout({
     selectedPlantId && user
       ? await prisma.plant.findUnique({
           where: { id: selectedPlantId },
-          select: { name: true },
+          select: { id: true, name: true, code: true },
         })
       : null;
 
@@ -82,6 +82,7 @@ export default async function AppLayout({
       plants={switchablePlants}
       currentPlantId={selectedPlantId}
       allowAllPlants={superAdmin}
+      entryPlant={selectedPlant}
     >
       {children}
     </AppShell>

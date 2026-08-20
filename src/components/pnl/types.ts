@@ -21,7 +21,6 @@ export const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: "factoryRent", label: "Factory Rent" },
   { key: "fixedAssets", label: "FAR" },
   { key: "expense", label: "Expense" },
-  { key: "pettyCash", label: "Petty Cash" },
   { key: "contactList", label: "Contact List" },
 ];
 
