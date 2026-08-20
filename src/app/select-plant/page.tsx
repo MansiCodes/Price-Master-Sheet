@@ -42,11 +42,6 @@ export default async function SelectPlantPage() {
     );
   }
 
-  // One plant: no cookie write needed — resolveSelectedPlantId uses the only plant.
-  if (plants.length === 1) {
-    redirect("/welcome");
-  }
-
   return (
     <div className="select-plant-screen">
       <div className="select-plant-screen__lang">

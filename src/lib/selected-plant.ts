@@ -36,7 +36,6 @@ export async function resolveSelectedPlantId(
 
   const accessible = await getAccessiblePlantIds(userId);
   if (accessible.length === 0) return null;
-  if (accessible.length === 1) return accessible[0]!;
 
   return getSelectedPlantId(userId);
 }
@@ -48,7 +47,7 @@ export async function needsPlantSelection(
   if (options?.isSuperAdmin) return false;
 
   const accessible = await getAccessiblePlantIds(userId);
-  if (accessible.length <= 1) return false;
+  if (accessible.length === 0) return false;
 
   const selected = await getSelectedPlantId(userId);
   return !selected;
