@@ -1488,7 +1488,7 @@ export function TodayHub({
                   </>
                 ) : (
                   <>
-                {expenseHead === "Electricity" && !isCat6 ? (
+                {expenseHead === "Electricity" ? (
                   <div className="prod-fields__row">
                     <div className="field">
                       <label htmlFor="e-opening">{t("openingReading")}</label>

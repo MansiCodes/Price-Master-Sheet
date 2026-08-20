@@ -100,6 +100,26 @@ export function ExpenseReport({
               render: (r) => r.description || tCommon("dash"),
             },
             {
+              key: "opening",
+              label: t("openingReading"),
+              align: "right",
+              compact: true,
+              render: (r) =>
+                r.openingReading == null
+                  ? tCommon("dash")
+                  : String(r.openingReading),
+            },
+            {
+              key: "closing",
+              label: t("closingReading"),
+              align: "right",
+              compact: true,
+              render: (r) =>
+                r.closingReading == null
+                  ? tCommon("dash")
+                  : String(r.closingReading),
+            },
+            {
               key: "amount",
               label: "Salary Amt",
               align: "right",

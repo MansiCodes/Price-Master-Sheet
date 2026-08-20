@@ -50,7 +50,7 @@ Open http://localhost:3000 — login with Super Admin from `.env`.
 
 ## Cron
 
-`GET /api/cron/daily-reminders` with `Authorization: Bearer $CRON_SECRET` (scheduled 16:00 UTC ≈ 9:30 PM IST).
+`GET /api/cron/daily-reminders` with `Authorization: Bearer $CRON_SECRET` (08:50 IST Day shift and 20:50 IST Night shift).
 
 ## Vercel
 

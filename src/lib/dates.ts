@@ -151,8 +151,8 @@ export function getIstHoursMinutes(now: Date = new Date()): {
 }
 
 /**
- * Shifts run 9:00–21:00 (Day) and 21:00–09:00 (Night) IST.
- * Reminders go out at 08:30 (Day) and 20:50 (Night) IST via Vercel cron.
+ * Shifts start at 09:00 (Day) and 21:00 (Night) IST.
+ * Reminders go out at 08:50 (Day) and 20:50 (Night) IST via Vercel cron.
  * Windows allow a short delay if the cron runs a few minutes late.
  */
 export function reminderShiftForNow(
@@ -160,9 +160,9 @@ export function reminderShiftForNow(
 ): "DAY" | "NIGHT" | null {
   const { hour, minute } = getIstHoursMinutes(now);
   const minutes = hour * 60 + minute;
-  const morningStart = 8 * 60 + 25; // 08:25 IST
+  const morningStart = 8 * 60 + 45; // 08:45 IST (8:50 target, allow slight early cron)
   const morningEnd = 9 * 60 + 15; // 09:15 IST
-  const eveningStart = 20 * 60 + 45; // 20:45 IST
+  const eveningStart = 20 * 60 + 45; // 20:45 IST (20:50 target, allow slight early cron)
   const eveningEnd = 21 * 60 + 15; // 21:15 IST
   if (minutes >= morningStart && minutes < morningEnd) return "DAY";
   if (minutes >= eveningStart && minutes < eveningEnd) return "NIGHT";
