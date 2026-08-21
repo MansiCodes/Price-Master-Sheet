@@ -39,147 +39,171 @@ function requireSuperAdmin(
 }
 
 export async function GET() {
-  const session = await auth();
-  const denied = requireSuperAdmin(session);
-  if (denied) return denied;
+  try {
+    const session = await auth();
+    const denied = requireSuperAdmin(session);
+    if (denied) return denied;
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      globalRole: true,
-      creditScore: true,
-      canViewPriceSheet: true,
-      isActive: true,
-      coinsBalance: true,
-      createdAt: true,
-      plantRoles: {
-        select: {
-          plantId: true,
-          role: true,
-          plant: { select: { id: true, name: true, code: true } },
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        globalRole: true,
+        creditScore: true,
+        canViewPriceSheet: true,
+        isActive: true,
+        coinsBalance: true,
+        createdAt: true,
+        plantRoles: {
+          select: {
+            plantId: true,
+            role: true,
+            plant: { select: { id: true, name: true, code: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ ok: true, users });
+    return NextResponse.json({ ok: true, users });
+  } catch (error) {
+    console.error("[api/admin/users GET]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Failed to load users",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const denied = requireSuperAdmin(session);
-  if (denied) return denied;
-
-  let json: unknown;
   try {
-    json = await request.json();
-  } catch {
-    return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 });
-  }
+    const session = await auth();
+    const denied = requireSuperAdmin(session);
+    if (denied) return denied;
 
-  const parsed = createSchema.safeParse(json);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { ok: false, message: "Invalid payload", issues: parsed.error.issues },
-      { status: 400 },
-    );
-  }
+    let json: unknown;
+    try {
+      json = await request.json();
+    } catch {
+      return NextResponse.json({ ok: false, message: "Invalid JSON" }, { status: 400 });
+    }
 
-  const email = parsed.data.email.toLowerCase().trim();
-  const plantIds = [...new Set(parsed.data.plantIds)];
-
-  if (plantIds.length > 0) {
-    const count = await prisma.plant.count({
-      where: { id: { in: plantIds }, isActive: true },
-    });
-    if (count !== plantIds.length) {
+    const parsed = createSchema.safeParse(json);
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, message: "One or more plants are invalid" },
+        { ok: false, message: "Invalid payload", issues: parsed.error.issues },
         { status: 400 },
       );
     }
-  }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return NextResponse.json(
-      { ok: false, message: "Email already registered" },
-      { status: 409 },
-    );
-  }
+    const email = parsed.data.email.toLowerCase().trim();
+    const plantIds = [...new Set(parsed.data.plantIds)];
 
-  const phone = parsed.data.phone;
-  const phoneTaken = await prisma.user.findFirst({
-    where: { phone },
-    select: { id: true },
-  });
-  if (phoneTaken) {
-    return NextResponse.json(
-      { ok: false, message: "Mobile number already registered" },
-      { status: 409 },
-    );
-  }
+    if (plantIds.length > 0) {
+      const count = await prisma.plant.count({
+        where: { id: { in: plantIds }, isActive: true },
+      });
+      if (count !== plantIds.length) {
+        return NextResponse.json(
+          { ok: false, message: "One or more plants are invalid" },
+          { status: 400 },
+        );
+      }
+    }
 
-  const role = parsed.data.globalRole;
-  if (role !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
-    return NextResponse.json(
-      { ok: false, message: "Assign at least one plant for this user" },
-      { status: 400 },
-    );
-  }
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json(
+        { ok: false, message: "Email already registered" },
+        { status: 409 },
+      );
+    }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-  const canViewPriceSheet =
-    role === GlobalRole.SUPER_ADMIN
-      ? true
-      : Boolean(parsed.data.canViewPriceSheet);
+    const phone = parsed.data.phone;
+    const phoneTaken = await prisma.user.findFirst({
+      where: { phone },
+      select: { id: true },
+    });
+    if (phoneTaken) {
+      return NextResponse.json(
+        { ok: false, message: "Mobile number already registered" },
+        { status: 409 },
+      );
+    }
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      name: parsed.data.name?.trim() || null,
-      phone,
-      passwordHash,
-      globalRole: role,
-      creditScore: role === GlobalRole.SUPER_ADMIN ? 100 : null,
-      canViewPriceSheet,
-      isActive: true,
-      plantRoles: {
-        create: plantIds.map((plantId) => ({
-          plantId,
-          role,
-        })),
+    const role = parsed.data.globalRole;
+    if (role !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "Assign at least one plant for this user" },
+        { status: 400 },
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+    const canViewPriceSheet =
+      role === GlobalRole.SUPER_ADMIN
+        ? true
+        : Boolean(parsed.data.canViewPriceSheet);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name: parsed.data.name?.trim() || null,
+        phone,
+        passwordHash,
+        globalRole: role,
+        creditScore: role === GlobalRole.SUPER_ADMIN ? 100 : null,
+        canViewPriceSheet,
+        isActive: true,
+        plantRoles: {
+          create: plantIds.map((plantId) => ({
+            plantId,
+            role,
+          })),
+        },
       },
-    },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      globalRole: true,
-      creditScore: true,
-      canViewPriceSheet: true,
-      isActive: true,
-    },
-  });
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        globalRole: true,
+        creditScore: true,
+        canViewPriceSheet: true,
+        isActive: true,
+      },
+    });
 
-  await writeAuditLog({
-    entityType: "User",
-    entityId: user.id,
-    field: "create",
-    newValue: {
-      email: user.email,
-      phone: user.phone,
-      globalRole: user.globalRole,
-      plantIds,
-      canViewPriceSheet: user.canViewPriceSheet,
-    },
-    actorId: session!.user!.id,
-  });
+    await writeAuditLog({
+      entityType: "User",
+      entityId: user.id,
+      field: "create",
+      newValue: {
+        email: user.email,
+        phone: user.phone,
+        globalRole: user.globalRole,
+        plantIds,
+        canViewPriceSheet: user.canViewPriceSheet,
+      },
+      actorId: session!.user!.id,
+    });
 
-  return NextResponse.json({ ok: true, user }, { status: 201 });
+    return NextResponse.json({ ok: true, user }, { status: 201 });
+  } catch (error) {
+    console.error("[api/admin/users POST]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Failed to create user",
+      },
+      { status: 500 },
+    );
+  }
 }

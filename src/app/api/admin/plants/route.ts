@@ -17,30 +17,42 @@ const createSchema = z.object({
 });
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (
+      session.user.globalRole !== GlobalRole.SUPER_ADMIN &&
+      session.user.globalRole !== GlobalRole.BUSINESS_HEAD
+    ) {
+      return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+    }
+
+    const plants = await prisma.plant.findMany({
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    return NextResponse.json({ ok: true, plants });
+  } catch (error) {
+    console.error("[api/admin/plants GET]", error);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          error instanceof Error ? error.message : "Failed to load plants",
+      },
+      { status: 500 },
+    );
   }
-
-  if (
-    session.user.globalRole !== GlobalRole.SUPER_ADMIN &&
-    session.user.globalRole !== GlobalRole.BUSINESS_HEAD
-  ) {
-    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-  }
-
-  const plants = await prisma.plant.findMany({
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-      isActive: true,
-      createdAt: true,
-    },
-  });
-
-  return NextResponse.json({ ok: true, plants });
 }
 
 export async function POST(request: Request) {

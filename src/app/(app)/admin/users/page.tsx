@@ -45,21 +45,25 @@ export default function AdminUsersPage() {
         fetch("/api/admin/users"),
         fetch("/api/admin/plants"),
       ]);
-      const usersJson = (await usersRes.json()) as {
+      const usersJson = (await usersRes.json().catch(() => null)) as {
         ok?: boolean;
         message?: string;
         users?: UserRow[];
-      };
-      const plantsJson = (await plantsRes.json()) as {
+      } | null;
+      const plantsJson = (await plantsRes.json().catch(() => null)) as {
         ok?: boolean;
         message?: string;
         plants?: PlantOption[];
-      };
-      if (!usersRes.ok || !usersJson.ok) {
-        throw new Error(usersJson.message || "Failed to load users");
+      } | null;
+      if (!usersRes.ok || !usersJson?.ok) {
+        throw new Error(
+          usersJson?.message || `Failed to load users (${usersRes.status})`,
+        );
       }
-      if (!plantsRes.ok || !plantsJson.ok) {
-        throw new Error(plantsJson.message || "Failed to load plants");
+      if (!plantsRes.ok || !plantsJson?.ok) {
+        throw new Error(
+          plantsJson?.message || `Failed to load plants (${plantsRes.status})`,
+        );
       }
       setUsers(usersJson.users ?? []);
       setPlants(plantsJson.plants ?? []);
