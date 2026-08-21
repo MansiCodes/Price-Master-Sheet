@@ -4,11 +4,15 @@ frontend:
     preBuild:
       commands:
         - npm install
+        - export NODE_TLS_REJECT_UNAUTHORIZED=0
         - env | grep -v '^_' >> .env.production
+        - echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env.production
         - npx prisma generate
     build:
       commands:
+        - export NODE_TLS_REJECT_UNAUTHORIZED=0
         - env | grep -v '^_' >> .env.production
+        - echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next

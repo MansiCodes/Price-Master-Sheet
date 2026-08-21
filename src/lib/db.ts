@@ -2,13 +2,18 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
+// Allow self-signed / AWS RDS certificates in serverless environment
+if (process.env.NODE_ENV === "production" || process.env.DATABASE_URL?.includes("rds.amazonaws.com")) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   prismaClientGen: number | undefined;
 };
 
 /** Bump when Prisma schema fields change so the cached client is rebuilt. */
-const PRISMA_CLIENT_GEN = 7;
+const PRISMA_CLIENT_GEN = 8;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {
@@ -36,15 +41,15 @@ function resolveDatabaseUrl(): string {
     );
   }
 
-  // For Neon, upgrade sslmode=require to verify-full.
-  // For AWS RDS, leave sslmode as is so rejectUnauthorized: false is honored.
   try {
     const url = new URL(raw);
     const mode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
-    if (!raw.includes("rds.amazonaws.com")) {
-      if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
-        url.searchParams.set("sslmode", "verify-full");
-      }
+
+    if (raw.includes("rds.amazonaws.com")) {
+      // Force no-verify for AWS RDS so self-signed cert chain is accepted
+      url.searchParams.set("sslmode", "no-verify");
+    } else if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
+      url.searchParams.set("sslmode", "verify-full");
     }
     return url.toString();
   } catch {
