@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -7,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Bump when Prisma schema fields change so the cached client is rebuilt. */
-const PRISMA_CLIENT_GEN = 6;
+const PRISMA_CLIENT_GEN = 7;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {
@@ -35,13 +36,15 @@ function resolveDatabaseUrl(): string {
     );
   }
 
-  // pg v8 warns that sslmode=require/prefer/verify-ca currently alias verify-full.
-  // Prefer the explicit mode so Neon connections stay secure without the console noise.
+  // For Neon, upgrade sslmode=require to verify-full.
+  // For AWS RDS, leave sslmode as is so rejectUnauthorized: false is honored.
   try {
     const url = new URL(raw);
     const mode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
-    if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
-      url.searchParams.set("sslmode", "verify-full");
+    if (!raw.includes("rds.amazonaws.com")) {
+      if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
+        url.searchParams.set("sslmode", "verify-full");
+      }
     }
     return url.toString();
   } catch {
@@ -51,7 +54,14 @@ function resolveDatabaseUrl(): string {
 
 function createPrismaClient() {
   const connectionString = resolveDatabaseUrl();
-  const adapter = new PrismaPg({ connectionString });
+  const isRds = connectionString.includes("rds.amazonaws.com");
+
+  const pool = new Pool({
+    connectionString,
+    ssl: isRds ? { rejectUnauthorized: false } : undefined,
+  });
+
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
