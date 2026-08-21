@@ -112,6 +112,8 @@ async function main() {
   const managerPassword = process.env.PLANT_MANAGER_PASSWORD ?? password;
   const managerHash = await bcrypt.hash(managerPassword, 12);
 
+  const managerPhone = process.env.PLANT_MANAGER_PHONE?.trim() || null;
+
   const manager = await prisma.user.upsert({
     where: { email: managerEmail },
     update: {
@@ -120,6 +122,7 @@ async function main() {
       globalRole: GlobalRole.PLANT_MANAGER,
       canViewPriceSheet: false,
       isActive: true,
+      ...(managerPhone ? { phone: managerPhone } : {}),
     },
     create: {
       email: managerEmail,
@@ -128,6 +131,7 @@ async function main() {
       globalRole: GlobalRole.PLANT_MANAGER,
       canViewPriceSheet: false,
       isActive: true,
+      phone: managerPhone,
     },
   });
 

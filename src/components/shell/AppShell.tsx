@@ -1,12 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { TodayEntryHost } from "@/components/today/TodayEntryHost";
 import { AppHeader, type AppHeaderUser } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { getNavSections, type NavFlags } from "./nav-config";
 import type { PlantSwitcherPlant } from "./PlantSwitcher";
 
 const SIDEBAR_STORAGE_KEY = "cj-sidebar-collapsed";
+
+type EntryPlant = {
+  id: string;
+  name: string;
+  code: string;
+};
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -16,6 +23,7 @@ type AppShellProps = {
   plants?: PlantSwitcherPlant[];
   currentPlantId?: string | null;
   allowAllPlants?: boolean;
+  entryPlant?: EntryPlant | null;
 };
 
 export function AppShell({
@@ -26,6 +34,7 @@ export function AppShell({
   plants = [],
   currentPlantId = null,
   allowAllPlants = false,
+  entryPlant = null,
 }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -90,6 +99,7 @@ export function AppShell({
         />
         <main className="dash-main">{children}</main>
       </div>
+      <TodayEntryHost plant={entryPlant} canEnter={canEnter} />
     </div>
   );
 }

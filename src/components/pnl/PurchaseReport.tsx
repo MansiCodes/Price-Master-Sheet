@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
@@ -62,10 +63,17 @@ export function PurchaseReport({
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
-  // CAT6 Purchase tab mirrors Purchase sheet (vendor bills). ATC-to-NF is P&L-only.
-  const baseUrl = cat6
-    ? `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&excludeAtc=1`
-    : `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const isPvc = plantCode?.toUpperCase() === "PVC";
+  const [purchaseView, setPurchaseView] = useState<"vendor" | "atcl">("vendor");
+  const baseUrl =
+    `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` +
+    (isPvc
+      ? purchaseView === "atcl"
+        ? "&atclOnly=1"
+        : "&excludeAtcl=1"
+      : cat6
+        ? "&excludeAtc=1"
+        : "");
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
   const totals = response?.totals as
@@ -77,7 +85,6 @@ export function PurchaseReport({
         unloadingExpense?: number;
       }
     | undefined;
-  const isPvc = plantCode?.toUpperCase() === "PVC";
   const crud = useReportCrud<PurchaseRow>(`/api/plants/${plantId}/purchases`, reload);
 
   const actionCol: ReportColumn<PurchaseRow> = {
@@ -273,7 +280,41 @@ export function PurchaseReport({
 
   return (
     <section className="pnl-report-panel">
-      <h3 className="pnl-report-panel__title">{t("purchaseTitle")}</h3>
+      <h3 className="pnl-report-panel__title">
+        {isPvc
+          ? purchaseView === "atcl"
+            ? "Inward Stock from ATCL"
+            : t("purchaseTitle")
+          : t("purchaseTitle")}
+      </h3>
+      {isPvc ? (
+        <div className="pnl-expense-subnav" role="tablist" aria-label="Purchase type">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={purchaseView === "vendor"}
+            className={purchaseView === "vendor" ? "is-active" : ""}
+            onClick={() => {
+              setPurchaseView("vendor");
+              setPage(1);
+            }}
+          >
+            Vendor purchase
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={purchaseView === "atcl"}
+            className={purchaseView === "atcl" ? "is-active" : ""}
+            onClick={() => {
+              setPurchaseView("atcl");
+              setPage(1);
+            }}
+          >
+            Stock from ATCL
+          </button>
+        </div>
+      ) : null}
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[...(cat6 ? cat6Columns : pvcColumns), actionCol]}

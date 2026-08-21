@@ -17,6 +17,7 @@ import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { isAtclPurchase } from "@/lib/plant-catalogs";
 import { isAdminOrHead } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -86,15 +87,18 @@ export async function GET(
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
   const excludeAtc = sp.get("excludeAtc") === "1";
+  const excludeAtcl = sp.get("excludeAtcl") === "1";
+  const atclOnly = sp.get("atclOnly") === "1";
 
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
     select: { code: true },
   });
   const cat6 = isCat6Plant(plant?.code);
+  const isPvc = plant?.code?.toUpperCase() === "PVC";
   const ownOnly = !isAdminOrHead(session.user.globalRole);
 
-  const purchases = await prisma.purchase.findMany({
+  let purchases = await prisma.purchase.findMany({
     where: {
       plantId,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
@@ -111,6 +115,12 @@ export async function GET(
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
+
+  if (isPvc && (excludeAtcl || atclOnly)) {
+    purchases = purchases.filter((row) =>
+      atclOnly ? isAtclPurchase(row) : !isAtclPurchase(row),
+    );
+  }
 
   const { slice, ...pageInfo } = paginate(purchases, page, pageSize);
   const totals = purchases.reduce(
@@ -432,6 +442,7 @@ export async function DELETE(
     plantId,
   });
   await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
+  await refreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

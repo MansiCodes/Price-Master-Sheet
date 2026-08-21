@@ -67,11 +67,13 @@ export async function GET(
       : null;
 
   const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const expenseHead = sp.get("expenseHead")?.trim() || null;
   const where = {
     plantId,
     ...(ownOnly ? { enteredById: session.user.id } : {}),
     ...filter,
     ...(entryType ? { entryType } : {}),
+    ...(expenseHead ? { expenseHead } : {}),
   };
   const [entries, aggregate] = await Promise.all([
     prisma.pettyCashEntry.findMany({
@@ -153,11 +155,17 @@ export async function POST(
       checkedBy: data.checkedBy?.trim() || null,
       approvedBy: data.approvedBy?.trim() || null,
       openingReading:
-        data.expenseHead === "Electricity"
+        data.expenseHead === "Electricity" ||
+        data.expenseHead === "Fuel & Power" ||
+        data.expenseHead === "Unloading of MT" ||
+        data.expenseHead === "Unloading MT"
           ? (data.openingReading ?? null)
           : null,
       closingReading:
-        data.expenseHead === "Electricity"
+        data.expenseHead === "Electricity" ||
+        data.expenseHead === "Fuel & Power" ||
+        data.expenseHead === "Unloading of MT" ||
+        data.expenseHead === "Unloading MT"
           ? (data.closingReading ?? null)
           : null,
       billNumber: data.billNumber ?? null,
@@ -310,6 +318,7 @@ export async function DELETE(
     plantId,
   });
   await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
+  await refreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { canAccessPlant, isSuperAdmin } from "@/lib/rbac";
 import {
   clearSelectedPlantCookie,
+  setAllPlantsCookie,
   setSelectedPlantCookie,
 } from "@/lib/selected-plant";
 
@@ -34,6 +35,6 @@ export async function viewAllPlantsAction() {
     throw new Error("Only a super admin can view all plants at once.");
   }
 
-  await clearSelectedPlantCookie();
+  await setAllPlantsCookie();
   redirect("/");
 }

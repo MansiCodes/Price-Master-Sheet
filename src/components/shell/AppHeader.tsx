@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo } from "react";
 import { LogoutButton } from "@/components/LogoutButton";
@@ -75,7 +75,6 @@ export function AppHeader({
   canEnter = false,
 }: AppHeaderProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const t = useTranslations("common");
   const tNav = useTranslations("nav");
   const locale = useLocale() as AppLocale;
@@ -116,11 +115,7 @@ export function AppHeader({
 
   function onAddTodayEntry() {
     storeEntryDate(today);
-    if (pathname === "/") {
-      requestOpenTodayEntry();
-      return;
-    }
-    router.push(`/?addEntry=1`);
+    requestOpenTodayEntry();
   }
 
   return (

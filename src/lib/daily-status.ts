@@ -1,5 +1,6 @@
 import type { ManpowerShift } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { allRequiredShiftFormsComplete } from "@/lib/shift-forms";
 
 function startOfUtcDay(date: Date): Date {
   return new Date(
@@ -32,7 +33,9 @@ export async function refreshDailyStatus(
     prisma.sale.count({ where }),
     prisma.stockEntry.count({ where }),
     prisma.productionEntry.count({ where }),
-    prisma.pettyCashEntry.count({ where }),
+    prisma.pettyCashEntry.count({
+      where: { ...where, entryType: "EXPENSE" },
+    }),
     prisma.dailyEntryStatus.findUnique({
       where: {
         plantId_date_shift: { plantId, date: day, shift },
@@ -46,12 +49,12 @@ export async function refreshDailyStatus(
   const productionFilled = productionCount > 0;
   const manpowerFilled = false;
   const pettyCashFilled = pettyCashCount > 0;
-  const allComplete =
-    purchaseFilled &&
-    saleFilled &&
-    stockFilled &&
-    productionFilled &&
-    pettyCashFilled;
+  const allComplete = allRequiredShiftFormsComplete({
+    purchaseFilled,
+    saleFilled,
+    stockFilled,
+    pettyCashFilled,
+  });
 
   const completedAt = allComplete
     ? (existing?.completedAt ?? new Date())

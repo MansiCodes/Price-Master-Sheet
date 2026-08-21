@@ -1,12 +1,20 @@
 "use client";
-
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
-import { PVC_EXPENSE_HEADS, pvcExpensePnlLine } from "@/lib/plant-catalogs";
+import {
+  PVC_EXPENSE_SECTIONS,
+  getPvcExpenseHeadsForSection,
+  pvcExpensePnlLine,
+  pvcExpenseSection,
+  type PvcExpenseSection,
+} from "@/lib/plant-catalogs";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
+import { useReportCrud } from "@/components/pnl/useReportCrud";
 
 type PvcExpenseRow = {
   id: string;
@@ -19,6 +27,12 @@ type PvcExpenseRow = {
   source: string;
 };
 
+function pettyCashIdFromRegister(row: PvcExpenseRow): string | null {
+  if (row.source !== "pettyCash") return null;
+  const match = /^(?:petty|labour|salary)-(.+)$/.exec(row.id);
+  return match?.[1] ?? null;
+}
+
 export function PvcExpenseRegisterReport({
   plantId,
   from,
@@ -29,14 +43,25 @@ export function PvcExpenseRegisterReport({
   to: string;
 }) {
   const t = useTranslations("pnl");
-  const [category, setCategory] = useState<string>(PVC_EXPENSE_HEADS[0]);
+  const [section, setSection] = useState<PvcExpenseSection>("direct");
+  const sectionHeads = useMemo(
+    () => [...getPvcExpenseHeadsForSection(section)],
+    [section],
+  );
+  const [category, setCategory] = useState<string>(
+    sectionHeads[0] ?? "Fuel & Power",
+  );
 
   const baseUrl = `/api/plants/${plantId}/pvc-expense-register?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&category=${encodeURIComponent(category)}`;
 
-  const { rows, page, pageSize, total, loading, error, response, setPage, setPageSize } =
+  const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<PvcExpenseRow>(baseUrl, t("networkError"), 20);
 
   const totals = response?.totals as { amount?: number } | undefined;
+  const crud = useReportCrud<PvcExpenseRow>(
+    `/api/plants/${plantId}/petty-cash`,
+    reload,
+  );
 
   const columns: ReportColumn<PvcExpenseRow>[] = useMemo(
     () => [
@@ -48,6 +73,15 @@ export function PvcExpenseRegisterReport({
         width: "4.5rem",
         render: (_r, index) =>
           String((page - 1) * pageSize + (index ?? 0) + 1),
+      },
+      {
+        key: "section",
+        label: "Section",
+        width: "7rem",
+        render: (r) =>
+          pvcExpenseSection(r.expenseLabel) === "direct"
+            ? "Direct"
+            : "Indirect",
       },
       {
         key: "pnl",
@@ -85,26 +119,97 @@ export function PvcExpenseRegisterReport({
     [page, pageSize, t],
   );
 
+  function onSectionChange(next: PvcExpenseSection) {
+    setSection(next);
+    const heads = [...getPvcExpenseHeadsForSection(next)];
+    setCategory(heads[0] ?? "");
+    setPage(1);
+  }
+
   return (
     <section className="pnl-report-panel pnl-report-panel--expense">
       <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
-      <div className="pnl-expense-subnav" role="tablist" aria-label="Expense type">
-        {PVC_EXPENSE_HEADS.map((head) => (
+
+      <div
+        className="pnl-tab-nav pnl-tab-nav--fit pnl-expense-type-nav"
+        role="tablist"
+        aria-label="Expense section"
+      >
+        {PVC_EXPENSE_SECTIONS.map((entry) => (
+          <button
+            key={entry.value}
+            type="button"
+            role="tab"
+            aria-selected={section === entry.value}
+            className={section === entry.value ? "is-active" : undefined}
+            onClick={() => onSectionChange(entry.value)}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      <div
+        className={`pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-${sectionHeads.length}`}
+        role="tablist"
+        aria-label={
+          section === "direct" ? "Direct expense types" : "Indirect expense types"
+        }
+      >
+        {sectionHeads.map((head) => (
           <button
             key={head}
             type="button"
             role="tab"
             aria-selected={category === head}
-            className={category === head ? "is-active" : ""}
-            onClick={() => setCategory(head)}
+            className={category === head ? "is-active" : undefined}
+            onClick={() => {
+              setCategory(head);
+              setPage(1);
+            }}
           >
-            {head}
+            {head === "Factory Rent" ? (
+              <span className="pnl-tab-nav__stacked">
+                <span>Factory</span>
+                <span>Rent</span>
+              </span>
+            ) : (
+              head
+            )}
           </button>
         ))}
       </div>
+
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={columns}
+        columns={[
+          ...columns,
+          {
+            key: "actions",
+            label: "Actions",
+            compact: true,
+            render: (r) => {
+              const entryId = pettyCashIdFromRegister(r);
+              if (!entryId) return "—";
+              return (
+                <ReportRowActions
+                  onEdit={() =>
+                    crud.openEdit(
+                      { ...r, id: entryId },
+                      {
+                        date: toYmd(r.sortDate),
+                        expenseHead: r.expenseLabel,
+                        description: r.description ?? "",
+                        amount: String(r.amount ?? ""),
+                      },
+                    )
+                  }
+                  onDelete={() => void crud.remove(entryId)}
+                />
+              );
+            },
+          },
+        ]}
         rows={rows}
         loading={loading}
         emptyLabel={t("noRecords")}
@@ -122,6 +227,30 @@ export function PvcExpenseRegisterReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
+      <EntryEditDrawer
+        open={Boolean(crud.editing)}
+        title="Edit expense"
+        fields={[
+          { name: "date", label: t("date"), type: "date", required: true },
+          { name: "expenseHead", label: t("category"), required: true },
+          { name: "description", label: t("remarksNotes"), type: "textarea" },
+          { name: "amount", label: t("amount"), type: "number", required: true },
+        ]}
+        values={crud.values}
+        saving={crud.saving}
+        error={crud.error}
+        onChange={crud.setField}
+        onClose={crud.closeEdit}
+        onSave={() =>
+          void crud.save({
+            date: crud.values.date,
+            expenseHead: crud.values.expenseHead,
+            description: crud.values.description || null,
+            amount: Number(crud.values.amount),
+          })
+        }
+      />
+      {crud.deleteDialog}
     </section>
   );
 }

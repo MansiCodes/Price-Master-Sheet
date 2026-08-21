@@ -1,6 +1,7 @@
 import { PettyCashKind, PurchaseType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import { isAtclPurchase, atclStockEntryFilter } from "@/lib/plant-catalogs";
 import type {
   PlantPnlResult,
   PlantPnlStatement,
@@ -20,11 +21,6 @@ const INCOME_TAX_RATE = 0.25;
 /** Excel P&L hardcoded income-tax base (2525000×25%). */
 const PVC_INCOME_TAX_BASE = 2_525_000;
 const PVC_UNLOADING_RATE_PER_MT = 70;
-const CAT6_REFERENCE_FROM = new Date(Date.UTC(2025, 3, 1));
-const CAT6_REFERENCE_TO = new Date(Date.UTC(2026, 4, 22));
-const CAT6_REFERENCE_DAYS = daysInclusive(CAT6_REFERENCE_FROM, CAT6_REFERENCE_TO);
-const CAT6_DEPRECIATION_DAILY = 4151829.07 / CAT6_REFERENCE_DAYS;
-const CAT6_INTEREST_DAILY = 3762040 / CAT6_REFERENCE_DAYS;
 
 // Excel quirk for CAT6:
 // - P&L header ends 22-MAY-26, but Sales account includes sales up to 03-JUN-26
@@ -141,7 +137,7 @@ async function buildPvcDynamic(
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
       },
-      select: { quantity: true, basicValue: true },
+      select: { quantity: true, basicValue: true, vendorName: true, notes: true },
     }),
     scoped
       ? Promise.resolve({ _sum: { closingValue: null } })
@@ -149,7 +145,7 @@ async function buildPvcDynamic(
           where: {
             plantId,
             date: { gte: from, lte: to },
-            NOT: { notes: { startsWith: "Closing stock" } },
+            ...atclStockEntryFilter(),
           },
           _sum: { closingValue: true },
         }),
@@ -187,13 +183,19 @@ async function buildPvcDynamic(
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
-  // Excel Purchase!J155 = SUM(J5:J154) basic value column.
-  const purchasesRaw = purchaseRows.reduce(
+  const vendorPurchaseRows = purchaseRows.filter((row) => !isAtclPurchase(row));
+  const atclPurchaseRows = purchaseRows.filter((row) => isAtclPurchase(row));
+  const purchasesRaw = vendorPurchaseRows.reduce(
     (sum, row) => sum + toNumber(row.basicValue),
     0,
   );
   const purchases = Math.round(purchasesRaw * 100) / 100;
-  const stockFromAtcl = round2(toNumber(stockInwardAgg._sum.closingValue));
+  const stockFromAtclPurchases = round2(
+    atclPurchaseRows.reduce((sum, row) => sum + toNumber(row.basicValue), 0),
+  );
+  const stockFromAtclLegacy = round2(toNumber(stockInwardAgg._sum.closingValue));
+  const stockFromAtcl =
+    stockFromAtclPurchases > 0 ? stockFromAtclPurchases : stockFromAtclLegacy;
   const totalPurchases = round2(purchasesRaw + stockFromAtcl);
   const openingStock = round2(openingStockRaw);
   // Auto-calculate: Closing Stock = Opening Stock (last snapshot) + Purchases − Sales
@@ -214,6 +216,7 @@ async function buildPvcDynamic(
         (r) =>
           r.entryType === PettyCashKind.EXPENSE &&
           (r.expenseHead.trim().toLowerCase() === "electricity" ||
+            r.expenseHead.trim().toLowerCase() === "fuel & power" ||
             r.payMode.trim().toLowerCase() === "electricity"),
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
@@ -233,14 +236,25 @@ async function buildPvcDynamic(
   const rent =
     rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
-  // Excel Purchase!H156 = SUM(H5:H154)*G156/1000
+  // Excel Purchase!H156 = SUM(H5:H154)*G156/1000 — prefer manual Unloading of MT expense entries
   const totalPurchaseQtyKgs = purchaseRows.reduce(
     (sum, row) => sum + toNumber(row.quantity),
     0,
   );
-  const unloadingExpense = round4(
+  const unloadingFromEntries = round2(
+    pettyEntries
+      .filter(
+        (r) =>
+          r.entryType === PettyCashKind.EXPENSE &&
+          /unloading/i.test(r.expenseHead.trim()),
+      )
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+  const unloadingFromPurchases = round4(
     (totalPurchaseQtyKgs * PVC_UNLOADING_RATE_PER_MT) / 1000,
   );
+  const unloadingExpense =
+    unloadingFromEntries > 0 ? unloadingFromEntries : unloadingFromPurchases;
 
   const pettyCashRows = pettyEntries.filter(
     (r) => r.entryType === PettyCashKind.PETTY_CASH,
@@ -679,15 +693,21 @@ async function buildCat6Dynamic(
   enteredById?: string,
 ): Promise<PlantPnlStatement> {
   const byUser = enteredById ? { enteredById } : {};
-  const periodDays = daysInclusive(from, to);
+  const farMonths = Math.max(1, monthStartsInRange(from, to).length);
 
   const isExcelCat6Period =
     to.getUTCFullYear() === 2026 && to.getUTCMonth() === 4 && to.getUTCDate() === 22;
   const salesTo = isExcelCat6Period ? CAT6_EXCEL_SALES_TO : to;
   const purchasesTo = isExcelCat6Period ? CAT6_EXCEL_PURCHASES_TO : to;
 
-  const [salesAgg, purchaseAgg, pettyEntries, openingStockRow, openingStockEntered] =
-    await Promise.all([
+  const [
+    salesAgg,
+    purchaseAgg,
+    pettyEntries,
+    openingStockRow,
+    openingStockEntered,
+    fixedAssets,
+  ] = await Promise.all([
       prisma.sale.aggregate({
         where: { plantId, ...byUser, date: { gte: from, lte: salesTo } },
         _sum: { salesValue: true },
@@ -722,6 +742,17 @@ async function buildCat6Dynamic(
             select: { closingValue: true },
           }),
       scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from),
+      scoped
+        ? Promise.resolve([])
+        : prisma.fixedAsset.findMany({
+            where: { plantId },
+            select: {
+              cost: true,
+              gst: true,
+              invoiceValue: true,
+              depreciationPercent: true,
+            },
+          }),
     ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
@@ -780,8 +811,23 @@ async function buildCat6Dynamic(
     }, 0),
   );
   const manpower = round2(salaryBase * 0.7);
-  const depreciation = round2(CAT6_DEPRECIATION_DAILY * periodDays);
-  const interestOnTl = round2(CAT6_INTEREST_DAILY * periodDays);
+  // Depreciation = Σ (asset cost × dep% × months / 12) — same formula as PVC FAR
+  const depreciation = round2(
+    fixedAssets.reduce((sum, asset) => {
+      const annual =
+        toNumber(asset.cost) * (toNumber(asset.depreciationPercent) / 100);
+      return sum + (annual * farMonths) / 12;
+    }, 0),
+  );
+  // Interest on TL from FAR invoice basis × 12% × months/12 (confirm rate if different)
+  const maxInvoiceBasis = fixedAssets.reduce((maxBasis, asset) => {
+    const invoiceBasis =
+      toNumber(asset.invoiceValue) > 0
+        ? toNumber(asset.invoiceValue)
+        : toNumber(asset.cost) + toNumber(asset.gst);
+    return Math.max(maxBasis, invoiceBasis);
+  }, 0);
+  const interestOnTl = round2(maxInvoiceBasis * 0.12 * (farMonths / 12));
   const variableCost = round2(salesRevenue * 0.01);
   const electricity = 0;
   const rent = 0;
@@ -868,7 +914,7 @@ async function buildDynamic(
 
   const [
     salesAgg,
-    purchaseAgg,
+    purchaseRowsScoped,
     purchaseQtyAgg,
     stockInwardAgg,
     manpowerAgg,
@@ -883,14 +929,14 @@ async function buildDynamic(
       where: { plantId, ...byUser, date: { gte: from, lte: to } },
       _sum: { salesValue: true },
     }),
-    prisma.purchase.aggregate({
+    prisma.purchase.findMany({
       where: {
         plantId,
         ...byUser,
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
       },
-      _sum: { basicValue: true },
+      select: { basicValue: true, vendorName: true, notes: true },
     }),
     prisma.purchase.aggregate({
       where: { plantId, ...byUser, date: { gte: from, lte: to } },
@@ -902,7 +948,7 @@ async function buildDynamic(
           where: {
             plantId,
             date: { gte: from, lte: to },
-            NOT: { notes: { startsWith: "Closing stock" } },
+            ...atclStockEntryFilter(),
           },
           _sum: { closingValue: true },
         }),
@@ -951,8 +997,27 @@ async function buildDynamic(
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
-  const purchases = round2(toNumber(purchaseAgg._sum.basicValue));
-  const stockFromAtcl = round2(toNumber(stockInwardAgg._sum.closingValue));
+  const vendorPurchaseRowsScoped = purchaseRowsScoped.filter(
+    (row) => !isAtclPurchase(row),
+  );
+  const atclPurchaseRowsScoped = purchaseRowsScoped.filter((row) =>
+    isAtclPurchase(row),
+  );
+  const purchases = round2(
+    vendorPurchaseRowsScoped.reduce(
+      (sum, row) => sum + toNumber(row.basicValue),
+      0,
+    ),
+  );
+  const stockFromAtclPurchases = round2(
+    atclPurchaseRowsScoped.reduce(
+      (sum, row) => sum + toNumber(row.basicValue),
+      0,
+    ),
+  );
+  const stockFromAtclLegacy = round2(toNumber(stockInwardAgg._sum.closingValue));
+  const stockFromAtcl =
+    stockFromAtclPurchases > 0 ? stockFromAtclPurchases : stockFromAtclLegacy;
   const totalPurchases = round2(purchases + stockFromAtcl);
   const openingStockSnap = round2(openingStockManualRaw);
   // Opening stock = last closing snapshot before period; fallback to legacy stockValueAsOf
@@ -977,6 +1042,7 @@ async function buildDynamic(
         (r) =>
           r.entryType === PettyCashKind.EXPENSE &&
           (r.expenseHead.trim().toLowerCase() === "electricity" ||
+            r.expenseHead.trim().toLowerCase() === "fuel & power" ||
             r.payMode.trim().toLowerCase() === "electricity"),
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
@@ -996,12 +1062,22 @@ async function buildDynamic(
   const electricity = electricityRentAmount > 0 ? electricityRentAmount : electricityFromPettyCash;
   const rent = rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
-  // Unloading = (Total Purchase Qty in KGS ÷ 1000) × Unloading Rate per MT
+  // Unloading: prefer manual "Unloading of MT" expense entries; else purchase qty × ₹70/MT
   const totalPurchaseQtyKgs = round2(toNumber(purchaseQtyAgg._sum.quantity));
-  // Excel hardcode: G156 = 70 ₹ per MT.
-  // We hardcode it here to avoid runtime crashes when DB schema isn't yet updated.
-  const unloadingRatePerMT = 70;
-  const unloadingExpense = round2((totalPurchaseQtyKgs / 1000) * unloadingRatePerMT);
+  const unloadingFromEntries = round2(
+    pettyEntries
+      .filter(
+        (r) =>
+          r.entryType === PettyCashKind.EXPENSE &&
+          /unloading/i.test(r.expenseHead.trim()),
+      )
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+  const unloadingFromPurchases = round2(
+    (totalPurchaseQtyKgs / 1000) * PVC_UNLOADING_RATE_PER_MT,
+  );
+  const unloadingExpense =
+    unloadingFromEntries > 0 ? unloadingFromEntries : unloadingFromPurchases;
 
   const pettyCashRows = pettyEntries.filter(
     (r) => r.entryType === PettyCashKind.PETTY_CASH,

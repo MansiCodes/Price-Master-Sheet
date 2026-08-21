@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
@@ -11,6 +12,7 @@ import { isCat6Plant } from "@/lib/plant-layout";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { PVC_STOCK_ENTRY_TYPES } from "@/lib/plant-catalogs";
 
 type StockRow = {
   id: string;
@@ -56,7 +58,14 @@ export function StockReport({
   const t = useTranslations("pnl");
   const isPvc = plantCode?.toUpperCase() === "PVC";
   const cat6 = isCat6Plant(plantCode);
-  const baseUrl = `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${isPvc ? "&snapshot=1" : ""}`;
+  const [stockView, setStockView] = useState<"closing" | "atcl">("closing");
+  const baseUrl =
+    `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` +
+    (isPvc
+      ? stockView === "atcl"
+        ? "&atcl=1"
+        : "&snapshot=1"
+      : "");
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<StockRow>(baseUrl, t("networkError"), isPvc ? 20 : 10);
   const totals = response?.totals as
@@ -234,8 +243,31 @@ export function StockReport({
   return (
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">
-        {isPvc ? "PVC Plant - Closing Stock" : t("stockTitle")}
+        {isPvc
+          ? stockView === "atcl"
+            ? "PVC Plant — Stock from ATCL"
+            : "PVC Plant — Closing Stock"
+          : t("stockTitle")}
       </h3>
+      {isPvc ? (
+        <div className="pnl-expense-subnav" role="tablist" aria-label="Stock type">
+          {PVC_STOCK_ENTRY_TYPES.map((entry) => (
+            <button
+              key={entry.value}
+              type="button"
+              role="tab"
+              aria-selected={stockView === entry.value}
+              className={stockView === entry.value ? "is-active" : ""}
+              onClick={() => {
+                setStockView(entry.value);
+                setPage(1);
+              }}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[

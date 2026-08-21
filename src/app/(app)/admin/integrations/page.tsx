@@ -236,7 +236,7 @@ export default function AdminIntegrationsPage() {
             />
             <p className="integrations-card__hint">
               Params: {"{{1}}"} name, {"{{2}}"} plant, {"{{3}}"} date, {"{{4}}"}{" "}
-              credit score
+              optional
             </p>
           </div>
 
@@ -249,8 +249,14 @@ export default function AdminIntegrationsPage() {
               placeholder="Cable Junction Price Sheet Share"
             />
             <p className="integrations-card__hint">
-              Params: {"{{1}}"} name, {"{{2}}"} item count, {"{{3}}"} date, {"{{4}}"}{" "}
-              rate summary
+              Campaign name must match AiSensy exactly ({" "}
+              <code>cable_price_camp</code> etc.). The WhatsApp template linked
+              to this campaign must be type <strong>Document / File</strong>{" "}
+              (not Text) — otherwise only the message text is delivered and the
+              PDF is skipped. Params: {"{{1}}"} name, {"{{2}}"} item count,{" "}
+              {"{{3}}"} date, {"{{4}}"} PDF link. After Meta approves the
+              document template, create/update the API campaign to use it and
+              set it Live.
             </p>
           </div>
 

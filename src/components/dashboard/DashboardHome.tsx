@@ -25,8 +25,6 @@ export async function DashboardHome({
   plant,
   shiftModules,
   scope,
-  showCreditScore,
-  creditScore,
 }: {
   metrics: DashboardMetrics;
   dateStr: string;
@@ -35,8 +33,6 @@ export async function DashboardHome({
   plant: { id: string; name: string; code: string } | null;
   shiftModules: ShiftModulesMap;
   scope: "org" | "plant";
-  showCreditScore: boolean;
-  creditScore: number | null;
 }) {
   const t = await getTranslations("dashboard");
   const tCommon = await getTranslations("common");
@@ -128,15 +124,6 @@ export async function DashboardHome({
         </div>
 
         <div className="dash-merged__side">
-          {showCreditScore ? (
-            <section className="mis-panel credit-score-panel">
-              <h2 className="section-label">{t("creditScore")}</h2>
-              <p className="credit-score-panel__value">
-                {creditScore != null ? creditScore : tCommon("dash")}
-              </p>
-            </section>
-          ) : null}
-
           <section className="mis-panel">
             <h2 className="section-label">{t("weekCompare")}</h2>
             <ul className="mis-day-list">

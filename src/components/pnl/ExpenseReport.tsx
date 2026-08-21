@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
@@ -9,7 +9,14 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
-import { pvcExpensePnlLine } from "@/lib/plant-catalogs";
+import {
+  PVC_EXPENSE_SECTIONS,
+  cat6ExpensePnlLine,
+  getExpenseHeadsForSection,
+  pvcExpensePnlLine,
+  usesExpenseSections,
+  type PvcExpenseSection,
+} from "@/lib/plant-catalogs";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
@@ -19,7 +26,13 @@ type ExpenseRow = {
   date: string;
   shift: string;
   expenseHead: string;
+  payMode?: string | null;
+  nature?: string | null;
   description: string | null;
+  location?: string | null;
+  checkedBy?: string | null;
+  approvedBy?: string | null;
+  billNumber?: string | null;
   openingReading: string | number | null;
   closingReading: string | number | null;
   amount: string | number;
@@ -66,10 +79,33 @@ export function ExpenseReport({
   const tCommon = useTranslations("common");
   const cat6 = isCat6Plant(plantCode);
   const pvc = plantCode?.toUpperCase() === "PVC";
-  const baseUrl = `/api/plants/${plantId}/petty-cash?entryType=EXPENSE&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const usesSections = usesExpenseSections(plantCode);
+
+  const [section, setSection] = useState<PvcExpenseSection>("direct");
+  const sectionHeads = useMemo(
+    () => [...getExpenseHeadsForSection(plantCode, section)],
+    [plantCode, section],
+  );
+  const [category, setCategory] = useState(
+    () =>
+      getExpenseHeadsForSection(plantCode, "direct")[0] ??
+      "Petty Cash",
+  );
+  const isPettyCategory = category === "Petty Cash";
+
+  const baseUrl = isPettyCategory
+    ? `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH` +
+      `&from=${encodeURIComponent(from)}` +
+      `&to=${encodeURIComponent(to)}`
+    : `/api/plants/${plantId}/petty-cash?entryType=EXPENSE` +
+      `&from=${encodeURIComponent(from)}` +
+      `&to=${encodeURIComponent(to)}` +
+      `&expenseHead=${encodeURIComponent(category)}`;
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
-  const totals = response?.totals as { total?: number } | undefined;
+  const totals = response?.totals as
+    | { total?: number; expenses?: number }
+    | undefined;
   const crud = useReportCrud<ExpenseRow>(`/api/plants/${plantId}/petty-cash`, reload);
 
   const columns: ReportColumn<ExpenseRow>[] = useMemo(
@@ -94,30 +130,16 @@ export function ExpenseReport({
               render: (r) => r.expenseHead,
             },
             {
+              key: "pnl",
+              label: "P&L Line",
+              wrap: true,
+              render: (r) => cat6ExpensePnlLine(r.expenseHead),
+            },
+            {
               key: "desc",
               label: "Remarks",
               wrap: "wide",
               render: (r) => r.description || tCommon("dash"),
-            },
-            {
-              key: "opening",
-              label: t("openingReading"),
-              align: "right",
-              compact: true,
-              render: (r) =>
-                r.openingReading == null
-                  ? tCommon("dash")
-                  : String(r.openingReading),
-            },
-            {
-              key: "closing",
-              label: t("closingReading"),
-              align: "right",
-              compact: true,
-              render: (r) =>
-                r.closingReading == null
-                  ? tCommon("dash")
-                  : String(r.closingReading),
             },
             {
               key: "amount",
@@ -161,26 +183,6 @@ export function ExpenseReport({
                 render: (r) => r.description || tCommon("dash"),
               },
               {
-                key: "opening",
-                label: t("openingReading"),
-                align: "right",
-                compact: true,
-                render: (r) =>
-                  r.openingReading == null
-                    ? tCommon("dash")
-                    : String(r.openingReading),
-              },
-              {
-                key: "closing",
-                label: t("closingReading"),
-                align: "right",
-                compact: true,
-                render: (r) =>
-                  r.closingReading == null
-                    ? tCommon("dash")
-                    : String(r.closingReading),
-              },
-              {
                 key: "amount",
                 label: t("amount"),
                 align: "right",
@@ -199,57 +201,115 @@ export function ExpenseReport({
               },
             ]
           : [
-            { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
-            { key: "shift", label: t("shift"), render: (r) => r.shift },
-            { key: "head", label: t("category"), render: (r) => r.expenseHead },
-            {
-              key: "desc",
-              label: t("remarksNotes"),
-              wrap: "wide",
-              render: (r) => r.description || tCommon("dash"),
-            },
-            {
-              key: "opening",
-              label: t("openingReading"),
-              align: "right",
-              render: (r) =>
-                r.openingReading == null
-                  ? tCommon("dash")
-                  : String(r.openingReading),
-            },
-            {
-              key: "closing",
-              label: t("closingReading"),
-              align: "right",
-              render: (r) =>
-                r.closingReading == null
-                  ? tCommon("dash")
-                  : String(r.closingReading),
-            },
-            {
-              key: "amount",
-              label: t("amount"),
-              align: "right",
-              render: (r) => formatINR(totalAmount(r)),
-            },
-            {
-              key: "photos",
-              label: "Bill",
-              compact: true,
-              render: (r) => (
-                <BillPhotosCell
-                  urls={r.billPhotoUrls}
-                  fallbackUrl={r.billPhotoUrl}
-                />
-              ),
-            },
-          ],
+              {
+                key: "s",
+                label: "S.No",
+                compact: true,
+                render: (_r, index) =>
+                  String((page - 1) * pageSize + (index ?? 0) + 1),
+              },
+              { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
+              { key: "head", label: t("category"), render: (r) => r.expenseHead },
+              {
+                key: "desc",
+                label: t("remarksNotes"),
+                wrap: "wide",
+                render: (r) => r.description || tCommon("dash"),
+              },
+              {
+                key: "amount",
+                label: t("amount"),
+                align: "right",
+                render: (r) => formatINR(totalAmount(r)),
+              },
+              {
+                key: "photos",
+                label: "Bill",
+                compact: true,
+                render: (r) => (
+                  <BillPhotosCell
+                    urls={r.billPhotoUrls}
+                    fallbackUrl={r.billPhotoUrl}
+                  />
+                ),
+              },
+            ],
     [cat6, pvc, page, pageSize, t, tCommon],
   );
 
+  function onSectionChange(next: PvcExpenseSection) {
+    setSection(next);
+    const heads = [...getExpenseHeadsForSection(plantCode, next)];
+    setCategory(heads[0] ?? "");
+    setPage(1);
+  }
+
   return (
-    <section className="pnl-report-panel">
+    <section className="pnl-report-panel pnl-report-panel--expense">
       <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
+
+      {usesSections ? (
+        <>
+          <div
+            className="pnl-tab-nav pnl-tab-nav--fit pnl-expense-type-nav"
+            role="tablist"
+            aria-label="Expense section"
+          >
+            {PVC_EXPENSE_SECTIONS.map((entry) => (
+              <button
+                key={entry.value}
+                type="button"
+                role="tab"
+                aria-selected={section === entry.value}
+                className={section === entry.value ? "is-active" : undefined}
+                onClick={() => onSectionChange(entry.value)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+
+          {sectionHeads.length > 0 ? (
+            <div
+              className={`pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-${sectionHeads.length}${
+                cat6 ? " pnl-expense-subnav--cat6" : ""
+              }`}
+              role="tablist"
+              aria-label={
+                section === "direct"
+                  ? "Direct expense types"
+                  : "Indirect expense types"
+              }
+            >
+              {sectionHeads.map((head) => (
+                <button
+                  key={head}
+                  type="button"
+                  role="tab"
+                  aria-selected={category === head}
+                  className={category === head ? "is-active" : undefined}
+                  onClick={() => {
+                    setCategory(head);
+                    setPage(1);
+                  }}
+                >
+                  {head === "Factory Rent" ? (
+                    <span className="pnl-tab-nav__stacked">
+                      <span>Factory</span>
+                      <span>Rent</span>
+                    </span>
+                  ) : (
+                    head
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="pnl-expense-empty-hint">No categories in this section.</p>
+          )}
+        </>
+      ) : null}
+
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[
@@ -268,6 +328,14 @@ export function ExpenseReport({
                     amount: String(r.amount ?? ""),
                     contractorSalary: String(r.contractorSalary ?? "0"),
                     supervisorSalary: String(r.supervisorSalary ?? "0"),
+                    ...(isPettyCategory
+                      ? {
+                          payMode: r.payMode ?? "",
+                          nature: r.nature ?? "",
+                          location: r.location ?? "",
+                          billNumber: r.billNumber ?? "",
+                        }
+                      : {}),
                   })
                 }
                 onDelete={() => void crud.remove(r.id)}
@@ -275,27 +343,27 @@ export function ExpenseReport({
             ),
           },
         ]}
-        rows={rows}
+        rows={sectionHeads.length === 0 ? [] : rows}
         loading={loading}
         emptyLabel={t("noRecords")}
-        variant={pvc ? "register" : undefined}
+        variant={pvc || cat6 ? "register" : undefined}
         footer={
-          totals
+          totals && rows.length > 0 && sectionHeads.length > 0
             ? cat6
-              ? { month: "TOTAL", amount: formatINR(totals.total ?? 0) }
-              : pvc
-                ? { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
-                : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
+              ? { s: "TOTAL", amount: formatINR(totals.total ?? 0) }
+              : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
             : undefined
         }
       />
-      <Pagination
-        page={page}
-        pageSize={pageSize}
-        total={total}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
+      {sectionHeads.length > 0 ? (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
       <EntryEditDrawer
         open={Boolean(crud.editing)}
         title="Edit expense"

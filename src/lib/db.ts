@@ -1,5 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+
+// Allow self-signed / AWS RDS certificates in serverless environment
+if (process.env.NODE_ENV === "production" || process.env.DATABASE_URL?.includes("rds.amazonaws.com")) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -7,7 +13,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Bump when Prisma schema fields change so the cached client is rebuilt. */
-const PRISMA_CLIENT_GEN = 15;
+const PRISMA_CLIENT_GEN = 8;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {
@@ -35,12 +41,14 @@ function resolveDatabaseUrl(): string {
     );
   }
 
-  // pg v8 warns that sslmode=require/prefer/verify-ca currently alias verify-full.
-  // Prefer the explicit mode so Neon connections stay secure without the console noise.
   try {
     const url = new URL(raw);
     const mode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
-    if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
+
+    if (raw.includes("rds.amazonaws.com")) {
+      // Force no-verify for AWS RDS so self-signed cert chain is accepted
+      url.searchParams.set("sslmode", "no-verify");
+    } else if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
       url.searchParams.set("sslmode", "verify-full");
     }
     return url.toString();
@@ -50,88 +58,38 @@ function resolveDatabaseUrl(): string {
 }
 
 function createPrismaClient() {
-  // Re-resolve @prisma/client from disk so `prisma generate` is visible after
-  // schema changes (Next.js otherwise keeps a stale bundled PrismaClient).
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const prismaPkgPath = require.resolve("@prisma/client");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  delete require.cache[prismaPkgPath];
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const defaultPath = require.resolve("@prisma/client/default");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    delete require.cache[defaultPath];
-  } catch {
-    // optional path
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const runtimePath = require.resolve(".prisma/client/index");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    delete require.cache[runtimePath];
-  } catch {
-    // optional path
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { PrismaClient: FreshPrismaClient } = require("@prisma/client") as {
-    PrismaClient: typeof PrismaClient;
-  };
-
   const connectionString = resolveDatabaseUrl();
-  const adapter = new PrismaPg({ connectionString });
-  return new FreshPrismaClient({
+  const isRds = connectionString.includes("rds.amazonaws.com");
+
+  const pool = new Pool({
+    connectionString,
+    ssl: isRds ? { rejectUnauthorized: false } : undefined,
+  });
+
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 }
 
-function clientMissingModels(client: PrismaClient): boolean {
-  // After schema adds, an old hot-reloaded client can lack new delegates.
-  const c = client as unknown as Record<string, unknown>;
-  return (
-    c.machine == null ||
-    c.machineProcess == null ||
-    c.machineCableType == null ||
-    c.machineCableSize == null ||
-    c.machineProductionEntry == null
-  );
-}
-
 /** Lazy Prisma accessor — avoids crashing Next.js build when DATABASE_URL is absent. */
 export function getPrisma(): PrismaClient {
-  const stale =
+  if (
     !globalForPrisma.prisma ||
-    globalForPrisma.prismaClientGen !== PRISMA_CLIENT_GEN ||
-    clientMissingModels(globalForPrisma.prisma);
-
-  if (stale) {
-    try {
-      void globalForPrisma.prisma?.$disconnect();
-    } catch {
-      // ignore disconnect errors from stale clients
-    }
+    globalForPrisma.prismaClientGen !== PRISMA_CLIENT_GEN
+  ) {
     globalForPrisma.prisma = createPrismaClient();
     globalForPrisma.prismaClientGen = PRISMA_CLIENT_GEN;
-
-    if (clientMissingModels(globalForPrisma.prisma)) {
-      throw new Error(
-        "Prisma client is missing Machine Production models. Stop npm run dev, run `npx prisma generate`, then start npm run dev again.",
-      );
-    }
   }
   return globalForPrisma.prisma;
 }
 
-/**
- * Proxy so `import { prisma }` stays lazy. Model delegates are getters on
- * PrismaClient — Reflect.get must use the real client as receiver, otherwise
- * `prisma.machine` / etc. become undefined.
- */
+/** @deprecated Prefer getPrisma() for clearer lazy init */
 export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop, _receiver) {
+  get(_target, prop, receiver) {
     const client = getPrisma();
-    const value = Reflect.get(client, prop, client);
+    const value = Reflect.get(client, prop, receiver);
     return typeof value === "function" ? value.bind(client) : value;
   },
 });
