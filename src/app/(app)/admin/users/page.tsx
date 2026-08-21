@@ -74,8 +74,10 @@ export default function AdminUsersPage() {
       if (!usersRes.ok || !usersJson.ok) {
         throw new Error(usersJson.message || "Failed to load users");
       }
-      if (!plantsRes.ok || !plantsJson.ok) {
-        throw new Error(plantsJson.message || "Failed to load plants");
+      if (!plantsRes.ok || !plantsJson?.ok) {
+        throw new Error(
+          plantsJson?.message || `Failed to load plants (${plantsRes.status})`,
+        );
       }
       setUsers(usersJson.users ?? []);
       setPlants(plantsJson.plants ?? []);

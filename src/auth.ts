@@ -20,19 +20,28 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
   });
   if (!user) return null;
 
+  // Find the most recent unconsumed challenge for this phone number
   const challenge = await prisma.otpChallenge.findFirst({
     where: {
       phone,
       consumed: false,
-      expiresAt: { gt: new Date() },
     },
     orderBy: { createdAt: "desc" },
   });
-  if (!challenge) return null;
 
+  if (!challenge) {
+    console.warn(`[authorizeWithOtp] No active OTP challenge found for ${phone}`);
+    return null;
+  }
+
+  // Check OTP code validity with bcrypt
   const valid = await bcrypt.compare(code, challenge.codeHash);
-  if (!valid) return null;
+  if (!valid) {
+    console.warn(`[authorizeWithOtp] Invalid OTP code for ${phone}`);
+    return null;
+  }
 
+  // Mark challenge as consumed
   await prisma.otpChallenge.update({
     where: { id: challenge.id },
     data: { consumed: true },
@@ -61,36 +70,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         code: { label: "OTP Code", type: "text" },
       },
       async authorize(credentials) {
-        const phone = readCredential(credentials?.phone);
-        const code = readCredential(credentials?.code);
-        if (phone && code) {
-          return authorizeWithOtp(phone, code);
-        }
+        try {
+          const phone = readCredential(credentials?.phone);
+          const code = readCredential(credentials?.code);
+          if (phone && code) {
+            return await authorizeWithOtp(phone, code);
+          }
 
-        const email = readCredential(credentials?.email).toLowerCase().trim();
-        const password = readCredential(credentials?.password);
-        if (!email || !password || !email.includes("@")) {
+          const email = readCredential(credentials?.email).toLowerCase().trim();
+          const password = readCredential(credentials?.password);
+          if (!email || !password || !email.includes("@")) {
+            return null;
+          }
+
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+
+          if (!user || !user.isActive || !user.passwordHash) {
+            return null;
+          }
+
+          const valid = await bcrypt.compare(password, user.passwordHash);
+          if (!valid) return null;
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            globalRole: user.globalRole,
+            canViewPriceSheet: user.canViewPriceSheet,
+          };
+        } catch (err) {
+          console.error("[NextAuth authorize error]", err);
           return null;
         }
-
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
-
-        if (!user || !user.isActive || !user.passwordHash) {
-          return null;
-        }
-
-        const valid = await bcrypt.compare(password, user.passwordHash);
-        if (!valid) return null;
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          globalRole: user.globalRole,
-          canViewPriceSheet: user.canViewPriceSheet,
-        };
       },
     }),
   ],
