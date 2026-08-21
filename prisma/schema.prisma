@@ -12,6 +12,7 @@ enum GlobalRole {
   PLANT_MANAGER
   ACCOUNTANT
   VIEWER
+  MACHINE_SUPERVISOR
 }
 
 enum PurchaseType {

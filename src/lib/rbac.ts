@@ -14,6 +14,7 @@ const PNL_VIEW_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.BUSINESS_HEAD,
   GlobalRole.PLANT_MANAGER,
   GlobalRole.VIEWER,
+  GlobalRole.MACHINE_SUPERVISOR,
 ]);
 
 const DATA_ENTRY_ROLES: ReadonlySet<GlobalRole> = new Set([
@@ -21,6 +22,7 @@ const DATA_ENTRY_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.BUSINESS_HEAD,
   GlobalRole.PLANT_MANAGER,
   GlobalRole.ACCOUNTANT,
+  GlobalRole.MACHINE_SUPERVISOR,
 ]);
 
 export function canViewPnl(role: GlobalRole | Role): boolean {
