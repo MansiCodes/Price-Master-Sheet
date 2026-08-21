@@ -4,9 +4,11 @@ frontend:
     preBuild:
       commands:
         - npm install
+        - env | grep -v '^_' >> .env.production
         - npx prisma generate
     build:
       commands:
+        - env | grep -v '^_' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
