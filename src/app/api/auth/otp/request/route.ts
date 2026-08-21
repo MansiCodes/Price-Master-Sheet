@@ -106,10 +106,11 @@ export async function POST(request: Request) {
       expiresAt: expiresAt.toISOString(),
       devCode: code,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Internal server error";
     console.error("[OTP Request Error]", err);
     return NextResponse.json(
-      { ok: false, message: err.message || "Internal server error" },
+      { ok: false, message },
       { status: 500 },
     );
   }
