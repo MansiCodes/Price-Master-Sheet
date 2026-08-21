@@ -6,7 +6,7 @@ frontend:
         - npm install
         - export NODE_TLS_REJECT_UNAUTHORIZED=0
         - export AUTH_TRUST_HOST=true
-        - env | grep -v '^_' >> .env.production
+        - env | grep -v '^_' | grep -v '^PATH=' | grep -v '^PWD=' | grep -v '^HOME=' | grep -v '^SHLVL=' | grep -v '^HOSTNAME=' > .env.production
         - echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env.production
         - echo "AUTH_TRUST_HOST=true" >> .env.production
         - npx prisma generate
@@ -14,9 +14,6 @@ frontend:
       commands:
         - export NODE_TLS_REJECT_UNAUTHORIZED=0
         - export AUTH_TRUST_HOST=true
-        - env | grep -v '^_' >> .env.production
-        - echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env.production
-        - echo "AUTH_TRUST_HOST=true" >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
@@ -26,3 +23,4 @@ frontend:
     paths:
       - .next/cache/**/*
       - node_modules/**/*
+

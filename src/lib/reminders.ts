@@ -50,7 +50,7 @@ function uniqueRecipients(
 }
 
 /**
- * Send one WhatsApp per person for the upcoming Day (08:50) or Night (20:50) shift.
+ * Send one WhatsApp per person for the upcoming Day (08:50 AM) or Night (08:50 PM) shift.
  */
 export async function runDailyReminders(now: Date = new Date()) {
   const day = todayIstAsUtcDate(now);
@@ -59,6 +59,7 @@ export async function runDailyReminders(now: Date = new Date()) {
   const shift = reminderShiftForNow(now);
 
   if (!shift) {
+    console.log(`[reminders] Skipped: outside shift reminder window (now=${now.toISOString()})`);
     return {
       skipped: true as const,
       reason: "outside_shift_reminder_window",
@@ -67,6 +68,8 @@ export async function runDailyReminders(now: Date = new Date()) {
       whatsappSent: 0,
     };
   }
+
+  console.log(`[reminders] Running ${shift} shift reminders for ${isoDate}`);
 
   const whatsappReady = await isAisensyReminderConfigured();
   const plants = await prisma.plant.findMany({
