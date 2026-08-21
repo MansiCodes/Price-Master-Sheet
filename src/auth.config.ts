@@ -1,10 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 /** Session cookie name — bump version whenever AUTH_SECRET rotates so old JWTs are ignored. */
-export const SESSION_COOKIE =
-  process.env.NODE_ENV === "production"
-    ? "__Secure-cj.session-token.v3"
-    : "cj.session-token.v3";
+export const SESSION_COOKIE = "cj.session-token.v3";
 
 /**
  * Edge-compatible Auth.js config used by middleware.
