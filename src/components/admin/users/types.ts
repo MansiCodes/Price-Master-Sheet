@@ -31,6 +31,7 @@ export const ROLES = [
   "PLANT_MANAGER",
   "ACCOUNTANT",
   "VIEWER",
+  "MACHINE_SUPERVISOR",
 ] as const;
 
 export type RoleValue = (typeof ROLES)[number];
@@ -41,6 +42,7 @@ export const ROLE_LABEL: Record<RoleValue, string> = {
   PLANT_MANAGER: "Plant Manager",
   ACCOUNTANT: "Accountant",
   VIEWER: "Viewer",
+  MACHINE_SUPERVISOR: "Machine Supervisor",
 };
 
 export function userInitials(name: string | null, email: string): string {

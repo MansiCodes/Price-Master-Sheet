@@ -12,6 +12,13 @@ enum GlobalRole {
   PLANT_MANAGER
   ACCOUNTANT
   VIEWER
+  /// Machine Production module only — not used for Plant P&L.
+  MACHINE_SUPERVISOR
+}
+
+enum MachineProductionShift {
+  DAY
+  NIGHT
 }
 
 enum PurchaseType {
@@ -80,6 +87,7 @@ model User {
   creditScoreAwards  CreditScoreAward[]
   priceSheetRecipients PriceSheetRecipient[] @relation("PriceSheetRecipientsCreated")
   otpChallenges      OtpChallenge[]
+  machineProductionEntries MachineProductionEntry[] @relation("MachineProductionSupervisor")
 }
 
 model Plant {
@@ -485,4 +493,96 @@ model PriceSheetRecipient {
   createdBy   User     @relation("PriceSheetRecipientsCreated", fields: [createdById], references: [id])
 
   @@index([createdAt])
+}
+
+/// Standalone Machine Production module (independent of Plant P&L).
+model Machine {
+  id          String                   @id @default(cuid())
+  name        String
+  code        String                   @unique
+  description String?
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  entries     MachineProductionEntry[]
+  processes   MachineProcess[]
+
+  @@index([isActive, name])
+}
+
+/// Per-machine process options for the "Current process" dropdown.
+model MachineProcess {
+  id        String   @id @default(cuid())
+  machineId String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, name])
+  @@index([machineId, isActive, sortOrder])
+}
+
+/// Global cable types shared by all machines.
+model MachineCableType {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  sortOrder Int               @default(0)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  sizes     MachineCableSize[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Cable sizes belong to a cable type (global, not per machine).
+model MachineCableSize {
+  id          String          @id @default(cuid())
+  cableTypeId String
+  name        String
+  sortOrder   Int             @default(0)
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  cableType   MachineCableType @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([cableTypeId, name])
+  @@index([cableTypeId, isActive, sortOrder])
+}
+
+model MachineProductionEntry {
+  id                String                 @id @default(cuid())
+  machineId         String
+  supervisorId      String
+  /// Calendar date of the shift (for night: the date the 9PM start falls on).
+  entryDate         DateTime               @db.Date
+  shift             MachineProductionShift
+  /// Slot start hour in IST: Day 9/13/17, Night 21/1/5.
+  slotStartHour     Int
+  /// Snapshot of selected process name at submit time.
+  currentProcess    String
+  cableType         String
+  cableSize         String
+  plannedProduction Decimal                @db.Decimal(18, 4)
+  actualProduction  Decimal                @db.Decimal(18, 4)
+  efficiencyPct     Decimal                @db.Decimal(8, 2)
+  operators         Int
+  helpers           Int
+  totalManpower     Int
+  remarks           String?
+  photoUrls         String[]               @default([])
+  submittedAt       DateTime               @default(now())
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  machine           Machine                @relation(fields: [machineId], references: [id])
+  supervisor        User                   @relation("MachineProductionSupervisor", fields: [supervisorId], references: [id])
+
+  @@unique([machineId, entryDate, shift, slotStartHour])
+  @@index([entryDate, shift])
+  @@index([supervisorId, entryDate])
+  @@index([cableType])
+  @@index([currentProcess])
 }

@@ -60,7 +60,8 @@ export function UserFormModal({
     () => plants.filter((p) => p.isActive),
     [plants],
   );
-  const requiresPlants = globalRole !== "SUPER_ADMIN";
+  const requiresPlants =
+    globalRole !== "SUPER_ADMIN" && globalRole !== "MACHINE_SUPERVISOR";
 
   useEffect(() => {
     if (open) {
@@ -110,7 +111,7 @@ export function UserFormModal({
 
   useEffect(() => {
     if (!open) return;
-    if (globalRole === "SUPER_ADMIN") {
+    if (globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR") {
       setSelectedPlantIds([]);
       setPlantError(null);
       return;
@@ -161,7 +162,9 @@ export function UserFormModal({
       globalRole,
       canViewPriceSheet,
       isActive: editing?.isActive ?? true,
-      plantIds: globalRole === "SUPER_ADMIN" ? [] : selectedPlantIds,
+      plantIds: globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR"
+        ? []
+        : selectedPlantIds,
     });
   }
 

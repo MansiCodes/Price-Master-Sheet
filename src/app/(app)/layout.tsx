@@ -5,10 +5,12 @@ import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
 import {
   getAccessiblePlantIds,
+  canAccessMachineProduction,
   canEnterData,
   canViewPnl,
   canViewPriceSheet,
   isAdminOrHead,
+  isMachineSupervisor,
   isPlantManager,
   isSuperAdmin,
 } from "@/lib/rbac";
@@ -28,6 +30,37 @@ export default async function AppLayout({
   const user = session.user;
   const role = user.globalRole;
   const superAdmin = role ? isSuperAdmin(role) : false;
+
+  // Machine supervisors skip plant-scoped shell chrome.
+  if (role && isMachineSupervisor(role)) {
+    return (
+      <AppShell
+        navFlags={{
+          showPnl: false,
+          showPriceSheet: false,
+          showMachineProduction: true,
+          showAdmin: false,
+          showSuper: false,
+          isManager: false,
+          primaryPlantId: null,
+          showSwitchPlant: false,
+          selectedPlantName: null,
+        }}
+        user={{
+          name: user.name ?? null,
+          email: user.email ?? "",
+          role: user.globalRole,
+        }}
+        canEnter={false}
+        plants={[]}
+        currentPlantId={null}
+        allowAllPlants={false}
+      >
+        {children}
+      </AppShell>
+    );
+  }
+
   const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
   const selectedPlantId = user
     ? await resolveSelectedPlantId(user.id, { isSuperAdmin: false })
@@ -55,6 +88,9 @@ export default async function AppLayout({
   const showPriceSheet =
     !!user &&
     (user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user));
+  const showMachineProduction = role
+    ? canAccessMachineProduction(role)
+    : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
@@ -66,6 +102,7 @@ export default async function AppLayout({
       navFlags={{
         showPnl,
         showPriceSheet,
+        showMachineProduction,
         showAdmin,
         showSuper,
         isManager,

@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { getAccessiblePlantIds, isSuperAdmin } from "@/lib/rbac";
+import {
+  getAccessiblePlantIds,
+  isMachineSupervisor,
+  isSuperAdmin,
+} from "@/lib/rbac";
 import { PlantChooser } from "@/components/select-plant/PlantChooser";
 import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import "@/components/select-plant/plant-chooser.css";
@@ -16,6 +20,9 @@ export default async function SelectPlantPage() {
   const user = session.user;
   if (isSuperAdmin(user.globalRole)) {
     redirect("/");
+  }
+  if (isMachineSupervisor(user.globalRole)) {
+    redirect("/machine-production");
   }
 
   const plantIds = await getAccessiblePlantIds(user.id);

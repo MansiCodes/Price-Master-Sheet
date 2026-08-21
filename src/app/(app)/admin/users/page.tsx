@@ -45,16 +45,32 @@ export default function AdminUsersPage() {
         fetch("/api/admin/users"),
         fetch("/api/admin/plants"),
       ]);
-      const usersJson = (await usersRes.json()) as {
+      const usersText = await usersRes.text();
+      const plantsText = await plantsRes.text();
+      let usersJson: {
         ok?: boolean;
         message?: string;
         users?: UserRow[];
       };
-      const plantsJson = (await plantsRes.json()) as {
+      let plantsJson: {
         ok?: boolean;
         message?: string;
         plants?: PlantOption[];
       };
+      try {
+        usersJson = usersText
+          ? (JSON.parse(usersText) as typeof usersJson)
+          : { ok: false, message: "Empty response from users API" };
+      } catch {
+        throw new Error("Users API returned invalid JSON");
+      }
+      try {
+        plantsJson = plantsText
+          ? (JSON.parse(plantsText) as typeof plantsJson)
+          : { ok: false, message: "Empty response from plants API" };
+      } catch {
+        throw new Error("Plants API returned invalid JSON");
+      }
       if (!usersRes.ok || !usersJson.ok) {
         throw new Error(usersJson.message || "Failed to load users");
       }

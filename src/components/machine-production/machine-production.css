@@ -1,0 +1,589 @@
+/* Standalone Machine Production module styles */
+
+.mp-root {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.mp-shift-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mp-shift-tab {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--stone);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.mp-shift-tab:hover {
+  border-color: var(--teal);
+  color: var(--teal-ink);
+}
+
+.mp-shift-tab--active {
+  background: var(--teal-soft);
+  border-color: transparent;
+  color: var(--teal-ink);
+}
+
+.mp-slot-banner {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--teal-soft) 70%, white),
+    var(--bg-elevated)
+  );
+  border: 1px solid var(--border);
+}
+
+.mp-slot-banner__label {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--stone);
+}
+
+.mp-slot-banner__value {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mp-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mp-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--stone);
+}
+
+.mp-count--ok {
+  background: color-mix(in srgb, #16a34a 12%, white);
+  color: #166534;
+  border-color: transparent;
+}
+
+.mp-count--pending {
+  background: var(--amber-soft);
+  color: #92400e;
+  border-color: transparent;
+}
+
+.mp-count--overdue {
+  background: color-mix(in srgb, #dc2626 12%, white);
+  color: #991b1b;
+  border-color: transparent;
+}
+
+.mp-machine-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.mp-machine-card {
+  text-align: left;
+  padding: 1rem 1.05rem;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mp-machine-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--teal);
+  box-shadow: 0 6px 16px rgb(28 25 23 / 10%), var(--shadow);
+}
+
+/*
+ * Status tint for the whole card. Supervisors scan a grid of ~60 machines and
+ * need to spot what is still owed for the current slot without reading badges,
+ * so the card carries the same colour as its .mp-status pill:
+ * green = submitted, amber = still open, red = past the 4-hour deadline.
+ */
+.mp-machine-card--ok,
+.mp-machine-card--pending,
+.mp-machine-card--overdue {
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+/*
+ * Submitted slots go solid dark green — the only filled card in the grid, so
+ * "done" reads instantly against the pale amber/red of everything still owed.
+ * Text inside has to be re-coloured for the dark ground.
+ */
+.mp-machine-card--ok {
+  background: linear-gradient(135deg, #166534 0%, #14532d 100%);
+  border-color: #14532d;
+  border-left-color: #4ade80;
+  box-shadow: 0 4px 14px rgb(20 83 45 / 28%);
+}
+
+.mp-machine-card--ok:hover {
+  border-color: #22c55e;
+  border-left-color: #86efac;
+  box-shadow: 0 8px 20px rgb(20 83 45 / 34%);
+}
+
+.mp-machine-card--ok .mp-machine-card__code {
+  color: #86efac;
+}
+
+.mp-machine-card--ok .mp-machine-card__name {
+  color: #ffffff;
+}
+
+.mp-machine-card--ok .mp-machine-card__desc {
+  color: #a7d8b4;
+}
+
+.mp-machine-card--ok .mp-machine-card__meta {
+  color: #dcfce7;
+  font-weight: 600;
+}
+
+.mp-machine-card--ok .mp-status--ok {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.mp-machine-card--pending {
+  background: color-mix(in srgb, #d97706 6%, var(--bg-elevated));
+  border-color: color-mix(in srgb, #d97706 24%, var(--border));
+  border-left-color: #d97706;
+}
+
+.mp-machine-card--pending:hover {
+  border-color: color-mix(in srgb, #d97706 45%, var(--border));
+  border-left-color: #b45309;
+}
+
+.mp-machine-card--pending .mp-machine-card__code {
+  color: #92400e;
+}
+
+.mp-machine-card--overdue {
+  background: color-mix(in srgb, #dc2626 7%, var(--bg-elevated));
+  border-color: color-mix(in srgb, #dc2626 26%, var(--border));
+  border-left-color: #dc2626;
+}
+
+.mp-machine-card--overdue:hover {
+  border-color: color-mix(in srgb, #dc2626 45%, var(--border));
+  border-left-color: #b91c1c;
+}
+
+.mp-machine-card--overdue .mp-machine-card__code {
+  color: #991b1b;
+}
+
+.mp-machine-card--overdue .mp-machine-card__cta {
+  color: #991b1b;
+  font-weight: 700;
+}
+
+.mp-machine-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mp-machine-card__code {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--teal);
+}
+
+.mp-machine-card__name {
+  margin: 0.55rem 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.mp-machine-card__desc,
+.mp-machine-card__meta,
+.mp-machine-card__cta,
+.mp-muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--stone);
+}
+
+.mp-machine-card__cta {
+  margin-top: 0.65rem;
+  font-weight: 600;
+  color: var(--teal-ink);
+}
+
+.mp-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.mp-status--ok {
+  background: color-mix(in srgb, #16a34a 14%, white);
+  color: #166534;
+}
+
+.mp-status--pending {
+  background: var(--amber-soft);
+  color: #92400e;
+}
+
+.mp-status--overdue {
+  background: color-mix(in srgb, #dc2626 14%, white);
+  color: #991b1b;
+}
+
+.mp-error {
+  color: #991b1b;
+  margin: 0;
+}
+
+.mp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.mp-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.mp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--stone);
+}
+
+.mp-field input,
+.mp-field textarea,
+.mp-filters input,
+.mp-filters select,
+.mp-machine-form input {
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--bg-elevated);
+}
+
+.mp-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.mp-form__banner {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.55rem;
+  font-size: 0.85rem;
+}
+
+.mp-form__banner--ok {
+  background: color-mix(in srgb, #16a34a 12%, white);
+  color: #166534;
+}
+
+.mp-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.mp-filters label,
+.mp-machine-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--stone);
+}
+
+.mp-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.mp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.mp-table th,
+.mp-table td {
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.mp-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--stone);
+  background: color-mix(in srgb, var(--bg) 70%, white);
+}
+
+.mp-table__row {
+  cursor: pointer;
+}
+
+.mp-table__row:hover {
+  background: color-mix(in srgb, var(--teal-soft) 35%, white);
+}
+
+.mp-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.mp-admin-machines {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 1rem;
+}
+
+.mp-cable-admin {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.mp-cable-admin .mp-admin-machines {
+  grid-template-columns: 1fr;
+}
+
+.mp-table__row--selected {
+  background: color-mix(in srgb, var(--teal-soft) 55%, white);
+}
+
+.mp-machine-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+}
+
+.mp-machine-form h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mp-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(28 25 23 / 45%);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  z-index: 80;
+}
+
+.mp-detail {
+  width: min(640px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  background: var(--bg-elevated);
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px rgb(28 25 23 / 25%);
+  padding: 1.1rem 1.2rem 1.3rem;
+}
+
+.mp-detail__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.mp-detail__head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mp-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem 1rem;
+  margin: 0;
+}
+
+.mp-detail__grid dt {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--stone);
+}
+
+.mp-detail__grid dd {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+}
+
+.mp-detail__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.mp-detail__photos img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 0.55rem;
+  border: 1px solid var(--border);
+}
+
+.mp-process-panel {
+  width: min(720px, 100%);
+}
+
+.mp-process-panel__form {
+  margin-bottom: 1rem;
+}
+
+.mp-live-photo.bill-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mp-live-photo .bill-upload__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--stone);
+}
+
+.mp-live-photo .bill-upload__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mp-live-photo .bill-upload__thumb {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.mp-live-photo .bill-upload__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mp-live-photo .bill-upload__remove {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  border: none;
+  border-radius: 999px;
+  width: 1.4rem;
+  height: 1.4rem;
+  background: rgb(28 25 23 / 70%);
+  color: white;
+  cursor: pointer;
+}
+
+.mp-live-photo .bill-upload__add {
+  width: 88px;
+  height: 88px;
+  border-radius: 0.55rem;
+  border: 1px dashed var(--border);
+  background: color-mix(in srgb, var(--bg) 80%, white);
+  color: var(--teal-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mp-live-photo .bill-upload__error {
+  margin: 0;
+  color: #991b1b;
+  font-size: 0.8rem;
+}
+
+.mp-denied {
+  max-width: 420px;
+  margin: 3rem auto;
+  text-align: center;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+@media (max-width: 800px) {
+  .mp-slot-banner,
+  .mp-form__row,
+  .mp-detail__grid,
+  .mp-admin-machines,
+  .mp-cable-admin {
+    grid-template-columns: 1fr;
+  }
+}

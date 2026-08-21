@@ -29,6 +29,10 @@ function navItemLabel(
       return t("pnl");
     case "price-sheet":
       return t("priceSheet");
+    case "machine-production":
+      return "Machine Production";
+    case "machine-production-admin":
+      return "MP Admin";
     case "users":
       return t("users");
     case "integrations":
@@ -57,6 +61,8 @@ const ICON_PATHS: Record<NavIconName, string> = {
   pnl: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   priceSheet:
     "M6 3h9l6 6v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm3 9h6m-6 4h6m-6-8h2",
+  machineProduction:
+    "M4 7h16v10H4V7Zm3 0V5h2v2m6 0V5h2v2M8 12h2m4 0h2M7 17v2m10-2v2",
   punctuality: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-14v5l3.5 2",
   plants: "M4 21V10l8-6 8 6v11M9 21v-6h6v6M4 10h16",
   users: "M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm8 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM2.5 20c0-2.8 2.5-5 5.5-5s5.5 2.2 5.5 5M14 15.5c2.8 0 5.5 1.8 5.5 4.5",

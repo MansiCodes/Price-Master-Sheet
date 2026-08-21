@@ -18,6 +18,7 @@ export type NavIconName =
   | "assets"
   | "pnl"
   | "priceSheet"
+  | "machineProduction"
   | "punctuality"
   | "plants"
   | "users"
@@ -40,6 +41,7 @@ export type NavSection = {
 export type NavFlags = {
   showPnl: boolean;
   showPriceSheet: boolean;
+  showMachineProduction: boolean;
   showAdmin: boolean;
   showSuper: boolean;
   isManager: boolean;
@@ -52,6 +54,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
   const {
     showPnl,
     showPriceSheet,
+    showMachineProduction,
     showAdmin,
     showSuper,
     primaryPlantId,
@@ -68,6 +71,16 @@ export function getNavSections(flags: NavFlags): NavSection[] {
         href: "/",
         icon: "home",
       },
+      ...(showMachineProduction
+        ? [
+            {
+              key: "machine-production",
+              label: "Machine Production",
+              href: "/machine-production",
+              icon: "machineProduction" as const,
+            },
+          ]
+        : []),
     ],
   });
 
@@ -100,6 +113,12 @@ export function getNavSections(flags: NavFlags): NavSection[] {
       label: "Integrations",
       href: "/admin/integrations",
       icon: "export",
+    });
+    adminItems.push({
+      key: "machine-production-admin",
+      label: "MP Admin",
+      href: "/machine-production/admin",
+      icon: "machineProduction",
     });
   }
   if (showAdmin) {

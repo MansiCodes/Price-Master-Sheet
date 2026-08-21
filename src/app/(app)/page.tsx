@@ -7,6 +7,7 @@ import {
   canEnterData,
   canViewPnl,
   getAccessiblePlantIds,
+  isMachineSupervisor,
   isSuperAdmin,
 } from "@/lib/rbac";
 import {
@@ -59,6 +60,10 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
 
   const user = session.user;
+  if (isMachineSupervisor(user.globalRole)) {
+    redirect("/machine-production");
+  }
+
   const superAdmin = isSuperAdmin(user.globalRole);
   const plantIds = await getAccessiblePlantIds(user.id);
 

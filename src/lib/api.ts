@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
-import { canAccessPlant, canEnterData } from "@/lib/rbac";
+import {
+  canAccessPlant,
+  canAdminMachineProduction,
+  canEnterData,
+  canEnterMachineProduction,
+  canAccessMachineProduction,
+} from "@/lib/rbac";
 
 export type SessionUser = {
   id: string;
@@ -52,6 +58,53 @@ export function requireCanEnter(
     );
   }
   return null;
+}
+
+export function requireMachineProductionAccess(
+  role: GlobalRole,
+): NextResponse | null {
+  if (!canAccessMachineProduction(role)) {
+    return NextResponse.json(
+      { error: "Forbidden — Machine Production access required" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+export function requireMachineProductionEnter(
+  role: GlobalRole,
+): NextResponse | null {
+  if (!canEnterMachineProduction(role)) {
+    return NextResponse.json(
+      { error: "Forbidden — Supervisor access required" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+export function requireMachineProductionAdmin(
+  role: GlobalRole,
+): NextResponse | null {
+  if (!canAdminMachineProduction(role)) {
+    return NextResponse.json(
+      { error: "Forbidden — Admin access required" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+/** Plant P&L data entry or Machine Production supervisor/admin. */
+export function requireCanEnterOrMachineProduction(
+  role: GlobalRole,
+): NextResponse | null {
+  if (canEnterData(role) || canEnterMachineProduction(role)) return null;
+  return NextResponse.json(
+    { error: "You cannot upload files with this role" },
+    { status: 403 },
+  );
 }
 
 export function jsonError(message: string, status: number) {

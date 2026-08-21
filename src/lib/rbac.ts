@@ -23,12 +23,36 @@ const DATA_ENTRY_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.ACCOUNTANT,
 ]);
 
+/** Machine Production module — Admin (SUPER_ADMIN) + Supervisor only. */
+const MACHINE_PRODUCTION_ROLES: ReadonlySet<GlobalRole> = new Set([
+  GlobalRole.SUPER_ADMIN,
+  GlobalRole.MACHINE_SUPERVISOR,
+]);
+
 export function canViewPnl(role: GlobalRole | Role): boolean {
   return PNL_VIEW_ROLES.has(role);
 }
 
 export function canEnterData(role: GlobalRole | Role): boolean {
   return DATA_ENTRY_ROLES.has(role);
+}
+
+export function canAccessMachineProduction(role: GlobalRole | Role): boolean {
+  return MACHINE_PRODUCTION_ROLES.has(role);
+}
+
+export function canEnterMachineProduction(role: GlobalRole | Role): boolean {
+  return (
+    role === GlobalRole.MACHINE_SUPERVISOR || role === GlobalRole.SUPER_ADMIN
+  );
+}
+
+export function canAdminMachineProduction(role: GlobalRole | Role): boolean {
+  return role === GlobalRole.SUPER_ADMIN;
+}
+
+export function isMachineSupervisor(role: GlobalRole | Role): boolean {
+  return role === GlobalRole.MACHINE_SUPERVISOR;
 }
 
 export function canViewPriceSheet(user: PriceSheetUser): boolean {

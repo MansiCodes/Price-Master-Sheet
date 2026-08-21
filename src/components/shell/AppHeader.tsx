@@ -99,6 +99,10 @@ export function AppHeader({
         return tNav("pnl");
       case "price-sheet":
         return tNav("priceSheet");
+      case "machine-production":
+        return "Machine Production";
+      case "machine-production-admin":
+        return "MP Admin";
       case "users":
         return tNav("users");
       case "integrations":

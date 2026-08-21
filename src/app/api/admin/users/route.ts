@@ -43,30 +43,42 @@ export async function GET() {
   const denied = requireSuperAdmin(session);
   if (denied) return denied;
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      globalRole: true,
-      creditScore: true,
-      canViewPriceSheet: true,
-      isActive: true,
-      coinsBalance: true,
-      createdAt: true,
-      plantRoles: {
-        select: {
-          plantId: true,
-          role: true,
-          plant: { select: { id: true, name: true, code: true } },
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone: true,
+        globalRole: true,
+        creditScore: true,
+        canViewPriceSheet: true,
+        isActive: true,
+        coinsBalance: true,
+        createdAt: true,
+        plantRoles: {
+          select: {
+            plantId: true,
+            role: true,
+            plant: { select: { id: true, name: true, code: true } },
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ ok: true, users });
+    return NextResponse.json({ ok: true, users });
+  } catch (err) {
+    console.error("GET /api/admin/users failed", err);
+    return NextResponse.json(
+      {
+        ok: false,
+        message:
+          err instanceof Error ? err.message : "Failed to load users",
+      },
+      { status: 500 },
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -125,7 +137,10 @@ export async function POST(request: Request) {
   }
 
   const role = parsed.data.globalRole;
-  if (role !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
+  const needsPlants =
+    role !== GlobalRole.SUPER_ADMIN &&
+    role !== GlobalRole.MACHINE_SUPERVISOR;
+  if (needsPlants && plantIds.length === 0) {
     return NextResponse.json(
       { ok: false, message: "Assign at least one plant for this user" },
       { status: 400 },

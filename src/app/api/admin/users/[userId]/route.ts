@@ -106,7 +106,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
     }
-    if (nextRole !== GlobalRole.SUPER_ADMIN && plantIds.length === 0) {
+    if (nextRole !== GlobalRole.SUPER_ADMIN && nextRole !== GlobalRole.MACHINE_SUPERVISOR && plantIds.length === 0) {
       return NextResponse.json(
         { ok: false, message: "Assign at least one plant for this user" },
         { status: 400 },

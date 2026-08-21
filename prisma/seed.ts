@@ -148,13 +148,120 @@ async function main() {
     },
   });
 
+  const supervisorEmail = (
+    process.env.MACHINE_SUPERVISOR_EMAIL ?? "supervisor@machine.local"
+  )
+    .toLowerCase()
+    .trim();
+  const supervisorPassword =
+    process.env.MACHINE_SUPERVISOR_PASSWORD ?? password;
+  const supervisorHash = await bcrypt.hash(supervisorPassword, 12);
+
+  const supervisor = await prisma.user.upsert({
+    where: { email: supervisorEmail },
+    update: {
+      name: "Machine Supervisor",
+      passwordHash: supervisorHash,
+      globalRole: GlobalRole.MACHINE_SUPERVISOR,
+      canViewPriceSheet: false,
+      isActive: true,
+    },
+    create: {
+      email: supervisorEmail,
+      name: "Machine Supervisor",
+      passwordHash: supervisorHash,
+      globalRole: GlobalRole.MACHINE_SUPERVISOR,
+      canViewPriceSheet: false,
+      isActive: true,
+    },
+  });
+
+  const defaultMachines = [
+    { code: "EXT-01", name: "Extruder 01", description: "Main line extruder" },
+    { code: "EXT-02", name: "Extruder 02", description: "Secondary extruder" },
+    { code: "TW-01", name: "Twister 01", description: "Pair twisting" },
+    { code: "SH-01", name: "Sheathing 01", description: "Outer sheathing" },
+  ];
+
+  for (const m of defaultMachines) {
+    await prisma.machine.upsert({
+      where: { code: m.code },
+      update: {
+        name: m.name,
+        description: m.description,
+        isActive: true,
+      },
+      create: {
+        code: m.code,
+        name: m.name,
+        description: m.description,
+        isActive: true,
+      },
+    });
+  }
+
+  // Processes stay machine-wise and are managed only in Admin (not seeded).
+
+  const defaultCableTypes = [
+    "CAT6",
+    "CAT6A",
+    "Coaxial",
+    "Power",
+    "Fiber",
+    "Other",
+  ];
+  const defaultCableSizes = [
+    "0.5 sqmm",
+    "0.75 sqmm",
+    "1.0 sqmm",
+    "1.5 sqmm",
+    "2.5 sqmm",
+    "23 AWG",
+    "24 AWG",
+  ];
+
+  let typeSort = 10;
+  for (const name of defaultCableTypes) {
+    const type = await prisma.machineCableType.upsert({
+      where: { name },
+      update: { isActive: true },
+      create: { name, sortOrder: typeSort, isActive: true },
+    });
+    typeSort += 10;
+
+    let sizeSort = 10;
+    for (const sizeName of defaultCableSizes) {
+      await prisma.machineCableSize.upsert({
+        where: {
+          cableTypeId_name: { cableTypeId: type.id, name: sizeName },
+        },
+        update: { isActive: true },
+        create: {
+          cableTypeId: type.id,
+          name: sizeName,
+          sortOrder: sizeSort,
+          isActive: true,
+        },
+      });
+      sizeSort += 10;
+    }
+  }
+
   console.log("Seed complete:");
   for (const target of plants) {
     console.log(`  Plant: ${target.name} (${target.code}) id=${target.id}`);
   }
   console.log(`  Super Admin: ${admin.email} id=${admin.id}`);
   console.log(`  Plant Manager: ${manager.email} id=${manager.id}`);
+  console.log(
+    `  Machine Supervisor: ${supervisor.email} id=${supervisor.id}`,
+  );
   console.log("  Manpower rates: Manager 4000 / Operator 1500 / Helper 800");
+  console.log(`  Machines seeded: ${defaultMachines.length}`);
+  console.log("  Processes: none (add per machine in Admin)");
+  console.log(
+    `  Cable: ${defaultCableTypes.length} types × ${defaultCableSizes.length} sizes each`,
+  );
 }
 
 main()

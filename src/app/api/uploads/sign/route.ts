@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireCanEnter, requireSession } from "@/lib/api";
+import { requireCanEnterOrMachineProduction, requireSession } from "@/lib/api";
 import { createBillUploadSignature } from "@/lib/cloudinary";
 
 export async function POST() {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const enterDenied = requireCanEnter(session.user.globalRole);
+  const enterDenied = requireCanEnterOrMachineProduction(
+    session.user.globalRole,
+  );
   if (enterDenied) return enterDenied;
 
   const signed = createBillUploadSignature();
