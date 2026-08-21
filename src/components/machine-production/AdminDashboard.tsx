@@ -40,10 +40,11 @@ type EntryRow = {
 
 type ProcessRow = {
   id: string;
-  machineId: string;
   name: string;
   sortOrder: number;
   isActive: boolean;
+  machineCount: number;
+  machineIds: string[];
 };
 
 type CableTypeRow = {
@@ -91,7 +92,9 @@ const EMPTY_FILTERS: Filters = {
 };
 
 export function AdminDashboard() {
-  const [tab, setTab] = useState<"records" | "machines" | "cable">("records");
+  const [tab, setTab] = useState<
+    "records" | "machines" | "processes" | "cable"
+  >("records");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [entries, setEntries] = useState<EntryRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -121,9 +124,9 @@ export function AdminDashboard() {
   const [editingProcessId, setEditingProcessId] = useState<string | null>(
     null,
   );
-  const [processMachine, setProcessMachine] = useState<MachineRow | null>(
-    null,
-  );
+  /** Machines ticked for the process being created or edited. */
+  const [processMachineIds, setProcessMachineIds] = useState<string[]>([]);
+  const [machineSearch, setMachineSearch] = useState("");
 
   const loadMachines = useCallback(async () => {
     const res = await fetch("/api/machine-production/machines");
@@ -138,14 +141,8 @@ export function AdminDashboard() {
     setMachines(json.machines ?? []);
   }, []);
 
-  const loadProcesses = useCallback(async (machineId: string) => {
-    if (!machineId) {
-      setProcesses([]);
-      return;
-    }
-    const res = await fetch(
-      `/api/machine-production/processes?machineId=${encodeURIComponent(machineId)}&all=1`,
-    );
+  const loadProcesses = useCallback(async () => {
+    const res = await fetch("/api/machine-production/processes?all=1");
     const json = (await res.json()) as {
       processes?: ProcessRow[];
       error?: string;
@@ -262,12 +259,8 @@ export function AdminDashboard() {
   }, [tab, selectedCableTypeId, loadCableSizes]);
 
   useEffect(() => {
-    if (!processMachine) {
-      setProcesses([]);
-      return;
-    }
-    void loadProcesses(processMachine.id);
-  }, [processMachine, loadProcesses]);
+    if (tab === "processes") void loadProcesses();
+  }, [tab, loadProcesses]);
 
   async function saveMachine(e: FormEvent) {
     e.preventDefault();
@@ -318,18 +311,20 @@ export function AdminDashboard() {
   async function saveProcess(e: FormEvent) {
     e.preventDefault();
     const name = processForm.name.trim();
-    if (!processMachine) {
-      toast.error("Select a machine first");
-      return;
-    }
     if (!name) {
       toast.error("Process name is required");
       return;
     }
+    if (processMachineIds.length === 0) {
+      toast.error("Tick at least one machine for this process");
+      return;
+    }
+    const payload = { name, machineIds: processMachineIds };
+
     if (editingProcessId) {
       const res = await patchJson<{ ok: boolean; error?: string }>(
         `/api/machine-production/processes/${editingProcessId}`,
-        { name },
+        payload,
       );
       if (!res.ok) {
         toast.error(res.error);
@@ -339,7 +334,7 @@ export function AdminDashboard() {
     } else {
       const res = await postJson<{ ok: boolean; error?: string }>(
         "/api/machine-production/processes",
-        { machineId: processMachine.id, name },
+        payload,
       );
       if (!res.ok) {
         toast.error(res.error);
@@ -347,13 +342,11 @@ export function AdminDashboard() {
       }
       toast.success("Process added");
     }
-    setEditingProcessId(null);
-    setProcessForm({ name: "" });
-    void loadProcesses(processMachine.id);
+    resetProcessForm();
+    void loadProcesses();
   }
 
   async function toggleProcessActive(p: ProcessRow) {
-    if (!processMachine) return;
     const res = await patchJson<{ ok: boolean; error?: string }>(
       `/api/machine-production/processes/${p.id}`,
       { isActive: !p.isActive },
@@ -363,20 +356,52 @@ export function AdminDashboard() {
       return;
     }
     toast.success(p.isActive ? "Process deactivated" : "Process activated");
-    void loadProcesses(processMachine.id);
+    void loadProcesses();
   }
 
-  function openProcessesForMachine(m: MachineRow) {
-    setProcessMachine(m);
-    setEditingProcessId(null);
-    setProcessForm({ name: "" });
+  function editProcess(p: ProcessRow) {
+    setEditingProcessId(p.id);
+    setProcessForm({ name: p.name });
+    setProcessMachineIds(p.machineIds);
+    setMachineSearch("");
   }
 
-  function closeProcessPanel() {
-    setProcessMachine(null);
+  function resetProcessForm() {
     setEditingProcessId(null);
     setProcessForm({ name: "" });
-    setProcesses([]);
+    setProcessMachineIds([]);
+    setMachineSearch("");
+  }
+
+  /**
+   * Moves one process up or down and persists the whole order. Optimistic so
+   * repeated clicks feel instant; a failed save reloads the server's truth.
+   */
+  async function moveProcess(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= processes.length) return;
+
+    const next = [...processes];
+    const [moved] = next.splice(index, 1);
+    next.splice(target, 0, moved!);
+    setProcesses(next);
+
+    const res = await patchJson<{ ok: boolean; error?: string }>(
+      "/api/machine-production/processes",
+      { order: next.map((p) => p.id) },
+    );
+    if (!res.ok) {
+      toast.error(res.error);
+      void loadProcesses();
+    }
+  }
+
+  function toggleProcessMachine(machineId: string) {
+    setProcessMachineIds((prev) =>
+      prev.includes(machineId)
+        ? prev.filter((id) => id !== machineId)
+        : [...prev, machineId],
+    );
   }
 
   async function saveCableType(e: FormEvent) {
@@ -511,6 +536,17 @@ export function AdminDashboard() {
           onClick={() => setTab("machines")}
         >
           Machines
+        </button>
+        <button
+          type="button"
+          className={
+            tab === "processes"
+              ? "mp-shift-tab mp-shift-tab--active"
+              : "mp-shift-tab"
+          }
+          onClick={() => setTab("processes")}
+        >
+          Processes
         </button>
         <button
           type="button"
@@ -758,13 +794,6 @@ export function AdminDashboard() {
                     <td className="mp-table__actions">
                       <Button
                         type="button"
-                        variant="secondary"
-                        onClick={() => openProcessesForMachine(m)}
-                      >
-                        Add process
-                      </Button>
-                      <Button
-                        type="button"
                         variant="ghost"
                         onClick={() => {
                           setEditingId(m.id);
@@ -783,6 +812,153 @@ export function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : tab === "processes" ? (
+        <div className="mp-admin-machines">
+          <form
+            className="mp-machine-form mp-process-form"
+            onSubmit={(e) => void saveProcess(e)}
+          >
+            <h2>{editingProcessId ? "Edit process" : "Add process"}</h2>
+            <p className="mp-muted">
+              Supervisors pick a process first, then a machine inside it.
+            </p>
+            <label>
+              Process name
+              <input
+                required
+                value={processForm.name}
+                onChange={(e) => setProcessForm({ name: e.target.value })}
+                placeholder="e.g. Aluminium Stranding"
+              />
+            </label>
+
+            <div className="mp-machine-picker">
+              <div className="mp-machine-picker__head">
+                <span>
+                  Machines in this process ({processMachineIds.length})
+                </span>
+                <input
+                  type="search"
+                  value={machineSearch}
+                  onChange={(e) => setMachineSearch(e.target.value)}
+                  placeholder="Search machines…"
+                />
+              </div>
+              <div className="mp-machine-picker__list">
+                {machines
+                  .filter((m) => {
+                    const q = machineSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      m.name.toLowerCase().includes(q) ||
+                      m.code.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((m) => (
+                    <label key={m.id} className="mp-machine-picker__item">
+                      <input
+                        type="checkbox"
+                        checked={processMachineIds.includes(m.id)}
+                        onChange={() => toggleProcessMachine(m.id)}
+                      />
+                      <span>
+                        {m.name}
+                        <span className="mp-muted"> · {m.code}</span>
+                        {!m.isActive ? (
+                          <span className="mp-muted"> (inactive)</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  ))}
+                {machines.length === 0 ? (
+                  <p className="mp-muted">
+                    No machines yet — add them on the Machines tab first.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mp-form__actions">
+              {editingProcessId ? (
+                <Button type="button" variant="ghost" onClick={resetProcessForm}>
+                  Cancel
+                </Button>
+              ) : null}
+              <Button type="submit">
+                {editingProcessId ? "Save process" : "Add process"}
+              </Button>
+            </div>
+          </form>
+
+          <div className="mp-table-wrap">
+            <table className="mp-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Process</th>
+                  <th>Machines</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {processes.map((p, i) => (
+                  <tr key={p.id}>
+                    <td>
+                      <div className="mp-reorder">
+                        <span className="mp-reorder__num">{i + 1}</span>
+                        <button
+                          type="button"
+                          className="mp-reorder__btn"
+                          aria-label={`Move ${p.name} up`}
+                          disabled={i === 0}
+                          onClick={() => void moveProcess(i, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="mp-reorder__btn"
+                          aria-label={`Move ${p.name} down`}
+                          disabled={i === processes.length - 1}
+                          onClick={() => void moveProcess(i, 1)}
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </td>
+                    <td>{p.name}</td>
+                    <td>{p.machineCount}</td>
+                    <td>{p.isActive ? "Active" : "Inactive"}</td>
+                    <td className="mp-table__actions">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => editProcess(p)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void toggleProcessActive(p)}
+                      >
+                        {p.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {processes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="mp-muted">
+                      No processes yet.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -993,106 +1169,6 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {processMachine ? (
-        <div className="mp-detail-backdrop" onClick={closeProcessPanel}>
-          <div
-            className="mp-detail mp-process-panel"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="mp-detail__head">
-              <div>
-                <h2>Processes</h2>
-                <p className="mp-muted">
-                  {processMachine.name} ({processMachine.code})
-                </p>
-              </div>
-              <Button type="button" variant="ghost" onClick={closeProcessPanel}>
-                Close
-              </Button>
-            </div>
-
-            <form
-              className="mp-machine-form mp-process-panel__form"
-              onSubmit={(e) => void saveProcess(e)}
-            >
-              <label>
-                {editingProcessId ? "Edit process" : "Add process"}
-                <input
-                  required
-                  value={processForm.name}
-                  onChange={(e) => setProcessForm({ name: e.target.value })}
-                  placeholder="e.g. Aluminium Stranding"
-                />
-              </label>
-              <div className="mp-form__actions">
-                {editingProcessId ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditingProcessId(null);
-                      setProcessForm({ name: "" });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                ) : null}
-                <Button type="submit">
-                  {editingProcessId ? "Save" : "Add process"}
-                </Button>
-              </div>
-            </form>
-
-            <div className="mp-table-wrap">
-              <table className="mp-table">
-                <thead>
-                  <tr>
-                    <th>Process</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {processes.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.name}</td>
-                      <td>{p.isActive ? "Active" : "Inactive"}</td>
-                      <td className="mp-table__actions">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingProcessId(p.id);
-                            setProcessForm({ name: p.name });
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => void toggleProcessActive(p)}
-                        >
-                          {p.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {processes.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="mp-muted">
-                        No processes for this machine yet.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {selected ? (
         <div className="mp-detail-backdrop" onClick={() => setSelected(null)}>

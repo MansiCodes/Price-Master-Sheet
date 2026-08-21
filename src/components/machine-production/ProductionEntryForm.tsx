@@ -30,7 +30,6 @@ export type SlotInfo = {
   deadlineLabel: string;
 };
 
-const PROCESS_PLACEHOLDER = "Select process";
 const TYPE_PLACEHOLDER = "Select cable type";
 const SIZE_PLACEHOLDER = "Select cable size";
 
@@ -38,6 +37,8 @@ type Props = {
   open: boolean;
   machine: MachineCard | null;
   viewSlot: SlotInfo | null;
+  /** Process the supervisor drilled into — the entry is filed against it. */
+  processName: string | null;
   onClose: () => void;
   onSaved: () => void;
 };
@@ -46,16 +47,15 @@ export function ProductionEntryForm({
   open,
   machine,
   viewSlot,
+  processName,
   onClose,
   onSaved,
 }: Props) {
-  const [processes, setProcesses] = useState<string[]>([]);
   const [cableTypeRows, setCableTypeRows] = useState<
     { id: string; name: string }[]
   >([]);
   const [cableTypes, setCableTypes] = useState<string[]>([]);
   const [cableSizes, setCableSizes] = useState<string[]>([]);
-  const [currentProcess, setCurrentProcess] = useState(PROCESS_PLACEHOLDER);
   const [cableType, setCableType] = useState(TYPE_PLACEHOLDER);
   const [cableSize, setCableSize] = useState(SIZE_PLACEHOLDER);
   const [planned, setPlanned] = useState("");
@@ -68,7 +68,6 @@ export function ProductionEntryForm({
 
   useEffect(() => {
     if (!open) return;
-    setCurrentProcess(PROCESS_PLACEHOLDER);
     setCableType(TYPE_PLACEHOLDER);
     setCableSize(SIZE_PLACEHOLDER);
     setCableSizes([]);
@@ -97,29 +96,6 @@ export function ProductionEntryForm({
         toast.error("Failed to load cable types");
         setCableTypes([]);
         setCableTypeRows([]);
-      }
-
-      if (!machine?.id) {
-        setProcesses([]);
-        return;
-      }
-      try {
-        const res = await fetch(
-          `/api/machine-production/processes?machineId=${encodeURIComponent(machine.id)}`,
-        );
-        const json = (await res.json()) as {
-          processes?: { name: string }[];
-          error?: string;
-        };
-        if (!res.ok) {
-          toast.error(json.error ?? "Failed to load processes");
-          setProcesses([]);
-          return;
-        }
-        setProcesses((json.processes ?? []).map((p) => p.name));
-      } catch {
-        toast.error("Failed to load processes");
-        setProcesses([]);
       }
     })();
   }, [open, machine?.id]);
@@ -162,10 +138,6 @@ export function ProductionEntryForm({
   const efficiency =
     plannedNum > 0 ? Math.round((actualNum / plannedNum) * 10000) / 100 : 0;
 
-  const processOptions = useMemo(
-    () => [PROCESS_PLACEHOLDER, ...processes],
-    [processes],
-  );
   const typeOptions = useMemo(
     () => [TYPE_PLACEHOLDER, ...cableTypes],
     [cableTypes],
@@ -188,12 +160,8 @@ export function ProductionEntryForm({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!machine || !viewSlot || readOnly) return;
-    if (
-      !currentProcess ||
-      currentProcess === PROCESS_PLACEHOLDER ||
-      !processes.includes(currentProcess)
-    ) {
-      toast.error("Select a current process");
+    if (!processName) {
+      toast.error("Open a process first, then pick a machine inside it");
       return;
     }
     if (
@@ -225,7 +193,7 @@ export function ProductionEntryForm({
         entryDate: viewSlot.entryDate,
         shift: viewSlot.shift,
         slotStartHour: viewSlot.slotStartHour,
-        currentProcess,
+        currentProcess: processName,
         cableType,
         cableSize,
         plannedProduction: plannedNum,
@@ -272,18 +240,7 @@ export function ProductionEntryForm({
 
           <label className="mp-field">
             <span>Current process</span>
-            <SelectMenu
-              value={currentProcess}
-              options={processOptions}
-              placeholder={PROCESS_PLACEHOLDER}
-              onChange={setCurrentProcess}
-              disabled={readOnly || saving || processes.length === 0}
-            />
-            {processes.length === 0 ? (
-              <span className="mp-muted">
-                No processes for this machine yet. Ask Admin to add them.
-              </span>
-            ) : null}
+            <input value={processName ?? "—"} readOnly />
           </label>
 
           <label className="mp-field">

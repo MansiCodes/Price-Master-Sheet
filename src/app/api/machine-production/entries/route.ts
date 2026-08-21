@@ -238,16 +238,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const processRow = await prisma.machineProcess.findFirst({
+  // The machine must actually be assigned to the process the entry claims.
+  const processLink = await prisma.productionProcessMachine.findFirst({
     where: {
       machineId: machine.id,
-      name: parsed.data.currentProcess,
-      isActive: true,
+      process: { name: parsed.data.currentProcess, isActive: true },
     },
+    include: { process: { select: { name: true } } },
   });
-  if (!processRow) {
+  if (!processLink) {
     return NextResponse.json(
-      { error: "Select a valid current process for this machine" },
+      { error: "This machine is not assigned to that process" },
       { status: 400 },
     );
   }
@@ -299,7 +300,7 @@ export async function POST(request: Request) {
         entryDate: parseDateOnlyUtc(entryDate),
         shift,
         slotStartHour,
-        currentProcess: processRow.name,
+        currentProcess: processLink.process.name,
         cableType: cableTypeRow.name,
         cableSize: cableSizeRow.name,
         plannedProduction: planned,

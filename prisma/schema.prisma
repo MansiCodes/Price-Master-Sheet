@@ -505,13 +505,15 @@ model Machine {
   isActive    Boolean                  @default(true)
   createdAt   DateTime                 @default(now())
   updatedAt   DateTime                 @updatedAt
-  entries     MachineProductionEntry[]
-  processes   MachineProcess[]
+  entries      MachineProductionEntry[]
+  processes    MachineProcess[]
+  processLinks ProductionProcessMachine[]
 
   @@index([isActive, name])
 }
 
-/// Per-machine process options for the "Current process" dropdown.
+/// Legacy per-machine process options. Superseded by ProductionProcess, kept
+/// until its rows have been migrated across — do not write to it.
 model MachineProcess {
   id        String   @id @default(cuid())
   machineId String
@@ -524,6 +526,35 @@ model MachineProcess {
 
   @@unique([machineId, name])
   @@index([machineId, isActive, sortOrder])
+}
+
+/// Global production process. Supervisors pick a process first, then a machine
+/// within it, so a process owns many machines and a machine can run many processes.
+model ProductionProcess {
+  id        String                     @id @default(cuid())
+  name      String                     @unique
+  sortOrder Int                        @default(0)
+  isActive  Boolean                    @default(true)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+  machines  ProductionProcessMachine[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Join table: which machines run a given process.
+model ProductionProcessMachine {
+  id        String            @id @default(cuid())
+  processId String
+  machineId String
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  process   ProductionProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
+  machine   Machine           @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([processId, machineId])
+  @@index([machineId])
+  @@index([processId, sortOrder])
 }
 
 /// Global cable types shared by all machines.

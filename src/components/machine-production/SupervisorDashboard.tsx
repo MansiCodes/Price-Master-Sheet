@@ -7,22 +7,49 @@ import {
   type MachineCard,
   type SlotInfo,
 } from "@/components/machine-production/ProductionEntryForm";
-import type { ShiftFilter } from "@/lib/machine-production/slots";
+import type { ShiftFilter, SlotStatus } from "@/lib/machine-production/slots";
 
-type DashboardPayload = {
+type Counts = {
+  total: number;
+  completed: number;
+  pending: number;
+  overdue: number;
+};
+
+export type ProcessCard = {
+  id: string;
+  name: string;
+  machineCount: number;
+  completed: number;
+  pending: number;
+  overdue: number;
+  status: SlotStatus;
+};
+
+type ProcessLevel = {
   ok: boolean;
+  level: "processes";
   shiftFilter: ShiftFilter;
   currentSlot: SlotInfo;
   viewSlot: SlotInfo;
-  counts: {
-    total: number;
-    completed: number;
-    pending: number;
-    overdue: number;
-  };
+  counts: Counts;
+  processes: ProcessCard[];
+  error?: string;
+};
+
+type MachineLevel = {
+  ok: boolean;
+  level: "machines";
+  shiftFilter: ShiftFilter;
+  currentSlot: SlotInfo;
+  viewSlot: SlotInfo;
+  process: { id: string; name: string };
+  counts: Counts;
   machines: MachineCard[];
   error?: string;
 };
+
+type DashboardPayload = ProcessLevel | MachineLevel;
 
 const SHIFT_TABS: { id: ShiftFilter; label: string }[] = [
   { id: "ALL", label: "All" },
@@ -30,25 +57,22 @@ const SHIFT_TABS: { id: ShiftFilter; label: string }[] = [
   { id: "NIGHT", label: "Night (9PM–9AM)" },
 ];
 
-function statusClass(status: MachineCard["status"]) {
+function statusClass(status: SlotStatus) {
   if (status === "COMPLETED") return "mp-status--ok";
   if (status === "OVERDUE") return "mp-status--overdue";
   return "mp-status--pending";
 }
 
 /** Tints the whole card so a submitted slot is readable at a glance across the grid. */
-function cardStatusClass(status: MachineCard["status"]) {
+function cardStatusClass(status: SlotStatus) {
   if (status === "COMPLETED") return "mp-machine-card--ok";
   if (status === "OVERDUE") return "mp-machine-card--overdue";
   return "mp-machine-card--pending";
 }
 
-export function SupervisorDashboard({
-  isAdmin,
-}: {
-  isAdmin: boolean;
-}) {
+export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
   const [shift, setShift] = useState<ShiftFilter>("ALL");
+  const [processId, setProcessId] = useState<string | null>(null);
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,9 +82,9 @@ export function SupervisorDashboard({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/machine-production/dashboard?shift=${shift}`,
-      );
+      const sp = new URLSearchParams({ shift });
+      if (processId) sp.set("processId", processId);
+      const res = await fetch(`/api/machine-production/dashboard?${sp}`);
       const json = (await res.json()) as DashboardPayload;
       if (!res.ok) {
         setError(json.error ?? "Failed to load dashboard");
@@ -74,19 +98,24 @@ export function SupervisorDashboard({
     } finally {
       setLoading(false);
     }
-  }, [shift]);
+  }, [shift, processId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   const viewSlot = data?.viewSlot ?? null;
+  const inProcess = data?.level === "machines" ? data : null;
 
   return (
     <div className="mp-root">
       <PageToolbar
         title="Machine Production"
-        subtitle="Submit production every 4 hours per machine"
+        subtitle={
+          inProcess
+            ? `${inProcess.process.name} — pick a machine to submit`
+            : "Pick a process to see its machines"
+        }
         action={
           isAdmin ? (
             <a className="btn btn-secondary" href="/machine-production/admin">
@@ -96,6 +125,22 @@ export function SupervisorDashboard({
         }
       />
 
+      {inProcess ? (
+        <nav className="mp-breadcrumb" aria-label="Breadcrumb">
+          <button
+            type="button"
+            className="mp-breadcrumb__back"
+            onClick={() => setProcessId(null)}
+          >
+            ← All processes
+          </button>
+          <span className="mp-breadcrumb__sep">/</span>
+          <span className="mp-breadcrumb__current">
+            {inProcess.process.name}
+          </span>
+        </nav>
+      ) : null}
+
       <div className="mp-shift-tabs" role="tablist" aria-label="Shift">
         {SHIFT_TABS.map((tab) => (
           <button
@@ -104,7 +149,9 @@ export function SupervisorDashboard({
             role="tab"
             aria-selected={shift === tab.id}
             className={
-              shift === tab.id ? "mp-shift-tab mp-shift-tab--active" : "mp-shift-tab"
+              shift === tab.id
+                ? "mp-shift-tab mp-shift-tab--active"
+                : "mp-shift-tab"
             }
             onClick={() => setShift(tab.id)}
           >
@@ -147,14 +194,48 @@ export function SupervisorDashboard({
         </div>
       ) : null}
 
-      {loading ? <p className="mp-muted">Loading machines…</p> : null}
+      {loading ? <p className="mp-muted">Loading…</p> : null}
       {error ? <p className="mp-error">{error}</p> : null}
 
-      {!loading && data ? (
+      {!loading && data?.level === "processes" ? (
+        <div className="mp-machine-grid">
+          {data.processes.length === 0 ? (
+            <p className="mp-muted">
+              No processes yet. Ask an Admin to add processes and assign
+              machines to them.
+            </p>
+          ) : (
+            data.processes.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`mp-machine-card ${cardStatusClass(p.status)}`}
+                onClick={() => setProcessId(p.id)}
+              >
+                <div className="mp-machine-card__top">
+                  <span className="mp-machine-card__code">PROCESS</span>
+                  <span className={`mp-status ${statusClass(p.status)}`}>
+                    {p.status}
+                  </span>
+                </div>
+                <h2 className="mp-machine-card__name">{p.name}</h2>
+                <p className="mp-machine-card__meta">
+                  {p.completed} of {p.machineCount} submitted
+                  {p.overdue > 0 ? ` · ${p.overdue} overdue` : ""}
+                </p>
+                <p className="mp-machine-card__cta">View machines →</p>
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+
+      {!loading && data?.level === "machines" ? (
         <div className="mp-machine-grid">
           {data.machines.length === 0 ? (
             <p className="mp-muted">
-              No active machines. Ask an Admin to add machines.
+              No active machines in this process. Ask an Admin to assign
+              machines to it.
             </p>
           ) : (
             data.machines.map((m) => (
@@ -192,6 +273,7 @@ export function SupervisorDashboard({
         open={Boolean(selected)}
         machine={selected}
         viewSlot={viewSlot}
+        processName={inProcess?.process.name ?? null}
         onClose={() => setSelected(null)}
         onSaved={() => void load()}
       />
