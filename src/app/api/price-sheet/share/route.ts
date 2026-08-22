@@ -15,6 +15,7 @@ const rateSchema = z.object({
   name: z.string().default("Cable"),
   specification: z.string().optional().nullable().default(""),
   specificationFull: z.string().optional().nullable().default(""),
+  rmCostingPerMtr: z.number().default(0),
   p10: z.number().default(0),
   p12: z.number().default(0),
   p15: z.number().default(0),

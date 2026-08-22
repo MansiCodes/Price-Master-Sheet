@@ -72,8 +72,14 @@ export function getNavSections(flags: NavFlags): NavSection[] {
         {
           key: "dashboard",
           label: "Dashboard",
-          href: "/machine-production",
+          href: "/",
           icon: "home",
+        },
+        {
+          key: "machine-production",
+          label: "Machine Production",
+          href: "/machine-production",
+          icon: "machineProduction",
         },
       ],
     });

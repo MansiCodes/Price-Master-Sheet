@@ -37,6 +37,7 @@ function formatItemLine(row: CableRate): string {
     `${row.sNo ?? "—"})`,
     name,
     spec,
+    `RM ₹${formatPrice(row.rmCostingPerMtr)}`,
     `P10 ₹${formatPrice(row.p10)}`,
     `P12 ₹${formatPrice(row.p12)}`,
     `P15 ₹${formatPrice(row.p15)}`,
@@ -51,7 +52,7 @@ export function formatPriceSheetSummary(
 ): string {
   if (rows.length === 0) return "No items selected.";
 
-  const header = "SNO | CABLE | SPEC | P10 | P12 | P15 | P20";
+  const header = "SNO | CABLE | SPEC | RM/MTR | P10 | P12 | P15 | P20";
   const parts: string[] = [header];
 
   for (const row of rows.slice(0, maxLines)) {
@@ -91,7 +92,16 @@ export function whatsAppShareUrl(phoneE164: string, message: string): string {
 }
 
 export function buildPriceSheetCsv(rows: CableRate[]): string {
-  const header = ["S NO.", "NAME", "SPECIFICATION", "P10", "P12", "P15", "P20"];
+  const header = [
+    "S NO.",
+    "NAME",
+    "SPECIFICATION",
+    "RM Costing Per Mtr",
+    "P10",
+    "P12",
+    "P15",
+    "P20",
+  ];
   const escape = (value: string | number | null | undefined) => {
     const str = String(value ?? "");
     if (/[",\n]/.test(str)) return `"${str.replaceAll('"', '""')}"`;
@@ -102,6 +112,7 @@ export function buildPriceSheetCsv(rows: CableRate[]): string {
       escape(row.sNo ?? ""),
       escape(row.name),
       escape(row.specificationFull || row.specification || ""),
+      escape(row.rmCostingPerMtr),
       escape(row.p10),
       escape(row.p12),
       escape(row.p15),

@@ -6,6 +6,51 @@
   gap: 1.1rem;
 }
 
+.mp-home a.today-check {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Six KPIs: two rows of three (not 5+1). */
+.mp-home .mis-kpi-grid--six {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mp-home .kpi-card {
+  background: #fff;
+  border-left: 4px solid var(--teal);
+  box-shadow: none !important;
+}
+
+.mp-home .mis .kpi-card,
+.mp-home.mis .kpi-card {
+  box-shadow: none;
+}
+
+@media (max-width: 1100px) {
+  .mp-home .mis-kpi-grid--six {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .mp-home .mis-kpi-grid--six {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mp-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.mp-top-row .mp-breadcrumb {
+  margin: 0;
+}
+
 .mp-shift-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -30,9 +75,16 @@
 }
 
 .mp-shift-tab--active {
-  background: var(--teal-soft);
+  background: var(--teal-fill);
   border-color: transparent;
-  color: var(--teal-ink);
+  color: var(--teal-active-text);
+  box-shadow: var(--teal-fill-shadow);
+}
+
+.mp-shift-tab--active:hover {
+  background: var(--teal-fill-hover);
+  color: var(--teal-active-text);
+  border-color: transparent;
 }
 
 .mp-slot-banner {
@@ -41,12 +93,9 @@
   gap: 0.75rem;
   padding: 1rem 1.1rem;
   border-radius: var(--radius);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--teal-soft) 70%, white),
-    var(--bg-elevated)
-  );
+  background: #fff;
   border: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .mp-slot-banner__label {
@@ -89,8 +138,8 @@
 }
 
 .mp-count--pending {
-  background: var(--amber-soft);
-  color: #92400e;
+  background: var(--teal-soft);
+  color: var(--teal-ink);
   border-color: transparent;
 }
 
@@ -110,48 +159,30 @@
   text-align: left;
   padding: 1rem 1.05rem;
   border-radius: var(--radius);
-  background: var(--bg-elevated);
+  background: #fff;
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: none;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
 .mp-machine-card:hover {
   transform: translateY(-2px);
-  border-color: var(--teal);
-  box-shadow: 0 6px 16px rgb(28 25 23 / 10%), var(--shadow);
+  border-color: color-mix(in srgb, var(--teal) 35%, var(--border));
 }
 
 /*
- * Status tint for the whole card. Supervisors scan a grid of ~60 machines and
- * need to spot what is still owed for the current slot without reading badges,
- * so the card carries the same colour as its .mp-status pill:
- * green = submitted, amber = still open, red = past the 4-hour deadline.
- */
-.mp-machine-card--ok,
-.mp-machine-card--pending,
-.mp-machine-card--overdue {
-  border-left-width: 4px;
-  border-left-style: solid;
-}
-
-/*
- * Submitted slots go solid dark green — the only filled card in the grid, so
- * "done" reads instantly against the pale amber/red of everything still owed.
- * Text inside has to be re-coloured for the dark ground.
+ * Submitted slots stay solid green so “done” is still obvious.
+ * Pending / overdue stay white; status comes from the badge.
  */
 .mp-machine-card--ok {
   background: linear-gradient(135deg, #166534 0%, #14532d 100%);
   border-color: #14532d;
-  border-left-color: #4ade80;
-  box-shadow: 0 4px 14px rgb(20 83 45 / 28%);
+  box-shadow: none;
 }
 
 .mp-machine-card--ok:hover {
   border-color: #22c55e;
-  border-left-color: #86efac;
-  box-shadow: 0 8px 20px rgb(20 83 45 / 34%);
 }
 
 .mp-machine-card--ok .mp-machine-card__code {
@@ -177,29 +208,30 @@
 }
 
 .mp-machine-card--pending {
-  background: color-mix(in srgb, #d97706 6%, var(--bg-elevated));
-  border-color: color-mix(in srgb, #d97706 24%, var(--border));
-  border-left-color: #d97706;
+  background: #fff;
+  border-color: var(--border);
 }
 
 .mp-machine-card--pending:hover {
-  border-color: color-mix(in srgb, #d97706 45%, var(--border));
-  border-left-color: #b45309;
+  border-color: color-mix(in srgb, var(--teal) 35%, var(--border));
 }
 
 .mp-machine-card--pending .mp-machine-card__code {
-  color: #92400e;
+  color: var(--teal-ink);
+}
+
+.mp-machine-card--pending .mp-machine-card__cta {
+  color: var(--teal-ink);
+  font-weight: 700;
 }
 
 .mp-machine-card--overdue {
-  background: color-mix(in srgb, #dc2626 7%, var(--bg-elevated));
-  border-color: color-mix(in srgb, #dc2626 26%, var(--border));
-  border-left-color: #dc2626;
+  background: #fff;
+  border-color: color-mix(in srgb, #dc2626 28%, var(--border));
 }
 
 .mp-machine-card--overdue:hover {
   border-color: color-mix(in srgb, #dc2626 45%, var(--border));
-  border-left-color: #b91c1c;
 }
 
 .mp-machine-card--overdue .mp-machine-card__code {
@@ -262,8 +294,8 @@
 }
 
 .mp-status--pending {
-  background: var(--amber-soft);
-  color: #92400e;
+  background: var(--teal-soft);
+  color: var(--teal-ink);
 }
 
 .mp-status--overdue {
@@ -407,7 +439,17 @@
 }
 
 .mp-table__row--selected {
-  background: color-mix(in srgb, var(--teal-soft) 55%, white);
+  background: var(--teal-soft);
+  outline: 2px solid color-mix(in srgb, var(--teal) 45%, transparent);
+  outline-offset: -2px;
+}
+
+.mp-table__row--selected td {
+  color: var(--teal-ink);
+}
+
+.mp-table__row {
+  user-select: none;
 }
 
 .mp-machine-form {

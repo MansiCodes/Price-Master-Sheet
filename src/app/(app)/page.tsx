@@ -15,6 +15,8 @@ import {
   resolveSelectedPlantId,
 } from "@/lib/selected-plant";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
+import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
+import { getMachineProductionHomeMetrics } from "@/lib/machine-production/home-metrics";
 import {
   type TodayModuleStatus,
   type ShiftModulesMap,
@@ -60,7 +62,8 @@ export default async function DashboardPage() {
 
   const user = session.user;
   if (isMachineSupervisor(user.globalRole)) {
-    redirect("/machine-production");
+    const metrics = await getMachineProductionHomeMetrics();
+    return <MachineProductionHome metrics={metrics} />;
   }
 
   const superAdmin = isSuperAdmin(user.globalRole);

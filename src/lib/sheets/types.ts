@@ -3,6 +3,8 @@ export type CableRate = {
   name: string;
   specification: string;
   specificationFull: string;
+  /** Sheet “RM Costing (Per Box=305Mtr)” — shown as RM Costing Per Mtr in the app. */
+  rmCostingPerMtr: number;
   p10: number;
   p12: number;
   p15: number;
@@ -27,16 +29,32 @@ export class SheetsError extends Error {
   }
 }
 
-/** Column indexes (0-based) for Master List: A…L */
+/**
+ * Default Master List indexes when header labels cannot be resolved.
+ * A=S NO, B=Name, D=Description, J=RM Per Box (app: RM Costing Per Mtr),
+ * L–O = #P=10% … #P=20%.
+ */
 export const SheetColumns = {
   S_NO: 0,
   NAME: 1,
-  DESCRIPTION: 2,
-  P10: 8,
-  P12: 9,
-  P15: 10,
-  P20: 11,
+  DESCRIPTION: 3,
+  RM_COSTING_PER_MTR: 9,
+  P10: 11,
+  P12: 12,
+  P15: 13,
+  P20: 14,
 } as const;
+
+export type ResolvedSheetColumns = {
+  sNo: number;
+  name: number;
+  description: number;
+  rmCostingPerMtr: number;
+  p10: number;
+  p12: number;
+  p15: number;
+  p20: number;
+};
 
 export const CACHE_KEYS = {
   DAILY_RATES: "daily_rates",

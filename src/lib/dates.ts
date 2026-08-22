@@ -152,18 +152,18 @@ export function getIstHoursMinutes(now: Date = new Date()): {
 
 /**
  * Shifts start at 09:00 (Day) and 21:00 (Night) IST.
- * Reminders go out at 08:50 (Day) and 20:50 (Night) IST via scheduled cron.
- * Windows allow flexibilities (08:30-09:30 IST and 20:30-21:30 IST) if cron runs slightly early or late.
+ * Reminders must fire at **08:50 AM** and **08:50 PM** IST only.
+ * Allow a 4-minute cron jitter (08:50–08:53 / 20:50–20:53) — reject anything later (e.g. 9:03).
  */
 export function reminderShiftForNow(
   now: Date = new Date(),
 ): "DAY" | "NIGHT" | null {
   const { hour, minute } = getIstHoursMinutes(now);
   const minutes = hour * 60 + minute;
-  const morningStart = 8 * 60 + 30; // 08:30 IST (8:50 target)
-  const morningEnd = 9 * 60 + 30; // 09:30 IST
-  const eveningStart = 20 * 60 + 30; // 20:30 IST (20:50 target)
-  const eveningEnd = 21 * 60 + 30; // 21:30 IST
+  const morningStart = 8 * 60 + 50; // 08:50 IST
+  const morningEnd = 8 * 60 + 54; // 08:53 IST (exclusive upper via <)
+  const eveningStart = 20 * 60 + 50; // 20:50 IST
+  const eveningEnd = 20 * 60 + 54; // 20:53 IST
   if (minutes >= morningStart && minutes < morningEnd) return "DAY";
   if (minutes >= eveningStart && minutes < eveningEnd) return "NIGHT";
   return null;

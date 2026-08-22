@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PageToolbar } from "@/components/ui/PageToolbar";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ProductionEntryForm,
   type MachineCard,
@@ -71,12 +71,32 @@ function cardStatusClass(status: SlotStatus) {
 }
 
 export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const processFromUrl = searchParams.get("processId");
+
   const [shift, setShift] = useState<ShiftFilter>("ALL");
-  const [processId, setProcessId] = useState<string | null>(null);
+  const [processId, setProcessId] = useState<string | null>(processFromUrl);
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MachineCard | null>(null);
+
+  useEffect(() => {
+    setProcessId(processFromUrl);
+  }, [processFromUrl]);
+
+  const selectProcess = useCallback(
+    (id: string | null) => {
+      setProcessId(id);
+      const sp = new URLSearchParams(searchParams.toString());
+      if (id) sp.set("processId", id);
+      else sp.delete("processId");
+      const q = sp.toString();
+      router.replace(q ? `/machine-production?${q}` : "/machine-production");
+    },
+    [router, searchParams],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -109,36 +129,31 @@ export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mp-root">
-      <PageToolbar
-        title="Machine Production"
-        subtitle={
-          inProcess
-            ? `${inProcess.process.name} — pick a machine to submit`
-            : "Pick a process to see its machines"
-        }
-        action={
-          isAdmin ? (
+      {isAdmin || inProcess ? (
+        <div className="mp-top-row">
+          {inProcess ? (
+            <nav className="mp-breadcrumb" aria-label="Breadcrumb">
+              <button
+                type="button"
+                className="mp-breadcrumb__back"
+                onClick={() => selectProcess(null)}
+              >
+                ← All processes
+              </button>
+              <span className="mp-breadcrumb__sep">/</span>
+              <span className="mp-breadcrumb__current">
+                {inProcess.process.name}
+              </span>
+            </nav>
+          ) : (
+            <span />
+          )}
+          {isAdmin ? (
             <a className="btn btn-secondary" href="/machine-production/admin">
               Admin dashboard
             </a>
-          ) : undefined
-        }
-      />
-
-      {inProcess ? (
-        <nav className="mp-breadcrumb" aria-label="Breadcrumb">
-          <button
-            type="button"
-            className="mp-breadcrumb__back"
-            onClick={() => setProcessId(null)}
-          >
-            ← All processes
-          </button>
-          <span className="mp-breadcrumb__sep">/</span>
-          <span className="mp-breadcrumb__current">
-            {inProcess.process.name}
-          </span>
-        </nav>
+          ) : null}
+        </div>
       ) : null}
 
       <div className="mp-shift-tabs" role="tablist" aria-label="Shift">
@@ -210,7 +225,7 @@ export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
                 key={p.id}
                 type="button"
                 className={`mp-machine-card ${cardStatusClass(p.status)}`}
-                onClick={() => setProcessId(p.id)}
+                onClick={() => selectProcess(p.id)}
               >
                 <div className="mp-machine-card__top">
                   <span className="mp-machine-card__code">PROCESS</span>

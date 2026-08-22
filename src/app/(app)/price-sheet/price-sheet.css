@@ -356,10 +356,11 @@
   background: rgba(13, 148, 136, 0.11);
 }
 
-.ps-col-sno { width: 6%; }
-.ps-col-name { width: 20%; }
-.ps-col-spec { width: 34%; }
-.ps-col-price { width: 10%; }
+.ps-col-sno { width: 5%; }
+.ps-col-name { width: 18%; }
+.ps-col-spec { width: 28%; }
+.ps-col-price { width: 9%; }
+.ps-col-rm { width: 12%; }
 
 .ps-rates-table td.ps-spec {
   white-space: nowrap;
@@ -380,13 +381,29 @@
   font-weight: 600;
 }
 
+.ps-col-sno,
+.ps-rates-table th.ps-col-sno,
+.ps-rates-table td.ps-sno {
+  text-align: center;
+}
+
+.ps-col-name,
+.ps-rates-table th.ps-col-name,
+.ps-rates-table td.ps-name,
+.ps-col-spec,
+.ps-rates-table th.ps-col-spec,
+.ps-rates-table td.ps-spec {
+  text-align: left;
+}
+
 .ps-col-price,
 .ps-rates-table th.ps-col-price,
 .ps-rates-table td.ps-price {
-  text-align: right;
+  text-align: center;
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  padding-right: 1.1rem;
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
 }
 
 .ps-rates-table td.ps-price {
@@ -418,7 +435,7 @@
 .ps-sk-sno { width: 1.4rem; }
 .ps-sk-name { width: 78%; }
 .ps-sk-spec { width: 92%; }
-.ps-sk-price { width: 3.2rem; margin-left: auto; display: block; }
+.ps-sk-price { width: 3.2rem; margin-left: auto; margin-right: auto; display: block; }
 
 .ps-skeleton-card {
   border: 1px solid var(--line);
@@ -538,7 +555,7 @@
 
 .ps-rate-card-prices {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.3rem;
   padding-left: 0.1rem;
 }

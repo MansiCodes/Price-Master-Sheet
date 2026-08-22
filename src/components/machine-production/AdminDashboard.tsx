@@ -506,7 +506,6 @@ export function AdminDashboard() {
     <div className="mp-root">
       <PageToolbar
         title="Machine Production Admin"
-        subtitle="Records, slot board summary, and machine master"
         action={
           <a className="btn btn-secondary" href="/machine-production">
             Supervisor view

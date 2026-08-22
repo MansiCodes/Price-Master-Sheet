@@ -47,7 +47,7 @@ function navItemLabel(
 
 /** Minimal stroke-icon set (24x24) — no extra icon dependency. */
 const ICON_PATHS: Record<NavIconName, string> = {
-  home: "M3 11.5 12 4l9 7.5M5.5 10v9a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1v-9",
+  home: "M3 3h8v10H3V3Zm10 0h8v6h-8V3ZM3 17h8v4H3v-4Zm10-4h8v8h-8v-8Z",
   today: "M4 5h16v15H4V5Zm0 5h16M8 3v4M16 3v4M8.5 14.5l1.7 1.7L14.5 12",
   purchase:
     "M3 5h2l1.6 9.6a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20 8H6M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
