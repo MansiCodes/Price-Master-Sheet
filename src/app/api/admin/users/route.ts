@@ -44,7 +44,6 @@ export async function GET() {
     const denied = requireSuperAdmin(session);
     if (denied) return denied;
 
-  try {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
