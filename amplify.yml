@@ -10,7 +10,6 @@ frontend:
         - echo "AUTH_TRUST_HOST=true" >> .env.production
         - npm install
         - npx prisma generate
-        - npx prisma db push --skip-generate
     build:
       commands:
         - export NODE_TLS_REJECT_UNAUTHORIZED=0
