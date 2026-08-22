@@ -175,14 +175,14 @@ export function getPurchaseCatalog(plantCode: string): {
 } {
   if (plantCode.toUpperCase() === "PVC") {
     return {
-      suppliers: PVC_SUPPLIERS.includes("Other" as any) ? PVC_SUPPLIERS : [...PVC_SUPPLIERS, "Other"],
-      goods: PVC_PURCHASE_GOODS.includes("Other" as any) ? PVC_PURCHASE_GOODS : [...PVC_PURCHASE_GOODS, "Other"],
+      suppliers: PVC_SUPPLIERS,
+      goods: PVC_PURCHASE_GOODS,
     };
   }
 
   return {
-    suppliers: DEFAULT_SUPPLIERS.includes("Other" as any) ? DEFAULT_SUPPLIERS : [...DEFAULT_SUPPLIERS, "Other"],
-    goods: DEFAULT_PURCHASE_GOODS.includes("Other" as any) ? DEFAULT_PURCHASE_GOODS : [...DEFAULT_PURCHASE_GOODS, "Other"],
+    suppliers: DEFAULT_SUPPLIERS,
+    goods: DEFAULT_PURCHASE_GOODS,
   };
 }
 

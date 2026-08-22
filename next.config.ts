@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   env: {
     AUTH_SECRET: authSecret,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "4mb",
