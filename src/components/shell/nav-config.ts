@@ -42,6 +42,8 @@ export type NavFlags = {
   showPnl: boolean;
   showPriceSheet: boolean;
   showMachineProduction: boolean;
+  /** Machine Supervisor: home is machine production, not plant P&L dashboard. */
+  isMachineSupervisor?: boolean;
   showAdmin: boolean;
   showSuper: boolean;
   isManager: boolean;
@@ -55,35 +57,50 @@ export function getNavSections(flags: NavFlags): NavSection[] {
     showPnl,
     showPriceSheet,
     showMachineProduction,
+    isMachineSupervisor = false,
     showAdmin,
     showSuper,
     primaryPlantId,
   } = flags;
   const sections: NavSection[] = [];
 
-  sections.push({
-    key: "work",
-    title: "Work",
-    items: [
-      {
-        key: "dashboard",
-        label: "Dashboard",
-        href: "/",
-        icon: "home",
-      },
-      ...(showMachineProduction
-        ? [
-            {
-              key: "machine-production",
-              label: "Machine Production",
-              href: "/machine-production",
-              icon: "machineProduction" as const,
-            },
-          ]
-        : []),
-    ],
-  });
-
+  if (isMachineSupervisor) {
+    sections.push({
+      key: "work",
+      title: "Work",
+      items: [
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          href: "/machine-production",
+          icon: "home",
+        },
+      ],
+    });
+  } else {
+    sections.push({
+      key: "work",
+      title: "Work",
+      items: [
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          href: "/",
+          icon: "home",
+        },
+        ...(showMachineProduction
+          ? [
+              {
+                key: "machine-production",
+                label: "Machine Production",
+                href: "/machine-production",
+                icon: "machineProduction" as const,
+              },
+            ]
+          : []),
+      ],
+    });
+  }
   const reportItems: NavItem[] = [];
   if (showPnl && primaryPlantId) {
     reportItems.push({

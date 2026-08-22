@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { AppHeaderUser } from "./AppHeader";
 import type { NavIconName, NavSection } from "./nav-config";
+import { findActiveNavItem } from "./nav-config";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { PlantSwitcher, type PlantSwitcherPlant } from "./PlantSwitcher";
 
@@ -141,6 +142,7 @@ function SidebarNav({
   onNavigate?: () => void;
 }) {
   const tNav = useTranslations("nav");
+  const activeItem = findActiveNavItem(pathname, navSections);
 
   return (
     <nav className="dash-sidebar__nav" aria-label="Main">
@@ -153,10 +155,7 @@ function SidebarNav({
           ) : null}
           {section.items.map((item) => {
             const label = navItemLabel(tNav, item.key);
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+            const active = activeItem?.key === item.key;
             return (
               <Link
                 key={item.key}

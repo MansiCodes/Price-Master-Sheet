@@ -79,6 +79,10 @@ export function AppHeader({
   const tNav = useTranslations("nav");
   const locale = useLocale() as AppLocale;
   const activeItem = findActiveNavItem(pathname, navSections);
+  const homeHref =
+    navSections
+      .flatMap((s) => s.items)
+      .find((item) => item.key === "dashboard")?.href ?? "/";
   const today = useMemo(() => todayLocalISO(), []);
   const dateLabel = useMemo(
     () => formatHeaderDate(today, true, locale),
@@ -132,7 +136,7 @@ export function AppHeader({
         <MenuIcon collapsed={sidebarCollapsed} />
       </button>
 
-      <Link href="/" className="dash-header__brand">
+      <Link href={homeHref} className="dash-header__brand">
         <span>{t("brandCable")}</span>
         <span>{t("brandJunction")}</span>
       </Link>

@@ -39,6 +39,7 @@ export default async function AppLayout({
           showPnl: false,
           showPriceSheet: false,
           showMachineProduction: true,
+          isMachineSupervisor: true,
           showAdmin: false,
           showSuper: false,
           isManager: false,

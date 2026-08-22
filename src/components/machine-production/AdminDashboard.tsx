@@ -500,7 +500,7 @@ export function AdminDashboard() {
     void loadCableSizes(selectedCableTypeId);
   }
 
-  const displaySummary = boardSummary ?? summary;
+  const displaySummary = tab === "records" ? summary ?? boardSummary : boardSummary ?? summary;
 
   return (
     <div className="mp-root">
