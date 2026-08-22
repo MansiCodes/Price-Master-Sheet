@@ -91,24 +91,26 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
-  padding: 1rem 1.1rem;
+  padding: 0.85rem 1rem;
   border-radius: var(--radius);
   background: #fff;
   border: 1px solid var(--border);
   box-shadow: none;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .mp-slot-banner__label {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--stone);
 }
 
 .mp-slot-banner__value {
-  margin: 0.2rem 0 0;
-  font-size: 1rem;
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--ink);
 }
@@ -149,10 +151,38 @@
   border-color: transparent;
 }
 
+/* Cap board to ~3 compact cards so banner/cards don’t stretch full screen */
+.mp-board {
+  --mp-card-w: 252px;
+  --mp-card-gap: 0.85rem;
+  width: 100%;
+  max-width: calc(3 * var(--mp-card-w) + 2 * var(--mp-card-gap));
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
 .mp-machine-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, var(--mp-card-w));
+  gap: var(--mp-card-gap);
+  width: 100%;
+  justify-content: start;
+}
+
+.mp-machine-grid--processes {
+  grid-template-columns: repeat(3, var(--mp-card-w));
+}
+
+@media (max-width: 900px) {
+  .mp-board {
+    max-width: 100%;
+  }
+
+  .mp-machine-grid,
+  .mp-machine-grid--processes {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  }
 }
 
 .mp-machine-card {

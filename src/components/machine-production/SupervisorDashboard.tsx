@@ -204,6 +204,7 @@ export function SupervisorDashboard() {
         ))}
       </div>
 
+      <div className="mp-board">
       {viewSlot ? (
         <div className="mp-slot-banner">
           <div>
@@ -242,7 +243,7 @@ export function SupervisorDashboard() {
       {error ? <p className="mp-error">{error}</p> : null}
 
       {!loading && data?.level === "processes" ? (
-        <div className="mp-machine-grid">
+        <div className="mp-machine-grid mp-machine-grid--processes">
           {data.processes.length === 0 ? (
             <p className="mp-muted">
               No processes yet. Ask an Admin to add processes and assign
@@ -339,6 +340,7 @@ export function SupervisorDashboard() {
           )}
         </div>
       ) : null}
+      </div>
 
       <ProductionEntryForm
         open={Boolean(selected)}
