@@ -100,6 +100,7 @@ export const CAT6_CUSTOMERS = [
   "Vision Technologies",
   "Wirelux Cables Private Limited",
   "Yernest Compactivity",
+  "Other",
 ] as const;
 
 export const CAT6_SALE_PRODUCTS = [
@@ -203,6 +204,7 @@ export const CAT6_SUPPLIERS = [
   "Wirelux Cables Private Limited",
   "WIRELUX CABLES PRIVATE LTD",
   "YATHARTH METATECH PRIVATE LIMITED",
+  "Other",
 ] as const;
 
 export const CAT6_PURCHASE_GOODS = [
@@ -245,6 +247,7 @@ export const CAT6_PURCHASE_GOODS = [
   "SPOOL",
   "TAPE",
   "XL_ZHFR",
+  "Other",
 ] as const;
 
 export const CAT6_STOCK_ITEMS = [
@@ -266,6 +269,7 @@ export const CAT6_STOCK_ITEMS = [
   "INDOOR CAT 6 24AWG UTP NETWORKING CABLE - 100 MTR",
   "INDOOR CAT 6 24AWG UTP NETWORKING CABLE - 305 MTR",
   "OUTDOOR CAT 6 24AWG DOUBLE SHELD CABLE - 300 MTR",
+  "Other",
 ] as const;
 
 export const CAT6_PETTY_NATURES = [
@@ -295,6 +299,7 @@ export const CAT6_PETTY_NATURES = [
   "VEHICLE RUNNING",
   "WORKER FOOD ALLOWENCE",
   "WORKER FOODS ALLOWENCE",
+  "Other",
 ] as const;
 
 export const CAT6_PETTY_PERSONS = [
@@ -312,10 +317,12 @@ export const CAT6_PETTY_PERSONS = [
   "TULSHI JI",
   "TULSI SIR",
   "VIPIN",
+  "Other",
 ] as const;
 
 export const CAT6_PETTY_LOCATIONS = [
   "ATC BHAGWANPUR",
+  "Other",
 ] as const;
 
 export const CAT6_PETTY_CHECKED_BY = [
@@ -324,10 +331,12 @@ export const CAT6_PETTY_CHECKED_BY = [
   "MANISH",
   "SANDESH",
   "VIPIN",
+  "Other",
 ] as const;
 
 export const CAT6_PETTY_APPROVED_BY = [
   "ASHOK SIR",
   "SHUKLA JI",
+  "Other",
 ] as const;
 

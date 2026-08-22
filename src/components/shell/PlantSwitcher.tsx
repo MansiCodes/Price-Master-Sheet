@@ -50,10 +50,11 @@ export function PlantSwitcher({
     };
   }, [open]);
 
-  if (plants.length <= 1) return null;
-
-  const current = plants.find((p) => p.id === currentPlantId) ?? null;
+  const current = plants.find((p) => p.id === currentPlantId) ?? plants[0] ?? null;
   const allPlantsActive = allowAllPlants && !current;
+  const isMulti = plants.length > 1 || allowAllPlants;
+
+  if (!current && !allPlantsActive) return null;
 
   function choose(plantId: string) {
     if (plantId === currentPlantId) {
@@ -79,44 +80,74 @@ export function PlantSwitcher({
 
   return (
     <div className="dash-sidebar__plant" ref={rootRef}>
-      <button
-        type="button"
-        className={`dash-sidebar__link dash-sidebar__plant-toggle${open ? " is-open" : ""}`}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        disabled={pending}
-        title={showLabels ? undefined : current?.name ?? t("label")}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="dash-sidebar__icon">
-          <svg
-            viewBox="0 0 24 24"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 21V10l8-6 8 6v11M9 21v-6h6v6M4 10h16" />
-          </svg>
-        </span>
-        <span className="dash-sidebar__plant-meta">
-          <span className="dash-sidebar__plant-label">{t("label")}</span>
-          {current ? (
-            <span className="dash-sidebar__plant-current">{current.name}</span>
-          ) : allPlantsActive ? (
-            <span className="dash-sidebar__plant-current">{t("allPlants")}</span>
-          ) : null}
-        </span>
-        <span className="dash-sidebar__plant-chevron" aria-hidden="true">
-          {open ? "▾" : "▸"}
-        </span>
-      </button>
+      {isMulti ? (
+        <button
+          type="button"
+          className={`dash-sidebar__link dash-sidebar__plant-toggle${open ? " is-open" : ""}`}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          disabled={pending}
+          title={showLabels ? undefined : current?.name ?? t("label")}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="dash-sidebar__icon">
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 21V10l8-6 8 6v11M9 21v-6h6v6M4 10h16" />
+            </svg>
+          </span>
+          <span className="dash-sidebar__plant-meta">
+            <span className="dash-sidebar__plant-label">{t("label")}</span>
+            {current ? (
+              <span className="dash-sidebar__plant-current">{current.name}</span>
+            ) : allPlantsActive ? (
+              <span className="dash-sidebar__plant-current">{t("allPlants")}</span>
+            ) : null}
+          </span>
+          <span className="dash-sidebar__plant-chevron" aria-hidden="true">
+            {open ? "▾" : "▸"}
+          </span>
+        </button>
+      ) : (
+        <div
+          className="dash-sidebar__link dash-sidebar__plant-toggle"
+          style={{ cursor: "default" }}
+          title={showLabels ? undefined : current?.name ?? t("label")}
+        >
+          <span className="dash-sidebar__icon">
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M4 21V10l8-6 8 6v11M9 21v-6h6v6M4 10h16" />
+            </svg>
+          </span>
+          <span className="dash-sidebar__plant-meta">
+            <span className="dash-sidebar__plant-label">{t("label")}</span>
+            {current ? (
+              <span className="dash-sidebar__plant-current">{current.name}</span>
+            ) : null}
+          </span>
+        </div>
+      )}
 
-      {open ? (
+      {open && isMulti ? (
         <ul className="dash-sidebar__plant-list" role="listbox">
           {allowAllPlants ? (
             <li role="option" aria-selected={allPlantsActive}>

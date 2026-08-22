@@ -22,6 +22,7 @@ async function main() {
     { code: "CAT6", name: "CAT-6 Cable Plant" },
     { code: "PVC", name: "PVC Plant" },
     { code: "LEDROPE", name: "LED Rope Light Plant" },
+    { code: "SIGNALLING", name: "Signalling Plant" },
   ];
 
   const plants = [];

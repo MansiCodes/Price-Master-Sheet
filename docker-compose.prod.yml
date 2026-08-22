@@ -1,0 +1,53 @@
+# Lowest-cost production stack: app + Postgres on one EC2/Lightsail box.
+# Usage on the server:
+#   cp .env.production.example .env
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Restore Neon/local backup into this Postgres:
+#   docker compose -f docker-compose.prod.yml exec -T db \
+#     psql -U postgres -d plant_pnl < backups/plant_pnl_backup_....sql
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: plant_pnl
+    volumes:
+      - plant_pnl_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d plant_pnl"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-changeme}@db:5432/plant_pnl?sslmode=disable
+      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_URL: ${AUTH_URL}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
+      CRON_SECRET: ${CRON_SECRET:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
+      GOOGLE_SHEET_NAME: ${GOOGLE_SHEET_NAME:-}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  plant_pnl_data:

@@ -7,6 +7,7 @@ import {
   isMachineSupervisor,
   isSuperAdmin,
 } from "@/lib/rbac";
+import { setSelectedPlantCookie } from "@/lib/selected-plant";
 import { PlantChooser } from "@/components/select-plant/PlantChooser";
 import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import "@/components/select-plant/plant-chooser.css";
@@ -34,6 +35,12 @@ export default async function SelectPlantPage() {
           select: { id: true, name: true, code: true },
         })
       : [];
+
+  if (plants.length === 1) {
+    const targetId = plants[0].id;
+    await setSelectedPlantCookie(targetId);
+    redirect(`/plants/${targetId}/today`);
+  }
 
   if (plants.length === 0) {
     return (

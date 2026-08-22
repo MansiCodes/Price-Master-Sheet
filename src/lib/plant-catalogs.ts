@@ -36,6 +36,7 @@ const PVC_SUPPLIERS = [
   "SUNTEK CHLORIDES Pvt Ltd.",
   "A K ENTERPRISES , KANPUR",
   "S.K. SCRAP TRADERS",
+  "Other",
 ] as const;
 
 const PVC_PURCHASE_GOODS = [
@@ -74,8 +75,9 @@ const PVC_PURCHASE_GOODS = [
   "Stearic Acid (Wax/Mom)",
   "BARDANA (Empty Bag)",
   "Ghash Granding",
-  "H. CLEAR/GRANDING/S. CLEAR/JHAAL",
-  "S. CLEAR / GREEN PIPE",
+  "Lump+Cable",
+  "Lump+cable",
+  "Other",
 ] as const;
 
 export const PVC_STOCK_PARTICULARS = [
@@ -93,9 +95,10 @@ export const PVC_STOCK_PARTICULARS = [
   "Lump+Cable",
   "H. Cilies",
   "JHAL Plastic Scrap",
+  "Other",
 ] as const;
 
-export const STOCK_CATEGORIES = ["RM", "WIP", "FG"] as const;
+export const STOCK_CATEGORIES = ["RM", "WIP", "FG", "Other"] as const;
 
 /** Notes prefix for inventory snapshot rows (P&L Opening / Closing Stock). */
 export const STOCK_CLOSING_NOTE_PREFIX = "Closing stock";
@@ -172,19 +175,30 @@ export function getPurchaseCatalog(plantCode: string): {
 } {
   if (plantCode.toUpperCase() === "PVC") {
     return {
-      suppliers: PVC_SUPPLIERS,
-      goods: PVC_PURCHASE_GOODS,
+      suppliers: PVC_SUPPLIERS.includes("Other" as any) ? PVC_SUPPLIERS : [...PVC_SUPPLIERS, "Other"],
+      goods: PVC_PURCHASE_GOODS.includes("Other" as any) ? PVC_PURCHASE_GOODS : [...PVC_PURCHASE_GOODS, "Other"],
     };
   }
 
   return {
-    suppliers: DEFAULT_SUPPLIERS,
-    goods: DEFAULT_PURCHASE_GOODS,
+    suppliers: DEFAULT_SUPPLIERS.includes("Other" as any) ? DEFAULT_SUPPLIERS : [...DEFAULT_SUPPLIERS, "Other"],
+    goods: DEFAULT_PURCHASE_GOODS.includes("Other" as any) ? DEFAULT_PURCHASE_GOODS : [...DEFAULT_PURCHASE_GOODS, "Other"],
   };
 }
 
 export function getSalesCatalog(plantCode: string): readonly string[] {
   if (isCat6Plant(plantCode)) return CAT6_SALE_PRODUCTS;
+  if (plantCode?.toUpperCase() === "SIGNALLING") {
+    return [
+      "Signalling Cable 1.5 sq mm",
+      "Signalling Cable 2.5 sq mm",
+      "Signalling Cable 4 sq mm",
+      "Signalling Cable 6 sq mm",
+      "RDSO Black",
+      "RDSO Grey",
+      "Other",
+    ];
+  }
   return [
     "RDSO Black",
     "RDSO Grey",
@@ -210,6 +224,19 @@ export function getCat6PettyCatalog(): {
 
 export function getCustomerCatalog(plantCode: string): readonly string[] {
   if (isCat6Plant(plantCode)) return CAT6_CUSTOMERS;
+  if (plantCode?.toUpperCase() === "PVC") {
+    return ["ATCL", "Other"];
+  }
+  if (plantCode?.toUpperCase() === "SIGNALLING") {
+    return [
+      "Indian Railways",
+      "RDSO",
+      "ATCL",
+      "Wirelux",
+      "Samriddhi Automation Noida",
+      "Other",
+    ];
+  }
   return [
     "Noto Fire",
     "Wirelux",
@@ -229,6 +256,7 @@ export function getCustomerCatalog(plantCode: string): readonly string[] {
     "Reliable securities",
     "Chrome Infra",
     "Epsillon Cable",
+    "Other",
   ];
 }
 
@@ -244,7 +272,6 @@ export type PvcExpenseSection =
 /** Direct expenses (P&L trading account). */
 export const PVC_DIRECT_EXPENSE_HEADS = [
   "Fuel & Power",
-  "Unloading of MT",
   "Labour Contractor",
   "Expense",
   "Other",
@@ -305,6 +332,7 @@ export const DEFAULT_EXPENSE_HEADS = CAT6_EXPENSE_HEADS;
 export const PVC_FAR_VENDORS = [
   "Choudhary Enterprises",
   "Perfect Traders",
+  "Other",
 ] as const;
 
 export const PVC_FAR_DEP_PERCENT = 18.1;
@@ -331,7 +359,7 @@ export function getExpenseHeadsForSection(
       ? CAT6_DIRECT_EXPENSE_HEADS
       : CAT6_INDIRECT_EXPENSE_HEADS;
   }
-  if (code === "LEDROPE") {
+  if (code === "LEDROPE" || code === "SIGNALLING") {
     return section === "direct"
       ? LED_DIRECT_EXPENSE_HEADS
       : LED_INDIRECT_EXPENSE_HEADS;
@@ -374,7 +402,7 @@ export function expenseSectionForPlant(
     }
     return "indirect";
   }
-  if (code === "LEDROPE") {
+  if (code === "LEDROPE" || code === "SIGNALLING") {
     const normalized = head.trim();
     if (
       (LED_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
@@ -395,7 +423,7 @@ export function getExpenseHeads(plantCode?: string | null): readonly string[] {
   const code = plantCode?.toUpperCase() ?? "";
   if (code === "PVC") return PVC_EXPENSE_HEADS;
   if (code === "CAT6") return CAT6_EXPENSE_HEADS;
-  if (code === "LEDROPE") return LED_EXPENSE_HEADS;
+  if (code === "LEDROPE" || code === "SIGNALLING") return LED_EXPENSE_HEADS;
   return DEFAULT_EXPENSE_HEADS;
 }
 

@@ -250,7 +250,8 @@ export function TodayHub({
   const customers = useMemo(() => getCustomerCatalog(plantCode), [plantCode]);
   const pettyCatalog = useMemo(() => getCat6PettyCatalog(), []);
   const [expenseSection, setExpenseSection] = useState<PvcExpenseSection>("direct");
-  const [purchaseSource, setPurchaseSource] = useState<"vendor" | "atcl">("vendor");
+  const [purchaseSource, setPurchaseSource] = useState<"vendor" | "atcl" | "other">("vendor");
+  const [purchaseSourceOther, setPurchaseSourceOther] = useState("");
   const expenseHeads = useMemo(
     () =>
       hasExpenseSections
@@ -267,7 +268,9 @@ export function TodayHub({
     () => [...customers, "Other"],
     [customers],
   );
-  const stockParticulars = [...stockCatalog.particulars, "Others"];
+  const stockParticulars = Array.from(
+    new Set(stockCatalog.particulars.map((x) => (x === "Others" ? "Other" : x)))
+  );
 
   const entryOptions = useMemo(
     () =>
@@ -372,6 +375,34 @@ export function TodayHub({
   const [unloadRatePerMt, setUnloadRatePerMt] = useState(
     String(PVC_UNLOADING_RATE_PER_MT),
   );
+  const [fetchedPurchaseKg, setFetchedPurchaseKg] = useState<number>(0);
+
+  useEffect(() => {
+    if (
+      isPvc &&
+      kind === "expense" &&
+      (expenseHead === "Unloading of MT" || expenseHead === "Unloading MT") &&
+      entryDate
+    ) {
+      fetch(
+        `/api/plants/${plantId}/purchases?from=${encodeURIComponent(entryDate)}&to=${encodeURIComponent(entryDate)}`,
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          const qty = Number(data?.totals?.quantity) || 0;
+          setFetchedPurchaseKg(qty);
+        })
+        .catch(() => setFetchedPurchaseKg(0));
+    }
+  }, [isPvc, kind, expenseHead, entryDate, plantId]);
+
+  const currentPurchaseKg = purchaseLines.reduce(
+    (sum, l) => sum + (Number(l.quantity) || 0),
+    0,
+  );
+  const effectivePurchaseKg =
+    currentPurchaseKg > 0 ? currentPurchaseKg : fetchedPurchaseKg;
+  const calculatedUnloadMt = (effectivePurchaseKg / 1000).toFixed(3);
   const [pettyCashPayMode, setPettyCashPayMode] = useState("");
   const [pettyCashDescription, setPettyCashDescription] = useState("");
   const [pettyCashBillNumber, setPettyCashBillNumber] = useState("");
@@ -770,14 +801,14 @@ export function TodayHub({
         isPvc &&
         (expenseHead === "Unloading of MT" || expenseHead === "Unloading MT")
       ) {
-        const qty = Number(unloadQtyMt);
+        const qty = Number(calculatedUnloadMt);
         const rate =
           Number(unloadRatePerMt) > 0
             ? Number(unloadRatePerMt)
             : PVC_UNLOADING_RATE_PER_MT;
         const amount = qty * rate;
         if (!(qty > 0) || !(amount > 0)) {
-          fail("Enter unloading quantity (MT) and rate.");
+          fail("Unloading MT is 0. Please enter purchases first for auto-calculation.");
           return;
         }
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
@@ -1077,7 +1108,14 @@ export function TodayHub({
         {error ? <Alert type="error">{error}</Alert> : null}
 
         <form id="today-entry-form" className="form-grid" onSubmit={onSubmit}>
-            <div className={`form-grid ${isCat6 ? "two" : "three"}`}>
+        {(() => {
+          const showShift =
+            kind !== "contactList" &&
+            kind !== "purchase" &&
+            kind !== "sale" &&
+            !isCat6;
+          return (
+            <div className={`form-grid ${showShift ? "three" : "two"}`}>
               <div className="field">
                 <label htmlFor="entry-kind">{t("entryType")}</label>
                 <SelectMenu
@@ -1095,48 +1133,50 @@ export function TodayHub({
                 />
               </div>
               {kind !== "contactList" && (
-              <div className="field">
-                <label htmlFor="entry-date">
-                  {isCat6
-                    ? kind === "expense"
-                      ? "Date"
-                      : "Bill Date"
-                    : kind === "expense" && expenseHead === "Petty Cash"
-                      ? t("billDate")
-                      : t("date")}
-                </label>
-                <input
-                  id="entry-date"
-                  type="date"
-                  required
-                  max={todayLocalISO()}
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                />
-              </div>
-              )}
-              {kind !== "contactList" && !isCat6 && (
-              <div className="field">
-                <label>{t("shift")}</label>
-                <div className="shift-toggle">
-                  <button
-                    type="button"
-                    className={shift === "DAY" ? "is-active" : ""}
-                    onClick={() => setShift("DAY")}
-                  >
-                    {tCommon("day")}
-                  </button>
-                  <button
-                    type="button"
-                    className={shift === "NIGHT" ? "is-active" : ""}
-                    onClick={() => setShift("NIGHT")}
-                  >
-                    {tCommon("night")}
-                  </button>
+                <div className="field">
+                  <label htmlFor="entry-date">
+                    {isCat6
+                      ? kind === "expense"
+                        ? "Date"
+                        : "Bill Date"
+                      : kind === "expense" && expenseHead === "Petty Cash"
+                        ? t("billDate")
+                        : t("date")}
+                  </label>
+                  <input
+                    id="entry-date"
+                    type="date"
+                    required
+                    max={todayLocalISO()}
+                    value={entryDate}
+                    onChange={(e) => setEntryDate(e.target.value)}
+                  />
                 </div>
-              </div>
+              )}
+              {showShift && (
+                <div className="field">
+                  <label>{t("shift")}</label>
+                  <div className="shift-toggle">
+                    <button
+                      type="button"
+                      className={shift === "DAY" ? "is-active" : ""}
+                      onClick={() => setShift("DAY")}
+                    >
+                      {tCommon("day")}
+                    </button>
+                    <button
+                      type="button"
+                      className={shift === "NIGHT" ? "is-active" : ""}
+                      onClick={() => setShift("NIGHT")}
+                    >
+                      {tCommon("night")}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
+          );
+        })()}
 
             {kind === "purchase" ? (
               <>
@@ -1172,24 +1212,40 @@ export function TodayHub({
                   </div>
                 ) : null}
                 {isPvc ? (
-                  <div className="field">
-                    <label htmlFor="p-source">Purchase source</label>
-                    <SelectMenu
-                      id="p-source"
-                      value={
-                        purchaseSource === "atcl"
-                          ? "Stock from ATCL"
-                          : "Vendor purchase"
-                      }
-                      options={["Vendor purchase", "Stock from ATCL"]}
-                      required
-                      onChange={(label) =>
-                        setPurchaseSource(
-                          label === "Stock from ATCL" ? "atcl" : "vendor",
-                        )
-                      }
-                    />
-                  </div>
+                  <>
+                    <div className="field">
+                      <label htmlFor="p-source">Purchase source</label>
+                      <SelectMenu
+                        id="p-source"
+                        value={
+                          purchaseSource === "atcl"
+                            ? "Stock from ATCL"
+                            : purchaseSource === "other"
+                              ? "Other"
+                              : "Vendor purchase"
+                        }
+                        options={["Vendor purchase", "Stock from ATCL", "Other"]}
+                        required
+                        onChange={(label) => {
+                          if (label === "Stock from ATCL") setPurchaseSource("atcl");
+                          else if (label === "Other") setPurchaseSource("other");
+                          else setPurchaseSource("vendor");
+                        }}
+                      />
+                    </div>
+                    {purchaseSource === "other" ? (
+                      <div className="field">
+                        <label htmlFor="p-source-other">Specify Purchase Source</label>
+                        <input
+                          id="p-source-other"
+                          required
+                          placeholder="Enter purchase source"
+                          value={purchaseSourceOther}
+                          onChange={(e) => setPurchaseSourceOther(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </>
                 ) : null}
                 {isCat6 ? (
                 <div className="field">
@@ -1239,7 +1295,7 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
-                {isCat6 && vendorName === "Other" ? (
+                {vendorName === "Other" ? (
                   <div className="field">
                     <label htmlFor="p-vendor-other">Vendor&apos;s Name</label>
                     <input
@@ -1298,6 +1354,20 @@ export function TodayHub({
                     }}
                   />
                 </div>
+                ) : isPvc ? (
+                <div className="field">
+                  <label htmlFor="s-cust">Customer</label>
+                  <SelectMenu
+                    id="s-cust"
+                    value={customerName}
+                    options={customers}
+                    required
+                    onChange={(next) => {
+                      setCustomerName(next);
+                      if (next !== "Other") setCustomerNameOther("");
+                    }}
+                  />
+                </div>
                 ) : (
                 <div className="form-grid two">
                   <div className="field">
@@ -1331,7 +1401,7 @@ export function TodayHub({
                   </div>
                 </div>
                 )}
-                {isCat6 && customerName === "Other" ? (
+                {customerName === "Other" ? (
                   <div className="field">
                     <label htmlFor="s-cust-other">Customer Name</label>
                     <input
@@ -1343,7 +1413,7 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
-                {!isCat6 && saleType === "OTHERS" ? (
+                {!isCat6 && !isPvc && saleType === "OTHERS" ? (
                   <div className="field">
                     <label htmlFor="s-type-other">Other type</label>
                     <input
@@ -1366,13 +1436,15 @@ export function TodayHub({
                 <LineEditor
                   lines={saleLines}
                   onChange={setSaleLines}
-                  defaultUnit={isCat6 ? "NOS" : PRODUCTS[0].unit}
+                  defaultUnit={isCat6 ? "NOS" : isPvc ? "KG" : PRODUCTS[0].unit}
                   itemLabel="Item Details"
                   itemOptions={saleProducts}
-                  unitOptions={isCat6 ? CAT6_LINE_UNITS : PRODUCT_UNITS}
+                  unitOptions={
+                    isCat6 ? CAT6_LINE_UNITS : isPvc ? ["KG", "Other"] : PRODUCT_UNITS
+                  }
                   showCat6MeterFields={isCat6}
                   resolveUnitForItem={(name) =>
-                    PRODUCTS.find((p) => p.name === name)?.unit
+                    isPvc ? "KG" : PRODUCTS.find((p) => p.name === name)?.unit
                   }
                 />
                 {isCat6 ? null : (
@@ -1396,12 +1468,6 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
-                {isPvc ? (
-                  <p className="cost-hint">
-                    Closing stock snapshot — feeds P&L Opening / Closing Stock. Use
-                    Purchase → Stock from ATCL for inward register.
-                  </p>
-                ) : null}
                 {isPvc ? (
                   <div className="field">
                     <label htmlFor="st-category">Stock</label>
@@ -1707,62 +1773,6 @@ export function TodayHub({
                         onChange={setFarDepPercent}
                       />
                     </div>
-                  </>
-                ) : isPvc &&
-                  (expenseHead === "Unloading of MT" ||
-                    expenseHead === "Unloading MT") ? (
-                  <>
-                    <div className="prod-fields__row">
-                      <div className="field">
-                        <label htmlFor="e-unload-qty">Quantity (MT)</label>
-                        <DecimalInput
-                          id="e-unload-qty"
-                          required
-                          value={unloadQtyMt}
-                          onChange={setUnloadQtyMt}
-                        />
-                      </div>
-                      <div className="field">
-                        <label htmlFor="e-unload-rate">Rate (₹/MT)</label>
-                        <DecimalInput
-                          id="e-unload-rate"
-                          required
-                          value={unloadRatePerMt}
-                          onChange={setUnloadRatePerMt}
-                        />
-                      </div>
-                    </div>
-                    <p className="cost-hint">
-                      Unloading amount{" "}
-                      <span className="cost-hint__amount">
-                        {formatINR(
-                          (Number(unloadQtyMt) || 0) *
-                            (Number(unloadRatePerMt) > 0
-                              ? Number(unloadRatePerMt)
-                              : PVC_UNLOADING_RATE_PER_MT),
-                        )}
-                      </span>
-                    </p>
-                    <div className="prod-fields__row">
-                      <div className="field">
-                        <label htmlFor="e-paid">{t("paidTo")}</label>
-                        <input
-                          id="e-paid"
-                          value={paidTo}
-                          onChange={(e) => setPaidTo(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="field expense-desc">
-                      <label htmlFor="e-desc">{t("remarksNotes")}</label>
-                      <textarea
-                        id="e-desc"
-                        value={expenseDesc}
-                        onChange={(e) => setExpenseDesc(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    <BillUpload urls={expensePhotos} onChange={setExpensePhotos} />
                   </>
                 ) : expenseHead === "Petty Cash" ? (
                   isCat6 ? (

@@ -92,10 +92,11 @@ export async function GET(
 
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
-    select: { code: true },
+    select: { code: true, unloadingRatePerMT: true },
   });
   const cat6 = isCat6Plant(plant?.code);
   const isPvc = plant?.code?.toUpperCase() === "PVC";
+  const unloadingRate = Number(plant?.unloadingRatePerMT ?? 70);
   const ownOnly = !isAdminOrHead(session.user.globalRole);
 
   let purchases = await prisma.purchase.findMany({
@@ -133,9 +134,13 @@ export async function GET(
     },
     { quantity: 0, basicValue: 0, gstAmount: 0, invoiceValue: 0 },
   );
-  const unloadingExpense = round2((totals.quantity / 1000) * 70);
+  const unloadingExpense = round2((totals.quantity / 1000) * unloadingRate);
 
-  return NextResponse.json({ rows: slice, ...pageInfo, totals: { ...totals, unloadingExpense } });
+  return NextResponse.json({
+    rows: slice,
+    ...pageInfo,
+    totals: { ...totals, unloadingExpense, unloadingRate },
+  });
 }
 
 export async function POST(

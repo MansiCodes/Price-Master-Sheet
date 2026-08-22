@@ -244,30 +244,9 @@ export function StockReport({
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">
         {isPvc
-          ? stockView === "atcl"
-            ? "PVC Plant — Stock from ATCL"
-            : "PVC Plant — Closing Stock"
+          ? "PVC Plant — Closing Stock"
           : t("stockTitle")}
       </h3>
-      {isPvc ? (
-        <div className="pnl-expense-subnav" role="tablist" aria-label="Stock type">
-          {PVC_STOCK_ENTRY_TYPES.map((entry) => (
-            <button
-              key={entry.value}
-              type="button"
-              role="tab"
-              aria-selected={stockView === entry.value}
-              className={stockView === entry.value ? "is-active" : ""}
-              onClick={() => {
-                setStockView(entry.value);
-                setPage(1);
-              }}
-            >
-              {entry.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[

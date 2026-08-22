@@ -73,17 +73,6 @@ export async function DashboardHome({
           icon="stock"
         />
         <KpiCard
-          label={t("production")}
-          value={t("units", {
-            count: metrics.mtdProductionQty.toLocaleString(
-              localeToBcp47(locale),
-            ),
-          })}
-          tone="teal"
-          hint={scope === "plant" ? t("loggedQtyPlant") : t("loggedQty")}
-          icon="production"
-        />
-        <KpiCard
           label={t("expenses")}
           value={formatMoney(metrics.mtdExpenses)}
           tone="teal"

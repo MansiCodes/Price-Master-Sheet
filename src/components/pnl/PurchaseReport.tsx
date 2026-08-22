@@ -83,6 +83,7 @@ export function PurchaseReport({
         gstAmount?: number;
         invoiceValue?: number;
         unloadingExpense?: number;
+        unloadingRate?: number;
       }
     | undefined;
   const crud = useReportCrud<PurchaseRow>(`/api/plants/${plantId}/purchases`, reload);
@@ -278,6 +279,58 @@ export function PurchaseReport({
     },
   ];
 
+  const atclColumns: ReportColumn<PurchaseRow>[] = [
+    {
+      key: "sno",
+      label: "S.No",
+      render: (_r, index) =>
+        String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "description",
+      label: "Items Details",
+      wrap: true,
+      render: (r) => r.itemDescription,
+    },
+    {
+      key: "billDate",
+      label: "Bill Date",
+      render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "unit",
+      label: "Unit",
+      compact: true,
+      render: (r) => r.unit || "—",
+    },
+    {
+      key: "qty",
+      label: "Quantity",
+      align: "right",
+      compact: true,
+      render: (r) => formatQty(r.quantity),
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      render: (r) => formatQty(r.rate),
+    },
+    {
+      key: "basic",
+      label: "Goods Value",
+      align: "right",
+      render: (r) => formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
+    },
+  ];
+
+  const columnsToUse = cat6
+    ? cat6Columns
+    : isPvc && purchaseView === "atcl"
+      ? atclColumns
+      : pvcColumns;
+
   return (
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">
@@ -317,7 +370,7 @@ export function PurchaseReport({
       ) : null}
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={[...(cat6 ? cat6Columns : pvcColumns), actionCol]}
+        columns={[...columnsToUse, actionCol]}
         rows={rows}
         loading={loading}
         variant="register"
@@ -329,30 +382,36 @@ export function PurchaseReport({
                   qty: formatQty(totals.quantity ?? 0),
                   amt: formatINR(totals.basicValue ?? 0),
                 }
-              : isPvc
+              : isPvc && purchaseView === "atcl"
                 ? {
-                    supplier: "Total Amount",
+                    description: "TOTAL",
                     qty: formatQty(totals.quantity ?? 0),
                     basic: formatINR(totals.basicValue ?? 0),
-                    gst: formatINR(totals.gstAmount ?? 0),
-                    invoice: formatINR(totals.invoiceValue ?? 0),
-                    remarks: "—",
                   }
-                : {
-                    supplier: "TOTAL",
-                    qty: formatQty(totals.quantity ?? 0),
-                    basic: formatINR(totals.basicValue ?? 0),
-                    gst: formatINR(totals.gstAmount ?? 0),
-                    invoice: formatINR(totals.invoiceValue ?? 0),
-                  }
+                : isPvc
+                  ? {
+                      supplier: "Total Amount",
+                      qty: formatQty(totals.quantity ?? 0),
+                      basic: formatINR(totals.basicValue ?? 0),
+                      gst: formatINR(totals.gstAmount ?? 0),
+                      invoice: formatINR(totals.invoiceValue ?? 0),
+                      remarks: "—",
+                    }
+                  : {
+                      supplier: "TOTAL",
+                      qty: formatQty(totals.quantity ?? 0),
+                      basic: formatINR(totals.basicValue ?? 0),
+                      gst: formatINR(totals.gstAmount ?? 0),
+                      invoice: formatINR(totals.invoiceValue ?? 0),
+                    }
             : undefined
         }
         secondaryFooter={
-          totals && rows.length > 0 && isPvc
+          totals && rows.length > 0 && isPvc && purchaseView === "vendor"
             ? {
                 supplier: "Unloading/MT",
-                rate: "70",
-                qty: formatINR(totals.unloadingExpense ?? 0),
+                rate: String(totals.unloadingRate ?? 70),
+                basic: formatINR(totals.unloadingExpense ?? 0),
               }
             : undefined
         }

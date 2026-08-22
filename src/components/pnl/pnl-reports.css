@@ -88,15 +88,125 @@
   box-shadow: var(--teal-fill-shadow, none);
 }
 
-/* Few tabs: shrink bar to content — no empty stretch on the right */
+.pnl-expense-navigation-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+  width: 100%;
+}
+
+/* Separate pill buttons with border and teal gradient selection */
 .pnl-tab-nav--fit {
-  width: fit-content;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: fit-content !important;
   max-width: 100%;
 }
 
-.pnl-tab-nav--fit button {
-  flex: 0 0 auto;
-  padding: 0 0.55rem;
+/* Separate pill buttons with border and teal gradient selection (2-button bars) */
+.pnl-expense-type-nav,
+.pnl-expense-subnav-2,
+.pnl-expense-subnav {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 0.55rem !important;
+  width: fit-content !important;
+  max-width: 100%;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  margin-bottom: 0;
+}
+
+.pnl-expense-type-nav button,
+.pnl-expense-subnav-2 button,
+.pnl-expense-subnav button {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  height: 2.35rem !important;
+  padding: 0 1.25rem !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  border: 1.5px solid var(--border-strong, #c5d3cd) !important;
+  color: var(--fg-muted, #475569) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.pnl-expense-type-nav button:hover:not(.is-active),
+.pnl-expense-subnav-2 button:hover:not(.is-active),
+.pnl-expense-subnav button:hover:not(.is-active) {
+  background: #f0f5f3 !important;
+  border-color: var(--teal, #127269) !important;
+  color: var(--teal-ink, #0e5a54) !important;
+}
+
+.pnl-expense-type-nav button.is-active,
+.pnl-expense-subnav-2 button.is-active,
+.pnl-expense-subnav button.is-active {
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%)) !important;
+  color: #ffffff !important;
+  border: 1.5px solid transparent !important;
+  box-shadow: 0 3px 10px rgba(18, 114, 105, 0.25) !important;
+}
+
+/* Multi-Category Pill Track (Matching Screenshot 2 - 4 or 7 buttons fit 100% in 1 row) */
+.pnl-expense-cat-nav-multi {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 0.28rem !important;
+  border-radius: 14px !important;
+  background: #eef3f1 !important;
+  border: 1px solid var(--border, #d7e0dc) !important;
+  box-sizing: border-box !important;
+  gap: 0.25rem !important;
+}
+
+.pnl-expense-cat-nav-multi button {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  height: 2.35rem !important;
+  padding: 0 0.35rem !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  border-radius: 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--fg-muted, #5b6b66) !important;
+  cursor: pointer !important;
+}
+
+.pnl-expense-cat-nav-multi button.is-active {
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%)) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
 /* Many tabs (e.g. PVC): keep one row; stack "Factory Rent" on two lines */
@@ -815,59 +925,34 @@
     white-space: nowrap;
   }
 
-  /* Expense Direct/Indirect: keep pill track (not 4-col main tab grid) */
-  .pnl-expense-type-nav {
-    display: flex;
-    width: 100%;
-    max-width: 100%;
-    grid-template-columns: none;
-  }
-
-  .pnl-expense-type-nav button {
-    width: auto;
-    flex: 1 1 0;
-    min-width: 0;
-    height: 2.35rem;
-    padding: 0 0.55rem;
-    font-size: 0.78rem;
-    overflow: visible;
-    text-overflow: unset;
-  }
-
+  /* Expense Direct/Indirect: keep pill track (matching main tab bar) */
+  .pnl-expense-type-nav,
   .pnl-expense-cat-nav {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.25rem;
-    width: 100%;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    width: fit-content !important;
     max-width: 100%;
-    overflow-x: visible;
+    overflow-x: auto;
   }
 
-  .pnl-expense-cat-nav--cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  /* Indirect (7): two rows — 4 + 3 */
-  .pnl-expense-cat-nav--cols-7 {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
+  .pnl-expense-type-nav button,
   .pnl-expense-cat-nav button {
-    width: 100%;
-    min-width: 0;
-    height: auto;
-    min-height: 2.35rem;
-    padding: 0.35rem 0.3rem;
-    font-size: 0.7rem;
-    white-space: normal;
-    line-height: 1.15;
-    overflow: visible;
-    text-overflow: unset;
-  }
-
-  .pnl-expense-cat-nav--cols-7 button {
-    font-size: 0.68rem;
-    padding: 0.32rem 0.25rem;
+    appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    height: 2.35rem !important;
+    padding: 0 1rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    border-radius: 10px !important;
   }
 
   .pnl-reports__actions {

@@ -249,7 +249,7 @@ export function ExpenseReport({
       <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
 
       {usesSections ? (
-        <>
+        <div className="pnl-expense-navigation-group">
           <div
             className="pnl-tab-nav pnl-tab-nav--fit pnl-expense-type-nav"
             role="tablist"
@@ -271,8 +271,10 @@ export function ExpenseReport({
 
           {sectionHeads.length > 0 ? (
             <div
-              className={`pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-${sectionHeads.length}${
-                cat6 ? " pnl-expense-subnav--cat6" : ""
+              className={`pnl-tab-nav ${
+                sectionHeads.length <= 2
+                  ? "pnl-expense-subnav-2"
+                  : "pnl-tab-nav--compact pnl-expense-cat-nav-multi"
               }`}
               role="tablist"
               aria-label={
@@ -293,21 +295,14 @@ export function ExpenseReport({
                     setPage(1);
                   }}
                 >
-                  {head === "Factory Rent" ? (
-                    <span className="pnl-tab-nav__stacked">
-                      <span>Factory</span>
-                      <span>Rent</span>
-                    </span>
-                  ) : (
-                    head
-                  )}
+                  {head}
                 </button>
               ))}
             </div>
           ) : (
             <p className="pnl-expense-empty-hint">No categories in this section.</p>
           )}
-        </>
+        </div>
       ) : null}
 
       {error ? <div className="alert alert--error">{error}</div> : null}
