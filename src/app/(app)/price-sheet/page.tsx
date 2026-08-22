@@ -188,7 +188,7 @@ export default function PriceSheetPage() {
     selectionMode && selectedRows.length > 0
       ? `Share (${selectedRows.length})`
       : "Share";
-  const tableColSpan = selectionMode ? 9 : 8;
+  const tableColSpan = selectionMode ? 8 : 7;
 
   const fetchRates = useCallback(async () => {
     const response = await fetch("/api/rates");
@@ -287,8 +287,7 @@ export default function PriceSheetPage() {
     const header = [
       "S NO.",
       "NAME OF CABLE",
-      "SPECIFICATION",
-      "RM Costing Per Mtr",
+      "RM Costing (Per Box=305Mtr)",
       "P=10%",
       "P=12%",
       "P=15%",
@@ -300,8 +299,7 @@ export default function PriceSheetPage() {
         [
           csvEscape(row.sNo ?? ""),
           csvEscape(row.name),
-          csvEscape(row.specificationFull || row.specification || ""),
-          csvEscape(row.rmCostingPerMtr),
+          csvEscape(row.rmCostingPerBox),
           csvEscape(row.p10),
           csvEscape(row.p12),
           csvEscape(row.p15),
@@ -347,7 +345,7 @@ export default function PriceSheetPage() {
               </span>
               <input
                 type="search"
-                placeholder="Search cable, spec or S NO"
+                placeholder="Search cable or S NO"
                 autoComplete="off"
                 enterKeyHint="search"
                 value={query}
@@ -449,13 +447,12 @@ export default function PriceSheetPage() {
                       </th>
                     ) : null}
                     <th className="ps-col-sno">S NO.</th>
-                    <th className="ps-col-name">NAME</th>
-                    <th className="ps-col-spec">SPEC</th>
-                    <th className="ps-col-price ps-col-rm">RM / MTR</th>
-                    <th className="ps-col-price">P10</th>
-                    <th className="ps-col-price">P12</th>
-                    <th className="ps-col-price">P15</th>
-                    <th className="ps-col-price">P20</th>
+                    <th className="ps-col-name">NAME OF CABLE</th>
+                    <th className="ps-col-price ps-col-rm">RM Costing (Per Box=305Mtr)</th>
+                    <th className="ps-col-price">P=10%</th>
+                    <th className="ps-col-price">P=12%</th>
+                    <th className="ps-col-price">P=15%</th>
+                    <th className="ps-col-price">P=20%</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -465,7 +462,6 @@ export default function PriceSheetPage() {
                           {selectionMode ? <td><span className="ps-skeleton ps-sk-sno" /></td> : null}
                           <td><span className="ps-skeleton ps-sk-sno" /></td>
                           <td><span className="ps-skeleton ps-sk-name" /></td>
-                          <td><span className="ps-skeleton ps-sk-spec" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
@@ -496,13 +492,9 @@ export default function PriceSheetPage() {
                             ) : null}
                             <td className="ps-sno">{row.sNo ?? "—"}</td>
                             <td className="ps-name" title={row.name}>{row.name}</td>
-                            <td
-                              className="ps-spec"
-                              title={row.specificationFull || row.specification || ""}
-                            >
-                              {row.specification || "—"}
+                            <td className="ps-price ps-price-primary">
+                              {formatPrice(row.rmCostingPerBox)}
                             </td>
-                            <td className="ps-price ps-price-primary">{formatPrice(row.rmCostingPerMtr)}</td>
                             <td className="ps-price">{formatPrice(row.p10)}</td>
                             <td className="ps-price">{formatPrice(row.p12)}</td>
                             <td className="ps-price">{formatPrice(row.p15)}</td>
@@ -566,18 +558,10 @@ export default function PriceSheetPage() {
                         <p className="ps-rate-card-name" title={row.name}>{row.name}</p>
                         <span className="ps-rate-card-sno">{row.sNo ?? "—"}</span>
                       </div>
-                      {row.specification ? (
-                        <p
-                          className="ps-rate-card-spec"
-                          title={row.specificationFull || row.specification}
-                        >
-                          {row.specification}
-                        </p>
-                      ) : null}
                       <div className="ps-rate-card-prices">
                         <div className="ps-price-chip is-primary">
-                          <span>RM / Mtr</span>
-                          <strong>{formatPrice(row.rmCostingPerMtr)}</strong>
+                          <span>Per Box</span>
+                          <strong>{formatPrice(row.rmCostingPerBox)}</strong>
                         </div>
                         <div className="ps-price-chip">
                           <span>P=10%</span>

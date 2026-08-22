@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import { PageToolbar } from "@/components/ui/PageToolbar";
 import { patchJson, postJson } from "@/lib/client-forms";
 import { todayIstYmd } from "@/lib/machine-production/slots";
 
@@ -504,15 +503,6 @@ export function AdminDashboard() {
 
   return (
     <div className="mp-root">
-      <PageToolbar
-        title="Machine Production Admin"
-        action={
-          <a className="btn btn-secondary" href="/machine-production">
-            Supervisor view
-          </a>
-        }
-      />
-
       <div className="mp-shift-tabs">
         <button
           type="button"
@@ -671,9 +661,14 @@ export function AdminDashboard() {
                 <option value="OVERDUE">Overdue</option>
               </select>
             </label>
-            <Button type="button" onClick={() => void loadEntries()}>
-              Apply
-            </Button>
+            <label className="mp-filters__apply">
+              <span className="mp-filters__apply-spacer" aria-hidden="true">
+                &nbsp;
+              </span>
+              <Button type="button" onClick={() => void loadEntries()}>
+                Apply
+              </Button>
+            </label>
           </div>
 
           {loading ? <p className="mp-muted">Loading…</p> : null}

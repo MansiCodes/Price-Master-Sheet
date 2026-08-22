@@ -193,7 +193,7 @@ async function resolveSheetName(sheetId: string): Promise<string> {
 
   for (const title of titles) {
     try {
-      const rows = await fetchValues(sheetId, `${title}!A1:L10`);
+      const rows = await fetchValues(sheetId, `${title}!A1:Z10`);
       const hasHeader = (rows || []).some((row) => {
         const joined = (row || [])
           .map((cell) => String(cell).toLowerCase())
@@ -226,7 +226,7 @@ async function fetchDailyRatesFromSheet(): Promise<CableRate[]> {
 
   try {
     const sheetName = await resolveSheetName(sheetId);
-    const rows = await fetchValues(sheetId, `${sheetName}!A:L`);
+    const rows = await fetchValues(sheetId, `${sheetName}!A:Z`);
     assertSheetStructure(rows);
     return mapSheetRowsToRates(rows);
   } catch (error) {

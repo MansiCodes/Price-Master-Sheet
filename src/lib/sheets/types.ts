@@ -3,8 +3,14 @@ export type CableRate = {
   name: string;
   specification: string;
   specificationFull: string;
-  /** Sheet “RM Costing (Per Box=305Mtr)” — shown as RM Costing Per Mtr in the app. */
+  tab: string;
+  hyperlink: string;
+  /** Sheet “RM Costing” (e.g. 29662). */
+  rmCosting: number;
+  /** Sheet “RM Costing Per Mtr” (e.g. 29.66). */
   rmCostingPerMtr: number;
+  /** Sheet “RM Costing (Per Box=305Mtr)” (e.g. 9046.97). */
+  rmCostingPerBox: number;
   p10: number;
   p12: number;
   p15: number;
@@ -30,26 +36,34 @@ export class SheetsError extends Error {
 }
 
 /**
- * Default Master List indexes when header labels cannot be resolved.
- * A=S NO, B=Name, D=Description, J=RM Per Box (app: RM Costing Per Mtr),
- * L–O = #P=10% … #P=20%.
+ * Master List fallback indexes (0-based). Header labels override these.
+ * Live data: Per Box / P% are one column right of the older A–L layout
+ * (Per Mtr at G, Per Box at I, P10–P20 at J–M).
  */
 export const SheetColumns = {
   S_NO: 0,
   NAME: 1,
-  DESCRIPTION: 3,
-  RM_COSTING_PER_MTR: 9,
-  P10: 11,
-  P12: 12,
-  P15: 13,
-  P20: 14,
+  DESCRIPTION: 2,
+  TAB: 3,
+  HYPERLINK: 4,
+  RM_COSTING: 5,
+  RM_COSTING_PER_MTR: 7,
+  RM_COSTING_PER_BOX: 8,
+  P10: 9,
+  P12: 10,
+  P15: 11,
+  P20: 12,
 } as const;
 
 export type ResolvedSheetColumns = {
   sNo: number;
   name: number;
   description: number;
+  tab: number;
+  hyperlink: number;
+  rmCosting: number;
   rmCostingPerMtr: number;
+  rmCostingPerBox: number;
   p10: number;
   p12: number;
   p15: number;

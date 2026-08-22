@@ -9,7 +9,7 @@ function formatPrice(value: number): string {
   });
 }
 
-/** Build a landscape PDF of the selected price-sheet rows (all columns). */
+/** Build a landscape PDF of the selected price-sheet rows. */
 export function buildPriceSheetPdf(rows: CableRate[]): {
   buffer: Buffer;
   filename: string;
@@ -44,8 +44,7 @@ export function buildPriceSheetPdf(rows: CableRate[]): {
     head: [[
       "S NO.",
       "NAME OF CABLE",
-      "SPECIFICATION",
-      "RM Costing Per Mtr",
+      "RM Costing (Per Box=305Mtr)",
       "P=10%",
       "P=12%",
       "P=15%",
@@ -54,16 +53,15 @@ export function buildPriceSheetPdf(rows: CableRate[]): {
     body: rows.map((row) => [
       row.sNo == null ? "—" : String(row.sNo),
       row.name || "",
-      row.specificationFull || row.specification || "",
-      formatPrice(row.rmCostingPerMtr),
+      formatPrice(row.rmCostingPerBox),
       formatPrice(row.p10),
       formatPrice(row.p12),
       formatPrice(row.p15),
       formatPrice(row.p20),
     ]),
     styles: {
-      fontSize: 7.5,
-      cellPadding: 1.8,
+      fontSize: 8,
+      cellPadding: 2,
       overflow: "linebreak",
       valign: "middle",
     },
@@ -71,20 +69,19 @@ export function buildPriceSheetPdf(rows: CableRate[]): {
       fillColor: [14, 90, 84],
       textColor: 255,
       fontStyle: "bold",
-      fontSize: 7.5,
+      fontSize: 8,
     },
     alternateRowStyles: {
       fillColor: [245, 248, 247],
     },
     columnStyles: {
-      0: { cellWidth: 14, halign: "center" },
-      1: { cellWidth: 52, halign: "left" },
-      2: { cellWidth: 70, halign: "left" },
+      0: { cellWidth: 16, halign: "center" },
+      1: { cellWidth: 70, halign: "left" },
+      2: { cellWidth: 40, halign: "center" },
       3: { cellWidth: 28, halign: "center" },
-      4: { cellWidth: 22, halign: "center" },
-      5: { cellWidth: 22, halign: "center" },
-      6: { cellWidth: 22, halign: "center" },
-      7: { cellWidth: 22, halign: "center" },
+      4: { cellWidth: 28, halign: "center" },
+      5: { cellWidth: 28, halign: "center" },
+      6: { cellWidth: 28,halign: "center" },
     },
     margin: { left: 14, right: 14 },
   });

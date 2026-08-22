@@ -48,7 +48,7 @@ function isHeaderRow(row: SheetRow): boolean {
   const joined = (row || [])
     .map((cell) => trimCell(cell).toLowerCase())
     .join(" | ");
-  const name = trimCell(row[SheetColumns.NAME]).toLowerCase();
+  const name = trimCell(row[1]).toLowerCase();
   const sNo = trimCell(row[0]).toLowerCase();
 
   return (
@@ -64,91 +64,98 @@ function isHeaderRow(row: SheetRow): boolean {
   );
 }
 
-function findHeaderIndex(
+const DEFAULT_COLS: ResolvedSheetColumns = {
+  sNo: SheetColumns.S_NO,
+  name: SheetColumns.NAME,
+  description: SheetColumns.DESCRIPTION,
+  tab: SheetColumns.TAB,
+  hyperlink: SheetColumns.HYPERLINK,
+  rmCosting: SheetColumns.RM_COSTING,
+  rmCostingPerMtr: SheetColumns.RM_COSTING_PER_MTR,
+  rmCostingPerBox: SheetColumns.RM_COSTING_PER_BOX,
+  p10: SheetColumns.P10,
+  p12: SheetColumns.P12,
+  p15: SheetColumns.P15,
+  p20: SheetColumns.P20,
+};
+
+function headerIndex(
   headers: string[],
-  predicate: (header: string) => boolean,
+  match: (header: string) => boolean,
 ): number {
-  return headers.findIndex(predicate);
+  return headers.findIndex(match);
 }
 
 /**
- * Resolve column indexes from the Master List header row.
- * Prefer “RM Costing (Per Box=305Mtr)” for the app’s RM Costing Per Mtr column
- * (values like 9046.97), then #P=10% … #P=20%.
+ * Resolve columns from header labels so Per Box / P% stay aligned even if
+ * the sheet gains spacer or extra columns.
  */
 export function resolveSheetColumns(headerRow: SheetRow): ResolvedSheetColumns {
   const headers = (headerRow || []).map((cell) => trimCell(cell).toLowerCase());
+  const cols = { ...DEFAULT_COLS };
 
-  const sNo = findHeaderIndex(
+  const sNo = headerIndex(
     headers,
     (h) => h === "s no." || h === "s no" || h === "sno" || h.startsWith("s no"),
   );
-  const name = findHeaderIndex(
+  const name = headerIndex(
+    headers,
+    (h) => h.includes("name of cable") || h === "name",
+  );
+  const description = headerIndex(
+    headers,
+    (h) => h === "description" || h.includes("description"),
+  );
+  const tab = headerIndex(headers, (h) => h === "tab");
+  const hyperlink = headerIndex(
+    headers,
+    (h) => h.includes("hyperlink") || h === "link",
+  );
+  const perBox = headerIndex(
+    headers,
+    (h) => h.includes("per box") || (h.includes("305") && h.includes("rm")),
+  );
+  const perMtr = headerIndex(
+    headers,
+    (h) => h.includes("per mtr") || h.includes("per meter"),
+  );
+  const rmCosting = headerIndex(
     headers,
     (h) =>
-      h.includes("name of cable") ||
-      h === "name" ||
-      (h.includes("cable") && h.includes("name")),
+      h.includes("rm costing") &&
+      !h.includes("per mtr") &&
+      !h.includes("per meter") &&
+      !h.includes("per box") &&
+      !h.includes("305"),
   );
-  const description = findHeaderIndex(headers, (h) =>
-    h.includes("description"),
-  );
+  const p10 = headerIndex(headers, (h) => /#?\s*p\s*=\s*10\s*%?/.test(h));
+  const p12 = headerIndex(headers, (h) => /#?\s*p\s*=\s*12\s*%?/.test(h));
+  const p15 = headerIndex(headers, (h) => /#?\s*p\s*=\s*15\s*%?/.test(h));
+  const p20 = headerIndex(headers, (h) => /#?\s*p\s*=\s*20\s*%?/.test(h));
 
-  // User-facing “RM Costing Per Mtr” = sheet Per Box column (≈9046.97), not the
-  // smaller “RM Costing Per Mtr” meter column (≈29.66).
-  let rmCostingPerMtr = findHeaderIndex(
-    headers,
-    (h) =>
-      h.includes("per box") ||
-      (h.includes("rm costing") && h.includes("305")),
-  );
-  if (rmCostingPerMtr < 0) {
-    rmCostingPerMtr = findHeaderIndex(
-      headers,
-      (h) => h.includes("rm costing") && h.includes("per mtr"),
-    );
-  }
+  if (sNo >= 0) cols.sNo = sNo;
+  if (name >= 0) cols.name = name;
+  if (description >= 0) cols.description = description;
+  if (tab >= 0) cols.tab = tab;
+  if (hyperlink >= 0) cols.hyperlink = hyperlink;
+  if (rmCosting >= 0) cols.rmCosting = rmCosting;
+  if (perMtr >= 0) cols.rmCostingPerMtr = perMtr;
+  if (perBox >= 0) cols.rmCostingPerBox = perBox;
+  if (p10 >= 0) cols.p10 = p10;
+  if (p12 >= 0) cols.p12 = p12;
+  if (p15 >= 0) cols.p15 = p15;
+  if (p20 >= 0) cols.p20 = p20;
 
-  const p10 = findHeaderIndex(
-    headers,
-    (h) => h.includes("p=10") || h.includes("p = 10") || h.includes("# p=10"),
-  );
-  const p12 = findHeaderIndex(
-    headers,
-    (h) => h.includes("p=12") || h.includes("p = 12"),
-  );
-  const p15 = findHeaderIndex(
-    headers,
-    (h) => h.includes("p=15") || h.includes("p = 15"),
-  );
-  const p20 = findHeaderIndex(
-    headers,
-    (h) => h.includes("p=20") || h.includes("p = 20"),
-  );
-
-  const resolved: ResolvedSheetColumns = {
-    sNo: sNo >= 0 ? sNo : SheetColumns.S_NO,
-    name: name >= 0 ? name : SheetColumns.NAME,
-    description: description >= 0 ? description : SheetColumns.DESCRIPTION,
-    rmCostingPerMtr:
-      rmCostingPerMtr >= 0 ? rmCostingPerMtr : SheetColumns.RM_COSTING_PER_MTR,
-    p10: p10 >= 0 ? p10 : SheetColumns.P10,
-    p12: p12 >= 0 ? p12 : SheetColumns.P12,
-    p15: p15 >= 0 ? p15 : SheetColumns.P15,
-    p20: p20 >= 0 ? p20 : SheetColumns.P20,
-  };
-
-  return resolved;
+  return cols;
 }
 
 function isEmptyRow(row: SheetRow, cols: ResolvedSheetColumns): boolean {
   const name = trimCell(row[cols.name]);
-  const rm = trimCell(row[cols.rmCostingPerMtr]);
+  const rm = trimCell(row[cols.rmCosting]);
+  const perMtr = trimCell(row[cols.rmCostingPerMtr]);
+  const perBox = trimCell(row[cols.rmCostingPerBox]);
   const p10 = trimCell(row[cols.p10]);
-  const p12 = trimCell(row[cols.p12]);
-  const p15 = trimCell(row[cols.p15]);
-  const p20 = trimCell(row[cols.p20]);
-  return !name && !rm && !p10 && !p12 && !p15 && !p20;
+  return !name && !rm && !perMtr && !perBox && !p10;
 }
 
 function parseSerial(value: SheetCell): number | null {
@@ -160,9 +167,6 @@ function parseSerial(value: SheetCell): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
-/**
- * Shortens a long DESCRIPTION cell for UI display.
- */
 export function shortenSpecification(
   value: SheetCell,
   maxLen = 88,
@@ -186,8 +190,7 @@ export function shortenSpecification(
 }
 
 /**
- * Maps Master List rows using header labels when present.
- * Columns: RM Costing Per Mtr (Per Box values) then P10 / P12 / P15 / P20.
+ * Maps Master List rows with every pricing column aligned to the sheet.
  */
 export function mapSheetRowsToRates(
   rows: SheetRow[] | undefined | null,
@@ -198,16 +201,7 @@ export function mapSheetRowsToRates(
 
   const rates: CableRate[] = [];
   let headerSeen = false;
-  let cols: ResolvedSheetColumns = {
-    sNo: SheetColumns.S_NO,
-    name: SheetColumns.NAME,
-    description: SheetColumns.DESCRIPTION,
-    rmCostingPerMtr: SheetColumns.RM_COSTING_PER_MTR,
-    p10: SheetColumns.P10,
-    p12: SheetColumns.P12,
-    p15: SheetColumns.P15,
-    p20: SheetColumns.P20,
-  };
+  let cols: ResolvedSheetColumns = { ...DEFAULT_COLS };
 
   for (let i = 0; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
@@ -233,27 +227,35 @@ export function mapSheetRowsToRates(
     }
 
     try {
-      const rmCostingPerMtr = parseRate(
-        row[cols.rmCostingPerMtr],
-        rowNumber,
-        "RM Costing Per Mtr",
-      );
-      const p10 = parseRate(row[cols.p10], rowNumber, "P=10%");
-      const p12 = parseRate(row[cols.p12], rowNumber, "P=12%");
-      const p15 = parseRate(row[cols.p15], rowNumber, "P=15%");
-      const p20 = parseRate(row[cols.p20], rowNumber, "P=20%");
       const { short, full } = shortenSpecification(row[cols.description]);
-
+      const softRate = (cell: SheetCell, label: string): number => {
+        try {
+          return parseRate(cell, rowNumber, label);
+        } catch {
+          return 0;
+        }
+      };
       rates.push({
         sNo: parseSerial(row[cols.sNo]),
         name,
         specification: short,
         specificationFull: full,
-        rmCostingPerMtr,
-        p10,
-        p12,
-        p15,
-        p20,
+        tab: trimCell(row[cols.tab]),
+        hyperlink: trimCell(row[cols.hyperlink]),
+        rmCosting: softRate(row[cols.rmCosting], "RM Costing"),
+        rmCostingPerMtr: softRate(
+          row[cols.rmCostingPerMtr],
+          "RM Costing Per Mtr",
+        ),
+        rmCostingPerBox: parseRate(
+          row[cols.rmCostingPerBox],
+          rowNumber,
+          "RM Costing (Per Box=305Mtr)",
+        ),
+        p10: parseRate(row[cols.p10], rowNumber, "P=10%"),
+        p12: parseRate(row[cols.p12], rowNumber, "P=12%"),
+        p15: parseRate(row[cols.p15], rowNumber, "P=15%"),
+        p20: parseRate(row[cols.p20], rowNumber, "P=20%"),
       });
     } catch {
       // Skip rows with invalid price data
@@ -275,35 +277,17 @@ export function assertSheetStructure(
   }
 
   const headerRow = rows.find((row) => isHeaderRow(row ?? []));
-  const cols = headerRow
-    ? resolveSheetColumns(headerRow)
-    : {
-        sNo: SheetColumns.S_NO,
-        name: SheetColumns.NAME,
-        description: SheetColumns.DESCRIPTION,
-        rmCostingPerMtr: SheetColumns.RM_COSTING_PER_MTR,
-        p10: SheetColumns.P10,
-        p12: SheetColumns.P12,
-        p15: SheetColumns.P15,
-        p20: SheetColumns.P20,
-      };
-
-  const probeRow = headerRow || rows.find((row) => !isEmptyRow(row ?? [], cols));
+  const cols = headerRow ? resolveSheetColumns(headerRow) : { ...DEFAULT_COLS };
+  const probeRow =
+    headerRow || rows.find((row) => !isEmptyRow(row ?? [], cols));
 
   if (!probeRow) {
     throw new SheetsError("No cable rate data found in the sheet", 404, "EMPTY_DATA");
   }
 
-  const needed = Math.max(
-    cols.rmCostingPerMtr,
-    cols.p10,
-    cols.p12,
-    cols.p15,
-    cols.p20,
-  );
-  if (probeRow.length < needed + 1) {
+  if (probeRow.length < cols.p20 + 1) {
     throw new SheetsError(
-      "Sheet columns do not match the expected structure (RM Costing Per Mtr, P=10%, P=12%, P=15%, P=20%)",
+      "Sheet columns do not match Master List (S NO…P=20%)",
       422,
       "INVALID_COLUMNS",
     );

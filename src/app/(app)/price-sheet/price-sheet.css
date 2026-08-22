@@ -356,11 +356,17 @@
   background: rgba(13, 148, 136, 0.11);
 }
 
-.ps-col-sno { width: 5%; }
-.ps-col-name { width: 18%; }
-.ps-col-spec { width: 28%; }
-.ps-col-price { width: 9%; }
-.ps-col-rm { width: 12%; }
+.ps-col-sno { width: 8%; }
+.ps-col-name { width: 28%; }
+.ps-col-price { width: 12%; }
+.ps-col-rm { width: 16%; }
+
+.ps-rates-table th.ps-col-rm,
+.ps-rates-table th.ps-col-price {
+  white-space: normal;
+  line-height: 1.2;
+  font-size: 0.68rem;
+}
 
 .ps-rates-table td.ps-spec {
   white-space: nowrap;
@@ -555,7 +561,7 @@
 
 .ps-rate-card-prices {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.3rem;
   padding-left: 0.1rem;
 }

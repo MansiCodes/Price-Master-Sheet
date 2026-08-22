@@ -70,7 +70,47 @@ function cardStatusClass(status: SlotStatus) {
   return "mp-machine-card--pending";
 }
 
-export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
+const PROCESS_IMAGES = {
+  extrusion: "/machine-production/extrusion-card.jpg",
+  twisting: "/machine-production/twisting.jpg",
+  sheathing: "/machine-production/sheathing.jpg",
+} as const;
+
+/** Pick Extrusion / Twisting / Sheathing art from process or machine labels. */
+function resolveProcessImage(
+  ...parts: Array<string | null | undefined>
+): string | null {
+  const text = parts.filter(Boolean).join(" ").toLowerCase();
+  if (!text) return null;
+  // Extrusion first (also matches Extruder / EXT-01)
+  if (
+    text.includes("extrusion") ||
+    text.includes("extruder") ||
+    text.includes("extrud") ||
+    /(^|[^a-z])ext([\s_-]|$|\d)/.test(text)
+  ) {
+    return PROCESS_IMAGES.extrusion;
+  }
+  if (
+    text.includes("twisting") ||
+    text.includes("twister") ||
+    text.includes("twist") ||
+    /(^|[^a-z])tw([\s_-]|$|\d)/.test(text)
+  ) {
+    return PROCESS_IMAGES.twisting;
+  }
+  if (
+    text.includes("sheathing") ||
+    text.includes("sheather") ||
+    text.includes("sheath") ||
+    /(^|[^a-z])sh([\s_-]|$|\d)/.test(text)
+  ) {
+    return PROCESS_IMAGES.sheathing;
+  }
+  return null;
+}
+
+export function SupervisorDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const processFromUrl = searchParams.get("processId");
@@ -129,31 +169,20 @@ export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="mp-root">
-      {isAdmin || inProcess ? (
-        <div className="mp-top-row">
-          {inProcess ? (
-            <nav className="mp-breadcrumb" aria-label="Breadcrumb">
-              <button
-                type="button"
-                className="mp-breadcrumb__back"
-                onClick={() => selectProcess(null)}
-              >
-                ← All processes
-              </button>
-              <span className="mp-breadcrumb__sep">/</span>
-              <span className="mp-breadcrumb__current">
-                {inProcess.process.name}
-              </span>
-            </nav>
-          ) : (
-            <span />
-          )}
-          {isAdmin ? (
-            <a className="btn btn-secondary" href="/machine-production/admin">
-              Admin dashboard
-            </a>
-          ) : null}
-        </div>
+      {inProcess ? (
+        <nav className="mp-breadcrumb" aria-label="Breadcrumb">
+          <button
+            type="button"
+            className="mp-breadcrumb__back"
+            onClick={() => selectProcess(null)}
+          >
+            ← All processes
+          </button>
+          <span className="mp-breadcrumb__sep">/</span>
+          <span className="mp-breadcrumb__current">
+            {inProcess.process.name}
+          </span>
+        </nav>
       ) : null}
 
       <div className="mp-shift-tabs" role="tablist" aria-label="Shift">
@@ -220,27 +249,38 @@ export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
               machines to them.
             </p>
           ) : (
-            data.processes.map((p) => (
+            data.processes.map((p) => {
+              const imageSrc = resolveProcessImage(p.name);
+              return (
               <button
                 key={p.id}
                 type="button"
-                className={`mp-machine-card ${cardStatusClass(p.status)}`}
+                className={`mp-machine-card mp-machine-card--process ${cardStatusClass(p.status)}`}
                 onClick={() => selectProcess(p.id)}
               >
-                <div className="mp-machine-card__top">
-                  <span className="mp-machine-card__code">PROCESS</span>
-                  <span className={`mp-status ${statusClass(p.status)}`}>
-                    {p.status}
-                  </span>
+                {imageSrc ? (
+                  <div className="mp-machine-card__media">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageSrc} alt="" />
+                  </div>
+                ) : null}
+                <div className="mp-machine-card__body">
+                  <div className="mp-machine-card__top">
+                    <span className="mp-machine-card__code">PROCESS</span>
+                    <span className={`mp-status ${statusClass(p.status)}`}>
+                      {p.status}
+                    </span>
+                  </div>
+                  <h2 className="mp-machine-card__name">{p.name}</h2>
+                  <p className="mp-machine-card__meta">
+                    {p.completed} of {p.machineCount} submitted
+                    {p.overdue > 0 ? ` · ${p.overdue} overdue` : ""}
+                  </p>
+                  <p className="mp-machine-card__cta">View machines →</p>
                 </div>
-                <h2 className="mp-machine-card__name">{p.name}</h2>
-                <p className="mp-machine-card__meta">
-                  {p.completed} of {p.machineCount} submitted
-                  {p.overdue > 0 ? ` · ${p.overdue} overdue` : ""}
-                </p>
-                <p className="mp-machine-card__cta">View machines →</p>
               </button>
-            ))
+              );
+            })
           )}
         </div>
       ) : null}
@@ -253,33 +293,49 @@ export function SupervisorDashboard({ isAdmin }: { isAdmin: boolean }) {
               machines to it.
             </p>
           ) : (
-            data.machines.map((m) => (
+            data.machines.map((m) => {
+              const imageSrc = resolveProcessImage(
+                data.process.name,
+                m.code,
+                m.name,
+                m.description,
+              );
+              return (
               <button
                 key={m.id}
                 type="button"
-                className={`mp-machine-card ${cardStatusClass(m.status)}`}
+                className={`mp-machine-card mp-machine-card--process ${cardStatusClass(m.status)}`}
                 onClick={() => setSelected(m)}
               >
-                <div className="mp-machine-card__top">
-                  <span className="mp-machine-card__code">{m.code}</span>
-                  <span className={`mp-status ${statusClass(m.status)}`}>
-                    {m.status}
-                  </span>
-                </div>
-                <h2 className="mp-machine-card__name">{m.name}</h2>
-                {m.description ? (
-                  <p className="mp-machine-card__desc">{m.description}</p>
+                {imageSrc ? (
+                  <div className="mp-machine-card__media">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageSrc} alt="" />
+                  </div>
                 ) : null}
-                {m.status === "COMPLETED" ? (
-                  <p className="mp-machine-card__meta">
-                    Actual {m.actualProduction ?? "—"} · Eff{" "}
-                    {m.efficiencyPct != null ? `${m.efficiencyPct}%` : "—"}
-                  </p>
-                ) : (
-                  <p className="mp-machine-card__cta">Open production form →</p>
-                )}
+                <div className="mp-machine-card__body">
+                  <div className="mp-machine-card__top">
+                    <span className="mp-machine-card__code">{m.code}</span>
+                    <span className={`mp-status ${statusClass(m.status)}`}>
+                      {m.status}
+                    </span>
+                  </div>
+                  <h2 className="mp-machine-card__name">{m.name}</h2>
+                  {m.description ? (
+                    <p className="mp-machine-card__desc">{m.description}</p>
+                  ) : null}
+                  {m.status === "COMPLETED" ? (
+                    <p className="mp-machine-card__meta">
+                      Actual {m.actualProduction ?? "—"} · Eff{" "}
+                      {m.efficiencyPct != null ? `${m.efficiencyPct}%` : "—"}
+                    </p>
+                  ) : (
+                    <p className="mp-machine-card__cta">Open production form →</p>
+                  )}
+                </div>
               </button>
-            ))
+              );
+            })
           )}
         </div>
       ) : null}
