@@ -1,10 +1,17 @@
 import { config } from "dotenv";
 import { resolve } from "node:path";
+import { existsSync } from "node:fs";
 import { defineConfig } from "prisma/config";
 
-// Only load .env if process.env.DATABASE_URL is not already set by Amplify/hosting provider
+// Only load .env / .env.production if process.env.DATABASE_URL is not already set
 if (!process.env.DATABASE_URL) {
-  config({ path: resolve(__dirname, ".env") });
+  const envPath = resolve(__dirname, ".env");
+  const envProdPath = resolve(__dirname, ".env.production");
+  if (existsSync(envPath)) {
+    config({ path: envPath });
+  } else if (existsSync(envProdPath)) {
+    config({ path: envProdPath });
+  }
 }
 
 const databaseUrl =
