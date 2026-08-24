@@ -524,8 +524,71 @@
   gap: 1rem;
 }
 
+.mp-cable-scope {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: flex-end;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--teal-soft) 35%, transparent);
+}
+
+.mp-cable-scope label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  min-width: 200px;
+}
+
+.mp-cable-scope select {
+  min-height: 2.25rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.mp-cable-scope .mp-muted {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
 .mp-cable-admin .mp-admin-machines {
   grid-template-columns: 1fr;
+}
+
+.mp-field__extra {
+  margin-top: 0.45rem;
+  width: 100%;
+}
+
+.mp-field__extra-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.45rem;
+}
+
+.mp-field__extra-row .mp-field__extra {
+  margin-top: 0;
+  flex: 1;
+}
+
+.mp-field__remove {
+  margin-top: 0.4rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: color-mix(in srgb, #b42318 85%, var(--ink));
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.mp-field__remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .mp-table__row--selected {

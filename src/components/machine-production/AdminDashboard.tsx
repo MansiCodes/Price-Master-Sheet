@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import { patchJson, postJson } from "@/lib/client-forms";
+import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
 import { todayIstYmd } from "@/lib/machine-production/slots";
 
 type MachineRow = {
@@ -102,6 +102,8 @@ export function AdminDashboard() {
   const [processes, setProcesses] = useState<ProcessRow[]>([]);
   const [cableTypes, setCableTypes] = useState<CableTypeRow[]>([]);
   const [cableSizes, setCableSizes] = useState<CableSizeRow[]>([]);
+  const [cableProcessId, setCableProcessId] = useState("");
+  const [cableMachineId, setCableMachineId] = useState("");
   const [selectedCableTypeId, setSelectedCableTypeId] = useState("");
   const [cableTypeForm, setCableTypeForm] = useState({ name: "" });
   const [cableSizeForm, setCableSizeForm] = useState({ name: "" });
@@ -154,13 +156,25 @@ export function AdminDashboard() {
   }, []);
 
   const loadCableTypes = useCallback(async () => {
-    const res = await fetch("/api/machine-production/cable-types?all=1");
+    if (!cableProcessId || !cableMachineId) {
+      setCableTypes([]);
+      setSelectedCableTypeId("");
+      setCableSizes([]);
+      return;
+    }
+    const qs = new URLSearchParams({
+      processId: cableProcessId,
+      machineId: cableMachineId,
+      all: "1",
+    });
+    const res = await fetch(`/api/machine-production/cable-types?${qs}`);
     const json = (await res.json()) as {
       types?: CableTypeRow[];
       error?: string;
     };
     if (!res.ok) {
       toast.error(json.error ?? "Failed to load cable types");
+      setCableTypes([]);
       return;
     }
     const types = json.types ?? [];
@@ -169,7 +183,7 @@ export function AdminDashboard() {
       if (prev && types.some((t) => t.id === prev)) return prev;
       return types[0]?.id ?? "";
     });
-  }, []);
+  }, [cableProcessId, cableMachineId]);
 
   const loadCableSizes = useCallback(async (cableTypeId: string) => {
     if (!cableTypeId) {
@@ -189,6 +203,12 @@ export function AdminDashboard() {
     }
     setCableSizes(json.sizes ?? []);
   }, []);
+
+  const cableMachinesForProcess = useMemo(() => {
+    const process = processes.find((p) => p.id === cableProcessId);
+    if (!process) return [] as MachineRow[];
+    return machines.filter((m) => process.machineIds.includes(m.id));
+  }, [processes, machines, cableProcessId]);
 
   const loadEntries = useCallback(async () => {
     setLoading(true);
@@ -249,8 +269,11 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (tab === "records") void loadEntries();
-    if (tab === "cable") void loadCableTypes();
-  }, [tab, loadEntries, loadCableTypes]);
+    if (tab === "cable") {
+      void loadProcesses();
+      void loadCableTypes();
+    }
+  }, [tab, loadEntries, loadCableTypes, loadProcesses]);
 
   useEffect(() => {
     if (tab !== "cable") return;
@@ -260,6 +283,17 @@ export function AdminDashboard() {
   useEffect(() => {
     if (tab === "processes") void loadProcesses();
   }, [tab, loadProcesses]);
+
+  useEffect(() => {
+    if (!cableProcessId) {
+      setCableMachineId("");
+      return;
+    }
+    const allowed = cableMachinesForProcess.map((m) => m.id);
+    setCableMachineId((prev) =>
+      prev && allowed.includes(prev) ? prev : (allowed[0] ?? ""),
+    );
+  }, [cableProcessId, cableMachinesForProcess]);
 
   async function saveMachine(e: FormEvent) {
     e.preventDefault();
@@ -406,6 +440,10 @@ export function AdminDashboard() {
   async function saveCableType(e: FormEvent) {
     e.preventDefault();
     const name = cableTypeForm.name.trim();
+    if (!cableProcessId || !cableMachineId) {
+      toast.error("Select a process and machine first");
+      return;
+    }
     if (!name) {
       toast.error("Cable type name is required");
       return;
@@ -423,7 +461,11 @@ export function AdminDashboard() {
     } else {
       const res = await postJson<{ ok: boolean; error?: string }>(
         "/api/machine-production/cable-types",
-        { name },
+        {
+          processId: cableProcessId,
+          machineId: cableMachineId,
+          name,
+        },
       );
       if (!res.ok) {
         toast.error(res.error);
@@ -433,6 +475,51 @@ export function AdminDashboard() {
     }
     setEditingCableTypeId(null);
     setCableTypeForm({ name: "" });
+    void loadCableTypes();
+  }
+
+  async function addOthersCableType() {
+    if (!cableProcessId || !cableMachineId) {
+      toast.error("Select a process and machine first");
+      return;
+    }
+    if (cableTypes.some((t) => t.name === "Others")) {
+      toast.message("Others is already linked");
+      return;
+    }
+    const res = await postJson<{ ok: boolean; error?: string }>(
+      "/api/machine-production/cable-types",
+      {
+        processId: cableProcessId,
+        machineId: cableMachineId,
+        name: "Others",
+      },
+    );
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Others added");
+    void loadCableTypes();
+  }
+
+  async function removeCableType(t: CableTypeRow) {
+    if (
+      !window.confirm(
+        `Remove cable type "${t.name}" and all its sizes from this process + machine?`,
+      )
+    ) {
+      return;
+    }
+    const res = await deleteJson<{ ok: boolean; error?: string }>(
+      `/api/machine-production/cable-types/${t.id}`,
+    );
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Cable type removed");
+    if (selectedCableTypeId === t.id) setSelectedCableTypeId("");
     void loadCableTypes();
   }
 
@@ -483,6 +570,42 @@ export function AdminDashboard() {
     }
     setEditingCableSizeId(null);
     setCableSizeForm({ name: "" });
+    void loadCableSizes(selectedCableTypeId);
+  }
+
+  async function addOthersCableSize() {
+    if (!selectedCableTypeId) {
+      toast.error("Select a cable type first");
+      return;
+    }
+    if (cableSizes.some((s) => s.name === "Others")) {
+      toast.message("Others is already linked");
+      return;
+    }
+    const res = await postJson<{ ok: boolean; error?: string }>(
+      "/api/machine-production/cable-sizes",
+      { cableTypeId: selectedCableTypeId, name: "Others" },
+    );
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Others size added");
+    void loadCableSizes(selectedCableTypeId);
+  }
+
+  async function removeCableSize(s: CableSizeRow) {
+    if (!window.confirm(`Remove size "${s.name}" from this cable type?`)) {
+      return;
+    }
+    const res = await deleteJson<{ ok: boolean; error?: string }>(
+      `/api/machine-production/cable-sizes/${s.id}`,
+    );
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Cable size removed");
     void loadCableSizes(selectedCableTypeId);
   }
 
@@ -959,6 +1082,56 @@ export function AdminDashboard() {
         </div>
       ) : (
         <div className="mp-cable-admin">
+          <div className="mp-cable-scope">
+            <label>
+              Process
+              <select
+                value={cableProcessId}
+                onChange={(e) => {
+                  setCableProcessId(e.target.value);
+                  setEditingCableTypeId(null);
+                  setEditingCableSizeId(null);
+                  setCableTypeForm({ name: "" });
+                  setCableSizeForm({ name: "" });
+                }}
+              >
+                <option value="">Select process</option>
+                {processes
+                  .filter((p) => p.isActive)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Machine
+              <select
+                value={cableMachineId}
+                onChange={(e) => {
+                  setCableMachineId(e.target.value);
+                  setEditingCableTypeId(null);
+                  setEditingCableSizeId(null);
+                  setCableTypeForm({ name: "" });
+                  setCableSizeForm({ name: "" });
+                }}
+                disabled={!cableProcessId}
+              >
+                <option value="">Select machine</option>
+                {cableMachinesForProcess.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="mp-muted">
+              Cable type and size lists are linked to this process + machine.
+              Supervisors only see these options when filling that form.
+            </p>
+          </div>
+
           <div className="mp-admin-machines">
             <form
               className="mp-machine-form"
@@ -967,16 +1140,14 @@ export function AdminDashboard() {
               <h2>
                 {editingCableTypeId ? "Edit cable type" : "Add cable type"}
               </h2>
-              <p className="mp-muted">
-                Shared for all machines. Sizes are managed per cable type.
-              </p>
               <label>
                 Name
                 <input
                   required
                   value={cableTypeForm.name}
                   onChange={(e) => setCableTypeForm({ name: e.target.value })}
-                  placeholder="e.g. CAT6"
+                  placeholder="e.g. Signalling Cable"
+                  disabled={!cableProcessId || !cableMachineId}
                 />
               </label>
               <div className="mp-form__actions">
@@ -992,7 +1163,18 @@ export function AdminDashboard() {
                     Cancel
                   </Button>
                 ) : null}
-                <Button type="submit">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!cableProcessId || !cableMachineId}
+                  onClick={() => void addOthersCableType()}
+                >
+                  Add Others
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!cableProcessId || !cableMachineId}
+                >
                   {editingCableTypeId ? "Save" : "Add type"}
                 </Button>
               </div>
@@ -1008,51 +1190,71 @@ export function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cableTypes.map((t) => (
-                    <tr
-                      key={t.id}
-                      className={
-                        selectedCableTypeId === t.id
-                          ? "mp-table__row mp-table__row--selected"
-                          : "mp-table__row"
-                      }
-                      onClick={() => {
-                        setSelectedCableTypeId(t.id);
-                        setEditingCableSizeId(null);
-                        setCableSizeForm({ name: "" });
-                      }}
-                    >
-                      <td>{t.name}</td>
-                      <td>{t.isActive ? "Active" : "Inactive"}</td>
-                      <td className="mp-table__actions">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingCableTypeId(t.id);
-                            setCableTypeForm({ name: t.name });
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void toggleCableType(t);
-                          }}
-                        >
-                          {t.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {cableTypes.length === 0 ? (
+                  {!cableProcessId || !cableMachineId ? (
                     <tr>
                       <td colSpan={3} className="mp-muted">
-                        No cable types yet.
+                        Select process and machine above.
+                      </td>
+                    </tr>
+                  ) : (
+                    cableTypes.map((t) => (
+                      <tr
+                        key={t.id}
+                        className={
+                          selectedCableTypeId === t.id
+                            ? "mp-table__row mp-table__row--selected"
+                            : "mp-table__row"
+                        }
+                        onClick={() => {
+                          setSelectedCableTypeId(t.id);
+                          setEditingCableSizeId(null);
+                          setCableSizeForm({ name: "" });
+                        }}
+                      >
+                        <td>{t.name}</td>
+                        <td>{t.isActive ? "Active" : "Inactive"}</td>
+                        <td className="mp-table__actions">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingCableTypeId(t.id);
+                              setCableTypeForm({ name: t.name });
+                            }}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void toggleCableType(t);
+                            }}
+                          >
+                            {t.isActive ? "Deactivate" : "Activate"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void removeCableType(t);
+                            }}
+                          >
+                            Remove
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                  {cableProcessId &&
+                  cableMachineId &&
+                  cableTypes.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="mp-muted">
+                        No cable types linked yet for this process + machine.
                       </td>
                     </tr>
                   ) : null}
@@ -1083,7 +1285,7 @@ export function AdminDashboard() {
                   required
                   value={cableSizeForm.name}
                   onChange={(e) => setCableSizeForm({ name: e.target.value })}
-                  placeholder="e.g. 1.5 sqmm"
+                  placeholder="e.g. 2 Core x 2.5 sqmm"
                   disabled={!selectedCableTypeId}
                 />
               </label>
@@ -1100,6 +1302,14 @@ export function AdminDashboard() {
                     Cancel
                   </Button>
                 ) : null}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!selectedCableTypeId}
+                  onClick={() => void addOthersCableSize()}
+                >
+                  Add Others
+                </Button>
                 <Button type="submit" disabled={!selectedCableTypeId}>
                   {editingCableSizeId ? "Save" : "Add size"}
                 </Button>
@@ -1144,6 +1354,13 @@ export function AdminDashboard() {
                             onClick={() => void toggleCableSize(s)}
                           >
                             {s.isActive ? "Deactivate" : "Activate"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void removeCableSize(s)}
+                          >
+                            Remove
                           </Button>
                         </td>
                       </tr>

@@ -544,20 +544,52 @@ model ProductionProcess {
 
 /// Join table: which machines run a given process.
 model ProductionProcessMachine {
-  id        String            @id @default(cuid())
-  processId String
-  machineId String
-  sortOrder Int               @default(0)
-  createdAt DateTime          @default(now())
-  process   ProductionProcess @relation(fields: [processId], references: [id], onDelete: Cascade)
-  machine   Machine           @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  id         String                   @id @default(cuid())
+  processId  String
+  machineId  String
+  sortOrder  Int                      @default(0)
+  createdAt  DateTime                 @default(now())
+  process    ProductionProcess        @relation(fields: [processId], references: [id], onDelete: Cascade)
+  machine    Machine                  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  cableTypes ProcessMachineCableType[]
 
   @@unique([processId, machineId])
   @@index([machineId])
   @@index([processId, sortOrder])
 }
 
-/// Global cable types shared by all machines.
+/// Cable types for a specific process + machine pair (supervisor only sees these).
+model ProcessMachineCableType {
+  id                String                   @id @default(cuid())
+  processMachineId  String
+  name              String
+  sortOrder         Int                      @default(0)
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  processMachine    ProductionProcessMachine @relation(fields: [processMachineId], references: [id], onDelete: Cascade)
+  sizes             ProcessMachineCableSize[]
+
+  @@unique([processMachineId, name])
+  @@index([processMachineId, isActive, sortOrder])
+}
+
+/// Cable sizes for a process+machine cable type.
+model ProcessMachineCableSize {
+  id          String                 @id @default(cuid())
+  cableTypeId String
+  name        String
+  sortOrder   Int                    @default(0)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  cableType   ProcessMachineCableType @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([cableTypeId, name])
+  @@index([cableTypeId, isActive, sortOrder])
+}
+
+/// Legacy global cable types (kept for old data; new links use ProcessMachineCableType).
 model MachineCableType {
   id        String            @id @default(cuid())
   name      String            @unique
@@ -570,15 +602,15 @@ model MachineCableType {
   @@index([isActive, sortOrder])
 }
 
-/// Cable sizes belong to a cable type (global, not per machine).
+/// Legacy global sizes (kept for old data).
 model MachineCableSize {
-  id          String          @id @default(cuid())
+  id          String           @id @default(cuid())
   cableTypeId String
   name        String
-  sortOrder   Int             @default(0)
-  isActive    Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   cableType   MachineCableType @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
 
   @@unique([cableTypeId, name])

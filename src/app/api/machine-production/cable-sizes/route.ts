@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   requireMachineProductionAccess,
-  requireMachineProductionAdmin,
+  requireMachineProductionEnter,
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import {
+  CABLE_OTHERS_LABEL,
+  upsertProcessMachineCableSize,
+} from "@/lib/machine-production/persist-cable-options";
 
 const createSchema = z.object({
   cableTypeId: z.string().min(1),
@@ -33,7 +37,39 @@ export async function GET(request: NextRequest) {
   const all = request.nextUrl.searchParams.get("all") === "1";
   const isAdmin = session.user.globalRole === "SUPER_ADMIN";
 
-  const sizes = await prisma.machineCableSize.findMany({
+  const cableType = await prisma.processMachineCableType.findUnique({
+    where: { id: cableTypeId },
+  });
+  if (!cableType) {
+    return NextResponse.json({ error: "Cable type not found" }, { status: 404 });
+  }
+
+  const othersSize = await prisma.processMachineCableSize.findUnique({
+    where: {
+      cableTypeId_name: { cableTypeId, name: CABLE_OTHERS_LABEL },
+    },
+  });
+  if (!othersSize) {
+    const maxSort = await prisma.processMachineCableSize.aggregate({
+      where: { cableTypeId },
+      _max: { sortOrder: true },
+    });
+    await prisma.processMachineCableSize.create({
+      data: {
+        cableTypeId,
+        name: CABLE_OTHERS_LABEL,
+        sortOrder: (maxSort._max.sortOrder ?? 0) + 10,
+        isActive: true,
+      },
+    });
+  } else if (!othersSize.isActive && !(all && isAdmin)) {
+    await prisma.processMachineCableSize.update({
+      where: { id: othersSize.id },
+      data: { isActive: true },
+    });
+  }
+
+  const sizes = await prisma.processMachineCableSize.findMany({
     where: {
       cableTypeId,
       ...(all && isAdmin ? {} : { isActive: true }),
@@ -58,50 +94,80 @@ export async function POST(request: Request) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  const denied = requireMachineProductionEnter(session.user.globalRole);
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
-  const cableType = await prisma.machineCableType.findUnique({
+  if (parsed.data.name === CABLE_OTHERS_LABEL) {
+    const others = await prisma.processMachineCableSize.findUnique({
+      where: {
+        cableTypeId_name: {
+          cableTypeId: parsed.data.cableTypeId,
+          name: CABLE_OTHERS_LABEL,
+        },
+      },
+    });
+    if (!others) {
+      const created = await prisma.processMachineCableSize.create({
+        data: {
+          cableTypeId: parsed.data.cableTypeId,
+          name: CABLE_OTHERS_LABEL,
+          sortOrder: 9990,
+          isActive: true,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        size: {
+          id: created.id,
+          cableTypeId: created.cableTypeId,
+          name: created.name,
+          sortOrder: created.sortOrder,
+          isActive: created.isActive,
+        },
+      });
+    }
+    if (!others.isActive) {
+      const updated = await prisma.processMachineCableSize.update({
+        where: { id: others.id },
+        data: { isActive: true },
+      });
+      return NextResponse.json({
+        ok: true,
+        size: {
+          id: updated.id,
+          cableTypeId: updated.cableTypeId,
+          name: updated.name,
+          sortOrder: updated.sortOrder,
+          isActive: updated.isActive,
+        },
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      size: {
+        id: others.id,
+        cableTypeId: others.cableTypeId,
+        name: others.name,
+        sortOrder: others.sortOrder,
+        isActive: others.isActive,
+      },
+    });
+  }
+
+  const cableType = await prisma.processMachineCableType.findUnique({
     where: { id: parsed.data.cableTypeId },
   });
   if (!cableType) {
     return NextResponse.json({ error: "Cable type not found" }, { status: 404 });
   }
 
-  const name = parsed.data.name;
-  const existing = await prisma.machineCableSize.findUnique({
-    where: {
-      cableTypeId_name: {
-        cableTypeId: parsed.data.cableTypeId,
-        name,
-      },
-    },
-  });
-  if (existing) {
-    return NextResponse.json(
-      { error: "That size already exists for this cable type" },
-      { status: 409 },
-    );
-  }
-
-  const maxSort = await prisma.machineCableSize.aggregate({
-    where: { cableTypeId: parsed.data.cableTypeId },
-    _max: { sortOrder: true },
-  });
-  const sortOrder =
-    parsed.data.sortOrder ?? (maxSort._max.sortOrder ?? 0) + 10;
-
-  const size = await prisma.machineCableSize.create({
-    data: {
-      cableTypeId: parsed.data.cableTypeId,
-      name,
-      sortOrder,
-      isActive: parsed.data.isActive ?? true,
-    },
+  const size = await upsertProcessMachineCableSize({
+    cableTypeId: parsed.data.cableTypeId,
+    name: parsed.data.name,
   });
 
   return NextResponse.json({

@@ -253,36 +253,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const cableTypeRow = await prisma.machineCableType.findFirst({
-    where: {
-      name: parsed.data.cableType,
-      isActive: true,
-    },
-  });
-  if (!cableTypeRow) {
-    return NextResponse.json(
-      { error: "Select a valid cable type" },
-      { status: 400 },
-    );
-  }
-
-  const cableSizeRow = await prisma.machineCableSize.findFirst({
-    where: {
-      cableTypeId: cableTypeRow.id,
-      name: parsed.data.cableSize,
-      isActive: true,
-    },
-  });
-  if (!cableSizeRow) {
-    return NextResponse.json(
-      { error: "Select a valid cable size for this cable type" },
-      { status: 400 },
-    );
-  }
-
   const photos = (parsed.data.photoUrls ?? []).filter((u) =>
     isCloudinaryBillUrl(u),
   );
+
+  // Others free-text becomes a permanent dropdown option for this process+machine.
+  const { persistOthersCableOptions } = await import(
+    "@/lib/machine-production/persist-cable-options"
+  );
+  const persisted = await persistOthersCableOptions({
+    processMachineId: processLink.id,
+    cableType: parsed.data.cableType,
+    cableSize: parsed.data.cableSize,
+  });
 
   const planned = parsed.data.plannedProduction;
   const actual = parsed.data.actualProduction;
@@ -301,8 +284,8 @@ export async function POST(request: Request) {
         shift,
         slotStartHour,
         currentProcess: processLink.process.name,
-        cableType: cableTypeRow.name,
-        cableSize: cableSizeRow.name,
+        cableType: persisted.cableType,
+        cableSize: persisted.cableSize,
         plannedProduction: planned,
         actualProduction: actual,
         efficiencyPct: eff,

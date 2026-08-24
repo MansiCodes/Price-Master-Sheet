@@ -213,7 +213,7 @@ async function main() {
     "Coaxial",
     "Power",
     "Fiber",
-    "Other",
+    "Others",
   ];
   const defaultCableSizes = [
     "0.5 sqmm",
@@ -223,6 +223,7 @@ async function main() {
     "2.5 sqmm",
     "23 AWG",
     "24 AWG",
+    "Others",
   ];
 
   let typeSort = 10;
