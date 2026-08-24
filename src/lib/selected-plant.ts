@@ -60,8 +60,8 @@ async function defaultPlantId(accessible: string[]): Promise<string | null> {
  * Resolves the active plant for shell / dashboard.
  * - Cookie plant id → that plant
  * - Cookie `__ALL__` (super admin) → null (all plants)
- * - No cookie + super admin → CAT-6 by default
- * - No cookie + other roles → null (force plant picker when needed)
+ * - No / invalid cookie → default plant (CAT-6 if available, else first accessible)
+ *   so login can go straight to the dashboard; switch plants from the sidebar.
  */
 export async function resolveSelectedPlantId(
   userId: string,
@@ -81,22 +81,13 @@ export async function resolveSelectedPlantId(
     return raw;
   }
 
-  if (options?.isSuperAdmin) {
-    return defaultPlantId(accessible);
-  }
-
-  return null;
+  return defaultPlantId(accessible);
 }
 
+/** @deprecated Plant picker removed — always false; keep for callers. */
 export async function needsPlantSelection(
-  userId: string,
-  options?: { isSuperAdmin?: boolean },
+  _userId: string,
+  _options?: { isSuperAdmin?: boolean },
 ): Promise<boolean> {
-  if (options?.isSuperAdmin) return false;
-
-  const accessible = await getAccessiblePlantIds(userId);
-  if (accessible.length === 0) return false;
-
-  const selected = await getSelectedPlantId(userId);
-  return !selected;
+  return false;
 }

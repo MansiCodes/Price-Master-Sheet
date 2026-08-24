@@ -70,7 +70,7 @@ export default async function AppLayout({
   const primaryPlantId = selectedPlantId ?? plantIds[0] ?? null;
 
   const switchablePlantsRaw =
-    user && (plantIds.length > 1 || superAdmin)
+    user && (plantIds.length >= 1 || superAdmin)
       ? await prisma.plant.findMany({
           where: {
             ...(superAdmin ? { isActive: true } : { id: { in: plantIds }, isActive: true }),
