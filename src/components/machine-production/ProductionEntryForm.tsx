@@ -87,33 +87,43 @@ export function ProductionEntryForm({
       machineId: machine.id,
       processName,
     });
-    const typesRes = await fetch(`/api/machine-production/cable-types?${qs}`);
-    const typesJson = (await typesRes.json()) as {
-      types?: CableOption[];
-      error?: string;
-    };
-    if (!typesRes.ok) {
-      toast.error(typesJson.error ?? "Failed to load cable types");
+    try {
+      const typesRes = await fetch(`/api/machine-production/cable-types?${qs}`);
+      const typesJson = (await typesRes.json().catch(() => ({}))) as {
+        types?: CableOption[];
+        error?: string;
+      };
+      if (!typesRes.ok) {
+        toast.error(typesJson.error ?? "Failed to load cable types");
+        setCableTypeRows([]);
+        return;
+      }
+      setCableTypeRows(typesJson.types ?? []);
+    } catch {
+      toast.error("Failed to load cable types");
       setCableTypeRows([]);
-      return;
     }
-    setCableTypeRows(typesJson.types ?? []);
   }, [machine?.id, processName]);
 
   const loadSizes = useCallback(async (typeId: string) => {
-    const res = await fetch(
-      `/api/machine-production/cable-sizes?cableTypeId=${encodeURIComponent(typeId)}`,
-    );
-    const json = (await res.json()) as {
-      sizes?: CableOption[];
-      error?: string;
-    };
-    if (!res.ok) {
-      toast.error(json.error ?? "Failed to load cable sizes");
+    try {
+      const res = await fetch(
+        `/api/machine-production/cable-sizes?cableTypeId=${encodeURIComponent(typeId)}`,
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        sizes?: CableOption[];
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Failed to load cable sizes");
+        setCableSizeRows([]);
+        return;
+      }
+      setCableSizeRows(json.sizes ?? []);
+    } catch {
+      toast.error("Failed to load cable sizes");
       setCableSizeRows([]);
-      return;
     }
-    setCableSizeRows(json.sizes ?? []);
   }, []);
 
   useEffect(() => {

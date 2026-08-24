@@ -13,7 +13,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Bump when Prisma schema fields change so the cached client is rebuilt. */
-const PRISMA_CLIENT_GEN = 10;
+const PRISMA_CLIENT_GEN = 12;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {
@@ -79,6 +79,11 @@ export function getPrisma(): PrismaClient {
     !globalForPrisma.prisma ||
     globalForPrisma.prismaClientGen !== PRISMA_CLIENT_GEN
   ) {
+    // Drop the old client so new schema models (e.g. ProcessMachineCableType) bind.
+    const prev = globalForPrisma.prisma;
+    if (prev) {
+      void prev.$disconnect().catch(() => undefined);
+    }
     globalForPrisma.prisma = createPrismaClient();
     globalForPrisma.prismaClientGen = PRISMA_CLIENT_GEN;
   }
@@ -87,9 +92,10 @@ export function getPrisma(): PrismaClient {
 
 /** @deprecated Prefer getPrisma() for clearer lazy init */
 export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop, receiver) {
+  get(_target, prop) {
     const client = getPrisma();
-    const value = Reflect.get(client, prop, receiver);
+    // Use `client` as receiver so Prisma model getters keep the right `this`.
+    const value = Reflect.get(client, prop, client);
     return typeof value === "function" ? value.bind(client) : value;
   },
 });
