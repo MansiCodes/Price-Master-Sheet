@@ -109,3 +109,22 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     },
   });
 }
+
+export async function DELETE(_request: NextRequest, ctx: Ctx) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  if (denied) return denied;
+
+  const { processId } = await ctx.params;
+  const existing = await prisma.productionProcess.findUnique({
+    where: { id: processId },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Process not found" }, { status: 404 });
+  }
+
+  await prisma.productionProcess.delete({ where: { id: processId } });
+  return NextResponse.json({ ok: true });
+}

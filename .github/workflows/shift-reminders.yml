@@ -1,7 +1,11 @@
-# Backup shift reminders at 08:50 IST (Day) and 20:50 IST (Night).
-# Vercel Hobby may only run one cron/day and can drift past 9:00 — this
-# hits the same API at the exact UTC times so both shifts still fire.
+# Backup shift reminders near 08:50 IST (Day) and 20:50 IST (Night).
+# Vercel Hobby only guarantees "sometime in that UTC hour", so the API
+# accepts 08:30–09:25 / 20:30–21:25 IST. This workflow hits closer to :50.
 # Deduped by ReminderLog claim id (one WhatsApp per plant per shift).
+#
+# Required GitHub repo secrets:
+#   APP_URL      e.g. https://your-app.vercel.app
+#   CRON_SECRET  same value as Vercel env CRON_SECRET
 
 name: Shift reminders
 
@@ -25,9 +29,12 @@ jobs:
           set -euo pipefail
           if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
             echo "Missing APP_URL or CRON_SECRET repository secrets."
+            echo "GitHub → Settings → Secrets and variables → Actions"
             exit 1
           fi
           BASE="${APP_URL%/}"
-          curl -fsS -X GET \
+          echo "POST ${BASE}/api/cron/daily-reminders"
+          curl -fsS -X POST \
             -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
             "${BASE}/api/cron/daily-reminders"

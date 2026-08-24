@@ -1,5 +1,6 @@
 import { GlobalRole, Prisma } from "@prisma/client";
 import {
+  getIstHoursMinutes,
   reminderShiftForNow,
   startOfUtcDay,
   todayIstAsUtcDate,
@@ -59,11 +60,15 @@ export async function runDailyReminders(now: Date = new Date()) {
   const shift = reminderShiftForNow(now);
 
   if (!shift) {
-    console.log(`[reminders] Skipped: outside shift reminder window (now=${now.toISOString()})`);
+    const { hour, minute } = getIstHoursMinutes(now);
+    console.log(
+      `[reminders] Skipped: outside shift window (utc=${now.toISOString()} ist=${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")})`,
+    );
     return {
       skipped: true as const,
       reason: "outside_shift_reminder_window",
       date: isoDate,
+      istTime: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
       remindersCreated: 0,
       whatsappSent: 0,
     };

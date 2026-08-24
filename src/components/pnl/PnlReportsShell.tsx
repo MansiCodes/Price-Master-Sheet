@@ -30,11 +30,13 @@ export function PnlReportsShell({
   plantId,
   plantName,
   plantCode,
+  plantManagerName,
   isSuperAdmin = false,
 }: {
   plantId: string;
   plantName?: string;
   plantCode?: string;
+  plantManagerName?: string | null;
   isSuperAdmin?: boolean;
 }) {
   const [tab, setTab] = useState<ReportTab>("pnl");
@@ -67,7 +69,14 @@ export function PnlReportsShell({
   return (
     <div className="pnl-reports">
       {plantName ? (
-        <p className="pnl-reports__plant">{plantName}</p>
+        <div className="pnl-reports__plant-block">
+          <p className="pnl-reports__plant">{plantName}</p>
+          {plantManagerName ? (
+            <p className="pnl-reports__manager">
+              Plant manager · {plantManagerName}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <div className="pnl-reports__toolbar">
         <div className="pnl-reports__tabs">

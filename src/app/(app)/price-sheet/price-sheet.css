@@ -906,17 +906,28 @@
 
   .ps-pagination {
     margin: 0 0.75rem;
-    padding: 0.45rem 0.55rem;
+    padding: 0.4rem 0.5rem;
     background: rgba(255, 255, 255, 0.94);
     border: 1px solid rgba(26, 36, 33, 0.08);
     border-radius: 16px;
     box-shadow: 0 10px 28px rgba(26, 36, 33, 0.1);
+    display: flex;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 0.45rem;
+    justify-content: center;
+    gap: 0.4rem;
   }
 
   .ps-pagination__nav {
-    gap: 0.28rem;
+    flex: 0 1 auto;
+    min-width: 0;
+    gap: 0.22rem;
+  }
+
+  .ps-page-size-wrap {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
   }
 
   .ps-page-size-wrap .ps-field-label {
@@ -924,14 +935,15 @@
   }
 
   .ps-page-size-select {
-    min-width: 66px;
+    min-width: 3.4rem;
+    width: auto;
   }
 
   .ps-page-size-select .select-menu__trigger {
-    min-height: 2.25rem;
-    height: 2.25rem;
-    padding: 0 0.7rem;
-    font-size: 0.8rem;
+    height: 2rem;
+    min-height: 0;
+    padding: 0 0.55rem;
+    font-size: 0.78rem;
   }
 
   .ps-page-nav {
@@ -943,13 +955,24 @@
   }
 
   .ps-page-btn {
-    width: 2.25rem;
-    height: 2.25rem;
-    min-width: 2.25rem;
-    font-size: 0.8rem;
+    width: 2rem;
+    height: 2rem;
+    min-width: 2rem;
+    font-size: 0.78rem;
   }
 
   .ps-page-ellipsis {
-    display: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0.85rem;
+    padding: 0;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: var(--ink-soft, #6b7280);
+  }
+
+  .ps-page-numbers {
+    gap: 0.22rem;
   }
 }

@@ -29,14 +29,16 @@ function csvEscape(value: string | number | null | undefined): string {
 }
 
 function buildPageList(total: number, currentPage: number, compact: boolean): number[] {
+  if (total <= 1) return [1];
+
   if (compact) {
-    if (total <= 5) {
+    // Sliding window of 2 pages (e.g. 2,3 … → 3,4 …) so mobile never crowds.
+    if (total <= 2) {
       return Array.from({ length: total }, (_, i) => i + 1);
     }
-    const pages = new Set([1, total, currentPage]);
-    if (currentPage > 1) pages.add(currentPage - 1);
-    if (currentPage < total) pages.add(currentPage + 1);
-    return [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+    const start =
+      currentPage >= total ? Math.max(1, total - 1) : Math.max(1, currentPage);
+    return [start, start + 1].filter((p) => p <= total);
   }
 
   if (total <= 7) {
@@ -619,36 +621,53 @@ export default function PriceSheetPage() {
 
             <div className="ps-page-numbers">
               {!loading && filtered.length > 0
-                ? pageList.flatMap((page, index) => {
-                    const prev = pageList[index - 1];
-                    const showEllipsis = prev !== undefined && page - prev > 1;
-                    const items = [];
-                    if (showEllipsis) {
-                      items.push(
-                        <span
-                          key={`e-${page}`}
-                          className="ps-page-ellipsis"
-                          aria-hidden="true"
-                        >
-                          …
-                        </span>,
-                      );
-                    }
-                    items.push(
-                      <button
-                        key={page}
-                        type="button"
-                        className={`ps-page-btn${page === safePage ? " is-active" : ""}`}
-                        aria-label={`Page ${page}`}
-                        aria-current={page === safePage ? "page" : undefined}
-                        disabled={loading}
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </button>,
+                ? (() => {
+                    const lastShown = pageList[pageList.length - 1] ?? 0;
+                    const showTrailingEllipsis =
+                      isCompact && lastShown > 0 && lastShown < totalPages;
+                    return (
+                      <>
+                        {pageList.flatMap((page, index) => {
+                          const prev = pageList[index - 1];
+                          const showEllipsis =
+                            prev !== undefined && page - prev > 1;
+                          const items = [];
+                          if (showEllipsis) {
+                            items.push(
+                              <span
+                                key={`e-${page}`}
+                                className="ps-page-ellipsis"
+                                aria-hidden="true"
+                              >
+                                …
+                              </span>,
+                            );
+                          }
+                          items.push(
+                            <button
+                              key={page}
+                              type="button"
+                              className={`ps-page-btn${page === safePage ? " is-active" : ""}`}
+                              aria-label={`Page ${page}`}
+                              aria-current={
+                                page === safePage ? "page" : undefined
+                              }
+                              disabled={loading}
+                              onClick={() => setCurrentPage(page)}
+                            >
+                              {page}
+                            </button>,
+                          );
+                          return items;
+                        })}
+                        {showTrailingEllipsis ? (
+                          <span className="ps-page-ellipsis" aria-hidden="true">
+                            …
+                          </span>
+                        ) : null}
+                      </>
                     );
-                    return items;
-                  })
+                  })()
                 : null}
             </div>
 

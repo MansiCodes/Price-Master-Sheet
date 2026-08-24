@@ -15,6 +15,7 @@ import {
   isSuperAdmin,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
+import { getPlantRmSummary, getPlantSegment } from "@/lib/plant-segments";
 
 export const dynamic = "force-dynamic";
 
@@ -68,14 +69,23 @@ export default async function AppLayout({
     : null;
   const primaryPlantId = selectedPlantId ?? plantIds[0] ?? null;
 
-  const switchablePlants =
-    user && plantIds.length > 1
+  const switchablePlantsRaw =
+    user && (plantIds.length > 1 || superAdmin)
       ? await prisma.plant.findMany({
-          where: { id: { in: plantIds }, isActive: true },
-          orderBy: { name: "asc" },
+          where: {
+            ...(superAdmin ? { isActive: true } : { id: { in: plantIds }, isActive: true }),
+          },
           select: { id: true, name: true, code: true },
         })
       : [];
+
+  const switchablePlants = switchablePlantsRaw
+    .map((p) => ({
+      ...p,
+      rmSummary: getPlantRmSummary(p.code),
+      sortOrder: getPlantSegment(p.code)?.sortOrder ?? 99,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   const selectedPlant =
     selectedPlantId && user
