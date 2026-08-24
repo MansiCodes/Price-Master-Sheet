@@ -10,7 +10,7 @@ const bodySchema = z.object({
 });
 
 function generateOtpCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 /** WhatsApp OTP — stores hashed code and sends via AiSensy when configured. */

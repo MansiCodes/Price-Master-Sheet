@@ -187,7 +187,7 @@ export default function LoginPage() {
     }
 
     const e164 = toIndiaPhoneE164(phone);
-    if (!e164 || otp.trim().length < 4) {
+    if (!e164 || otp.trim().length !== 4) {
       setError(t("enterOtp"));
       return;
     }
@@ -447,12 +447,12 @@ export default function LoginPage() {
                     autoComplete="one-time-code"
                     autoFocus
                     required
-                    maxLength={6}
-                    pattern="[0-9]{4,6}"
+                    maxLength={4}
+                    pattern="[0-9]{4}"
                     placeholder={t("otpPlaceholder")}
                     value={otp}
                     onChange={(e) =>
-                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 4))
                     }
                   />
                 </div>

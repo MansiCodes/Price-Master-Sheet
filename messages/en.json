@@ -73,7 +73,7 @@
     "whatsappLogin": "WhatsApp login",
     "emailLogin": "Email login",
     "enterOtpLabel": "Enter OTP",
-    "otpPlaceholder": "6-digit code",
+    "otpPlaceholder": "4-digit code",
     "devOtpLabel": "Dev OTP",
     "devOtpNote": "Local testing only — removed when WhatsApp template is live",
     "brandName": "Cable Junction",

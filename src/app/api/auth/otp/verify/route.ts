@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 
 const bodySchema = z.object({
   phone: z.string().min(8).max(20),
-  code: z.string().min(4).max(10),
+  code: z.string().regex(/^\d{4}$/),
 });
 
 /**

@@ -73,7 +73,7 @@
     "whatsappLogin": "व्हाट्सऐप लॉगिन",
     "emailLogin": "ईमेल लॉगिन",
     "enterOtpLabel": "ओटीपी दर्ज करें",
-    "otpPlaceholder": "6 अंकों का कोड",
+    "otpPlaceholder": "4 अंकों का कोड",
     "devOtpLabel": "डेव ओटीपी",
     "devOtpNote": "केवल लोकल टेस्टिंग — व्हाट्सऐप टेम्पलेट लाइव होने पर हटेगा",
     "brandName": "केबल जंक्शन",
