@@ -738,10 +738,10 @@
   background: color-mix(in srgb, var(--teal-soft) 35%, white);
 }
 
+/* Keep as table-cell — display:flex on <td> breaks row border alignment. */
 .mp-table__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .mp-admin-machines {

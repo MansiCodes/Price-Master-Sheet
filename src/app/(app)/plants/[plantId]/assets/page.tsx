@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { formatINR } from "@/lib/format/inr";
+import { TablePageLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
 
 type Asset = {
   id: string;
@@ -98,6 +99,12 @@ export default function AssetsPage() {
       <p className="page-sub">Register plant assets and depreciation.</p>
       {error ? <div className="alert alert--error">{error}</div> : null}
 
+      {loading && assets.length === 0 ? (
+        <TablePageLoadingSkeleton label="Loading assets" showChrome={false} />
+      ) : null}
+
+      {!(loading && assets.length === 0) ? (
+      <>
       <form className="form-card form-grid" onSubmit={onSubmit}>
         <div className="field">
           <label htmlFor="desc">Description</label>
@@ -182,13 +189,7 @@ export default function AssetsPage() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="empty">
-                  Loading…
-                </td>
-              </tr>
-            ) : assets.length === 0 ? (
+            {assets.length === 0 ? (
               <tr>
                 <td colSpan={4} className="empty">
                   No assets yet.
@@ -207,6 +208,8 @@ export default function AssetsPage() {
           </tbody>
         </table>
       </div>
+      </>
+      ) : null}
     </div>
   );
 }

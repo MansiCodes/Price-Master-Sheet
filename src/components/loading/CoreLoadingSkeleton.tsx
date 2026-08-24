@@ -34,14 +34,20 @@ export function PnlRouteLoadingSkeleton() {
 export function TablePageLoadingSkeleton({
   rows = 8,
   label = "Loading",
+  showChrome = true,
 }: {
   rows?: number;
   label?: string;
+  showChrome?: boolean;
 }) {
   return (
     <div className="core-skeleton" aria-busy="true" aria-label={label}>
-      <div className="core-skeleton__title" />
-      <div className="core-skeleton__toolbar" />
+      {showChrome ? (
+        <>
+          <div className="core-skeleton__title" />
+          <div className="core-skeleton__toolbar" />
+        </>
+      ) : null}
       <div className="core-skeleton__table">
         {Array.from({ length: rows }, (_, index) => (
           <span key={index} />
@@ -53,13 +59,19 @@ export function TablePageLoadingSkeleton({
 
 export function FormPageLoadingSkeleton({
   label = "Loading form",
+  showChrome = true,
 }: {
   label?: string;
+  showChrome?: boolean;
 }) {
   return (
     <div className="core-skeleton" aria-busy="true" aria-label={label}>
-      <div className="core-skeleton__title" />
-      <div className="core-skeleton__toolbar" />
+      {showChrome ? (
+        <>
+          <div className="core-skeleton__title" />
+          <div className="core-skeleton__toolbar" />
+        </>
+      ) : null}
       <div className="core-skeleton__form">
         {Array.from({ length: 6 }, (_, index) => (
           <span key={index} />
@@ -72,14 +84,20 @@ export function FormPageLoadingSkeleton({
 export function CardGridLoadingSkeleton({
   cards = 8,
   label = "Loading",
+  showChrome = true,
 }: {
   cards?: number;
   label?: string;
+  showChrome?: boolean;
 }) {
   return (
     <div className="core-skeleton" aria-busy="true" aria-label={label}>
-      <div className="core-skeleton__title" />
-      <div className="core-skeleton__toolbar" />
+      {showChrome ? (
+        <>
+          <div className="core-skeleton__title" />
+          <div className="core-skeleton__toolbar" />
+        </>
+      ) : null}
       <div className="core-skeleton__counts">
         {Array.from({ length: 4 }, (_, index) => (
           <span key={index} />

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { formatINR } from "@/lib/format/inr";
 import { formatMonthLabel } from "@/lib/dates";
 import { DecimalInput } from "@/components/ui/DecimalInput";
+import { FormPageLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
 
 type Row = {
   id: string;
@@ -138,6 +139,12 @@ export default function ElectricityPage() {
       </p>
       {error ? <div className="alert alert--error">{error}</div> : null}
 
+      {loading && rows.length === 0 ? (
+        <FormPageLoadingSkeleton label="Loading electricity" showChrome={false} />
+      ) : null}
+
+      {!(loading && rows.length === 0) ? (
+      <>
       {isPvc ? (
         <form className="form-card form-grid" onSubmit={onSubmitRent}>
           <h2 className="page-title" style={{ fontSize: "1.05rem" }}>
@@ -295,13 +302,7 @@ export default function ElectricityPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="empty">
-                      Loading…
-                    </td>
-                  </tr>
-                ) : registerRows.length === 0 ? (
+                {registerRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="empty">
                       No rows yet.
@@ -353,13 +354,7 @@ export default function ElectricityPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="empty">
-                      Loading…
-                    </td>
-                  </tr>
-                ) : registerRows.length === 0 ? (
+                {registerRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="empty">
                       No rows yet.
@@ -409,13 +404,7 @@ export default function ElectricityPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="empty">
-                    Loading…
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
+              {rows.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="empty">
                     No rows yet.
@@ -435,6 +424,8 @@ export default function ElectricityPage() {
           </table>
         </div>
       )}
+      </>
+      ) : null}
     </div>
   );
 }

@@ -970,6 +970,20 @@ textarea {
   background: color-mix(in srgb, var(--teal-soft) 45%, white);
 }
 
+.data-table__skeleton-line {
+  display: block;
+  height: 0.85rem;
+  width: 72%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+
+.data-table__skeleton-row td:nth-child(even) .data-table__skeleton-line {
+  width: 48%;
+}
+
 .pagination {
   display: flex;
   align-items: center;
