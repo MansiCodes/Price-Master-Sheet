@@ -913,7 +913,7 @@
     max-width: 100%;
   }
 
-  /* Mobile: P&L / Sales / Purchase (and rest) — 3 per row */
+  /* Mobile: small equal tabs — 3/row by default; 4/row when 6+ tabs (CAT-6 = 4+3) */
   .pnl-reports__tabs {
     overflow-x: visible;
   }
@@ -927,19 +927,33 @@
     align-items: stretch !important;
     width: 100% !important;
     max-width: 100% !important;
+    box-sizing: border-box !important;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.25rem;
+    gap: 0.22rem;
+    padding: 0.22rem;
+  }
+
+  .pnl-tab-nav--n6,
+  .pnl-tab-nav--n7,
+  .pnl-tab-nav--n8,
+  .pnl-tab-nav--n9,
+  .pnl-tab-nav--n10 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
   .pnl-tab-nav button,
   .pnl-tab-nav--fit button,
   .pnl-tab-nav--compact button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     width: 100% !important;
     min-width: 0 !important;
+    max-width: 100% !important;
     flex: none !important;
-    height: 2.2rem;
-    padding: 0 0.25rem;
-    font-size: 0.72rem;
+    height: 2.05rem;
+    padding: 0 0.15rem !important;
+    font-size: 0.68rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1055,12 +1069,21 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .pnl-tab-nav--n6,
+  .pnl-tab-nav--n7,
+  .pnl-tab-nav--n8,
+  .pnl-tab-nav--n9,
+  .pnl-tab-nav--n10 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
   .pnl-tab-nav button,
   .pnl-tab-nav--fit button,
   .pnl-tab-nav--compact button {
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     letter-spacing: 0;
-    padding: 0 0.1rem;
+    padding: 0 0.08rem !important;
+    height: 1.95rem;
   }
 
   .pnl-expense-type-nav button {

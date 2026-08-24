@@ -61,7 +61,7 @@ export function PnlTabNav({
 
   return (
     <div
-      className={`pnl-tab-nav${fit ? " pnl-tab-nav--fit" : ""}${dense ? " pnl-tab-nav--compact" : ""}`}
+      className={`pnl-tab-nav pnl-tab-nav--n${visible.length}${fit ? " pnl-tab-nav--fit" : ""}${dense ? " pnl-tab-nav--compact" : ""}`}
       role="tablist"
       aria-label="Report type"
     >
