@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { SupervisorDashboard } from "@/components/machine-production/SupervisorDashboard";
+import { CardGridLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
 import { canAccessMachineProduction } from "@/lib/rbac";
 
 export default async function MachineProductionPage() {
@@ -12,7 +13,9 @@ export default async function MachineProductionPage() {
   }
 
   return (
-    <Suspense fallback={<p className="mp-muted">Loading…</p>}>
+    <Suspense
+      fallback={<CardGridLoadingSkeleton label="Loading machine production" />}
+    >
       <SupervisorDashboard />
     </Suspense>
   );

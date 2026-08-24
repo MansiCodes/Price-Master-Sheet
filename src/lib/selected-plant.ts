@@ -7,11 +7,6 @@ export const SELECTED_PLANT_COOKIE = "cj.selected-plant";
 export const ALL_PLANTS_COOKIE_VALUE = "__ALL__";
 const DEFAULT_SUPER_ADMIN_PLANT_CODE = "CAT6";
 
-export async function clearSelectedPlantCookie(): Promise<void> {
-  const cookieStore = await cookies();
-  cookieStore.delete(SELECTED_PLANT_COOKIE);
-}
-
 export async function setSelectedPlantCookie(plantId: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(SELECTED_PLANT_COOKIE, plantId, {
@@ -32,15 +27,6 @@ export async function setAllPlantsCookie(): Promise<void> {
     secure: process.env.NODE_ENV === "production",
     maxAge: 60 * 60 * 24 * 30,
   });
-}
-
-export async function getSelectedPlantId(userId: string): Promise<string | null> {
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(SELECTED_PLANT_COOKIE)?.value;
-  if (!raw || raw === ALL_PLANTS_COOKIE_VALUE) return null;
-
-  const accessible = await getAccessiblePlantIds(userId);
-  return accessible.includes(raw) ? raw : null;
 }
 
 async function defaultPlantId(accessible: string[]): Promise<string | null> {
@@ -82,12 +68,4 @@ export async function resolveSelectedPlantId(
   }
 
   return defaultPlantId(accessible);
-}
-
-/** @deprecated Plant picker removed — always false; keep for callers. */
-export async function needsPlantSelection(
-  _userId: string,
-  _options?: { isSuperAdmin?: boolean },
-): Promise<boolean> {
-  return false;
 }

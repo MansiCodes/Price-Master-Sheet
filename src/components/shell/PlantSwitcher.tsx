@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import {
   selectPlantAction,
   viewAllPlantsAction,
-} from "@/app/select-plant/actions";
+} from "@/lib/plant-actions";
 
 export type PlantSwitcherPlant = {
   id: string;
