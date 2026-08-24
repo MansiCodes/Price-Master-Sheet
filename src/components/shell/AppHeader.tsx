@@ -103,9 +103,9 @@ export function AppHeader({
       case "price-sheet":
         return tNav("priceSheet");
       case "machine-production":
-        return "Machine Production";
+        return tNav("machineProduction");
       case "machine-production-admin":
-        return "MP Admin";
+        return tNav("mpAdmin");
       case "users":
         return tNav("users");
       case "integrations":

@@ -878,7 +878,7 @@ export function AdminDashboard() {
               Actual {displaySummary.actualProduction}
             </span>
             <span className="mp-count">
-              Avg eff {displaySummary.averageEfficiency}%
+              Eff {displaySummary.averageEfficiency}%
             </span>
           </div>
         ) : null}

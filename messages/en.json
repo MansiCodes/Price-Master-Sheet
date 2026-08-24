@@ -35,6 +35,8 @@
     "dashboard": "Dashboard",
     "pnl": "P&L",
     "priceSheet": "Price Sheet",
+    "machineProduction": "Machine Production",
+    "mpAdmin": "MP Admin",
     "users": "Users",
     "integrations": "Integrations",
     "audit": "Audit trail"
