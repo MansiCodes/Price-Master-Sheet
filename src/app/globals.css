@@ -974,7 +974,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.75rem;
   margin-top: 1rem;
   font-size: 0.85rem;
@@ -987,6 +987,45 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  min-width: 0;
+}
+
+.pagination__summary {
+  flex: 1 1 auto;
+}
+
+.pagination__controls {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .pagination {
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+    justify-content: space-between;
+  }
+
+  .pagination__info {
+    display: none;
+  }
+
+  .pagination__page-size span {
+    display: none;
+  }
+
+  .pagination__page-size-select {
+    min-width: 3.4rem;
+  }
+
+  .pagination__controls {
+    gap: 0.35rem;
+  }
+
+  .pagination button {
+    min-width: 2rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+  }
 }
 
 .pagination__page-size {

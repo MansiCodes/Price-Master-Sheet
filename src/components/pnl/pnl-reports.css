@@ -913,24 +913,32 @@
     max-width: 100%;
   }
 
-  /* Mobile: row1 = P&L, Stock, Sales, Petty Cash | row2 = Purchase, Production, Expense */
+  /* Mobile: P&L / Sales / Purchase (and rest) — 3 per row */
   .pnl-reports__tabs {
     overflow-x: visible;
   }
 
-  .pnl-tab-nav {
-    width: 100%;
-    max-width: 100%;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .pnl-tab-nav,
+  .pnl-tab-nav--fit,
+  .pnl-tab-nav--compact {
+    display: grid !important;
+    flex-direction: unset !important;
+    flex-wrap: unset !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.25rem;
   }
 
-  .pnl-tab-nav button {
-    width: 100%;
-    min-width: 0;
+  .pnl-tab-nav button,
+  .pnl-tab-nav--fit button,
+  .pnl-tab-nav--compact button {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
     height: 2.2rem;
-    padding: 0 0.2rem;
+    padding: 0 0.25rem;
     font-size: 0.72rem;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1041,11 +1049,15 @@
 }
 
 @media (max-width: 480px) {
-  .pnl-tab-nav {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .pnl-tab-nav,
+  .pnl-tab-nav--fit,
+  .pnl-tab-nav--compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .pnl-tab-nav button {
+  .pnl-tab-nav button,
+  .pnl-tab-nav--fit button,
+  .pnl-tab-nav--compact button {
     font-size: 0.65rem;
     letter-spacing: 0;
     padding: 0 0.1rem;
