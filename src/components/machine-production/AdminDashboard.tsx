@@ -1,10 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
-import { patchJson, postJson } from "@/lib/client-forms";
+import { SelectMenu } from "@/components/ui/SelectMenu";
+import { DeleteConfirmDialog } from "@/components/pnl/DeleteConfirmDialog";
+import {
+  EntryEditDrawer,
+  type EditField,
+} from "@/components/pnl/EntryEditDrawer";
+import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
 import { todayIstYmd } from "@/lib/machine-production/slots";
+import "@/components/pnl/pnl-reports.css";
 
 type MachineRow = {
   id: string;
@@ -90,6 +98,24 @@ const EMPTY_FILTERS: Filters = {
   status: "",
 };
 
+const ENTRY_EDIT_FIELDS: EditField[] = [
+  { name: "currentProcess", label: "Process", required: true },
+  { name: "cableType", label: "Cable type", required: true },
+  { name: "cableSize", label: "Cable size", required: true },
+  { name: "plannedProduction", label: "Planned production", type: "number", required: true },
+  { name: "actualProduction", label: "Actual production", type: "number", required: true },
+  { name: "operators", label: "Operators", type: "number", required: true },
+  { name: "helpers", label: "Helpers", type: "number", required: true },
+  { name: "remarks", label: "Remarks", type: "textarea" },
+];
+
+type PendingDelete =
+  | { kind: "entry"; id: string }
+  | { kind: "machine"; id: string }
+  | { kind: "process"; id: string }
+  | { kind: "cableType"; id: string }
+  | { kind: "cableSize"; id: string };
+
 export function AdminDashboard() {
   const [tab, setTab] = useState<
     "records" | "machines" | "processes" | "cable"
@@ -116,6 +142,16 @@ export function AdminDashboard() {
   >([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<EntryRow | null>(null);
+  const [editingEntry, setEditingEntry] = useState<EntryRow | null>(null);
+  const [entryEditValues, setEntryEditValues] = useState<
+    Record<string, string>
+  >({});
+  const [entrySaving, setEntrySaving] = useState(false);
+  const [entryEditError, setEntryEditError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
 
   const [machineForm, setMachineForm] = useState({ name: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -499,7 +535,158 @@ export function AdminDashboard() {
     void loadCableSizes(selectedCableTypeId);
   }
 
+  function openEntryEdit(e: EntryRow) {
+    setSelected(null);
+    setEditingEntry(e);
+    setEntryEditError(null);
+    setEntryEditValues({
+      currentProcess: e.currentProcess,
+      cableType: e.cableType,
+      cableSize: e.cableSize,
+      plannedProduction: String(e.plannedProduction),
+      actualProduction: String(e.actualProduction),
+      operators: String(e.operators),
+      helpers: String(e.helpers),
+      remarks: e.remarks ?? "",
+    });
+  }
+
+  function closeEntryEdit() {
+    if (entrySaving) return;
+    setEditingEntry(null);
+    setEntryEditError(null);
+  }
+
+  async function saveEntryEdit() {
+    if (!editingEntry) return;
+    const planned = Number(entryEditValues.plannedProduction);
+    const actual = Number(entryEditValues.actualProduction);
+    const operators = Number(entryEditValues.operators);
+    const helpers = Number(entryEditValues.helpers);
+    if (
+      !Number.isFinite(planned) ||
+      !Number.isFinite(actual) ||
+      !Number.isInteger(operators) ||
+      !Number.isInteger(helpers) ||
+      planned < 0 ||
+      actual < 0 ||
+      operators < 0 ||
+      helpers < 0
+    ) {
+      setEntryEditError("Enter valid production and manpower numbers");
+      return;
+    }
+
+    setEntrySaving(true);
+    setEntryEditError(null);
+    const res = await patchJson<{ ok: boolean; error?: string }>(
+      `/api/machine-production/entries/${editingEntry.id}`,
+      {
+        currentProcess: entryEditValues.currentProcess?.trim(),
+        cableType: entryEditValues.cableType?.trim(),
+        cableSize: entryEditValues.cableSize?.trim(),
+        plannedProduction: planned,
+        actualProduction: actual,
+        operators,
+        helpers,
+        remarks: entryEditValues.remarks?.trim() || null,
+      },
+    );
+    setEntrySaving(false);
+    if (!res.ok) {
+      setEntryEditError(res.error);
+      return;
+    }
+    toast.success("Entry updated");
+    setEditingEntry(null);
+    void loadEntries();
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    const { kind, id } = pendingDelete;
+    const url =
+      kind === "entry"
+        ? `/api/machine-production/entries/${id}`
+        : kind === "machine"
+          ? `/api/machine-production/machines/${id}`
+          : kind === "process"
+            ? `/api/machine-production/processes/${id}`
+            : kind === "cableType"
+              ? `/api/machine-production/cable-types/${id}`
+              : `/api/machine-production/cable-sizes/${id}`;
+    const res = await deleteJson<{ ok: boolean; error?: string }>(url);
+    setDeleting(false);
+    if (!res.ok) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success("Deleted");
+    setPendingDelete(null);
+    if (kind === "entry") {
+      setSelected((s) => (s?.id === id ? null : s));
+      void loadEntries();
+    } else if (kind === "machine") {
+      if (editingId === id) {
+        setEditingId(null);
+        setMachineForm({ name: "" });
+      }
+      void loadMachines();
+    } else if (kind === "process") {
+      if (editingProcessId === id) resetProcessForm();
+      void loadProcesses();
+    } else if (kind === "cableType") {
+      if (editingCableTypeId === id) {
+        setEditingCableTypeId(null);
+        setCableTypeForm({ name: "" });
+      }
+      void loadCableTypes();
+    } else {
+      if (editingCableSizeId === id) {
+        setEditingCableSizeId(null);
+        setCableSizeForm({ name: "" });
+      }
+      void loadCableSizes(selectedCableTypeId);
+    }
+  }
+
   const displaySummary = tab === "records" ? summary ?? boardSummary : boardSummary ?? summary;
+
+  const shiftItems = useMemo(
+    () => [
+      { value: "", label: "All" },
+      { value: "DAY", label: "Day" },
+      { value: "NIGHT", label: "Night" },
+    ],
+    [],
+  );
+
+  const machineItems = useMemo(
+    () => [
+      { value: "", label: "All" },
+      ...machines.map((m) => ({ value: m.id, label: m.name })),
+    ],
+    [machines],
+  );
+
+  const supervisorItems = useMemo(
+    () => [
+      { value: "", label: "All" },
+      ...supervisors.map((s) => ({ value: s.id, label: s.label })),
+    ],
+    [supervisors],
+  );
+
+  const statusItems = useMemo(
+    () => [
+      { value: "", label: "All" },
+      { value: "COMPLETED", label: "Completed" },
+      { value: "PENDING", label: "Pending" },
+      { value: "OVERDUE", label: "Overdue" },
+    ],
+    [],
+  );
 
   return (
     <div className="mp-root">
@@ -592,50 +779,41 @@ export function AdminDashboard() {
                 }
               />
             </label>
-            <label>
+            <label htmlFor="mp-filter-shift">
               Shift
-              <select
+              <SelectMenu
+                id="mp-filter-shift"
                 value={filters.shift}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, shift: e.target.value }))
+                items={shiftItems}
+                placeholder="All"
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, shift: value }))
                 }
-              >
-                <option value="">All</option>
-                <option value="DAY">Day</option>
-                <option value="NIGHT">Night</option>
-              </select>
+              />
             </label>
-            <label>
+            <label htmlFor="mp-filter-machine">
               Machine
-              <select
+              <SelectMenu
+                id="mp-filter-machine"
                 value={filters.machineId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, machineId: e.target.value }))
+                items={machineItems}
+                placeholder="All"
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, machineId: value }))
                 }
-              >
-                <option value="">All</option>
-                {machines.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
-            <label>
+            <label htmlFor="mp-filter-supervisor">
               Supervisor
-              <select
+              <SelectMenu
+                id="mp-filter-supervisor"
                 value={filters.supervisorId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, supervisorId: e.target.value }))
+                items={supervisorItems}
+                placeholder="All"
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, supervisorId: value }))
                 }
-              >
-                <option value="">All</option>
-                {supervisors.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
             <label>
               Cable type
@@ -647,19 +825,17 @@ export function AdminDashboard() {
                 placeholder="Filter…"
               />
             </label>
-            <label>
+            <label htmlFor="mp-filter-status">
               Status
-              <select
+              <SelectMenu
+                id="mp-filter-status"
                 value={filters.status}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, status: e.target.value }))
+                items={statusItems}
+                placeholder="All"
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, status: value }))
                 }
-              >
-                <option value="">All</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="PENDING">Pending</option>
-                <option value="OVERDUE">Overdue</option>
-              </select>
+              />
             </label>
             <label className="mp-filters__apply">
               <span className="mp-filters__apply-spacer" aria-hidden="true">
@@ -686,6 +862,7 @@ export function AdminDashboard() {
                   <th>Actual</th>
                   <th>Eff %</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -719,11 +896,22 @@ export function AdminDashboard() {
                         {e.status}
                       </span>
                     </td>
+                    <td
+                      className="mp-table__actions"
+                      onClick={(ev) => ev.stopPropagation()}
+                    >
+                      <ReportRowActions
+                        onEdit={() => openEntryEdit(e)}
+                        onDelete={() =>
+                          setPendingDelete({ kind: "entry", id: e.id })
+                        }
+                      />
+                    </td>
                   </tr>
                 ))}
                 {entries.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={9} className="mp-muted">
+                    <td colSpan={10} className="mp-muted">
                       No records for these filters.
                     </td>
                   </tr>
@@ -802,6 +990,15 @@ export function AdminDashboard() {
                         onClick={() => void toggleActive(m)}
                       >
                         {m.isActive ? "Deactivate" : "Activate"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() =>
+                          setPendingDelete({ kind: "machine", id: m.id })
+                        }
+                      >
+                        Delete
                       </Button>
                     </td>
                   </tr>
@@ -943,6 +1140,15 @@ export function AdminDashboard() {
                       >
                         {p.isActive ? "Deactivate" : "Activate"}
                       </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() =>
+                          setPendingDelete({ kind: "process", id: p.id })
+                        }
+                      >
+                        Delete
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -1046,6 +1252,16 @@ export function AdminDashboard() {
                         >
                           {t.isActive ? "Deactivate" : "Activate"}
                         </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDelete({ kind: "cableType", id: t.id });
+                          }}
+                        >
+                          Delete
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -1145,6 +1361,15 @@ export function AdminDashboard() {
                           >
                             {s.isActive ? "Deactivate" : "Activate"}
                           </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() =>
+                              setPendingDelete({ kind: "cableSize", id: s.id })
+                            }
+                          >
+                            Delete
+                          </Button>
                         </td>
                       </tr>
                     ))
@@ -1174,13 +1399,31 @@ export function AdminDashboard() {
           >
             <div className="mp-detail__head">
               <h2>Production detail</h2>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setSelected(null)}
-              >
-                Close
-              </Button>
+              <div className="mp-detail__head-actions">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => openEntryEdit(selected)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() =>
+                    setPendingDelete({ kind: "entry", id: selected.id })
+                  }
+                >
+                  Delete
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setSelected(null)}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
             <dl className="mp-detail__grid">
               <div>
@@ -1250,6 +1493,29 @@ export function AdminDashboard() {
           </div>
         </div>
       ) : null}
+
+      <EntryEditDrawer
+        open={Boolean(editingEntry)}
+        title="Edit production entry"
+        fields={ENTRY_EDIT_FIELDS}
+        values={entryEditValues}
+        saving={entrySaving}
+        error={entryEditError}
+        onChange={(name, value) =>
+          setEntryEditValues((prev) => ({ ...prev, [name]: value }))
+        }
+        onClose={closeEntryEdit}
+        onSave={() => void saveEntryEdit()}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingDelete)}
+        deleting={deleting}
+        onNo={() => {
+          if (!deleting) setPendingDelete(null);
+        }}
+        onYes={() => void confirmDelete()}
+      />
     </div>
   );
 }

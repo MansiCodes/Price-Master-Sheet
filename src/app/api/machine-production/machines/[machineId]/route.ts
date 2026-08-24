@@ -58,3 +58,32 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     },
   });
 }
+
+export async function DELETE(_request: NextRequest, ctx: Ctx) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  if (denied) return denied;
+
+  const { machineId } = await ctx.params;
+  const existing = await prisma.machine.findUnique({
+    where: { id: machineId },
+    include: { _count: { select: { entries: true } } },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Machine not found" }, { status: 404 });
+  }
+  if (existing._count.entries > 0) {
+    return NextResponse.json(
+      {
+        error:
+          "This machine has production entries. Deactivate it instead of deleting.",
+      },
+      { status: 409 },
+    );
+  }
+
+  await prisma.machine.delete({ where: { id: machineId } });
+  return NextResponse.json({ ok: true });
+}

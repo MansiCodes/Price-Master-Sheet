@@ -11,6 +11,7 @@ export type PlantSwitcherPlant = {
   id: string;
   name: string;
   code: string;
+  rmSummary?: string;
 };
 
 type PlantSwitcherProps = {

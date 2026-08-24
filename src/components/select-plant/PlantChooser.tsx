@@ -8,6 +8,7 @@ type PlantChoice = {
   id: string;
   name: string;
   code: string;
+  rmSummary?: string;
 };
 
 type PlantChooserProps = {

@@ -47,6 +47,13 @@
   font-size: 0.95rem;
 }
 
+.select-plant-option__rm {
+  color: var(--teal-ink, #0f766e);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .select-plant-option__code {
   color: var(--fg-muted);
   font-size: 0.78rem;

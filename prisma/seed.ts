@@ -6,6 +6,7 @@ config({ path: resolve(__dirname, "../.env"), override: true });
 import { GlobalRole, ManpowerRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/db";
+import { listPlantSeeds } from "../src/lib/plant-segments";
 
 async function main() {
   const email = (
@@ -18,12 +19,7 @@ async function main() {
     throw new Error("SUPER_ADMIN_PASSWORD must be set to seed Super Admin");
   }
 
-  const PLANTS = [
-    { code: "CAT6", name: "CAT-6 Cable Plant" },
-    { code: "PVC", name: "PVC Plant" },
-    { code: "LEDROPE", name: "LED Rope Light Plant" },
-    { code: "SIGNALLING", name: "Signalling Plant" },
-  ];
+  const PLANTS = listPlantSeeds();
 
   const plants = [];
   for (const entry of PLANTS) {
@@ -36,7 +32,7 @@ async function main() {
     );
   }
 
-  const plant = plants[0]!;
+  const plant = plants.find((p) => p.code === "CAT6") ?? plants[0]!;
 
   const rateRows: { role: ManpowerRole; ratePerDay: number }[] = [
     { role: ManpowerRole.MANAGER, ratePerDay: 4000 },

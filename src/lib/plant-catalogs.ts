@@ -11,6 +11,7 @@ import {
   CAT6_SUPPLIERS,
 } from "@/lib/cat6-catalogs";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { getPlantSegment } from "@/lib/plant-segments";
 import { CAT6_STOCK_UNITS } from "@/lib/units";
 
 export const DEFAULT_PURCHASE_GOODS = CAT6_PURCHASE_GOODS;
@@ -162,6 +163,20 @@ export function getStockCatalog(plantCode: string): {
     };
   }
 
+  const segment = getPlantSegment(plantCode);
+  if (segment) {
+    const particulars = [
+      ...segment.rawMaterials.map((i) => i.name),
+      ...segment.finalProducts.map((i) => i.name),
+      "Other",
+    ];
+    return {
+      particulars,
+      defaultUnit: "KGS",
+      units: ["PCS", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"],
+    };
+  }
+
   return {
     particulars: DEFAULT_PURCHASE_GOODS,
     defaultUnit: "kg",
@@ -177,6 +192,14 @@ export function getPurchaseCatalog(plantCode: string): {
     return {
       suppliers: PVC_SUPPLIERS,
       goods: PVC_PURCHASE_GOODS,
+    };
+  }
+
+  const segment = getPlantSegment(plantCode);
+  if (segment && !isCat6Plant(plantCode)) {
+    return {
+      suppliers: DEFAULT_SUPPLIERS,
+      goods: [...segment.rawMaterials.map((i) => i.name), "Other"],
     };
   }
 
@@ -198,6 +221,10 @@ export function getSalesCatalog(plantCode: string): readonly string[] {
       "RDSO Grey",
       "Other",
     ];
+  }
+  const segment = getPlantSegment(plantCode);
+  if (segment) {
+    return [...segment.finalProducts.map((i) => i.name), "Other"];
   }
   return [
     "RDSO Black",
@@ -359,7 +386,7 @@ export function getExpenseHeadsForSection(
       ? CAT6_DIRECT_EXPENSE_HEADS
       : CAT6_INDIRECT_EXPENSE_HEADS;
   }
-  if (code === "LEDROPE" || code === "SIGNALLING") {
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
     return section === "direct"
       ? LED_DIRECT_EXPENSE_HEADS
       : LED_INDIRECT_EXPENSE_HEADS;
@@ -402,7 +429,7 @@ export function expenseSectionForPlant(
     }
     return "indirect";
   }
-  if (code === "LEDROPE" || code === "SIGNALLING") {
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
     const normalized = head.trim();
     if (
       (LED_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
@@ -423,7 +450,9 @@ export function getExpenseHeads(plantCode?: string | null): readonly string[] {
   const code = plantCode?.toUpperCase() ?? "";
   if (code === "PVC") return PVC_EXPENSE_HEADS;
   if (code === "CAT6") return CAT6_EXPENSE_HEADS;
-  if (code === "LEDROPE" || code === "SIGNALLING") return LED_EXPENSE_HEADS;
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
+    return LED_EXPENSE_HEADS;
+  }
   return DEFAULT_EXPENSE_HEADS;
 }
 

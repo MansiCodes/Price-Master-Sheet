@@ -4,17 +4,26 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
 
+export type SelectMenuItem = {
+  value: string;
+  label: string;
+};
+
 type SelectMenuProps = {
   id?: string;
   label?: string;
   value: string;
-  options: readonly string[];
+  /** Simple string options (value === label). Prefer `items` when they differ. */
+  options?: readonly string[];
+  /** Value/label pairs — use for id-backed filters (machine, supervisor, etc.). */
+  items?: readonly SelectMenuItem[];
   required?: boolean;
   disabled?: boolean;
   placeholder?: string;
@@ -34,6 +43,7 @@ export function SelectMenu({
   id,
   value,
   options,
+  items,
   required,
   disabled = false,
   placeholder = "Select…",
@@ -47,6 +57,14 @@ export function SelectMenu({
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<MenuPos | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  const resolvedItems = useMemo<SelectMenuItem[]>(() => {
+    if (items) return [...items];
+    return (options ?? []).map((opt) => ({ value: opt, label: opt }));
+  }, [items, options]);
+
+  const selectedLabel =
+    resolvedItems.find((opt) => opt.value === value)?.label ?? "";
 
   useEffect(() => {
     setMounted(true);
@@ -64,7 +82,7 @@ export function SelectMenu({
     setPos({
       top: openUp ? rect.top - gap : rect.bottom + gap,
       left: rect.left,
-      width: rect.width,
+      width: Math.max(rect.width, 180),
       maxHeight,
       openUp,
     });
@@ -143,16 +161,21 @@ export function SelectMenu({
               zIndex: 200,
             }}
           >
-            {options.map((opt) => {
-              const selected = opt === value;
-              const label = opt === "" ? placeholder : opt;
+            {resolvedItems.map((opt) => {
+              const selected = opt.value === value;
+              const label =
+                opt.label === "" && opt.value === "" ? placeholder : opt.label;
               return (
-                <li key={opt || "__blank__"} role="option" aria-selected={selected}>
+                <li
+                  key={opt.value === "" ? "__blank__" : opt.value}
+                  role="option"
+                  aria-selected={selected}
+                >
                   <button
                     type="button"
                     className={`select-menu__option${selected ? " is-selected" : ""}`}
                     onClick={() => {
-                      onChange(opt);
+                      onChange(opt.value);
                       setOpen(false);
                     }}
                   >
@@ -198,8 +221,10 @@ export function SelectMenu({
         }}
         onKeyDown={onTriggerKey}
       >
-        <span className={`select-menu__value${!value ? " is-placeholder" : ""}`}>
-          {value || placeholder}
+        <span
+          className={`select-menu__value${!selectedLabel ? " is-placeholder" : ""}`}
+        >
+          {selectedLabel || placeholder}
         </span>
         <span className="select-menu__chevron" aria-hidden>
           ▾

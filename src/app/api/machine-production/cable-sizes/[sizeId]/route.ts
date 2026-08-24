@@ -75,3 +75,22 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     },
   });
 }
+
+export async function DELETE(_request: NextRequest, ctx: Ctx) {
+  const session = await requireSession();
+  if ("error" in session) return session.error;
+
+  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  if (denied) return denied;
+
+  const { sizeId } = await ctx.params;
+  const existing = await prisma.machineCableSize.findUnique({
+    where: { id: sizeId },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Cable size not found" }, { status: 404 });
+  }
+
+  await prisma.machineCableSize.delete({ where: { id: sizeId } });
+  return NextResponse.json({ ok: true });
+}

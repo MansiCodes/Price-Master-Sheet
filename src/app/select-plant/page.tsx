@@ -8,6 +8,7 @@ import {
   isSuperAdmin,
 } from "@/lib/rbac";
 import { setSelectedPlantCookie } from "@/lib/selected-plant";
+import { getPlantRmSummary, getPlantSegment } from "@/lib/plant-segments";
 import { PlantChooser } from "@/components/select-plant/PlantChooser";
 import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
 import "@/components/select-plant/plant-chooser.css";
@@ -27,14 +28,21 @@ export default async function SelectPlantPage() {
   }
 
   const plantIds = await getAccessiblePlantIds(user.id);
-  const plants =
+  const plantsRaw =
     plantIds.length > 0
       ? await prisma.plant.findMany({
           where: { id: { in: plantIds }, isActive: true },
-          orderBy: { name: "asc" },
           select: { id: true, name: true, code: true },
         })
       : [];
+
+  const plants = plantsRaw
+    .map((p) => ({
+      ...p,
+      rmSummary: getPlantRmSummary(p.code),
+      sortOrder: getPlantSegment(p.code)?.sortOrder ?? 99,
+    }))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
   if (plants.length === 1) {
     const targetId = plants[0].id;
