@@ -142,6 +142,66 @@
   border-color: transparent;
 }
 
+/* MP Admin: tabs + counts on one row (desktop); tabs 2-up on mobile */
+.mp-admin-top {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.mp-admin-top .mp-shift-tabs--admin {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+.mp-admin-top .mp-counts--admin {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.mp-shift-tabs--admin {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  width: auto;
+  max-width: 100%;
+}
+
+.mp-shift-tabs--admin .mp-shift-tab {
+  flex: 0 0 auto;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .mp-admin-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mp-admin-top .mp-counts--admin {
+    justify-content: flex-start;
+  }
+
+  .mp-shift-tabs--admin {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .mp-shift-tabs--admin .mp-shift-tab {
+    width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    line-height: 1.2;
+    padding: 0.5rem 0.65rem;
+  }
+}
+
 .mp-toolbar {
   display: flex;
   flex-wrap: nowrap;

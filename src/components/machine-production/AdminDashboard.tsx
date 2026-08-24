@@ -690,74 +690,78 @@ export function AdminDashboard() {
 
   return (
     <div className="mp-root">
-      <div className="mp-shift-tabs">
-        <button
-          type="button"
-          className={
-            tab === "records"
-              ? "mp-shift-tab mp-shift-tab--active"
-              : "mp-shift-tab"
-          }
-          onClick={() => setTab("records")}
-        >
-          Production records
-        </button>
-        <button
-          type="button"
-          className={
-            tab === "machines"
-              ? "mp-shift-tab mp-shift-tab--active"
-              : "mp-shift-tab"
-          }
-          onClick={() => setTab("machines")}
-        >
-          Machines
-        </button>
-        <button
-          type="button"
-          className={
-            tab === "processes"
-              ? "mp-shift-tab mp-shift-tab--active"
-              : "mp-shift-tab"
-          }
-          onClick={() => setTab("processes")}
-        >
-          Processes
-        </button>
-        <button
-          type="button"
-          className={
-            tab === "cable" ? "mp-shift-tab mp-shift-tab--active" : "mp-shift-tab"
-          }
-          onClick={() => setTab("cable")}
-        >
-          Cable type & size
-        </button>
+      <div className="mp-admin-top">
+        <div className="mp-shift-tabs mp-shift-tabs--admin">
+          <button
+            type="button"
+            className={
+              tab === "records"
+                ? "mp-shift-tab mp-shift-tab--active"
+                : "mp-shift-tab"
+            }
+            onClick={() => setTab("records")}
+          >
+            Production records
+          </button>
+          <button
+            type="button"
+            className={
+              tab === "machines"
+                ? "mp-shift-tab mp-shift-tab--active"
+                : "mp-shift-tab"
+            }
+            onClick={() => setTab("machines")}
+          >
+            Machines
+          </button>
+          <button
+            type="button"
+            className={
+              tab === "processes"
+                ? "mp-shift-tab mp-shift-tab--active"
+                : "mp-shift-tab"
+            }
+            onClick={() => setTab("processes")}
+          >
+            Processes
+          </button>
+          <button
+            type="button"
+            className={
+              tab === "cable"
+                ? "mp-shift-tab mp-shift-tab--active"
+                : "mp-shift-tab"
+            }
+            onClick={() => setTab("cable")}
+          >
+            Cable type & size
+          </button>
+        </div>
+
+        {tab === "records" && displaySummary ? (
+          <div className="mp-counts mp-counts--admin">
+            <span className="mp-count">Total {displaySummary.total}</span>
+            <span className="mp-count mp-count--ok">
+              Completed {displaySummary.completed}
+            </span>
+            <span className="mp-count mp-count--pending">
+              Pending {displaySummary.pending}
+            </span>
+            <span className="mp-count mp-count--overdue">
+              Overdue {displaySummary.overdue}
+            </span>
+            <span className="mp-count">
+              Actual {displaySummary.actualProduction}
+            </span>
+            <span className="mp-count">
+              Avg eff {displaySummary.averageEfficiency}%
+            </span>
+          </div>
+        ) : null}
       </div>
 
       {tab === "records" ? (
         <>
-          {displaySummary ? (
-            <div className="mp-counts">
-              <span className="mp-count">Total {displaySummary.total}</span>
-              <span className="mp-count mp-count--ok">
-                Completed {displaySummary.completed}
-              </span>
-              <span className="mp-count mp-count--pending">
-                Pending {displaySummary.pending}
-              </span>
-              <span className="mp-count mp-count--overdue">
-                Overdue {displaySummary.overdue}
-              </span>
-              <span className="mp-count">
-                Actual {displaySummary.actualProduction}
-              </span>
-              <span className="mp-count">
-                Avg eff {displaySummary.averageEfficiency}%
-              </span>
-            </div>
-          ) : null}
-
           <div className="mp-filters">
             <label>
               From
