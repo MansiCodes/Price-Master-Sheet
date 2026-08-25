@@ -67,13 +67,8 @@ export function PurchaseReport({
   const [purchaseView, setPurchaseView] = useState<"vendor" | "atcl">("vendor");
   const baseUrl =
     `/api/plants/${plantId}/purchases?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` +
-    (isPvc
-      ? purchaseView === "atcl"
-        ? "&atclOnly=1"
-        : "&excludeAtcl=1"
-      : cat6
-        ? "&excludeAtc=1"
-        : "");
+    (purchaseView === "atcl" ? "&atclOnly=1" : "&excludeAtcl=1") +
+    (cat6 && purchaseView === "vendor" ? "&excludeAtc=1" : "");
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<PurchaseRow>(baseUrl, t("failedPurchase"));
   const totals = response?.totals as
@@ -327,47 +322,43 @@ export function PurchaseReport({
 
   const columnsToUse = cat6
     ? cat6Columns
-    : isPvc && purchaseView === "atcl"
+    : purchaseView === "atcl"
       ? atclColumns
       : pvcColumns;
 
   return (
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">
-        {isPvc
-          ? purchaseView === "atcl"
-            ? "Inward Stock from ATCL"
-            : t("purchaseTitle")
+        {purchaseView === "atcl"
+          ? "Stock Taken from ATCL"
           : t("purchaseTitle")}
       </h3>
-      {isPvc ? (
-        <div className="pnl-expense-subnav" role="tablist" aria-label="Purchase type">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={purchaseView === "vendor"}
-            className={purchaseView === "vendor" ? "is-active" : ""}
-            onClick={() => {
-              setPurchaseView("vendor");
-              setPage(1);
-            }}
-          >
-            Vendor purchase
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={purchaseView === "atcl"}
-            className={purchaseView === "atcl" ? "is-active" : ""}
-            onClick={() => {
-              setPurchaseView("atcl");
-              setPage(1);
-            }}
-          >
-            Stock from ATCL
-          </button>
-        </div>
-      ) : null}
+      <div className="pnl-expense-subnav" role="tablist" aria-label="Purchase type">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={purchaseView === "vendor"}
+          className={purchaseView === "vendor" ? "is-active" : ""}
+          onClick={() => {
+            setPurchaseView("vendor");
+            setPage(1);
+          }}
+        >
+          Purchase from Vendor
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={purchaseView === "atcl"}
+          className={purchaseView === "atcl" ? "is-active" : ""}
+          onClick={() => {
+            setPurchaseView("atcl");
+            setPage(1);
+          }}
+        >
+          Stock Taken from ATCL
+        </button>
+      </div>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[...columnsToUse, actionCol]}

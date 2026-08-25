@@ -731,10 +731,8 @@ textarea {
     font-size: 0.78rem;
   }
 
-  /* Language lives in the mobile menu instead, keeping the bar uncrowded. */
-  .dash-header .lang-switch {
-    display: none;
-  }
+  /* Phone only: language moves into the menu. Tablet keeps Eng/हि in the navbar. */
+  /* (lang-switch hide is in a tighter breakpoint below) */
 
   .dash-header__logout:hover,
   .dash-header__logout:active,
@@ -795,6 +793,13 @@ textarea {
   .dash-mobile-nav__panel .dash-sidebar__user {
     margin: 0 0.55rem calc(0.55rem + env(safe-area-inset-bottom));
     padding: 0.5rem 0.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Language lives in the mobile menu instead, keeping the bar uncrowded. */
+  .dash-header .lang-switch {
+    display: none;
   }
 }
 

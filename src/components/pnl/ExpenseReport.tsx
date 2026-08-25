@@ -12,14 +12,20 @@ import { isCat6Plant } from "@/lib/plant-layout";
 import {
   PVC_EXPENSE_SECTIONS,
   cat6ExpensePnlLine,
+  expenseHeadLabelLines,
+  expenseHeadTabLabel,
   getExpenseHeadsForSection,
+  normalizePvcExpenseHead,
   pvcExpensePnlLine,
+  upcastExpensePnlLine,
+  UPCAST_MISC_NATURES,
   usesExpenseSections,
   type PvcExpenseSection,
 } from "@/lib/plant-catalogs";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { FixedAssetsReport } from "@/components/pnl/FixedAssetsReport";
 
 type ExpenseRow = {
   id: string;
@@ -79,6 +85,7 @@ export function ExpenseReport({
   const tCommon = useTranslations("common");
   const cat6 = isCat6Plant(plantCode);
   const pvc = plantCode?.toUpperCase() === "PVC";
+  const upcast = plantCode?.toUpperCase() === "UPCAST";
   const usesSections = usesExpenseSections(plantCode);
 
   const [section, setSection] = useState<PvcExpenseSection>("direct");
@@ -92,17 +99,31 @@ export function ExpenseReport({
       "Petty Cash",
   );
   const isPettyCategory = category === "Petty Cash";
+  const isFarCategory = normalizePvcExpenseHead(category) === "FAR";
+  const isUpcastMiscCategory = upcast && category === "Miscellaneous";
 
   const baseUrl = isPettyCategory
     ? `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH` +
       `&from=${encodeURIComponent(from)}` +
       `&to=${encodeURIComponent(to)}`
-    : `/api/plants/${plantId}/petty-cash?entryType=EXPENSE` +
-      `&from=${encodeURIComponent(from)}` +
-      `&to=${encodeURIComponent(to)}` +
-      `&expenseHead=${encodeURIComponent(category)}`;
+    : isUpcastMiscCategory
+      ? `/api/plants/${plantId}/petty-cash?` +
+        `from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&expenseHeads=${encodeURIComponent(UPCAST_MISC_NATURES.join(","))}`
+      : upcast
+      ? `/api/plants/${plantId}/petty-cash?` +
+        `from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&expenseHead=${encodeURIComponent(category)}`
+      : `/api/plants/${plantId}/petty-cash?entryType=EXPENSE` +
+        `&from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&expenseHead=${encodeURIComponent(category)}`;
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
-    usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"));
+    usePaginatedReport<ExpenseRow>(baseUrl, t("failedExpenses"), undefined, {
+      enabled: !isFarCategory,
+    });
   const totals = response?.totals as
     | { total?: number; expenses?: number }
     | undefined;
@@ -159,7 +180,7 @@ export function ExpenseReport({
               ),
             },
           ]
-        : pvc
+        : pvc || upcast
           ? [
               {
                 key: "s",
@@ -174,7 +195,10 @@ export function ExpenseReport({
                 key: "pnlLine",
                 label: "P&L Line",
                 wrap: true,
-                render: (r) => pvcExpensePnlLine(r.expenseHead),
+                render: (r) =>
+                  upcast
+                    ? upcastExpensePnlLine(r.expenseHead)
+                    : pvcExpensePnlLine(r.expenseHead),
               },
               {
                 key: "desc",
@@ -234,7 +258,7 @@ export function ExpenseReport({
                 ),
               },
             ],
-    [cat6, pvc, page, pageSize, t, tCommon],
+    [cat6, pvc, upcast, page, pageSize, t, tCommon],
   );
 
   function onSectionChange(next: PvcExpenseSection) {
@@ -283,21 +307,44 @@ export function ExpenseReport({
                   : "Indirect expense types"
               }
             >
-              {sectionHeads.map((head) => (
-                <button
-                  key={head}
-                  type="button"
-                  role="tab"
-                  aria-selected={category === head}
-                  className={category === head ? "is-active" : undefined}
-                  onClick={() => {
-                    setCategory(head);
-                    setPage(1);
-                  }}
-                >
-                  {head}
-                </button>
-              ))}
+              {sectionHeads.map((head) => {
+                const lines = expenseHeadLabelLines(head);
+                const shortLabel = expenseHeadTabLabel(head);
+                return (
+                  <button
+                    key={head}
+                    type="button"
+                    role="tab"
+                    aria-label={head}
+                    title={head}
+                    aria-selected={category === head}
+                    className={category === head ? "is-active" : undefined}
+                    onClick={() => {
+                      setCategory(head);
+                      setPage(1);
+                    }}
+                  >
+                    {lines ? (
+                      <>
+                        <span className="pnl-expense-cat-label--full">{head}</span>
+                        <span className="pnl-expense-cat-label--stacked pnl-tab-nav__stacked">
+                          <span>{lines[0]}</span>
+                          <span>{lines[1]}</span>
+                        </span>
+                      </>
+                    ) : shortLabel !== head ? (
+                      <>
+                        <span className="pnl-expense-cat-label--full">{head}</span>
+                        <span className="pnl-expense-cat-label--short">
+                          {shortLabel}
+                        </span>
+                      </>
+                    ) : (
+                      head
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="pnl-expense-empty-hint">No categories in this section.</p>
@@ -305,83 +352,106 @@ export function ExpenseReport({
         </div>
       ) : null}
 
-      {error ? <div className="alert alert--error">{error}</div> : null}
-      <ReportTable
-        columns={[
-          ...columns,
-          {
-            key: "actions",
-            label: "Actions",
-            compact: true,
-            render: (r) => (
-              <ReportRowActions
-                onEdit={() =>
-                  crud.openEdit(r, {
-                    date: toYmd(r.date),
-                    expenseHead: r.expenseHead ?? "",
-                    description: r.description ?? "",
-                    amount: String(r.amount ?? ""),
-                    contractorSalary: String(r.contractorSalary ?? "0"),
-                    supervisorSalary: String(r.supervisorSalary ?? "0"),
-                    ...(isPettyCategory
-                      ? {
-                          payMode: r.payMode ?? "",
-                          nature: r.nature ?? "",
-                          location: r.location ?? "",
-                          billNumber: r.billNumber ?? "",
-                        }
-                      : {}),
-                  })
-                }
-                onDelete={() => void crud.remove(r.id)}
-              />
-            ),
-          },
-        ]}
-        rows={sectionHeads.length === 0 ? [] : rows}
-        loading={loading}
-        emptyLabel={t("noRecords")}
-        variant={pvc || cat6 ? "register" : undefined}
-        footer={
-          totals && rows.length > 0 && sectionHeads.length > 0
-            ? cat6
-              ? { s: "TOTAL", amount: formatINR(totals.total ?? 0) }
-              : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
-            : undefined
-        }
-      />
-      {sectionHeads.length > 0 ? (
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-          onPageSizeChange={setPageSize}
-        />
+      {error && !isFarCategory ? (
+        <div className="alert alert--error">{error}</div>
       ) : null}
-      <EntryEditDrawer
-        open={Boolean(crud.editing)}
-        title="Edit expense"
-        fields={[
-          { name: "date", label: cat6 ? "Months" : "Date", type: "date", required: true },
-          { name: "expenseHead", label: t("category"), required: true },
-          { name: "description", label: cat6 ? "Remarks" : t("remarksNotes"), type: "textarea" },
-          { name: "amount", label: cat6 ? "Salary Amt" : t("amount"), type: "number", required: true },
-        ]}
-        values={crud.values}
-        saving={crud.saving}
-        error={crud.error}
-        onChange={crud.setField}
-        onClose={crud.closeEdit}
-        onSave={() =>
-          void crud.save({
-            date: crud.values.date,
-            expenseHead: crud.values.expenseHead,
-            description: crud.values.description || null,
-            amount: Number(crud.values.amount),
-          })
-        }
-      />
+
+      {isFarCategory ? (
+        <FixedAssetsReport plantId={plantId} from={from} to={to} />
+      ) : (
+        <>
+          <ReportTable
+            columns={[
+              ...columns,
+              {
+                key: "actions",
+                label: "Actions",
+                compact: true,
+                render: (r) => (
+                  <ReportRowActions
+                    onEdit={() =>
+                      crud.openEdit(r, {
+                        date: toYmd(r.date),
+                        expenseHead: r.expenseHead ?? "",
+                        description: r.description ?? "",
+                        amount: String(r.amount ?? ""),
+                        contractorSalary: String(r.contractorSalary ?? "0"),
+                        supervisorSalary: String(r.supervisorSalary ?? "0"),
+                        ...(isPettyCategory
+                          ? {
+                              payMode: r.payMode ?? "",
+                              nature: r.nature ?? "",
+                              location: r.location ?? "",
+                              billNumber: r.billNumber ?? "",
+                            }
+                          : {}),
+                      })
+                    }
+                    onDelete={() => void crud.remove(r.id)}
+                  />
+                ),
+              },
+            ]}
+            rows={sectionHeads.length === 0 ? [] : rows}
+            loading={loading}
+            emptyLabel={t("noRecords")}
+            variant={pvc || cat6 ? "register" : undefined}
+            footer={
+              totals && rows.length > 0 && sectionHeads.length > 0
+                ? cat6
+                  ? { s: "TOTAL", amount: formatINR(totals.total ?? 0) }
+                  : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
+                : undefined
+            }
+          />
+          {sectionHeads.length > 0 ? (
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          ) : null}
+          <EntryEditDrawer
+            open={Boolean(crud.editing)}
+            title="Edit expense"
+            fields={[
+              {
+                name: "date",
+                label: cat6 ? "Months" : "Date",
+                type: "date",
+                required: true,
+              },
+              { name: "expenseHead", label: t("category"), required: true },
+              {
+                name: "description",
+                label: cat6 ? "Remarks" : t("remarksNotes"),
+                type: "textarea",
+              },
+              {
+                name: "amount",
+                label: cat6 ? "Salary Amt" : t("amount"),
+                type: "number",
+                required: true,
+              },
+            ]}
+            values={crud.values}
+            saving={crud.saving}
+            error={crud.error}
+            onChange={crud.setField}
+            onClose={crud.closeEdit}
+            onSave={() =>
+              void crud.save({
+                date: crud.values.date,
+                expenseHead: crud.values.expenseHead,
+                description: crud.values.description || null,
+                amount: Number(crud.values.amount),
+              })
+            }
+          />
+        </>
+      )}
       {crud.deleteDialog}
     </section>
   );

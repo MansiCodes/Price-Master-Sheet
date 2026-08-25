@@ -64,7 +64,7 @@ export function AppShell({
 
   /** Top hamburger: desktop collapses sidebar; mobile opens drawer. */
   const onHeaderMenu = useCallback(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 900px)").matches) {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 880px)").matches) {
       setMobileOpen(true);
       return;
     }

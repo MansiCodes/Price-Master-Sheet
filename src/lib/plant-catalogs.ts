@@ -163,6 +163,23 @@ export function getStockCatalog(plantCode: string): {
     };
   }
 
+  if (plantCode.toUpperCase() === "UPCAST") {
+    return {
+      particulars: [
+        "DORI",
+        "STRIP",
+        "RASSA",
+        "PIPE",
+        "Copper Cathode",
+        "Copper Scrap / Burr",
+        "CC Copper Rod 8 mm",
+        "Other",
+      ],
+      defaultUnit: "KGS",
+      units: ["KGS", "PCS", "NOS", "MT"],
+    };
+  }
+
   const segment = getPlantSegment(plantCode);
   if (segment) {
     const particulars = [
@@ -308,7 +325,7 @@ export const PVC_DIRECT_EXPENSE_HEADS = [
 export const PVC_INDIRECT_EXPENSE_HEADS = [
   "Petty Cash",
   "Salary Expenses",
-  "Depreciation (FAR)",
+  "FAR",
   "Financial Cost",
   "Factory Rent",
   "Transport",
@@ -328,11 +345,17 @@ export const PVC_LEGACY_EXPENSE_HEADS = PVC_EXPENSE_HEADS;
  * Direct Petty Cash → P&L PETTY CASH EXP (trading / direct side).
  * Direct Other / Indirect Salary & Wages / Miscellaneous → WAGES & SALARY EXP.
  */
-export const CAT6_DIRECT_EXPENSE_HEADS = ["Petty Cash", "Other"] as const;
+export const CAT6_DIRECT_EXPENSE_HEADS = [
+  "Electricity",
+  "Petty Cash",
+  "Other",
+] as const;
 
 export const CAT6_INDIRECT_EXPENSE_HEADS = [
   "Salary & Wages",
   "Miscellaneous",
+  "FAR",
+  "Factory Rent",
 ] as const;
 
 export const CAT6_EXPENSE_HEADS = [
@@ -340,18 +363,60 @@ export const CAT6_EXPENSE_HEADS = [
   ...CAT6_INDIRECT_EXPENSE_HEADS,
 ] as const;
 
-/** LED Rope — same Direct/Indirect pattern as other plants. */
-export const LED_DIRECT_EXPENSE_HEADS = ["Other"] as const;
+/** LED Rope — Direct/Indirect; Electricity + Rent aligned with PVC-style plants. */
+export const LED_DIRECT_EXPENSE_HEADS = [
+  "Electricity",
+  "Other",
+] as const;
 
 export const LED_INDIRECT_EXPENSE_HEADS = [
   "Salary & Wages",
   "Miscellaneous",
+  "FAR",
+  "Factory Rent",
 ] as const;
 
 export const LED_EXPENSE_HEADS = [
   ...LED_DIRECT_EXPENSE_HEADS,
   ...LED_INDIRECT_EXPENSE_HEADS,
 ] as const;
+
+/**
+ * Upcast expense UI: Electricity / Rent like PVC, plus Misc natures from Excel.
+ * P&L still breaks Misc natures into Excel lines (Consultancy, Consumable, …).
+ */
+export const UPCAST_DIRECT_EXPENSE_HEADS = [
+  "Electricity",
+  "Unloading of MT",
+  "Contractor Wages",
+  "Miscellaneous",
+] as const;
+
+export const UPCAST_INDIRECT_EXPENSE_HEADS = [
+  "Salary Expenses",
+  "FAR",
+  "Financial Cost",
+  "Factory Rent",
+] as const;
+
+export const UPCAST_EXPENSE_HEADS = [
+  ...UPCAST_DIRECT_EXPENSE_HEADS,
+  ...UPCAST_INDIRECT_EXPENSE_HEADS,
+] as const;
+
+/** Excel Misc Exp. factory natures → P&L DIRECT lines (entered via Miscellaneous). */
+export const UPCAST_MISC_NATURES = [
+  "Consultancy Exp.",
+  "Consumable Item",
+  "Freight & Others",
+  "Maintenance Item",
+  "Travelling Charges",
+  "Welfare Charges",
+  "Other Charges",
+] as const;
+
+/** @deprecated use UPCAST_MISC_NATURES */
+export const UPCAST_MISC_DIRECT_HEADS = UPCAST_MISC_NATURES;
 
 /** @deprecated prefer plant-specific heads / getExpenseHeadsForSection */
 export const DEFAULT_EXPENSE_HEADS = CAT6_EXPENSE_HEADS;
@@ -386,7 +451,12 @@ export function getExpenseHeadsForSection(
       ? CAT6_DIRECT_EXPENSE_HEADS
       : CAT6_INDIRECT_EXPENSE_HEADS;
   }
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
+  if (code === "UPCAST") {
+    return section === "direct"
+      ? UPCAST_DIRECT_EXPENSE_HEADS
+      : UPCAST_INDIRECT_EXPENSE_HEADS;
+  }
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
     return section === "direct"
       ? LED_DIRECT_EXPENSE_HEADS
       : LED_INDIRECT_EXPENSE_HEADS;
@@ -419,9 +489,15 @@ export function expenseSectionForPlant(
   head: string,
 ): PvcExpenseSection {
   const code = plantCode?.toUpperCase() ?? "";
+  const normalized = head.trim();
+  if (
+    normalizePvcExpenseHead(normalized) === "FAR" ||
+    normalized === "Financial Cost"
+  ) {
+    return "indirect";
+  }
   if (code === "PVC") return pvcExpenseSection(head);
   if (code === "CAT6") {
-    const normalized = head.trim();
     if (
       (CAT6_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
     ) {
@@ -429,8 +505,17 @@ export function expenseSectionForPlant(
     }
     return "indirect";
   }
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
-    const normalized = head.trim();
+  if (code === "UPCAST") {
+    const upcastHead = normalizeUpcastExpenseHead(normalized);
+    if (
+      (UPCAST_DIRECT_EXPENSE_HEADS as readonly string[]).includes(upcastHead) ||
+      (UPCAST_MISC_NATURES as readonly string[]).includes(upcastHead)
+    ) {
+      return "direct";
+    }
+    return "indirect";
+  }
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
     if (
       (LED_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
     ) {
@@ -450,7 +535,8 @@ export function getExpenseHeads(plantCode?: string | null): readonly string[] {
   const code = plantCode?.toUpperCase() ?? "";
   if (code === "PVC") return PVC_EXPENSE_HEADS;
   if (code === "CAT6") return CAT6_EXPENSE_HEADS;
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "UPCAST" || code === "SLSSL" || code === "QUAD") {
+  if (code === "UPCAST") return UPCAST_EXPENSE_HEADS;
+  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
     return LED_EXPENSE_HEADS;
   }
   return DEFAULT_EXPENSE_HEADS;
@@ -465,7 +551,6 @@ export function pvcExpensePnlLine(head: string): string {
     case "Factory Rent":
       return "FACTORY RENT";
     case "FAR":
-    case "Depreciation (FAR)":
       return "DEPRECIATION";
     case "Financial Cost":
       return "FINANCIAL COST";
@@ -493,13 +578,21 @@ export function pvcExpensePnlLine(head: string): string {
 
 /** CAT-6 expense → P&L line. */
 export function cat6ExpensePnlLine(head: string): string {
-  switch (head.trim()) {
+  switch (normalizePvcExpenseHead(head)) {
     case "Petty Cash":
       return "PETTY CASH EXP";
+    case "FAR":
+      return "DEPRECIATION";
+    case "Financial Cost":
+      return "FINANCIAL COST";
+    case "Electricity":
+    case "Fuel & Power":
+      return "FUEL & POWER EXP";
+    case "Factory Rent":
+      return "FACTORY RENT";
     case "Other":
     case "Salary & Wages":
     case "Miscellaneous":
-    case "Electricity":
     case "Transport":
     case "Maintenance":
     case "Office":
@@ -509,13 +602,111 @@ export function cat6ExpensePnlLine(head: string): string {
   }
 }
 
+/** Short tab label for dense expense category bars (full name stays in aria-label). */
+export function expenseHeadTabLabel(head: string): string {
+  if (head === "Miscellaneous") return "Misc.";
+  return head;
+}
+
+/** Split long expense category labels onto two lines for dense tab bars. */
+export function expenseHeadLabelLines(head: string): [string, string] | null {
+  if (head.trim() === "Miscellaneous") return null;
+  const parts = head.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return null;
+  if (parts.length === 2) return [parts[0], parts[1]];
+  if (parts.length === 3 && parts[1] === "&") {
+    return [`${parts[0]} &`, parts[2]];
+  }
+  if (parts.length === 3) {
+    return [parts[0], `${parts[1]} ${parts[2]}`];
+  }
+  const mid = Math.ceil(parts.length / 2);
+  return [parts.slice(0, mid).join(" "), parts.slice(mid).join(" ")];
+}
+
 /** Normalize legacy expense labels to current catalog names. */
 export function normalizePvcExpenseHead(head: string): string {
   const h = head.trim();
-  if (h === "Electricity") return "Fuel & Power";
-  if (h === "FAR") return "Depreciation (FAR)";
+  if (h === "Electricity" || h === "Fuel & Power") return "Fuel & Power";
+  if (h === "Depreciation (FAR)" || h === "Depreciation") return "FAR";
   if (h === "Unloading MT") return "Unloading of MT";
+  if (h === "Rent") return "Factory Rent";
   return h;
+}
+
+/** Normalize Upcast Misc / Excel natures to catalog expense heads. */
+export function normalizeUpcastExpenseHead(head: string): string {
+  const h = head.replace(/\s+/g, " ").trim();
+  const key = h.toUpperCase();
+  const map: Record<string, string> = {
+    ELECTRICITY: "Electricity",
+    "FUEL & POWER": "Electricity",
+    "FUEL & POWER EXP.": "Electricity",
+    "FUEL & POWER EXP": "Electricity",
+    "UNLOADING OF MT": "Unloading of MT",
+    "UNLOADING MT": "Unloading of MT",
+    "UNLOADING EXP.": "Unloading of MT",
+    "UNLOADING EXP": "Unloading of MT",
+    "CONTRACTOR WAGES": "Contractor Wages",
+    "LABOUR CONTRACTOR": "Contractor Wages",
+    "CONSULTANCY EXP.": "Consultancy Exp.",
+    "CONSULTANCY EXP": "Consultancy Exp.",
+    "CONSUMABLE ITEM": "Consumable Item",
+    "FREIGHT & OTHERS": "Freight & Others",
+    "MAINTENANCE ITEM": "Maintenance Item",
+    "TRAVELLING CHARGES": "Travelling Charges",
+    "WELFARE CHARGES": "Welfare Charges",
+    "OTHER CHARGES": "Other Charges",
+    "SALARY EXPNES": "Salary Expenses",
+    "SALARY EXPENSE": "Salary Expenses",
+    "SALARY EXPENSES": "Salary Expenses",
+    "FACTORY RENT": "Factory Rent",
+    FAR: "FAR",
+    "DEPRECIATION (FAR)": "FAR",
+    DEPRECIATION: "FAR",
+    "FINANCIAL COST": "Financial Cost",
+  };
+  return map[key] ?? h;
+}
+
+/** Upcast expense category → P&L line label (Excel wording). */
+export function upcastExpensePnlLine(head: string): string {
+  switch (normalizeUpcastExpenseHead(head)) {
+    case "Fuel & Power":
+    case "Electricity":
+      return "FUEL & POWER EXP.";
+    case "Unloading of MT":
+      return "UNLOADING EXP.";
+    case "Contractor Wages":
+      return "CONTRACTOR WAGES";
+    case "Consultancy Exp.":
+      return "CONSULTANCY EXP.";
+    case "Consumable Item":
+      return "CONSUMABLE ITEM";
+    case "Freight & Others":
+      return "FREIGHT & OTHERS";
+    case "Maintenance Item":
+      return "MAINTENANCE ITEM";
+    case "Travelling Charges":
+      return "TRAVELLING CHARGES";
+    case "Welfare Charges":
+      return "WELFARE CHARGES";
+    case "Other Charges":
+      return "OTHER CHARGES";
+    case "Miscellaneous":
+      return "MISCELLANEOUS EXP.";
+    case "Salary Expenses":
+      return "SALARY EXPENSES";
+    case "FAR":
+      return "DEPRECIATION";
+    case "Financial Cost":
+      return "FINANCIAL COST";
+    case "Factory Rent":
+    case "Rent":
+      return "FACTORY RENT";
+    default:
+      return head.trim().toUpperCase();
+  }
 }
 
 /** ATCL inward stock is captured in Purchase (Excel Inward Stock Register). */

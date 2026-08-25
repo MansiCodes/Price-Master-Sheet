@@ -68,12 +68,20 @@ export async function GET(
 
   const ownOnly = !isAdminOrHead(session.user.globalRole);
   const expenseHead = sp.get("expenseHead")?.trim() || null;
+  const expenseHeads = (sp.get("expenseHeads") ?? "")
+    .split(",")
+    .map((h) => h.trim())
+    .filter(Boolean);
   const where = {
     plantId,
     ...(ownOnly ? { enteredById: session.user.id } : {}),
     ...filter,
     ...(entryType ? { entryType } : {}),
-    ...(expenseHead ? { expenseHead } : {}),
+    ...(expenseHeads.length > 0
+      ? { expenseHead: { in: expenseHeads } }
+      : expenseHead
+        ? { expenseHead }
+        : {}),
   };
   const [entries, aggregate] = await Promise.all([
     prisma.pettyCashEntry.findMany({

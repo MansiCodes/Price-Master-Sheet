@@ -10,9 +10,53 @@
   overflow-x: clip;
 }
 
+.pnl-reports__header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .pnl-reports__plant-block {
   display: grid;
   gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* Desktop/tablet: PDF sits with From/To. Mobile: PDF next to plant name. */
+.pnl-reports__export--mobile {
+  display: none;
+}
+
+.pnl-reports__export--desktop {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.pnl-reports__header .pnl-export-btn,
+.pnl-reports__actions .pnl-export-btn,
+.pnl-export-btn--compact {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.3rem !important;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  width: fit-content !important;
+  max-width: fit-content !important;
+  min-width: 0 !important;
+  height: 2.1rem !important;
+  padding: 0 0.7rem !important;
+  margin: 0 !important;
+  border-radius: 10px !important;
+  box-sizing: border-box !important;
 }
 
 .pnl-reports__plant {
@@ -31,8 +75,9 @@
 
 .pnl-reports__toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.65rem;
   width: 100%;
   max-width: 100%;
@@ -40,21 +85,30 @@
 }
 
 .pnl-reports__tabs {
-  flex: 1 1 28rem;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: visible;
 }
 
+/* Desktop/tablet: tabs + From/To + Export on one row */
 .pnl-reports__actions {
   display: flex;
+  flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.55rem;
-  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex: 0 1 auto;
   width: auto;
+  max-width: 100%;
   min-width: 0;
-  margin-left: 0;
+}
+
+.pnl-reports__actions .pnl-date-filter {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .pnl-reports__body {
@@ -107,6 +161,9 @@
   gap: 0.65rem;
   margin-bottom: 0.85rem;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* Separate pill buttons with border and teal gradient selection */
@@ -119,7 +176,7 @@
   max-width: 100%;
 }
 
-/* Separate pill buttons with border and teal gradient selection (2-button bars) */
+/* Direct / Indirect — pill size matches label text (desktop/tablet) */
 .pnl-expense-type-nav,
 .pnl-expense-subnav-2,
 .pnl-expense-subnav {
@@ -127,14 +184,22 @@
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  gap: 0.55rem !important;
+  gap: 0.5rem !important;
   width: fit-content !important;
-  max-width: 100%;
+  max-width: 100% !important;
+  min-width: 0 !important;
   padding: 0 !important;
   background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
   margin-bottom: 0;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+.pnl-expense-type-nav.pnl-tab-nav--fit {
+  width: fit-content !important;
+  max-width: 100% !important;
 }
 
 .pnl-expense-type-nav button,
@@ -145,10 +210,11 @@
   align-items: center !important;
   justify-content: center !important;
   flex: 0 0 auto !important;
+  width: fit-content !important;
   min-width: 0 !important;
   height: 2.35rem !important;
-  padding: 0 1.25rem !important;
-  font-size: 0.82rem !important;
+  padding: 0 1.1rem !important;
+  font-size: 0.8rem !important;
   font-weight: 700 !important;
   white-space: nowrap !important;
   text-align: center !important;
@@ -158,6 +224,7 @@
   color: var(--fg-muted, #475569) !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
+  box-sizing: border-box !important;
 }
 
 .pnl-expense-type-nav button:hover:not(.is-active),
@@ -177,20 +244,22 @@
   box-shadow: 0 3px 10px rgba(18, 114, 105, 0.25) !important;
 }
 
-/* Multi-Category Pill Track (Matching Screenshot 2 - 4 or 7 buttons fit 100% in 1 row) */
+/* Multi-category expense pills — content-sized on desktop; one row */
 .pnl-expense-cat-nav-multi {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
-  width: 100% !important;
+  width: fit-content !important;
   max-width: 100% !important;
-  padding: 0.28rem !important;
+  min-width: 0 !important;
+  padding: 0.3rem 0.4rem !important;
   border-radius: 14px !important;
   background: #eef3f1 !important;
   border: 1px solid var(--border, #d7e0dc) !important;
   box-sizing: border-box !important;
-  gap: 0.25rem !important;
+  gap: 0.2rem !important;
+  overflow-x: visible !important;
 }
 
 .pnl-expense-cat-nav-multi button {
@@ -198,21 +267,40 @@
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  flex: 1 1 0 !important;
+  flex: 0 0 auto !important;
+  width: fit-content !important;
   min-width: 0 !important;
-  height: 2.35rem !important;
-  padding: 0 0.35rem !important;
-  font-size: 0.76rem !important;
+  height: auto !important;
+  min-height: 2.35rem !important;
+  padding: 0.35rem 0.7rem !important;
+  font-size: 0.78rem !important;
   font-weight: 700 !important;
+  letter-spacing: 0 !important;
   text-align: center !important;
   white-space: nowrap !important;
-  text-overflow: ellipsis !important;
-  overflow: hidden !important;
+  text-overflow: clip !important;
+  overflow: visible !important;
+  line-height: 1.15 !important;
   border-radius: 10px !important;
   border: 0 !important;
   background: transparent !important;
   color: var(--fg-muted, #5b6b66) !important;
   cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+.pnl-expense-cat-label--short {
+  display: none;
+}
+
+.pnl-expense-cat-label--full {
+  display: inline;
+}
+
+.pnl-expense-cat-nav-multi button .pnl-tab-nav__stacked {
+  gap: 0.04rem;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .pnl-expense-cat-nav-multi button.is-active {
@@ -248,6 +336,11 @@
 
 .pnl-tab-nav__stacked span {
   display: block;
+}
+
+/* Hidden on desktop; shown in mobile media queries (must follow .pnl-tab-nav__stacked) */
+.pnl-expense-cat-label--stacked {
+  display: none;
 }
 
 .pnl-date-filter {
@@ -295,8 +388,10 @@
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
-  height: 2.35rem;
-  padding: 0 0.8rem;
+  width: fit-content;
+  max-width: fit-content;
+  height: 2.1rem;
+  padding: 0 0.7rem;
   border-radius: 10px;
   border: 1px solid rgba(13, 148, 136, 0.35);
   background: #fff;
@@ -306,7 +401,9 @@
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
+  flex: 0 0 auto;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .pnl-export-btn:hover:not(:disabled) {
@@ -647,8 +744,8 @@
 }
 
 .pnl-expense-type-nav button {
-  padding: 0 0.95rem;
-  font-size: 0.82rem;
+  padding: 0 1.1rem !important;
+  font-size: 0.8rem !important;
 }
 
 /* Category options — one row; column count matches number of buttons */
@@ -899,21 +996,84 @@
   white-space: normal;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 640px) {
+  /* Phone only — tablet keeps desktop toolbar / tab layout */
+  .pnl-reports__export--mobile {
+    display: block !important;
+    flex: 0 0 auto;
+  }
+
+  .pnl-reports__export--desktop {
+    display: none !important;
+  }
+
   .pnl-reports__toolbar {
-    flex-direction: column;
-    flex-wrap: nowrap;
-    align-items: stretch;
-    gap: 0.65rem;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
   }
 
   .pnl-reports__tabs {
-    flex: none;
-    width: 100%;
-    max-width: 100%;
+    flex: none !important;
+    width: 100% !important;
   }
 
-  /* Mobile: small equal tabs — 3/row by default; 4/row when 6+ tabs (CAT-6 = 4+3) */
+  .pnl-reports__actions {
+    display: flex !important;
+    width: 100% !important;
+    flex: none !important;
+  }
+
+  .pnl-reports__actions .pnl-date-filter {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+
+  /* Phone: equal-width Direct/Indirect; wrap / stack long category labels */
+  .pnl-expense-type-nav,
+  .pnl-expense-type-nav.pnl-tab-nav--fit {
+    width: 100% !important;
+  }
+
+  .pnl-expense-type-nav button {
+    flex: 1 1 0 !important;
+    width: auto !important;
+  }
+
+  .pnl-expense-cat-nav-multi {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    align-items: stretch !important;
+  }
+
+  .pnl-expense-cat-nav-multi button {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 2.6rem !important;
+    padding: 0.3rem 0.2rem !important;
+    font-size: 0.62rem !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
+
+  .pnl-expense-cat-label--full {
+    display: none !important;
+  }
+
+  .pnl-expense-cat-label--short {
+    display: inline !important;
+  }
+
+  .pnl-expense-cat-label--stacked {
+    display: flex !important;
+  }
+
+  /* Phone: compact equal tabs — 3/row; 4/row when 6+ tabs */
   .pnl-reports__tabs {
     overflow-x: visible;
   }
@@ -959,52 +1119,95 @@
     white-space: nowrap;
   }
 
-  /* Expense Direct/Indirect: keep pill track (matching main tab bar) */
-  .pnl-expense-type-nav,
-  .pnl-expense-cat-nav {
+  .pnl-expense-type-nav {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
     width: fit-content !important;
-    max-width: 100%;
-    overflow-x: auto;
+    max-width: 100% !important;
+    overflow-x: auto !important;
   }
 
-  .pnl-expense-type-nav button,
+  .pnl-expense-cat-nav {
+    display: grid !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: visible !important;
+  }
+
+  .pnl-expense-cat-nav-multi {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: none !important;
+    overflow-x: hidden !important;
+    padding: 0.3rem 0.35rem !important;
+  }
+
+  .pnl-expense-type-nav button {
+    appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: fit-content !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    height: 2.35rem !important;
+    padding: 0 1rem !important;
+    font-size: 0.78rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    border-radius: 999px !important;
+    box-sizing: border-box !important;
+  }
+
   .pnl-expense-cat-nav button {
     appearance: none !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: auto !important;
-    flex: 0 0 auto !important;
+    width: 100% !important;
     min-width: 0 !important;
-    height: 2.35rem !important;
-    padding: 0 1rem !important;
-    font-size: 0.8rem !important;
+    height: auto !important;
+    min-height: 2.35rem !important;
+    padding: 0.3rem 0.35rem !important;
+    font-size: 0.72rem !important;
     font-weight: 700 !important;
-    white-space: nowrap !important;
+    white-space: normal !important;
+    line-height: 1.15 !important;
+    overflow: visible !important;
     text-align: center !important;
-    border-radius: 10px !important;
+    box-sizing: border-box !important;
   }
 
-  .pnl-reports__actions {
-    flex: none;
-    width: 100%;
-    max-width: 100%;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.55rem;
+  .pnl-reports__header {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
   }
 
-  /* Equal-width From / To */
+  .pnl-reports__header .pnl-export-btn,
+  .pnl-reports__actions .pnl-export-btn,
+  .pnl-export-btn--compact {
+    width: fit-content !important;
+    max-width: fit-content !important;
+    flex: 0 0 auto !important;
+    align-self: center !important;
+  }
+
   .pnl-date-filter {
-    width: 100%;
+    width: auto;
     max-width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
   }
 
   .pnl-date-filter__field {
@@ -1020,11 +1223,6 @@
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
-  }
-
-  .pnl-export-btn {
-    width: 100%;
-    max-width: 100%;
   }
 
   .pnl-export-btn__label {
@@ -1062,6 +1260,77 @@
   }
 }
 
+/* Tablet (no sidebar): keep report chrome usable — tabs one line; From/To/Export below if needed */
+@media (min-width: 641px) and (max-width: 880px) {
+  .pnl-reports__toolbar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+
+  .pnl-reports__tabs {
+    flex: none;
+    width: 100%;
+  }
+
+  .pnl-reports__tabs .pnl-tab-nav {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    grid-template-columns: none !important;
+  }
+
+  .pnl-reports__tabs .pnl-tab-nav button {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    font-size: 0.72rem !important;
+    padding: 0 0.35rem !important;
+    white-space: nowrap !important;
+  }
+
+  .pnl-reports__actions {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+    gap: 0.75rem !important;
+  }
+
+  .pnl-reports__actions .pnl-date-filter {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  .pnl-reports__actions .pnl-date-filter__field {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+  }
+
+  .pnl-reports__actions .pnl-date-filter__field input {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .pnl-reports__actions .pnl-reports__export--desktop {
+    flex: 0 0 auto !important;
+    margin-left: auto;
+  }
+}
+
 @media (max-width: 480px) {
   .pnl-tab-nav,
   .pnl-tab-nav--fit,
@@ -1087,8 +1356,25 @@
   }
 
   .pnl-expense-type-nav button {
-    font-size: 0.72rem;
-    padding: 0 0.4rem;
+    font-size: 0.74rem !important;
+    padding: 0 0.65rem !important;
+  }
+
+  .pnl-expense-cat-nav-multi {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    grid-template-columns: none !important;
+    overflow-x: hidden !important;
+    padding: 0.35rem 0.45rem !important;
+  }
+
+  /* Keep multi-line category labels readable; don't inherit fixed tab height */
+  .pnl-expense-cat-nav-multi button {
+    height: auto !important;
+    min-height: 2.4rem !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    line-height: 1.15 !important;
   }
 
   .pnl-expense-cat-nav {

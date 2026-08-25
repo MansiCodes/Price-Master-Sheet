@@ -1,7 +1,13 @@
 import { PettyCashKind, PurchaseType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
-import { isAtclPurchase, atclStockEntryFilter } from "@/lib/plant-catalogs";
+import {
+  isAtclPurchase,
+  atclStockEntryFilter,
+  normalizeUpcastExpenseHead,
+  upcastExpensePnlLine,
+  UPCAST_MISC_NATURES,
+} from "@/lib/plant-catalogs";
 import type {
   PlantPnlResult,
   PlantPnlStatement,
@@ -964,6 +970,7 @@ async function buildDynamic(
         contractorSalary: true,
         supervisorSalary: true,
         expenseHead: true,
+        nature: true,
         payMode: true,
         description: true,
       },
@@ -1050,12 +1057,12 @@ async function buildDynamic(
 
   const rentFromPettyCash = round2(
     pettyEntries
-      .filter(
-        (r) =>
-          r.entryType === PettyCashKind.EXPENSE &&
-          /rent/i.test(String(r.description ?? "")) &&
-          toNumber(r.amount) > 0,
-      )
+      .filter((r) => {
+        const head = normalizeUpcastExpenseHead(
+          r.expenseHead || r.nature || "",
+        );
+        return head === "Factory Rent" && toNumber(r.amount) > 0;
+      })
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
 
@@ -1068,8 +1075,8 @@ async function buildDynamic(
     pettyEntries
       .filter(
         (r) =>
-          r.entryType === PettyCashKind.EXPENSE &&
-          /unloading/i.test(r.expenseHead.trim()),
+          /unloading/i.test(r.expenseHead.trim()) &&
+          toNumber(r.amount) > 0,
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
@@ -1079,28 +1086,102 @@ async function buildDynamic(
   const unloadingExpense =
     unloadingFromEntries > 0 ? unloadingFromEntries : unloadingFromPurchases;
 
+  const isUpcast = plantCode?.toUpperCase() === "UPCAST";
+
   const pettyCashRows = pettyEntries.filter(
     (r) => r.entryType === PettyCashKind.PETTY_CASH,
   );
 
-  const pettyCashExp = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.amount), 0),
+  const upcastMiscDirectTotals: Record<string, number> = {};
+  for (const head of UPCAST_MISC_NATURES) {
+    upcastMiscDirectTotals[head] = 0;
+  }
+  let upcastUnmappedFactory = 0;
+
+  if (isUpcast) {
+    for (const row of pettyEntries) {
+      const head = normalizeUpcastExpenseHead(row.expenseHead || row.nature || "");
+      const amt = toNumber(row.amount);
+      if (!(amt > 0)) continue;
+      if (
+        head === "Fuel & Power" ||
+        head === "Electricity" ||
+        head === "Unloading of MT" ||
+        head === "Factory Rent" ||
+        head === "Salary Expenses" ||
+        head === "Contractor Wages" ||
+        head === "FAR" ||
+        head === "Depreciation (FAR)" ||
+        head === "Financial Cost"
+      ) {
+        continue;
+      }
+      if ((UPCAST_MISC_NATURES as readonly string[]).includes(head)) {
+        upcastMiscDirectTotals[head] = round2(
+          (upcastMiscDirectTotals[head] ?? 0) + amt,
+        );
+      } else {
+        upcastUnmappedFactory = round2(upcastUnmappedFactory + amt);
+      }
+    }
+    if (upcastUnmappedFactory > 0) {
+      upcastMiscDirectTotals["Other Charges"] = round2(
+        (upcastMiscDirectTotals["Other Charges"] ?? 0) + upcastUnmappedFactory,
+      );
+    }
+  }
+
+  const upcastMiscDirectTotal = round2(
+    Object.values(upcastMiscDirectTotals).reduce((s, n) => s + n, 0),
   );
 
-  // Your screenshot splits salaries into:
-  // - Direct: "LABOUR CONTRACTOR" (contractorSalary)
-  // - Indirect: "SALARY EXPENSES" (supervisorSalary)
+  const pettyCashExp = isUpcast
+    ? 0
+    : round2(
+        pettyCashRows.reduce((sum, row) => sum + toNumber(row.amount), 0),
+      );
+
+  // Direct: contractor wages; Indirect: salary expenses
   const contractorSalary = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.contractorSalary), 0),
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizeUpcastExpenseHead(row.expenseHead || "");
+      const fromField = toNumber(row.contractorSalary);
+      if (fromField > 0) return sum + fromField;
+      if (
+        isUpcast &&
+        head === "Contractor Wages" &&
+        toNumber(row.amount) > 0
+      ) {
+        return sum + toNumber(row.amount);
+      }
+      return sum;
+    }, 0),
   );
   const supervisorSalary = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.supervisorSalary), 0),
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizeUpcastExpenseHead(row.expenseHead || "");
+      const fromField = toNumber(row.supervisorSalary);
+      if (fromField > 0) return sum + fromField;
+      if (
+        isUpcast &&
+        head === "Salary Expenses" &&
+        toNumber(row.amount) > 0
+      ) {
+        return sum + toNumber(row.amount);
+      }
+      return sum;
+    }, 0),
   );
 
   const manpowerFromEntries = round2(toNumber(manpowerAgg._sum.totalCost));
   const manpower = manpowerFromEntries + contractorSalary;
 
-  const directExpenses = round2(electricity + unloadingExpense + manpower);
+  const directExpenses = round2(
+    electricity +
+      unloadingExpense +
+      manpower +
+      (isUpcast ? upcastMiscDirectTotal : 0),
+  );
   const cogs = round2(openingStock + totalPurchases + directExpenses - closingStock);
 
   const grossProfit = round2(salesRevenue - cogs);
@@ -1139,20 +1220,67 @@ async function buildDynamic(
 
   const salesBase = salesRevenue;
 
+  const upcastDirectLines: PnlStatementLine[] = isUpcast
+    ? [
+        line(
+          "FUEL & POWER EXP.",
+          electricity || null,
+          electricity ? ratioOf(electricity, salesBase) : null,
+          "item",
+        ),
+        line(
+          "UNLOADING EXP.",
+          unloadingExpense || null,
+          unloadingExpense ? ratioOf(unloadingExpense, salesBase) : null,
+          "item",
+        ),
+        line(
+          "CONTRACTOR WAGES",
+          manpower || null,
+          manpower ? ratioOf(manpower, salesBase) : null,
+          "item",
+        ),
+        ...UPCAST_MISC_NATURES.map((head) => {
+          const amt = upcastMiscDirectTotals[head] ?? 0;
+          return line(
+            upcastExpensePnlLine(head),
+            amt || null,
+            amt ? ratioOf(amt, salesBase) : null,
+            "item",
+          );
+        }),
+      ]
+    : [
+        line(
+          "FUEL & POWER EXP.",
+          electricity || null,
+          electricity ? ratioOf(electricity, salesBase) : null,
+          "item",
+        ),
+        line(
+          "UNLOADING EXP.",
+          unloadingExpense || null,
+          unloadingExpense ? ratioOf(unloadingExpense, salesBase) : null,
+          "item",
+        ),
+        line(
+          "LABOUR CONTRACTOR",
+          manpower || null,
+          manpower ? ratioOf(manpower, salesBase) : null,
+          "item",
+        ),
+      ];
+
   const tradingDebit: PnlStatementLine[] = [
     line("OPENING STOCK", openingStock || null, openingStock ? ratioOf(openingStock, salesBase) : null, "header"),
     line("PURCHASES", null, null, "header"),
     line("Purchase from Vendor", purchases || null, null, "item"),
-    ...(isPvc
-      ? [
-          line(
-            "Stock Taken from ATCL",
-            stockFromAtcl || null,
-            stockFromAtcl ? ratioOf(stockFromAtcl, salesBase) : null,
-            "item",
-          ),
-        ]
-      : []),
+    line(
+      "Stock Taken from ATCL",
+      stockFromAtcl || null,
+      stockFromAtcl ? ratioOf(stockFromAtcl, salesBase) : null,
+      "item",
+    ),
     line(
       "Total Purchases",
       totalPurchases || null,
@@ -1160,24 +1288,7 @@ async function buildDynamic(
       "subtotal",
     ),
     line("DIRECT EXPENSES", null, null, "header"),
-    line(
-      "FUEL & POWER EXP.",
-      electricity || null,
-      electricity ? ratioOf(electricity, salesBase) : null,
-      "item",
-    ),
-    line(
-      "UNLOADING EXP.",
-      unloadingExpense || null,
-      unloadingExpense ? ratioOf(unloadingExpense, salesBase) : null,
-      "item",
-    ),
-    line(
-      "LABOUR CONTRACTOR",
-      manpower || null,
-      manpower ? ratioOf(manpower, salesBase) : null,
-      "item",
-    ),
+    ...upcastDirectLines,
     line(
       "GROSS PROFIT",
       grossProfit > 0 ? grossProfit : null,
@@ -1203,12 +1314,16 @@ async function buildDynamic(
 
   const indirectDebit: PnlStatementLine[] = [
     line("INDIRECT EXPENSES", null, null, "header"),
-    line(
-      "PETTY CASH EXP",
-      pettyCashExp || null,
-      pettyCashExp ? ratioOf(pettyCashExp, salesBase) : null,
-      "item",
-    ),
+    ...(isUpcast
+      ? []
+      : [
+          line(
+            "PETTY CASH EXP",
+            pettyCashExp || null,
+            pettyCashExp ? ratioOf(pettyCashExp, salesBase) : null,
+            "item",
+          ),
+        ]),
     line(
       "SALARY EXPENSES",
       supervisorSalary || null,
@@ -1267,7 +1382,7 @@ async function buildDynamic(
     manpower,
     electricity,
     rent,
-    pettyCash: pettyCashExp,
+    pettyCash: isUpcast ? upcastMiscDirectTotal : pettyCashExp,
     depreciation,
     grossProfit,
     netProfit,
