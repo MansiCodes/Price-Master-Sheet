@@ -1,20 +1,29 @@
-# Backup shift reminders near 08:50 IST (Day) and 20:50 IST (Night).
-# Vercel Hobby only guarantees "sometime in that UTC hour", so the API
-# accepts 08:30–09:25 / 20:30–21:25 IST. This workflow hits closer to :50.
-# Deduped by ReminderLog claim id (one WhatsApp per plant per shift).
+# Shift reminders at 08:50 IST (Day) and 20:50 IST (Night).
+#
+# Target window in the API is strict: 08:50–08:54 / 20:50–20:54 IST only.
+# GitHub Actions cron is often several minutes late, so we fire a few
+# back-to-back attempts; ReminderLog claim ids keep WhatsApp to one send.
 #
 # Required GitHub repo secrets:
-#   APP_URL      e.g. https://your-app.vercel.app
-#   CRON_SECRET  same value as Vercel env CRON_SECRET
+#   APP_URL      e.g. https://main.d2zptt1fjuf5sk.amplifyapp.com
+#   CRON_SECRET  same value as the app env CRON_SECRET
 
 name: Shift reminders
 
 on:
   schedule:
-    # 08:50 AM IST = 03:20 UTC
+    # Day: 08:50–08:54 IST = 03:20–03:24 UTC
     - cron: "20 3 * * *"
-    # 08:50 PM IST = 15:20 UTC
+    - cron: "21 3 * * *"
+    - cron: "22 3 * * *"
+    - cron: "23 3 * * *"
+    - cron: "24 3 * * *"
+    # Night: 20:50–20:54 IST = 15:20–15:24 UTC
     - cron: "20 15 * * *"
+    - cron: "21 15 * * *"
+    - cron: "22 15 * * *"
+    - cron: "23 15 * * *"
+    - cron: "24 15 * * *"
   workflow_dispatch:
 
 jobs:
@@ -34,6 +43,7 @@ jobs:
           fi
           BASE="${APP_URL%/}"
           echo "POST ${BASE}/api/cron/daily-reminders"
+          echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           curl -fsS -X POST \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \

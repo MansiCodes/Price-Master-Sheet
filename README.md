@@ -50,7 +50,11 @@ Open http://localhost:3000 — login with Super Admin from `.env`.
 
 ## Cron
 
-`GET /api/cron/daily-reminders` with `Authorization: Bearer $CRON_SECRET` (08:50 IST Day shift and 20:50 IST Night shift).
+`POST /api/cron/daily-reminders` with `Authorization: Bearer $CRON_SECRET`.
+
+Sends only inside a strict IST window: **08:50–08:54** (Day) and **20:50–20:54** (Night). Outside that window the job no-ops (so a late 9:35 PM run will not send).
+
+On Amplify, use the GitHub Action `Shift reminders` (or another precise scheduler) — `vercel.json` crons do not run on Amplify.
 
 ## Vercel
 
