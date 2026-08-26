@@ -644,7 +644,8 @@ model MachineProductionEntry {
   machine           Machine                @relation(fields: [machineId], references: [id])
   supervisor        User                   @relation("MachineProductionSupervisor", fields: [supervisorId], references: [id])
 
-  @@unique([machineId, entryDate, shift, slotStartHour])
+  /// Multiple entries allowed per machine + slot (add more after completed).
+  @@index([machineId, entryDate, shift, slotStartHour])
   @@index([entryDate, shift])
   @@index([supervisorId, entryDate])
   @@index([cableType])

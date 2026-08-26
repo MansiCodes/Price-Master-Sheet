@@ -426,10 +426,20 @@ export function SupervisorDashboard() {
                     <p className="mp-machine-card__desc">{m.description}</p>
                   ) : null}
                   {m.status === "COMPLETED" ? (
-                    <p className="mp-machine-card__meta">
-                      Actual {m.actualProduction ?? "—"} · Eff{" "}
-                      {m.efficiencyPct != null ? `${m.efficiencyPct}%` : "—"}
-                    </p>
+                    <>
+                      <p className="mp-machine-card__meta">
+                        Actual{" "}
+                        {m.totalActualProduction ?? m.actualProduction ?? "—"}
+                        {m.entryCount && m.entryCount > 1
+                          ? ` (${m.entryCount} entries)`
+                          : ""}{" "}
+                        · Eff{" "}
+                        {m.efficiencyPct != null ? `${m.efficiencyPct}%` : "—"}
+                      </p>
+                      <p className="mp-machine-card__cta">
+                        Add another entry →
+                      </p>
+                    </>
                   ) : (
                     <p className="mp-machine-card__cta">Open production form →</p>
                   )}

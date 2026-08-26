@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
   }
 
   const actualSum = entries.reduce((s, e) => s + e.actualProduction, 0);
+  const plannedSum = entries.reduce((s, e) => s + e.plannedProduction, 0);
   const avgEff =
     entries.length === 0
       ? 0
@@ -189,6 +190,34 @@ export async function GET(request: NextRequest) {
             100,
         ) / 100;
 
+  const dayMap = new Map<
+    string,
+    { planned: number; actual: number; count: number; effSum: number }
+  >();
+  for (const e of entries) {
+    const cur = dayMap.get(e.entryDate) ?? {
+      planned: 0,
+      actual: 0,
+      count: 0,
+      effSum: 0,
+    };
+    cur.planned += e.plannedProduction;
+    cur.actual += e.actualProduction;
+    cur.count += 1;
+    cur.effSum += e.efficiencyPct;
+    dayMap.set(e.entryDate, cur);
+  }
+  const dayWise = [...dayMap.entries()]
+    .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+    .map(([date, d]) => ({
+      date,
+      entries: d.count,
+      plannedProduction: Math.round(d.planned * 10000) / 10000,
+      actualProduction: Math.round(d.actual * 10000) / 10000,
+      averageEfficiency:
+        d.count === 0 ? 0 : Math.round((d.effSum / d.count) * 100) / 100,
+    }));
+
   return NextResponse.json({
     ok: true,
     summary: {
@@ -196,9 +225,11 @@ export async function GET(request: NextRequest) {
       completed: entries.filter((e) => e.status === "COMPLETED").length,
       pending: entries.filter((e) => e.status === "PENDING").length,
       overdue: entries.filter((e) => e.status === "OVERDUE").length,
+      plannedProduction: Math.round(plannedSum * 10000) / 10000,
       actualProduction: Math.round(actualSum * 10000) / 10000,
       averageEfficiency: avgEff,
     },
+    dayWise,
     entries,
   });
 }
@@ -275,50 +306,34 @@ export async function POST(request: Request) {
   const eff = efficiencyPct(planned, actual);
   const now = new Date();
 
-  try {
-    const entry = await prisma.machineProductionEntry.create({
-      data: {
-        machineId: machine.id,
-        supervisorId: session.user.id,
-        entryDate: parseDateOnlyUtc(entryDate),
-        shift,
-        slotStartHour,
-        currentProcess: processLink.process.name,
-        cableType: persisted.cableType,
-        cableSize: persisted.cableSize,
-        plannedProduction: planned,
-        actualProduction: actual,
-        efficiencyPct: eff,
-        operators,
-        helpers,
-        totalManpower,
-        remarks: parsed.data.remarks || null,
-        photoUrls: photos,
-        submittedAt: now,
-      },
-      include: {
-        machine: { select: { id: true, name: true, code: true } },
-        supervisor: { select: { id: true, name: true, email: true } },
-      },
-    });
+  const entry = await prisma.machineProductionEntry.create({
+    data: {
+      machineId: machine.id,
+      supervisorId: session.user.id,
+      entryDate: parseDateOnlyUtc(entryDate),
+      shift,
+      slotStartHour,
+      currentProcess: processLink.process.name,
+      cableType: persisted.cableType,
+      cableSize: persisted.cableSize,
+      plannedProduction: planned,
+      actualProduction: actual,
+      efficiencyPct: eff,
+      operators,
+      helpers,
+      totalManpower,
+      remarks: parsed.data.remarks || null,
+      photoUrls: photos,
+      submittedAt: now,
+    },
+    include: {
+      machine: { select: { id: true, name: true, code: true } },
+      supervisor: { select: { id: true, name: true, email: true } },
+    },
+  });
 
-    return NextResponse.json({
-      ok: true,
-      entry: serializeEntry(entry, now),
-    });
-  } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.code === "P2002"
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Production already submitted for this machine, date, shift, and slot",
-        },
-        { status: 409 },
-      );
-    }
-    throw err;
-  }
+  return NextResponse.json({
+    ok: true,
+    entry: serializeEntry(entry, now),
+  });
 }

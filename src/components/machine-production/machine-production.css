@@ -1187,3 +1187,45 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+.mp-filters__apply-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .mp-filters__apply-actions {
+    width: 100%;
+  }
+
+  .mp-filters__apply-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+.mp-daywise {
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.mp-daywise__head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.mp-daywise__head .mp-muted {
+  margin: 0.15rem 0 0;
+}
+
+.mp-table--daywise {
+  max-width: 720px;
+}
+
+.mp-table__row--total td {
+  font-weight: 650;
+  border-top: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  background: color-mix(in srgb, var(--teal-soft) 55%, transparent);
+}

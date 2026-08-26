@@ -129,15 +129,33 @@ export async function GET(request: NextRequest) {
         efficiencyPct: true,
         currentProcess: true,
       },
+      orderBy: { submittedAt: "desc" },
     });
-    const byMachine = new Map(entries.map((e) => [e.machineId, e]));
 
-    const statusFor = (machineId: string): SlotStatus =>
-      resolveSlotStatus({
-        submitted: byMachine.has(machineId),
-        deadlineIso: activeSlot.deadlineIso,
-        now,
-      });
+    type SlotAgg = {
+      latest: (typeof entries)[number];
+      entryCount: number;
+      totalActual: number;
+    };
+
+    function aggregateForProcess(processName: string | null) {
+      const map = new Map<string, SlotAgg>();
+      for (const e of entries) {
+        if (processName && e.currentProcess !== processName) continue;
+        const cur = map.get(e.machineId);
+        if (!cur) {
+          map.set(e.machineId, {
+            latest: e,
+            entryCount: 1,
+            totalActual: Number(e.actualProduction),
+          });
+        } else {
+          cur.entryCount += 1;
+          cur.totalActual += Number(e.actualProduction);
+        }
+      }
+      return map;
+    }
 
     // ---- Level 2: machines inside one process ----
     if (processId) {
@@ -149,11 +167,20 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      const byMachine = aggregateForProcess(process.name);
+      const statusFor = (machineId: string): SlotStatus =>
+        resolveSlotStatus({
+          submitted: byMachine.has(machineId),
+          deadlineIso: activeSlot.deadlineIso,
+          now,
+        });
+
       const cards = process.machines
         .filter((link) => link.machine.isActive)
         .map((link) => {
           const m = link.machine;
-          const entry = byMachine.get(m.id);
+          const agg = byMachine.get(m.id);
+          const entry = agg?.latest;
           return {
             id: m.id,
             name: m.name,
@@ -161,7 +188,9 @@ export async function GET(request: NextRequest) {
             description: m.description,
             status: statusFor(m.id),
             entryId: entry?.id ?? null,
+            entryCount: agg?.entryCount ?? 0,
             actualProduction: entry ? Number(entry.actualProduction) : null,
+            totalActualProduction: agg ? agg.totalActual : null,
             efficiencyPct: entry ? Number(entry.efficiencyPct) : null,
             submittedAt: entry?.submittedAt.toISOString() ?? null,
           };
@@ -187,6 +216,13 @@ export async function GET(request: NextRequest) {
     // ---- Level 1: process cards with per-slot progress ----
     const processCards = processes.map((p) => {
       const active = p.machines.filter((l) => l.machine.isActive);
+      const byMachine = aggregateForProcess(p.name);
+      const statusFor = (machineId: string): SlotStatus =>
+        resolveSlotStatus({
+          submitted: byMachine.has(machineId),
+          deadlineIso: activeSlot.deadlineIso,
+          now,
+        });
       const statuses = active.map((l) => statusFor(l.machineId));
       const completed = statuses.filter((s) => s === "COMPLETED").length;
       const overdue = statuses.filter((s) => s === "OVERDUE").length;
@@ -210,9 +246,18 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const allStatuses = processes.flatMap((p) =>
-      p.machines.filter((l) => l.machine.isActive).map((l) => statusFor(l.machineId)),
-    );
+    const allStatuses = processes.flatMap((p) => {
+      const byMachine = aggregateForProcess(p.name);
+      return p.machines
+        .filter((l) => l.machine.isActive)
+        .map((l) =>
+          resolveSlotStatus({
+            submitted: byMachine.has(l.machineId),
+            deadlineIso: activeSlot.deadlineIso,
+            now,
+          }),
+        );
+    });
 
     return NextResponse.json({
       ok: true,

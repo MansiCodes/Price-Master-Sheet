@@ -16,7 +16,9 @@ export type MachineCard = {
   description: string | null;
   status: "PENDING" | "COMPLETED" | "OVERDUE";
   entryId: string | null;
+  entryCount?: number;
   actualProduction: number | null;
+  totalActualProduction?: number | null;
   efficiencyPct: number | null;
   submittedAt: string | null;
 };
@@ -180,7 +182,9 @@ export function ProductionEntryForm({
     }).format(new Date());
   }, [open]);
 
-  const readOnly = machine?.status === "COMPLETED";
+  const hasPriorEntries = (machine?.entryCount ?? 0) > 0;
+  // Always allow another entry for the same slot, even after COMPLETED.
+  const readOnly = false;
   const selectedTypeRow = cableTypeRows.find((t) => t.name === cableType);
   const selectedSizeRow = cableSizeRows.find((s) => s.name === cableSize);
   const canRemoveType =
@@ -439,9 +443,11 @@ export function ProductionEntryForm({
     >
       {machine && viewSlot ? (
         <form className="mp-form" onSubmit={(e) => void onSubmit(e)}>
-          {readOnly ? (
+          {hasPriorEntries ? (
             <p className="mp-form__banner mp-form__banner--ok">
-              Already submitted for this slot.
+              {machine.entryCount} entr
+              {machine.entryCount === 1 ? "y" : "ies"} already saved for this
+              slot — submit to add another.
             </p>
           ) : null}
 
