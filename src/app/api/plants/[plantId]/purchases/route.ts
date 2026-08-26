@@ -117,7 +117,7 @@ export async function GET(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
-  if (isPvc && (excludeAtcl || atclOnly)) {
+  if (excludeAtcl || atclOnly) {
     purchases = purchases.filter((row) =>
       atclOnly ? isAtclPurchase(row) : !isAtclPurchase(row),
     );

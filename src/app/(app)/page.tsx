@@ -10,10 +10,7 @@ import {
   isMachineSupervisor,
   isSuperAdmin,
 } from "@/lib/rbac";
-import {
-  needsPlantSelection,
-  resolveSelectedPlantId,
-} from "@/lib/selected-plant";
+import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
 import { getMachineProductionHomeMetrics } from "@/lib/machine-production/home-metrics";
@@ -68,10 +65,6 @@ export default async function DashboardPage() {
 
   const superAdmin = isSuperAdmin(user.globalRole);
   const plantIds = await getAccessiblePlantIds(user.id);
-
-  if (!superAdmin && (await needsPlantSelection(user.id))) {
-    redirect("/select-plant");
-  }
 
   const selectedPlantId = await resolveSelectedPlantId(user.id, {
     isSuperAdmin: superAdmin,

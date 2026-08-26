@@ -56,28 +56,42 @@ export function PnlReportsShell({
     () =>
       pvc
         ? ["pnl", "sales", "purchase", "stock", "expense", "contactList"]
-        : cat6
-          ? ["pnl", "sales", "purchase", "stock", "expense", "fixedAssets", "contactList"]
-          : ["pnl", "sales", "purchase", "stock", "expense", "contactList"],
-    [cat6, pvc],
+        : ["pnl", "sales", "purchase", "stock", "expense", "fixedAssets", "contactList"],
+    [pvc],
   );
 
   useEffect(() => {
     if (!allowedTabs.includes(tab)) setTab("pnl");
   }, [allowedTabs, tab]);
 
+  const exportFrom = tab === "factoryRent" ? "2026-01-01" : from;
+  const exportTo = tab === "factoryRent" ? "2027-03-31" : to;
+
   return (
     <div className="pnl-reports">
-      {plantName ? (
-        <div className="pnl-reports__plant-block">
-          <p className="pnl-reports__plant">{plantName}</p>
-          {plantManagerName ? (
-            <p className="pnl-reports__manager">
-              Plant manager · {plantManagerName}
-            </p>
-          ) : null}
+      <div className="pnl-reports__header">
+        {plantName ? (
+          <div className="pnl-reports__plant-block">
+            <p className="pnl-reports__plant">{plantName}</p>
+            {plantManagerName ? (
+              <p className="pnl-reports__manager">
+                Plant manager · {plantManagerName}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="pnl-reports__plant-block" />
+        )}
+        <div className="pnl-reports__export pnl-reports__export--mobile">
+          <PnlExportButton
+            plantId={plantId}
+            kind={tab}
+            from={exportFrom}
+            to={exportTo}
+          />
         </div>
-      ) : null}
+      </div>
+
       <div className="pnl-reports__toolbar">
         <div className="pnl-reports__tabs">
           <PnlTabNav active={tab} onChange={setTab} tabs={allowedTabs} />
@@ -91,12 +105,14 @@ export function PnlReportsShell({
               onToChange={setTo}
             />
           )}
-          <PnlExportButton
-            plantId={plantId}
-            kind={tab}
-            from={tab === "factoryRent" ? "2026-01-01" : from}
-            to={tab === "factoryRent" ? "2027-03-31" : to}
-          />
+          <div className="pnl-reports__export pnl-reports__export--desktop">
+            <PnlExportButton
+              plantId={plantId}
+              kind={tab}
+              from={exportFrom}
+              to={exportTo}
+            />
+          </div>
         </div>
       </div>
 

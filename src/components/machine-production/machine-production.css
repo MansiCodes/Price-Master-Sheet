@@ -161,6 +161,18 @@
   flex: 1 1 auto;
   justify-content: flex-end;
   min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 0.15rem;
+}
+
+.mp-counts--admin .mp-count {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.74rem;
 }
 
 .mp-shift-tabs--admin {
@@ -181,10 +193,12 @@
   .mp-admin-top {
     flex-direction: column;
     align-items: stretch;
+    gap: 0.65rem;
   }
 
   .mp-admin-top .mp-counts--admin {
     justify-content: flex-start;
+    width: 100%;
   }
 
   .mp-shift-tabs--admin {
@@ -674,11 +688,37 @@
 
 @media (max-width: 1100px) {
   .mp-filters {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.65rem 0.55rem;
+    align-items: end;
   }
 
   .mp-filters > label:not(.mp-filters__apply) {
-    flex: 1 1 7.5rem;
+    flex: unset;
+    min-width: 0;
+  }
+
+  .mp-filters__apply {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .mp-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mp-filters__apply {
+    grid-column: 1 / -1;
+  }
+
+  .mp-filters__apply .btn {
+    width: 100%;
+  }
+
+  .mp-filters__apply-spacer {
+    display: none;
   }
 }
 
@@ -703,6 +743,7 @@
 
 .mp-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
@@ -710,6 +751,7 @@
 
 .mp-table {
   width: 100%;
+  min-width: 72rem;
   border-collapse: collapse;
   font-size: 0.88rem;
 }
@@ -719,7 +761,8 @@
   padding: 0.7rem 0.8rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
+  white-space: nowrap;
 }
 
 .mp-table th {
@@ -738,10 +781,10 @@
   background: color-mix(in srgb, var(--teal-soft) 35%, white);
 }
 
+/* Keep as table-cell — display:flex on <td> breaks row border alignment. */
 .mp-table__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .mp-admin-machines {

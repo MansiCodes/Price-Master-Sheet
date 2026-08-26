@@ -213,7 +213,7 @@ export function PnlExportButton({
   return (
     <button
       type="button"
-      className="pnl-export-btn"
+      className="pnl-export-btn pnl-export-btn--compact"
       onClick={() => void onExport()}
       disabled={exporting}
       title={isPnl ? "Export PDF" : t("exportExcel")}

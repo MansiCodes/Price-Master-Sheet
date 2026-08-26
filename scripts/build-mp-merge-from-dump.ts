@@ -20,6 +20,8 @@ const MP_TABLES_IN_ORDER = [
   "ProductionProcess",
   "MachineProcess",
   "ProductionProcessMachine",
+  "ProcessMachineCableType",
+  "ProcessMachineCableSize",
   "MachineProductionEntry",
 ] as const;
 

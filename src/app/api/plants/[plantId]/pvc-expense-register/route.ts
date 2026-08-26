@@ -241,7 +241,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     unified.push({
       id: `far-${row.id}`,
-      expenseLabel: "Depreciation (FAR)",
+      expenseLabel: "FAR",
       sortDate: dateIso,
       periodLabel: formatDay(dateIso),
       description: row.assetDescription,

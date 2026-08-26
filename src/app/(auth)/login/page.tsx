@@ -9,7 +9,6 @@ import {
   toIndiaPhoneE164,
 } from "@/lib/phone";
 import { LanguageSwitcher } from "@/components/shell/LanguageSwitcher";
-import { clearPlantSelectionAction } from "@/app/select-plant/actions";
 import "./login.css";
 
 type LoginMode = "whatsapp" | "email";
@@ -203,8 +202,7 @@ export default function LoginPage() {
         setError(t("invalidOtp"));
         return;
       }
-      await clearPlantSelectionAction();
-      router.replace("/select-plant");
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));
@@ -228,8 +226,7 @@ export default function LoginPage() {
         setError(t("invalidEmailPassword"));
         return;
       }
-      await clearPlantSelectionAction();
-      router.replace("/select-plant");
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));

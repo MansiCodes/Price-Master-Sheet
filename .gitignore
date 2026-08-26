@@ -48,7 +48,14 @@ coverage/
 # DB backups (contain production data — do not commit)
 backups/*.sql
 backups/*.dump
+backups/*.rar
 !backups/run-pg-dump.sh
+
+# Generated merge SQL (rebuild with scripts/build-mp-merge-from-dump.ts)
+exports/mp-merge-only.sql
+
+# One-off scratch scripts
+scratch/
 
 # TypeScript
 *.tsbuildinfo

@@ -29,13 +29,19 @@ async function main() {
     throw new Error("DATABASE_URL is not set");
   }
 
+  const ensurePath = resolve(
+    __dirname,
+    "mp-ensure-process-cable-schema.sql",
+  );
   const sqlPath = resolve(
     process.argv[2] || resolve(__dirname, "../exports/mp-merge-only.sql"),
   );
+  const ensureSql = readFileSync(ensurePath, "utf8");
   const sql = readFileSync(sqlPath, "utf8");
 
   const safeUrl = url.replace(/:[^:@/]+@/, ":***@");
   console.log(`Applying merge to ${safeUrl}`);
+  console.log(`Ensure schema: ${ensurePath}`);
   console.log(`File: ${sqlPath}`);
 
   const client = new Client({
@@ -47,6 +53,9 @@ async function main() {
 
   await client.connect();
   try {
+    console.log("Ensuring ProcessMachineCable* tables exist (additive)...");
+    await client.query(ensureSql);
+
     // Count P&L rows before
     const before = await client.query(`
       SELECT
@@ -56,7 +65,9 @@ async function main() {
         (SELECT count(*)::int FROM "PettyCashEntry") AS petty,
         (SELECT count(*)::int FROM "Machine") AS machines,
         (SELECT count(*)::int FROM "MachineProductionEntry") AS mp_entries,
-        (SELECT count(*)::int FROM "ProductionProcess") AS processes
+        (SELECT count(*)::int FROM "ProductionProcess") AS processes,
+        (SELECT count(*)::int FROM "ProcessMachineCableType") AS pm_cable_types,
+        (SELECT count(*)::int FROM "ProcessMachineCableSize") AS pm_cable_sizes
     `);
     console.log("Before:", before.rows[0]);
 
@@ -70,7 +81,9 @@ async function main() {
         (SELECT count(*)::int FROM "PettyCashEntry") AS petty,
         (SELECT count(*)::int FROM "Machine") AS machines,
         (SELECT count(*)::int FROM "MachineProductionEntry") AS mp_entries,
-        (SELECT count(*)::int FROM "ProductionProcess") AS processes
+        (SELECT count(*)::int FROM "ProductionProcess") AS processes,
+        (SELECT count(*)::int FROM "ProcessMachineCableType") AS pm_cable_types,
+        (SELECT count(*)::int FROM "ProcessMachineCableSize") AS pm_cable_sizes
     `);
     console.log("After: ", after.rows[0]);
 

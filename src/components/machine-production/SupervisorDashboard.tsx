@@ -7,6 +7,7 @@ import {
   type MachineCard,
   type SlotInfo,
 } from "@/components/machine-production/ProductionEntryForm";
+import { CardGridLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
 import type { ShiftFilter, SlotStatus } from "@/lib/machine-production/slots";
 
 type Counts = {
@@ -332,7 +333,13 @@ export function SupervisorDashboard() {
         </div>
       ) : null}
 
-      {loading ? <p className="mp-muted">Loading…</p> : null}
+      {loading ? (
+        <CardGridLoadingSkeleton
+          cards={8}
+          label="Loading machine production"
+          showChrome={false}
+        />
+      ) : null}
       {error ? <p className="mp-error">{error}</p> : null}
 
       {!loading && data?.level === "processes" ? (

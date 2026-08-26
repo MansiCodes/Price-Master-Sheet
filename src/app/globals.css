@@ -731,10 +731,8 @@ textarea {
     font-size: 0.78rem;
   }
 
-  /* Language lives in the mobile menu instead, keeping the bar uncrowded. */
-  .dash-header .lang-switch {
-    display: none;
-  }
+  /* Phone only: language moves into the menu. Tablet keeps Eng/हि in the navbar. */
+  /* (lang-switch hide is in a tighter breakpoint below) */
 
   .dash-header__logout:hover,
   .dash-header__logout:active,
@@ -795,6 +793,13 @@ textarea {
   .dash-mobile-nav__panel .dash-sidebar__user {
     margin: 0 0.55rem calc(0.55rem + env(safe-area-inset-bottom));
     padding: 0.5rem 0.6rem;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Language lives in the mobile menu instead, keeping the bar uncrowded. */
+  .dash-header .lang-switch {
+    display: none;
   }
 }
 
@@ -970,6 +975,20 @@ textarea {
   background: color-mix(in srgb, var(--teal-soft) 45%, white);
 }
 
+.data-table__skeleton-line {
+  display: block;
+  height: 0.85rem;
+  width: 72%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+
+.data-table__skeleton-row td:nth-child(even) .data-table__skeleton-line {
+  width: 48%;
+}
+
 .pagination {
   display: flex;
   align-items: center;
@@ -1107,6 +1126,9 @@ textarea {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.8rem;
 }
+.core-skeleton__cards--four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .core-skeleton__card {
   display: grid;
   gap: 0.65rem;
@@ -1135,14 +1157,103 @@ textarea {
 }
 .core-skeleton__table span { width: 100%; height: 1.5rem; }
 
+.core-skeleton__form {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.1rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.core-skeleton__form span {
+  width: 100%;
+  height: 2.6rem;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+.core-skeleton__form span:nth-child(odd) { width: 72%; }
+
+.core-skeleton__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+.core-skeleton__counts span {
+  width: 7.5rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+
+.core-skeleton__tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.core-skeleton__tabs span {
+  height: 2.6rem;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+
+.core-skeleton__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+.core-skeleton__grid-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.core-skeleton__grid-media {
+  display: block;
+  width: 100%;
+  height: 7.5rem;
+  border-radius: 12px;
+}
+.core-skeleton__grid-card span:not(.core-skeleton__grid-media) {
+  height: 0.7rem;
+  width: 70%;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+.core-skeleton__grid-card span:nth-child(2) { width: 40%; }
+.core-skeleton__grid-card span:nth-child(3) { width: 85%; height: 1rem; }
+.core-skeleton__grid-card span:nth-child(4) { width: 55%; }
+.core-skeleton__grid-media {
+  background: linear-gradient(90deg, #e7eeeb 25%, #f8faf9 50%, #e7eeeb 75%);
+  background-size: 200% 100%;
+  animation: core-shimmer 1.35s ease-in-out infinite;
+}
+
 @keyframes core-shimmer {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
 
+@media (max-width: 1100px) {
+  .core-skeleton__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .core-skeleton__cards--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 760px) {
   .core-skeleton__cards { grid-template-columns: 1fr; }
+  .core-skeleton__cards--four { grid-template-columns: 1fr; }
   .core-skeleton__columns { grid-template-columns: 1fr; }
+  .core-skeleton__grid { grid-template-columns: 1fr; }
+  .core-skeleton__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .page-title {

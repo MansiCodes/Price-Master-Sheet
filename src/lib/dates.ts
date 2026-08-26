@@ -152,23 +152,22 @@ export function getIstHoursMinutes(now: Date = new Date()): {
 
 /**
  * Shifts start at 09:00 (Day) and 21:00 (Night) IST.
- * We *schedule* at 08:50, but hosts often fire late:
- * - Vercel Hobby: any minute within the scheduled UTC hour (±~30–60 min)
- * - GitHub Actions cron: often several minutes late
- * Accept a wide IST window so the WhatsApp still sends; ReminderLog claim
- * ids prevent duplicate sends if both Vercel and GitHub fire.
+ * Reminders must fire at 08:50 AM / 08:50 PM IST only — accept a short
+ * 5-minute window (08:50–08:54 / 20:50–20:54) so late host jitter does not
+ * send at the wrong time. ReminderLog claim ids still prevent duplicates if
+ * multiple schedulers hit within that window.
  */
 export function reminderShiftForNow(
   now: Date = new Date(),
 ): "DAY" | "NIGHT" | null {
   const { hour, minute } = getIstHoursMinutes(now);
   const minutes = hour * 60 + minute;
-  // 08:30–09:25 IST → Day (covers 03:00–03:59 UTC Hobby jitter)
-  const morningStart = 8 * 60 + 30;
-  const morningEnd = 9 * 60 + 25;
-  // 20:30–21:25 IST → Night (covers 15:00–15:59 UTC Hobby jitter)
-  const eveningStart = 20 * 60 + 30;
-  const eveningEnd = 21 * 60 + 25;
+  // 08:50–08:54 IST → Day
+  const morningStart = 8 * 60 + 50;
+  const morningEnd = 8 * 60 + 55;
+  // 20:50–20:54 IST → Night
+  const eveningStart = 20 * 60 + 50;
+  const eveningEnd = 20 * 60 + 55;
   if (minutes >= morningStart && minutes < morningEnd) return "DAY";
   if (minutes >= eveningStart && minutes < eveningEnd) return "NIGHT";
   return null;

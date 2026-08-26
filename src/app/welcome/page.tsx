@@ -13,14 +13,14 @@ export default async function WelcomePage() {
   const user = session.user;
   const plantIds = await getAccessiblePlantIds(user.id);
   if (plantIds.length === 0) {
-    redirect("/select-plant");
+    redirect("/");
   }
 
   const selectedPlantId = await resolveSelectedPlantId(user.id, {
     isSuperAdmin: isSuperAdmin(user.globalRole),
   });
   if (!selectedPlantId) {
-    redirect("/select-plant");
+    redirect("/");
   }
 
   const plant = await prisma.plant.findUnique({
@@ -29,7 +29,7 @@ export default async function WelcomePage() {
   });
 
   if (!plant) {
-    redirect("/select-plant");
+    redirect("/");
   }
 
   return <WelcomeRedirect plantName={plant.name} />;

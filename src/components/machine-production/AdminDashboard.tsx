@@ -10,6 +10,7 @@ import {
   type EditField,
 } from "@/components/pnl/EntryEditDrawer";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
+import { TablePageLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
 import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
 import { todayIstYmd } from "@/lib/machine-production/slots";
 import "@/components/pnl/pnl-reports.css";
@@ -142,7 +143,7 @@ export function AdminDashboard() {
   const [supervisors, setSupervisors] = useState<
     { id: string; label: string }[]
   >([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EntryRow | null>(null);
   const [editingEntry, setEditingEntry] = useState<EntryRow | null>(null);
   const [entryEditValues, setEntryEditValues] = useState<
@@ -877,7 +878,7 @@ export function AdminDashboard() {
               Actual {displaySummary.actualProduction}
             </span>
             <span className="mp-count">
-              Avg eff {displaySummary.averageEfficiency}%
+              Eff {displaySummary.averageEfficiency}%
             </span>
           </div>
         ) : null}
@@ -974,8 +975,13 @@ export function AdminDashboard() {
             </label>
           </div>
 
-          {loading ? <p className="mp-muted">Loading…</p> : null}
-
+          {loading ? (
+            <TablePageLoadingSkeleton
+              rows={8}
+              label="Loading production records"
+              showChrome={false}
+            />
+          ) : (
           <div className="mp-table-wrap">
             <table className="mp-table">
               <thead>
@@ -1036,7 +1042,7 @@ export function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
-                {entries.length === 0 && !loading ? (
+                {entries.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="mp-muted">
                       No records for these filters.
@@ -1046,6 +1052,7 @@ export function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          )}
         </>
       ) : tab === "machines" ? (
         <div className="mp-admin-machines">

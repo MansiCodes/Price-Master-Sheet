@@ -7,6 +7,8 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import {
   PVC_EXPENSE_SECTIONS,
+  expenseHeadLabelLines,
+  expenseHeadTabLabel,
   getPvcExpenseHeadsForSection,
   pvcExpensePnlLine,
   pvcExpenseSection,
@@ -156,28 +158,44 @@ export function PvcExpenseRegisterReport({
           section === "direct" ? "Direct expense types" : "Indirect expense types"
         }
       >
-        {sectionHeads.map((head) => (
-          <button
-            key={head}
-            type="button"
-            role="tab"
-            aria-selected={category === head}
-            className={category === head ? "is-active" : undefined}
-            onClick={() => {
-              setCategory(head);
-              setPage(1);
-            }}
-          >
-            {head === "Factory Rent" ? (
-              <span className="pnl-tab-nav__stacked">
-                <span>Factory</span>
-                <span>Rent</span>
-              </span>
-            ) : (
-              head
-            )}
-          </button>
-        ))}
+        {sectionHeads.map((head) => {
+          const lines = expenseHeadLabelLines(head);
+          const shortLabel = expenseHeadTabLabel(head);
+          return (
+            <button
+              key={head}
+              type="button"
+              role="tab"
+              aria-label={head}
+              title={head}
+              aria-selected={category === head}
+              className={category === head ? "is-active" : undefined}
+              onClick={() => {
+                setCategory(head);
+                setPage(1);
+              }}
+            >
+              {lines ? (
+                <>
+                  <span className="pnl-expense-cat-label--full">{head}</span>
+                  <span className="pnl-expense-cat-label--stacked pnl-tab-nav__stacked">
+                    <span>{lines[0]}</span>
+                    <span>{lines[1]}</span>
+                  </span>
+                </>
+              ) : shortLabel !== head ? (
+                <>
+                  <span className="pnl-expense-cat-label--full">{head}</span>
+                  <span className="pnl-expense-cat-label--short">
+                    {shortLabel}
+                  </span>
+                </>
+              ) : (
+                head
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {error ? <div className="alert alert--error">{error}</div> : null}

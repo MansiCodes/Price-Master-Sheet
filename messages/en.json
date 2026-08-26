@@ -35,6 +35,8 @@
     "dashboard": "Dashboard",
     "pnl": "P&L",
     "priceSheet": "Price Sheet",
+    "machineProduction": "Machine Production",
+    "mpAdmin": "MP Admin",
     "users": "Users",
     "integrations": "Integrations",
     "audit": "Audit trail"
@@ -78,14 +80,6 @@
     "devOtpNote": "Local testing only — removed when WhatsApp template is live",
     "brandName": "Cable Junction",
     "tagline": "Every plant's numbers, wired into one place."
-  },
-  "selectPlant": {
-    "brand": "Cable Junction",
-    "title": "Choose your plant",
-    "lead": "Select which plant you want to work in today.",
-    "noAccessTitle": "No plant access",
-    "noAccessBody": "Your account is not assigned to any plant yet. Contact the Super Admin to get access.",
-    "continue": "Continue"
   },
   "welcome": {
     "eyebrow": "Welcome to",

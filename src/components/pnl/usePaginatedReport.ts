@@ -17,7 +17,9 @@ export function usePaginatedReport<T>(
   baseUrl: string,
   fallbackError: string,
   initialPageSize = DEFAULT_REPORT_PAGE_SIZE,
+  options?: { enabled?: boolean },
 ) {
+  const enabled = options?.enabled !== false;
   const [rows, setRows] = useState<T[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
@@ -32,6 +34,15 @@ export function usePaginatedReport<T>(
   }, [baseUrl]);
 
   useEffect(() => {
+    if (!enabled) {
+      setRows([]);
+      setTotal(0);
+      setResponse(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
@@ -76,7 +87,7 @@ export function usePaginatedReport<T>(
     return () => {
       cancelled = true;
     };
-  }, [baseUrl, fallbackError, page, pageSize, reloadKey]);
+  }, [baseUrl, fallbackError, page, pageSize, reloadKey, enabled]);
 
   function changePageSize(nextPageSize: number) {
     setPage(1);

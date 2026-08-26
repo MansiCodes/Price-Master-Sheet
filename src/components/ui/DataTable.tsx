@@ -38,10 +38,20 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
+          {loading && rows.length === 0 ? (
+            Array.from({ length: 5 }, (_, rowIndex) => (
+              <tr key={`sk-${rowIndex}`} className="data-table__skeleton-row">
+                {columns.map((col) => (
+                  <td key={col.key}>
+                    <span className="data-table__skeleton-line" />
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="data-table__empty">
-                {loading ? "Loading…" : emptyMessage}
+                {emptyMessage}
               </td>
             </tr>
           ) : (

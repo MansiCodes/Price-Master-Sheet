@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { canAccessPlant, isSuperAdmin } from "@/lib/rbac";
 import {
-  clearSelectedPlantCookie,
   setAllPlantsCookie,
   setSelectedPlantCookie,
 } from "@/lib/selected-plant";
@@ -21,10 +20,6 @@ export async function selectPlantAction(plantId: string) {
   await setSelectedPlantCookie(plantId);
 
   redirect("/welcome");
-}
-
-export async function clearPlantSelectionAction() {
-  await clearSelectedPlantCookie();
 }
 
 export async function viewAllPlantsAction() {

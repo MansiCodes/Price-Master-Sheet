@@ -31,9 +31,9 @@ function navItemLabel(
     case "price-sheet":
       return t("priceSheet");
     case "machine-production":
-      return "Machine Production";
+      return t("machineProduction");
     case "machine-production-admin":
-      return "MP Admin";
+      return t("mpAdmin");
     case "users":
       return t("users");
     case "integrations":
