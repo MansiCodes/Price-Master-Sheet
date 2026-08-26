@@ -14,8 +14,26 @@ export type SessionUser = {
   email: string;
   globalRole: GlobalRole;
   canViewPriceSheet: boolean;
+  canMachineSupervise: boolean;
   name?: string | null;
 };
+
+type MachineUserLike =
+  | GlobalRole
+  | Pick<SessionUser, "globalRole" | "canMachineSupervise">;
+
+function asMachineOpts(userOrRole: MachineUserLike): {
+  role: GlobalRole;
+  opts: { canMachineSupervise?: boolean };
+} {
+  if (typeof userOrRole === "string") {
+    return { role: userOrRole, opts: {} };
+  }
+  return {
+    role: userOrRole.globalRole,
+    opts: { canMachineSupervise: userOrRole.canMachineSupervise },
+  };
+}
 
 export async function requireSession(): Promise<
   { user: SessionUser } | { error: NextResponse }
@@ -32,6 +50,7 @@ export async function requireSession(): Promise<
       email: session.user.email,
       globalRole: session.user.globalRole,
       canViewPriceSheet: session.user.canViewPriceSheet,
+      canMachineSupervise: Boolean(session.user.canMachineSupervise),
       name: session.user.name,
     },
   };
@@ -61,9 +80,10 @@ export function requireCanEnter(
 }
 
 export function requireMachineProductionAccess(
-  role: GlobalRole,
+  userOrRole: MachineUserLike,
 ): NextResponse | null {
-  if (!canAccessMachineProduction(role)) {
+  const { role, opts } = asMachineOpts(userOrRole);
+  if (!canAccessMachineProduction(role, opts)) {
     return NextResponse.json(
       { error: "Forbidden — Machine Production access required" },
       { status: 403 },
@@ -73,9 +93,10 @@ export function requireMachineProductionAccess(
 }
 
 export function requireMachineProductionEnter(
-  role: GlobalRole,
+  userOrRole: MachineUserLike,
 ): NextResponse | null {
-  if (!canEnterMachineProduction(role)) {
+  const { role, opts } = asMachineOpts(userOrRole);
+  if (!canEnterMachineProduction(role, opts)) {
     return NextResponse.json(
       { error: "Forbidden — Supervisor access required" },
       { status: 403 },
@@ -98,9 +119,10 @@ export function requireMachineProductionAdmin(
 
 /** Plant P&L data entry or Machine Production supervisor/admin. */
 export function requireCanEnterOrMachineProduction(
-  role: GlobalRole,
+  userOrRole: MachineUserLike,
 ): NextResponse | null {
-  if (canEnterData(role) || canEnterMachineProduction(role)) return null;
+  const { role, opts } = asMachineOpts(userOrRole);
+  if (canEnterData(role) || canEnterMachineProduction(role, opts)) return null;
   return NextResponse.json(
     { error: "You cannot upload files with this role" },
     { status: 403 },

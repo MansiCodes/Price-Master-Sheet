@@ -5,7 +5,9 @@ import {
   TodayHub,
   type ShiftModulesMap,
 } from "@/components/today/TodayHub";
+import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
 import type { DashboardMetrics } from "@/lib/dashboard/metrics";
+import type { MpHomeMetrics } from "@/lib/machine-production/home-metrics";
 import { localeToBcp47, type AppLocale } from "@/i18n/config";
 
 function formatDay(dateStr: string, locale: AppLocale): string {
@@ -25,6 +27,7 @@ export async function DashboardHome({
   plant,
   shiftModules,
   scope,
+  machineProductionMetrics = null,
 }: {
   metrics: DashboardMetrics;
   dateStr: string;
@@ -33,6 +36,7 @@ export async function DashboardHome({
   plant: { id: string; name: string; code: string } | null;
   shiftModules: ShiftModulesMap;
   scope: "org" | "plant";
+  machineProductionMetrics?: MpHomeMetrics | null;
 }) {
   const t = await getTranslations("dashboard");
   const tCommon = await getTranslations("common");
@@ -168,6 +172,22 @@ export async function DashboardHome({
           <WeekCompareChart points={metrics.weekSeries} />
         </section>
       </div>
+
+      {machineProductionMetrics ? (
+        <section
+          className="dash-merged__mp"
+          aria-label="Machine Production"
+          style={{ marginTop: "1.25rem" }}
+        >
+          <h2 className="section-label" style={{ marginBottom: "0.65rem" }}>
+            Machine Production
+          </h2>
+          <MachineProductionHome
+            metrics={machineProductionMetrics}
+            embedded
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

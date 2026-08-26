@@ -19,6 +19,7 @@ export type UserRow = {
   globalRole: string;
   creditScore: number | null;
   canViewPriceSheet: boolean;
+  canMachineSupervise: boolean;
   isActive: boolean;
   coinsBalance: number;
   createdAt: string;

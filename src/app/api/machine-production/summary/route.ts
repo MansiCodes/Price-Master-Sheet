@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAccess(session.user.globalRole);
+  const denied = requireMachineProductionAccess(session.user);
   if (denied) return denied;
 
   if (!canAdminMachineProduction(session.user.globalRole)) {

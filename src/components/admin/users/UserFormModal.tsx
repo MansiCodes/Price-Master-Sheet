@@ -22,6 +22,7 @@ type UserFormModalProps = {
     password: string;
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
+    canMachineSupervise: boolean;
     isActive: boolean;
     plantIds: string[];
   }) => Promise<void>;
@@ -52,6 +53,7 @@ export function UserFormModal({
   const [password, setPassword] = useState("");
   const [globalRole, setGlobalRole] = useState<RoleValue>("ACCOUNTANT");
   const [canViewPriceSheet, setCanViewPriceSheet] = useState(false);
+  const [canMachineSupervise, setCanMachineSupervise] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
   const [plantError, setPlantError] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export function UserFormModal({
   );
   const requiresPlants =
     globalRole !== "SUPER_ADMIN" && globalRole !== "MACHINE_SUPERVISOR";
+  const canAddMachineSupervise =
+    globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT";
 
   useEffect(() => {
     if (open) {
@@ -85,6 +89,7 @@ export function UserFormModal({
       setPassword("");
       setGlobalRole(editing.globalRole as RoleValue);
       setCanViewPriceSheet(editing.canViewPriceSheet);
+      setCanMachineSupervise(Boolean(editing.canMachineSupervise));
       setSelectedPlantIds(
         editing.plantRoles?.map((role) => role.plantId) ?? [],
       );
@@ -95,6 +100,7 @@ export function UserFormModal({
       setPassword("");
       setGlobalRole("ACCOUNTANT");
       setCanViewPriceSheet(false);
+      setCanMachineSupervise(false);
       setSelectedPlantIds(
         activePlants[0] ? [activePlants[0].id] : [],
       );
@@ -114,12 +120,20 @@ export function UserFormModal({
     if (globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR") {
       setSelectedPlantIds([]);
       setPlantError(null);
+      setCanMachineSupervise(false);
       return;
+    }
+    if (
+      globalRole !== "PLANT_MANAGER" &&
+      globalRole !== "ACCOUNTANT" &&
+      canMachineSupervise
+    ) {
+      setCanMachineSupervise(false);
     }
     if (selectedPlantIds.length === 0 && activePlants[0] && !editing) {
       setSelectedPlantIds([activePlants[0].id]);
     }
-  }, [globalRole, open, activePlants, editing, selectedPlantIds.length]);
+  }, [globalRole, open, activePlants, editing, selectedPlantIds.length, canMachineSupervise]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -161,6 +175,10 @@ export function UserFormModal({
       password,
       globalRole,
       canViewPriceSheet,
+      canMachineSupervise:
+        globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT"
+          ? canMachineSupervise
+          : false,
       isActive: editing?.isActive ?? true,
       plantIds: globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR"
         ? []
@@ -351,6 +369,17 @@ export function UserFormModal({
               />
               <span>Can view Price Sheet</span>
             </label>
+            {canAddMachineSupervise ? (
+              <label className="users-check">
+                <input
+                  type="checkbox"
+                  checked={canMachineSupervise}
+                  disabled={saving}
+                  onChange={(e) => setCanMachineSupervise(e.target.checked)}
+                />
+                <span>Also Machine Supervisor</span>
+              </label>
+            ) : null}
           </div>
         </form>
 

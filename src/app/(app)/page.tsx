@@ -7,7 +7,7 @@ import {
   canEnterData,
   canViewPnl,
   getAccessiblePlantIds,
-  isMachineSupervisor,
+  isMachineSupervisorOnly,
   isSuperAdmin,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
@@ -58,7 +58,7 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
 
   const user = session.user;
-  if (isMachineSupervisor(user.globalRole)) {
+  if (isMachineSupervisorOnly(user.globalRole)) {
     const metrics = await getMachineProductionHomeMetrics();
     return <MachineProductionHome metrics={metrics} />;
   }
@@ -107,6 +107,10 @@ export default async function DashboardPage() {
     };
   }
 
+  const machineProductionMetrics = user.canMachineSupervise
+    ? await getMachineProductionHomeMetrics()
+    : null;
+
   return (
     <DashboardHome
       metrics={metrics}
@@ -116,6 +120,7 @@ export default async function DashboardPage() {
       plant={primary}
       shiftModules={shiftModules}
       scope={primary ? "plant" : "org"}
+      machineProductionMetrics={machineProductionMetrics}
     />
   );
 }

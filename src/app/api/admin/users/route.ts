@@ -23,6 +23,7 @@ const createSchema = z.object({
   password: z.string().min(8).max(128),
   globalRole: z.enum(GlobalRole),
   canViewPriceSheet: z.boolean().optional().default(false),
+  canMachineSupervise: z.boolean().optional().default(false),
   plantIds: z.array(z.string().min(1)).optional().default([]),
 });
 
@@ -54,6 +55,7 @@ export async function GET() {
         globalRole: true,
         creditScore: true,
         canViewPriceSheet: true,
+        canMachineSupervise: true,
         isActive: true,
         coinsBalance: true,
         createdAt: true,
@@ -153,6 +155,10 @@ export async function POST(request: Request) {
       role === GlobalRole.SUPER_ADMIN
         ? true
         : Boolean(parsed.data.canViewPriceSheet);
+    const canMachineSupervise =
+      role === GlobalRole.PLANT_MANAGER || role === GlobalRole.ACCOUNTANT
+        ? Boolean(parsed.data.canMachineSupervise)
+        : false;
 
     const user = await prisma.user.create({
       data: {
@@ -163,6 +169,7 @@ export async function POST(request: Request) {
         globalRole: role,
         creditScore: role === GlobalRole.SUPER_ADMIN ? 100 : null,
         canViewPriceSheet,
+        canMachineSupervise,
         isActive: true,
         plantRoles: {
           create: plantIds.map((plantId) => ({
@@ -179,6 +186,7 @@ export async function POST(request: Request) {
         globalRole: true,
         creditScore: true,
         canViewPriceSheet: true,
+        canMachineSupervise: true,
         isActive: true,
       },
     });
@@ -193,6 +201,7 @@ export async function POST(request: Request) {
         globalRole: user.globalRole,
         plantIds,
         canViewPriceSheet: user.canViewPriceSheet,
+        canMachineSupervise: user.canMachineSupervise,
       },
       actorId: session!.user!.id,
     });

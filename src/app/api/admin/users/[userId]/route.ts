@@ -23,6 +23,7 @@ const patchSchema = z.object({
   phone: indiaPhoneSchema.optional(),
   globalRole: z.enum(GlobalRole).optional(),
   canViewPriceSheet: z.boolean().optional(),
+  canMachineSupervise: z.boolean().optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(128).optional(),
   plantIds: z.array(z.string().min(1)).optional(),
@@ -119,6 +120,17 @@ export async function PATCH(request: Request, context: RouteContext) {
   const nextCreditScore =
     nextRole === GlobalRole.SUPER_ADMIN ? 100 : null;
 
+  const nextCanMachineSupervise =
+    data.canMachineSupervise !== undefined
+      ? nextRole === GlobalRole.PLANT_MANAGER ||
+        nextRole === GlobalRole.ACCOUNTANT
+        ? data.canMachineSupervise
+        : false
+      : nextRole === GlobalRole.PLANT_MANAGER ||
+          nextRole === GlobalRole.ACCOUNTANT
+        ? existing.canMachineSupervise
+        : false;
+
   const updated = await prisma.$transaction(async (tx) => {
     const user = await tx.user.update({
       where: { id: userId },
@@ -136,6 +148,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           : nextRole === GlobalRole.SUPER_ADMIN
             ? { canViewPriceSheet: true }
             : {}),
+        canMachineSupervise: nextCanMachineSupervise,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         // For now it is prefilled only for SUPER_ADMIN.
         creditScore: nextCreditScore,
@@ -149,6 +162,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         globalRole: true,
         creditScore: true,
         canViewPriceSheet: true,
+        canMachineSupervise: true,
         isActive: true,
       },
     });

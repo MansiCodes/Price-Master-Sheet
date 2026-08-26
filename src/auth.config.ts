@@ -1,7 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 /** Session cookie name — bump version whenever AUTH_SECRET rotates so old JWTs are ignored. */
-export const SESSION_COOKIE = "cj.session-token.v3";
+export const SESSION_COOKIE = "cj.session-token.v4";
 
 /**
  * Edge-compatible Auth.js config used by middleware.
@@ -55,6 +55,7 @@ export const authConfig = {
         token.email = user.email;
         token.globalRole = user.globalRole;
         token.canViewPriceSheet = user.canViewPriceSheet;
+        token.canMachineSupervise = Boolean(user.canMachineSupervise);
       }
       return token;
     },
@@ -65,6 +66,7 @@ export const authConfig = {
           (token.email as string | null | undefined) ?? session.user.email;
         session.user.globalRole = token.globalRole as typeof session.user.globalRole;
         session.user.canViewPriceSheet = Boolean(token.canViewPriceSheet);
+        session.user.canMachineSupervise = Boolean(token.canMachineSupervise);
       }
       return session;
     },

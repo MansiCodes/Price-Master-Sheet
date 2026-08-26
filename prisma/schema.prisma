@@ -67,6 +67,8 @@ model User {
   phone              String?
   globalRole         GlobalRole       @default(ACCOUNTANT)
   canViewPriceSheet  Boolean          @default(false)
+  /// Extra Machine Production access for Plant Manager / Accountant hybrids.
+  canMachineSupervise Boolean         @default(false)
   coinsBalance       Int              @default(0)
   // Credit score is assigned after users complete required forms.
   // For now it is only initialized for SUPER_ADMIN.

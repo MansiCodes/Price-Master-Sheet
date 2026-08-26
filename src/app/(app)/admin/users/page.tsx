@@ -146,6 +146,7 @@ export default function AdminUsersPage() {
     password: string;
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
+    canMachineSupervise: boolean;
     isActive: boolean;
     plantIds: string[];
   }) {
@@ -159,6 +160,7 @@ export default function AdminUsersPage() {
           phone: payload.phone,
           globalRole: payload.globalRole,
           canViewPriceSheet: payload.canViewPriceSheet,
+          canMachineSupervise: payload.canMachineSupervise,
           isActive: payload.isActive,
           plantIds: payload.plantIds,
         };
@@ -184,6 +186,7 @@ export default function AdminUsersPage() {
             password: payload.password,
             globalRole: payload.globalRole,
             canViewPriceSheet: payload.canViewPriceSheet,
+            canMachineSupervise: payload.canMachineSupervise,
             plantIds: payload.plantIds,
           }),
         });

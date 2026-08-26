@@ -9,12 +9,16 @@ export type PriceSheetUser = {
   canViewPriceSheet: boolean;
 };
 
+export type MachineAccessOpts = {
+  /** Plant Manager / Accountant also acting as Machine Supervisor */
+  canMachineSupervise?: boolean;
+};
+
 const PNL_VIEW_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.SUPER_ADMIN,
   GlobalRole.BUSINESS_HEAD,
   GlobalRole.PLANT_MANAGER,
   GlobalRole.VIEWER,
-  GlobalRole.MACHINE_SUPERVISOR,
 ]);
 
 const DATA_ENTRY_ROLES: ReadonlySet<GlobalRole> = new Set([
@@ -25,10 +29,16 @@ const DATA_ENTRY_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.MACHINE_SUPERVISOR,
 ]);
 
-/** Machine Production module — Admin (SUPER_ADMIN) + Supervisor only. */
+/** Primary Machine Production roles (full MS shell). */
 const MACHINE_PRODUCTION_ROLES: ReadonlySet<GlobalRole> = new Set([
   GlobalRole.SUPER_ADMIN,
   GlobalRole.MACHINE_SUPERVISOR,
+]);
+
+/** Roles that may combine with Machine Supervisor via canMachineSupervise. */
+export const HYBRID_MACHINE_SUPERVISE_ROLES: ReadonlySet<GlobalRole> = new Set([
+  GlobalRole.PLANT_MANAGER,
+  GlobalRole.ACCOUNTANT,
 ]);
 
 export function canViewPnl(role: GlobalRole | Role): boolean {
@@ -39,22 +49,39 @@ export function canEnterData(role: GlobalRole | Role): boolean {
   return DATA_ENTRY_ROLES.has(role);
 }
 
-export function canAccessMachineProduction(role: GlobalRole | Role): boolean {
-  return MACHINE_PRODUCTION_ROLES.has(role);
+export function canAccessMachineProduction(
+  role: GlobalRole | Role,
+  opts?: MachineAccessOpts,
+): boolean {
+  if (MACHINE_PRODUCTION_ROLES.has(role)) return true;
+  return Boolean(opts?.canMachineSupervise);
 }
 
-export function canEnterMachineProduction(role: GlobalRole | Role): boolean {
-  return (
-    role === GlobalRole.MACHINE_SUPERVISOR || role === GlobalRole.SUPER_ADMIN
-  );
+export function canEnterMachineProduction(
+  role: GlobalRole | Role,
+  opts?: MachineAccessOpts,
+): boolean {
+  if (
+    role === GlobalRole.MACHINE_SUPERVISOR ||
+    role === GlobalRole.SUPER_ADMIN
+  ) {
+    return true;
+  }
+  return Boolean(opts?.canMachineSupervise);
 }
 
 export function canAdminMachineProduction(role: GlobalRole | Role): boolean {
   return role === GlobalRole.SUPER_ADMIN;
 }
 
-export function isMachineSupervisor(role: GlobalRole | Role): boolean {
+/** True only for dedicated Machine Supervisor accounts (no plant shell). */
+export function isMachineSupervisorOnly(role: GlobalRole | Role): boolean {
   return role === GlobalRole.MACHINE_SUPERVISOR;
+}
+
+/** @deprecated use isMachineSupervisorOnly — kept for call-site clarity */
+export function isMachineSupervisor(role: GlobalRole | Role): boolean {
+  return isMachineSupervisorOnly(role);
 }
 
 export function canViewPriceSheet(user: PriceSheetUser): boolean {
@@ -73,6 +100,10 @@ export function isAdminOrHead(role: GlobalRole | Role): boolean {
   return (
     role === GlobalRole.SUPER_ADMIN || role === GlobalRole.BUSINESS_HEAD
   );
+}
+
+export function canCombineMachineSupervise(role: GlobalRole | Role): boolean {
+  return HYBRID_MACHINE_SUPERVISE_ROLES.has(role);
 }
 
 export async function canAccessPlant(

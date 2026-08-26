@@ -10,7 +10,7 @@ import {
   canViewPnl,
   canViewPriceSheet,
   isAdminOrHead,
-  isMachineSupervisor,
+  isMachineSupervisorOnly,
   isPlantManager,
   isSuperAdmin,
 } from "@/lib/rbac";
@@ -32,8 +32,9 @@ export default async function AppLayout({
   const role = user.globalRole;
   const superAdmin = role ? isSuperAdmin(role) : false;
 
-  // Machine supervisors skip plant-scoped shell chrome.
-  if (role && isMachineSupervisor(role)) {
+  // Dedicated Machine Supervisors skip plant-scoped shell chrome.
+  // Plant Manager / Accountant hybrids keep the plant shell + Machine Production.
+  if (role && isMachineSupervisorOnly(role)) {
     return (
       <AppShell
         navFlags={{
@@ -100,7 +101,9 @@ export default async function AppLayout({
     !!user &&
     (user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user));
   const showMachineProduction = role
-    ? canAccessMachineProduction(role)
+    ? canAccessMachineProduction(role, {
+        canMachineSupervise: Boolean(user.canMachineSupervise),
+      })
     : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
   const showSuper = role ? isSuperAdmin(role) : false;

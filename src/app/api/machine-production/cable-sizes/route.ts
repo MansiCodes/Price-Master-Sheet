@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAccess(session.user.globalRole);
+  const denied = requireMachineProductionAccess(session.user);
   if (denied) return denied;
 
   const cableTypeId = request.nextUrl.searchParams.get("cableTypeId")?.trim();
@@ -94,7 +94,7 @@ export async function POST(request: Request) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionEnter(session.user.globalRole);
+  const denied = requireMachineProductionEnter(session.user);
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);

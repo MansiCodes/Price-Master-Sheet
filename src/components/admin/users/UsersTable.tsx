@@ -68,6 +68,7 @@ export function UsersTable({
                     <span className="users-pill users-pill--role">
                       {ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ??
                         u.globalRole}
+                      {u.canMachineSupervise ? " + MS" : ""}
                     </span>
                   </td>
                   <td>

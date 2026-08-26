@@ -19,7 +19,13 @@ function formatDay(dateStr: string): string {
   });
 }
 
-export function MachineProductionHome({ metrics }: { metrics: MpHomeMetrics }) {
+export function MachineProductionHome({
+  metrics,
+  embedded = false,
+}: {
+  metrics: MpHomeMetrics;
+  embedded?: boolean;
+}) {
   const liveShift = metrics.currentSlot.shift as ShiftKey;
   const [shift, setShift] = useState<ShiftKey>(liveShift);
 
@@ -33,7 +39,13 @@ export function MachineProductionHome({ metrics }: { metrics: MpHomeMetrics }) {
   }, [metrics.counts]);
 
   return (
-    <div className="dashboard mis dash-merged mp-home">
+    <div
+      className={
+        embedded
+          ? "mp-home mp-home--embedded"
+          : "dashboard mis dash-merged mp-home"
+      }
+    >
       <section className="mis-kpi-grid mis-kpi-grid--six" aria-label="Slot metrics">
         <KpiCard
           label="Machines"

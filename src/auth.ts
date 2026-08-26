@@ -53,6 +53,7 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
     name: user.name,
     globalRole: user.globalRole,
     canViewPriceSheet: user.canViewPriceSheet,
+    canMachineSupervise: user.canMachineSupervise,
   };
 }
 
@@ -100,6 +101,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name,
             globalRole: user.globalRole,
             canViewPriceSheet: user.canViewPriceSheet,
+            canMachineSupervise: user.canMachineSupervise,
           };
         } catch (err) {
           console.error("[NextAuth authorize error]", err);

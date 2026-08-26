@@ -6,9 +6,7 @@ export async function POST() {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const enterDenied = requireCanEnterOrMachineProduction(
-    session.user.globalRole,
-  );
+  const enterDenied = requireCanEnterOrMachineProduction(session.user);
   if (enterDenied) return enterDenied;
 
   const signed = createBillUploadSignature();
