@@ -263,13 +263,13 @@ export function TodayHub({
         : [...getExpenseHeads(plantCode)],
     [plantCode, hasExpenseSections, expenseSection],
   );
-  const farVendorOptions = useMemo(() => [...PVC_FAR_VENDORS, "Other"], []);
+  const farVendorOptions = useMemo(() => Array.from(new Set([...PVC_FAR_VENDORS, "Other"])), []);
   const cat6SupplierOptions = useMemo(
-    () => [...purchaseCatalog.suppliers, "Other"],
+    () => Array.from(new Set([...purchaseCatalog.suppliers, "Other"])),
     [purchaseCatalog.suppliers],
   );
   const cat6CustomerOptions = useMemo(
-    () => [...customers, "Other"],
+    () => Array.from(new Set([...customers, "Other"])),
     [customers],
   );
   const stockParticulars = Array.from(
@@ -672,6 +672,10 @@ export function TodayHub({
         fail("Describe the purchase type for Others.");
         return;
       }
+      if (billPhotos.length === 0) {
+        fail("Please upload at least one bill/challan image.");
+        return;
+      }
       result = await postJson(`/api/plants/${plantId}/purchases`, {
         date: entryDate,
         shift,
@@ -722,6 +726,10 @@ export function TodayHub({
         fail("Describe the sales type for Others.");
         return;
       }
+      if (invoicePhotos.length === 0) {
+        fail("Please upload at least one invoice/bill image.");
+        return;
+      }
       result = await postJson(`/api/plants/${plantId}/sales`, {
         date: entryDate,
         shift,
@@ -730,7 +738,7 @@ export function TodayHub({
         customerName: resolvedCustomerName,
         billNumber: invoiceNo || null,
         billDate: entryDate,
-        notes: isCat6 ? null : saleRemarks.trim() || null,
+        notes: saleRemarks.trim() || null,
         billPhotoUrls: invoicePhotos,
         items,
       });
@@ -741,36 +749,26 @@ export function TodayHub({
           : stockItem.trim();
       const closingQty = Number(stockQty);
       const closingRate = Number(stockRate);
-      const closingValue =
-        usesStockLedger
-          ? stockValue === ""
-            ? closingQty * closingRate
-            : Number(stockValue)
-          : stockValue === ""
-            ? closingQty * closingRate
-            : Number(stockValue);
+      const closingValue = closingQty * closingRate;
       if (
         !resolvedItem ||
         stockQty === "" ||
-        (usesStockLedger ? stockRate === "" : stockValue === "")
+        stockRate === ""
       ) {
         fail(
           (stockItem === "Others" || stockItem === "Other") &&
             !stockItemOther.trim()
             ? "Enter the other item name."
-            : usesStockLedger
-              ? "Enter stock category, item, quantity, unit, and rate."
-              : "Enter item, quantity, and value.",
+            : "Enter stock category, item, quantity, unit, and rate.",
         );
         return;
       }
-      if (
-        !(closingQty >= 0) ||
-        (usesStockLedger
-          ? !(closingRate >= 0)
-          : !(closingValue >= 0))
-      ) {
-        fail("Quantity, rate, and value must be zero or more.");
+      if (!(closingQty >= 0) || !(closingRate >= 0)) {
+        fail("Quantity and rate must be zero or more.");
+        return;
+      }
+      if (stockPhotos.length === 0) {
+        fail("Please upload a photo of the stock.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/stock`, {
@@ -784,16 +782,33 @@ export function TodayHub({
             ? stockUnit || stockCatalog.defaultUnit || "NOS"
             : "kg",
         quantity: closingQty,
-        rate: usesStockLedger ? closingRate : undefined,
-        value: usesStockLedger
-          ? closingQty * closingRate
-          : closingValue,
+        rate: closingRate,
+        value: closingValue,
         notes: isPvc
           ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
           : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
     } else if (kind === "expense") {
+      if (
+        expenseHead !== "Factory Rent" &&
+        expenseHead !== "Electricity" &&
+        expenseHead !== "Fuel & Power" &&
+        expenseHead !== "FAR" &&
+        expenseHead !== "Depreciation (FAR)"
+      ) {
+        if (expenseHead === "Petty Cash") {
+          if (pettyCashPhotos.length === 0) {
+            fail("Please upload at least one petty cash bill/receipt photo.");
+            return;
+          }
+        } else {
+          if (expensePhotos.length === 0) {
+            fail("Please upload at least one bill/receipt photo.");
+            return;
+          }
+        }
+      }
       if (expenseHead === "Factory Rent") {
         const area =
           rentCoveredArea === "" ? null : Number(rentCoveredArea);
@@ -1391,7 +1406,7 @@ export function TodayHub({
                 ) : null}
                 {vendorName === "Other" ? (
                   <div className="field">
-                    <label htmlFor="p-vendor-other">Vendor&apos;s Name</label>
+                    <label htmlFor="p-vendor-other">Vendor&apos;s Name <span style={{ color: "red" }}>*</span></label>
                     <input
                       id="p-vendor-other"
                       required
@@ -1497,7 +1512,7 @@ export function TodayHub({
                 )}
                 {customerName === "Other" ? (
                   <div className="field">
-                    <label htmlFor="s-cust-other">Customer Name</label>
+                    <label htmlFor="s-cust-other">Customer Name <span style={{ color: "red" }}>*</span></label>
                     <input
                       id="s-cust-other"
                       required
@@ -1541,17 +1556,15 @@ export function TodayHub({
                     isPvc ? "KG" : PRODUCTS.find((p) => p.name === name)?.unit
                   }
                 />
-                {isCat6 ? null : (
                 <div className="field">
                   <label htmlFor="s-remarks">Remarks</label>
                   <input
                     id="s-remarks"
                     value={saleRemarks}
                     onChange={(e) => setSaleRemarks(e.target.value)}
-                    placeholder="e.g. Factory staff / Operator"
+                    placeholder="Optional remarks"
                   />
                 </div>
-                )}
                 <BillUpload
                   label="Upload invoice"
                   urls={invoicePhotos}
@@ -1595,7 +1608,7 @@ export function TodayHub({
                 {stockItem === "Others" || stockItem === "Other" ? (
                   <div className="field">
                     <label htmlFor="st-item-other">
-                      {usesStockLedger ? "Other particulars" : "Other item"}
+                      {usesStockLedger ? "Other particulars" : "Other item"} <span style={{ color: "red" }}>*</span>
                     </label>
                     <input
                       id="st-item-other"
@@ -1652,46 +1665,17 @@ export function TodayHub({
                     )}
                   </div>
                 </div>
-                {usesStockLedger ? (
-                  <div className="prod-fields__row">
-                    <div className="field">
-                      <label htmlFor="st-rate">Rate</label>
-                      <DecimalInput
-                        id="st-rate"
-                        required
-                        value={stockRate}
-                        onChange={(next) => {
-                          setStockRate(next);
-                          const qty = Number(stockQty);
-                          const rate = Number(next);
-                          if (Number.isFinite(qty) && Number.isFinite(rate)) {
-                            setStockValue((qty * rate).toFixed(2));
-                          }
-                        }}
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="st-closing-value">Closing Value</label>
-                      <DecimalInput
-                        id="st-closing-value"
-                        value={stockValue}
-                        onChange={setStockValue}
-                      />
-                    </div>
+                <div className="prod-fields__row">
+                  <div className="field">
+                    <label htmlFor="st-rate">Rate</label>
+                    <DecimalInput
+                      id="st-rate"
+                      required
+                      value={stockRate}
+                      onChange={setStockRate}
+                    />
                   </div>
-                ) : (
-                  <div className="prod-fields__row">
-                    <div className="field">
-                      <label htmlFor="st-value">Value</label>
-                      <DecimalInput
-                        id="st-value"
-                        required
-                        value={stockValue}
-                        onChange={setStockValue}
-                      />
-                    </div>
-                  </div>
-                )}
+                </div>
                 <div className="field expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea
@@ -1902,7 +1886,7 @@ export function TodayHub({
                     </div>
                     {farVendor === "Other" ? (
                       <div className="field">
-                        <label htmlFor="far-vendor-other">Supplier (other)</label>
+                        <label htmlFor="far-vendor-other">Supplier (other) <span style={{ color: "red" }}>*</span></label>
                         <input
                           id="far-vendor-other"
                           value={farVendorOther}

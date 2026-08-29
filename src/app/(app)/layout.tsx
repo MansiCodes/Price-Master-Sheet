@@ -132,7 +132,7 @@ export default async function AppLayout({
       canEnter={canEnter}
       plants={switchablePlants}
       currentPlantId={selectedPlantId}
-      allowAllPlants={superAdmin}
+      allowAllPlants={false}
       entryPlant={selectedPlant}
     >
       {children}

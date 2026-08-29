@@ -84,7 +84,7 @@ export function BillUpload({
   return (
     <div className="bill-upload">
       <div className="bill-upload__head">
-        <label>{label}</label>
+        <label>{label} <span style={{ color: "red" }}>*</span></label>
         <span className="bill-upload__count">
           {urls.length}/{MAX_PHOTOS}
         </span>

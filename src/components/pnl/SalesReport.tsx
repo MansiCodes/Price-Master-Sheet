@@ -255,6 +255,14 @@ export function SalesReport({
       compact: true,
       render: (r) => r.meterUnit?.trim() || "—",
     },
+    {
+      key: "photos",
+      label: "Image",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+      ),
+    },
   ];
 
   return (

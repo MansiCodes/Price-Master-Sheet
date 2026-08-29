@@ -318,6 +318,14 @@ export function PurchaseReport({
       align: "right",
       render: (r) => formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
     },
+    {
+      key: "photos",
+      label: "Image",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.billPhotoUrls} fallbackUrl={r.billPhotoUrl} />
+      ),
+    },
   ];
 
   const columnsToUse = cat6

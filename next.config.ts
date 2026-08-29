@@ -12,6 +12,7 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig: NextConfig = {
   // Standalone is for Docker/ECS only — leave unset on Vercel.
   ...(process.env.VERCEL ? {} : { output: "standalone" as const }),
+  outputFileTracingRoot: path.join(__dirname, "."),
   // Force AUTH_SECRET into Edge middleware (fixes JWT "no matching decryption secret").
   env: {
     AUTH_SECRET: authSecret,

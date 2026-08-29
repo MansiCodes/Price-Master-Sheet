@@ -73,6 +73,15 @@ function clearStaleAuthCookies() {
   }
 }
 
+function setRememberMeCookie(remember: boolean) {
+  if (remember) {
+    const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+    document.cookie = `cj.remember-me=true; path=/; expires=${expires}; SameSite=Lax; Secure`;
+  } else {
+    document.cookie = `cj.remember-me=; path=/; max-age=0; SameSite=Lax; Secure`;
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const t = useTranslations("auth");
@@ -90,9 +99,15 @@ export default function LoginPage() {
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
+  const [rememberMe, setRememberMe] = useState(true);
 
   useEffect(() => {
     clearStaleAuthCookies();
+    const cookies = document.cookie.split(";").map((c) => c.trim());
+    const rememberMeCookie = cookies.find((c) => c.startsWith("cj.remember-me="));
+    if (rememberMeCookie) {
+      setRememberMe(rememberMeCookie.split("=")[1] === "true");
+    }
   }, []);
 
   useEffect(() => {
@@ -193,6 +208,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
+      setRememberMeCookie(rememberMe);
       const result = await signIn("credentials", {
         phone: e164,
         code: otp.trim(),
@@ -217,6 +233,7 @@ export default function LoginPage() {
     setInfo(null);
     setLoading(true);
     try {
+      setRememberMeCookie(rememberMe);
       const result = await signIn("credentials", {
         email: email.trim(),
         password,
@@ -400,6 +417,14 @@ export default function LoginPage() {
                     />
                   </div>
                 </div>
+                <label className="login-remember-me">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>{t("rememberMe")}</span>
+                </label>
                 <button
                   className="btn btn-primary login-submit"
                   type="submit"
@@ -453,6 +478,14 @@ export default function LoginPage() {
                     }
                   />
                 </div>
+                <label className="login-remember-me">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>{t("rememberMe")}</span>
+                </label>
                 <button
                   className="btn btn-primary login-submit"
                   type="submit"
@@ -517,6 +550,14 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+              <label className="login-remember-me">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>{t("rememberMe")}</span>
+              </label>
               <button
                 className="btn btn-primary login-submit"
                 type="submit"

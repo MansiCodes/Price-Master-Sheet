@@ -106,6 +106,14 @@ export function StockReport({
         String((page - 1) * pageSize + (index ?? 0) + 1),
     },
     {
+      key: "date",
+      label: "Date",
+      align: "center",
+      compact: true,
+      width: "6.5rem",
+      render: (r) => isoDate(r.date),
+    },
+    {
       key: "stock",
       label: "Stock",
       align: "center",
@@ -193,6 +201,13 @@ export function StockReport({
       label: "S.No",
       render: (_r, index) =>
         String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "date",
+      label: "Date",
+      align: "center",
+      compact: true,
+      render: (r) => isoDate(r.date),
     },
     {
       key: "item",
@@ -284,8 +299,7 @@ export function StockReport({
           { name: "itemName", label: isPvc ? "Particulars" : "Item Name", required: true },
           { name: "quantity", label: isPvc ? "Closing Stock" : "QTY", type: "number", required: true },
           { name: "unit", label: "Unit", required: true },
-          { name: "rate", label: "Rate", type: "number" },
-          { name: "value", label: isPvc ? "Closing Value" : "Value", type: "number", required: true },
+          { name: "rate", label: "Rate", type: "number", required: true },
           { name: "notes", label: "Notes", type: "textarea" },
         ]}
         values={crud.values}
@@ -293,17 +307,19 @@ export function StockReport({
         error={crud.error}
         onChange={crud.setField}
         onClose={crud.closeEdit}
-        onSave={() =>
+        onSave={() => {
+          const qty = Number(crud.values.quantity) || 0;
+          const rate = Number(crud.values.rate) || 0;
           void crud.save({
             date: crud.values.date,
             itemName: crud.values.itemName,
-            quantity: Number(crud.values.quantity),
+            quantity: qty,
             unit: crud.values.unit,
-            rate: crud.values.rate ? Number(crud.values.rate) : undefined,
-            value: Number(crud.values.value),
+            rate: rate,
+            value: qty * rate,
             notes: crud.values.notes || null,
-          })
-        }
+          });
+        }}
       />
       {crud.deleteDialog}
     </section>

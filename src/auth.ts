@@ -57,60 +57,93 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
   };
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
-  secret: process.env.AUTH_SECRET,
-  trustHost: true,
-  providers: [
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-        phone: { label: "Phone", type: "text" },
-        code: { label: "OTP Code", type: "text" },
-      },
-      async authorize(credentials) {
-        try {
-          const phone = readCredential(credentials?.phone);
-          const code = readCredential(credentials?.code);
-          if (phone && code) {
-            return await authorizeWithOtp(phone, code);
-          }
+export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
+  let rememberMe = false;
+  if (req) {
+    if ("cookies" in req && typeof (req.cookies as any)?.get === "function") {
+      rememberMe = (req.cookies as any).get("cj.remember-me")?.value === "true";
+    } else if (req.headers && typeof req.headers.get === "function") {
+      const cookieHeader = req.headers.get("cookie") || "";
+      rememberMe = cookieHeader.includes("cj.remember-me=true");
+    }
+  }
 
-          const email = readCredential(credentials?.email).toLowerCase().trim();
-          const password = readCredential(credentials?.password);
-          if (!email || !password || !email.includes("@")) {
+  const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 60 * 60 * 8; // 30 days vs 8 hours
+
+  return {
+    ...authConfig,
+    secret: process.env.AUTH_SECRET,
+    trustHost: true,
+    session: {
+      ...authConfig.session,
+      maxAge,
+      updateAge: maxAge,
+    },
+    jwt: {
+      ...authConfig.jwt,
+      maxAge,
+    },
+    cookies: {
+      ...authConfig.cookies,
+      sessionToken: {
+        ...authConfig.cookies?.sessionToken,
+        options: {
+          ...authConfig.cookies?.sessionToken?.options,
+          maxAge: rememberMe ? maxAge : undefined,
+        },
+      },
+    },
+    providers: [
+      Credentials({
+        name: "credentials",
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Password", type: "password" },
+          phone: { label: "Phone", type: "text" },
+          code: { label: "OTP Code", type: "text" },
+        },
+        async authorize(credentials) {
+          try {
+            const phone = readCredential(credentials?.phone);
+            const code = readCredential(credentials?.code);
+            if (phone && code) {
+              return await authorizeWithOtp(phone, code);
+            }
+
+            const email = readCredential(credentials?.email).toLowerCase().trim();
+            const password = readCredential(credentials?.password);
+            if (!email || !password || !email.includes("@")) {
+              return null;
+            }
+
+            const user = await prisma.user.findUnique({
+              where: { email },
+            });
+
+            if (!user || !user.isActive || !user.passwordHash) {
+              return null;
+            }
+
+            const valid = await bcrypt.compare(password, user.passwordHash);
+            if (!valid) return null;
+
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              globalRole: user.globalRole,
+              canViewPriceSheet: user.canViewPriceSheet,
+              canMachineSupervise: user.canMachineSupervise,
+            };
+          } catch (err) {
+            console.error("[NextAuth authorize error]", err);
             return null;
           }
-
-          const user = await prisma.user.findUnique({
-            where: { email },
-          });
-
-          if (!user || !user.isActive || !user.passwordHash) {
-            return null;
-          }
-
-          const valid = await bcrypt.compare(password, user.passwordHash);
-          if (!valid) return null;
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            globalRole: user.globalRole,
-            canViewPriceSheet: user.canViewPriceSheet,
-            canMachineSupervise: user.canMachineSupervise,
-          };
-        } catch (err) {
-          console.error("[NextAuth authorize error]", err);
-          return null;
-        }
-      },
-    }),
-  ],
-  callbacks: {
-    ...authConfig.callbacks,
-  },
+        },
+      }),
+    ],
+    callbacks: {
+      ...authConfig.callbacks,
+    },
+  };
 });

@@ -79,7 +79,8 @@
     "devOtpLabel": "Dev OTP",
     "devOtpNote": "Local testing only — removed when WhatsApp template is live",
     "brandName": "Cable Junction",
-    "tagline": "Every plant's numbers, wired into one place."
+    "tagline": "Every plant's numbers, wired into one place.",
+    "rememberMe": "Remember me"
   },
   "welcome": {
     "eyebrow": "Welcome to",
