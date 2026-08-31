@@ -90,7 +90,7 @@ export default async function DashboardPage() {
   const metrics = await getDashboardMetrics(scopedPlantIds, {
     includePnl: showPnl,
     enteredById: ownEntriesOnly ? user.id : undefined,
-    approvedOnly: !ownEntriesOnly,
+    approvedOnly: false,
   });
   const showNet = showPnl && metrics.mtdNetProfit != null;
 

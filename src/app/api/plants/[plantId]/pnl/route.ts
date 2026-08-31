@@ -48,7 +48,7 @@ export async function GET(
         parseDateOnly(toStr),
         {
           ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
-          approvedOnly: isAdminOrHeadUser,
+          approvedOnly: false,
         },
       ),
       prisma.plant.findUnique({
