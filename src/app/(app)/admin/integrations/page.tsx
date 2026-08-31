@@ -207,7 +207,7 @@ export default function AdminIntegrationsPage() {
               id="aisensy-otp-campaign"
               value={otpCampaignName}
               onChange={(e) => setOtpCampaignName(e.target.value)}
-              placeholder="Cable Junction Login OTP"
+              placeholder="Atlanta Telecables Login OTP"
             />
             <p className="integrations-card__hint">Params: {"{{1}}"} = OTP code</p>
           </div>
@@ -218,7 +218,7 @@ export default function AdminIntegrationsPage() {
               id="aisensy-reminder-campaign"
               value={reminderCampaignName}
               onChange={(e) => setReminderCampaignName(e.target.value)}
-              placeholder="Cable Junction Shift Reminder"
+              placeholder="Atlanta Telecables Shift Reminder"
             />
             <p className="integrations-card__hint">
               Params: {"{{1}}"} name, {"{{2}}"} Day/Night, {"{{3}}"} plant,{" "}
@@ -232,7 +232,7 @@ export default function AdminIntegrationsPage() {
               id="aisensy-complete-campaign"
               value={completeCampaignName}
               onChange={(e) => setCompleteCampaignName(e.target.value)}
-              placeholder="Cable Junction Forms Complete"
+              placeholder="Atlanta Telecables Forms Complete"
             />
             <p className="integrations-card__hint">
               Params: {"{{1}}"} name, {"{{2}}"} plant, {"{{3}}"} date, {"{{4}}"}{" "}
@@ -246,7 +246,7 @@ export default function AdminIntegrationsPage() {
               id="aisensy-price-sheet-campaign"
               value={priceSheetCampaignName}
               onChange={(e) => setPriceSheetCampaignName(e.target.value)}
-              placeholder="Cable Junction Price Sheet Share"
+              placeholder="Atlanta Telecables Price Sheet Share"
             />
             <p className="integrations-card__hint">
               Campaign name must match AiSensy exactly ({" "}

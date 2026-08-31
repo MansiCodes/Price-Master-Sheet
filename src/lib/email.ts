@@ -31,12 +31,12 @@ export async function sendPasswordResetEmail(email: string, token: string) {
   const mailOptions = {
     from,
     to: email,
-    subject: "Reset your Cable Junction Password",
-    text: `You requested a password reset for your Cable Junction account.\n\nPlease reset your password by clicking on the link below:\n\n${resetUrl}\n\nThis link will expire in 1 hour.\n\nIf you did not request this, you can safely ignore this email.`,
+    subject: "Reset your Atlanta Telecables Password",
+    text: `You requested a password reset for your Atlanta Telecables account.\n\nPlease reset your password by clicking on the link below:\n\n${resetUrl}\n\nThis link will expire in 1 hour.\n\nIf you did not request this, you can safely ignore this email.`,
     html: `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e4e8e5; border-radius: 16px;">
         <h2 style="color: #127269; font-family: Georgia, serif;">Reset your password</h2>
-        <p>You requested a password reset for your Cable Junction account.</p>
+        <p>You requested a password reset for your Atlanta Telecables account.</p>
         <p>Please click the button below to reset your password. This link is valid for 1 hour.</p>
         <div style="margin: 24px 0;">
           <a href="${resetUrl}" style="background-color: #127269; color: white; padding: 12px 24px; text-decoration: none; border-radius: 999px; font-weight: bold; display: inline-block;">Reset Password</a>

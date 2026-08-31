@@ -175,7 +175,7 @@ export async function sendAisensyOtp(
     destination: params.destination,
     userName: params.userName,
     templateParams: [params.otp],
-    source: "Cable Junction login",
+    source: "Atlanta Telecables login",
     buttons: [
       {
         type: "button",
@@ -219,7 +219,7 @@ export async function sendShiftReminderWhatsApp(params: {
       params.plantName,
       params.dateLabel,
     ],
-    source: "Cable Junction shift reminder",
+    source: "Atlanta Telecables shift reminder",
   });
 }
 
@@ -254,7 +254,7 @@ export async function sendFormsCompleteWhatsApp(params: {
       params.dateLabel,
       String(params.creditScore),
     ],
-    source: "Cable Junction forms complete",
+    source: "Atlanta Telecables forms complete",
   });
 }
 
@@ -306,7 +306,7 @@ export async function sendPriceSheetWhatsApp(params: {
       url: params.mediaUrl,
       filename: params.mediaFilename,
     },
-    source: "Cable Junction price sheet share",
+    source: "Atlanta Telecables price sheet share",
   });
 }
 
