@@ -1028,13 +1028,20 @@
 }
 
 .mp-live-photo .bill-upload__add {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+  line-height: 1.25;
   width: 88px;
   height: 88px;
   border-radius: 0.55rem;
   border: 1px dashed var(--border);
   background: color-mix(in srgb, var(--bg) 80%, white);
   color: var(--teal-ink);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
 }

@@ -38,7 +38,9 @@ const createSchema = z.object({
   operators: z.number().int().nonnegative(),
   helpers: z.number().int().nonnegative(),
   remarks: z.string().trim().max(2000).optional().nullable(),
-  photoUrls: z.array(z.string().url()).max(3).optional(),
+  coilNo: z.string().trim().max(100).optional().nullable(),
+  weight: z.number().finite().nonnegative().optional().nullable(),
+  photoUrls: z.array(z.string().url()).max(20).optional(),
 });
 
 function serializeEntry(
@@ -59,6 +61,8 @@ function serializeEntry(
     helpers: number;
     totalManpower: number;
     remarks: string | null;
+    coilNo: string | null;
+    weight: Prisma.Decimal | null;
     photoUrls: string[];
     submittedAt: Date;
     createdAt: Date;
@@ -108,6 +112,8 @@ function serializeEntry(
     helpers: entry.helpers,
     totalManpower: entry.totalManpower,
     remarks: entry.remarks,
+    coilNo: entry.coilNo,
+    weight: entry.weight ? Number(entry.weight) : null,
     photoUrls: entry.photoUrls,
     submittedAt: entry.submittedAt.toISOString(),
     createdAt: entry.createdAt.toISOString(),
@@ -323,6 +329,8 @@ export async function POST(request: Request) {
       helpers,
       totalManpower,
       remarks: parsed.data.remarks || null,
+      coilNo: parsed.data.coilNo || null,
+      weight: parsed.data.weight ?? null,
       photoUrls: photos,
       submittedAt: now,
     },

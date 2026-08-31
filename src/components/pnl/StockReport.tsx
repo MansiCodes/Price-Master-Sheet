@@ -26,6 +26,8 @@ type StockRow = {
   closingValue: string | number;
   photoUrl?: string | null;
   photoUrls?: string[];
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
 };
 
 function isoDate(value: string | Date | null | undefined) {
@@ -49,11 +51,13 @@ export function StockReport({
   plantCode,
   from,
   to,
+  userRole,
 }: {
   plantId: string;
   plantCode?: string;
   from: string;
   to: string;
+  userRole?: string;
 }) {
   const t = useTranslations("pnl");
   const isPvc = plantCode?.toUpperCase() === "PVC";
@@ -159,6 +163,46 @@ export function StockReport({
         formatINR(num(r.closingValue) || num(r.quantity) * num(r.rate)),
     },
     {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
+            color: r.approvedByHead ? "#10b981" : "#d97706",
+          }}
+        >
+          {r.approvedByHead ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
+            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
+          }}
+        >
+          {r.approvedByAdmin ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
       key: "photos",
       label: "Image",
       align: "center",
@@ -184,6 +228,46 @@ export function StockReport({
       label: "Value",
       align: "right",
       render: (r) => formatINR(r.closingValue),
+    },
+    {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
+            color: r.approvedByHead ? "#10b981" : "#d97706",
+          }}
+        >
+          {r.approvedByHead ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
+            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
+          }}
+        >
+          {r.approvedByAdmin ? "Approved" : "Pending"}
+        </span>
+      ),
     },
     {
       key: "photos",
@@ -246,6 +330,80 @@ export function StockReport({
       render: (r) => formatINR(r.closingValue),
     },
     {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByHead;
+        const isApproved = r.approvedByHead;
+        let label = "Pending";
+        let bg = "#d9770615";
+        let fg = "#d97706";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByAdmin;
+        const isApproved = r.approvedByAdmin;
+        let label = "Pending";
+        let bg = "#3b82f615";
+        let fg = "#3b82f6";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
       key: "photos",
       label: "Image",
       compact: true,
@@ -254,6 +412,14 @@ export function StockReport({
       ),
     },
   ];
+
+  const activeColumns = useMemo(() => {
+    const baseCols = isPvc ? pvcColumns : cat6 ? cat6Columns : defaultColumns;
+    if (userRole === "SUPER_ADMIN" || userRole === "BUSINESS_HEAD") {
+      return baseCols.filter(c => c.key !== "approvedByHead" && c.key !== "approvedByAdmin");
+    }
+    return baseCols;
+  }, [isPvc, pvcColumns, cat6, cat6Columns, defaultColumns, userRole]);
 
   return (
     <section className="pnl-report-panel">
@@ -265,7 +431,7 @@ export function StockReport({
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={[
-          ...(isPvc ? pvcColumns : cat6 ? cat6Columns : defaultColumns),
+          ...activeColumns,
           actionCol,
         ]}
         rows={rows}

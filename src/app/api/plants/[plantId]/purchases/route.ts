@@ -42,6 +42,9 @@ const purchaseItemSchema = z.object({
   quantity: z.coerce.number().positive(),
   rate: z.coerce.number().nonnegative(),
   gstPercent: z.coerce.number().min(0).optional(),
+  debitQuantity: z.coerce.number().nonnegative().optional().default(0),
+  openingReading: z.coerce.number().nonnegative().optional().nullable(),
+  closingReading: z.coerce.number().nonnegative().optional().nullable(),
 });
 
 const purchaseSingleSchema = z.object({
@@ -51,6 +54,9 @@ const purchaseSingleSchema = z.object({
   quantity: z.coerce.number().positive(),
   rate: z.coerce.number().nonnegative(),
   gstPercent: z.coerce.number().min(0).default(0),
+  debitQuantity: z.coerce.number().nonnegative().optional().default(0),
+  openingReading: z.coerce.number().nonnegative().optional().nullable(),
+  closingReading: z.coerce.number().nonnegative().optional().nullable(),
 });
 
 const purchaseBatchSchema = z.object({
@@ -61,8 +67,8 @@ const purchaseBatchSchema = z.object({
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
-function lineTotals(quantity: number, rate: number, gstPercent: number) {
-  const basicValue = round2(quantity * rate);
+function lineTotals(quantity: number, rate: number, gstPercent: number, debitQuantity = 0) {
+  const basicValue = round2((quantity - debitQuantity) * rate);
   const gstAmount = round2(basicValue * (gstPercent / 100));
   const invoiceValue = round2(basicValue + gstAmount);
   return { basicValue, gstAmount, invoiceValue, gstPercent };
@@ -123,8 +129,42 @@ export async function GET(
     );
   }
 
-  const { slice, ...pageInfo } = paginate(purchases, page, pageSize);
-  const totals = purchases.reduce(
+  // Filter and map statuses
+  const dailyStatuses = purchases.length > 0
+    ? await prisma.dailyEntryStatus.findMany({
+        where: {
+          plantId,
+          OR: purchases.map(p => ({
+            date: p.date,
+            shift: p.shift
+          }))
+        },
+        select: { date: true, shift: true, approvedByHead: true, approvedByAdmin: true, rejectedByHead: true, rejectedByAdmin: true }
+      })
+    : [];
+
+  const statusMap = new Map<string, { approvedByHead: boolean; approvedByAdmin: boolean; rejectedByHead: boolean; rejectedByAdmin: boolean }>();
+  for (const s of dailyStatuses) {
+    const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
+    statusMap.set(key, {
+      approvedByHead: s.approvedByHead,
+      approvedByAdmin: s.approvedByAdmin,
+      rejectedByHead: s.rejectedByHead,
+      rejectedByAdmin: s.rejectedByAdmin
+    });
+  }
+
+  let filteredPurchases = purchases;
+  if (session.user.globalRole === "SUPER_ADMIN") {
+    filteredPurchases = purchases.filter((p) => {
+      const key = `${p.date.toISOString().slice(0, 10)}_${p.shift}`;
+      const status = statusMap.get(key);
+      return status?.approvedByHead === true;
+    });
+  }
+
+  const { slice, ...pageInfo } = paginate(filteredPurchases, page, pageSize);
+  const totals = filteredPurchases.reduce(
     (acc, row) => {
       acc.quantity += Number(row.quantity) || 0;
       acc.basicValue += Number(row.basicValue) || 0;
@@ -136,8 +176,20 @@ export async function GET(
   );
   const unloadingExpense = round2((totals.quantity / 1000) * unloadingRate);
 
+  const rowsWithStatus = slice.map((p) => {
+    const key = `${p.date.toISOString().slice(0, 10)}_${p.shift}`;
+    const status = statusMap.get(key);
+    return {
+      ...p,
+      approvedByHead: status?.approvedByHead ?? false,
+      approvedByAdmin: status?.approvedByAdmin ?? false,
+      rejectedByHead: status?.rejectedByHead ?? false,
+      rejectedByAdmin: status?.rejectedByAdmin ?? false,
+    };
+  });
+
   return NextResponse.json({
-    rows: slice,
+    rows: rowsWithStatus,
     ...pageInfo,
     totals: { ...totals, unloadingExpense, unloadingRate },
   });
@@ -189,6 +241,7 @@ export async function POST(
           item.quantity,
           item.rate,
           gstPercent,
+          item.debitQuantity,
         );
         return prisma.purchase.create({
           data: {
@@ -204,6 +257,9 @@ export async function POST(
             billNumber: data.billNumber ?? null,
             billDate: data.billDate ? parseDateOnly(data.billDate) : null,
             gstin: data.gstin?.trim() || null,
+            debitQuantity: item.debitQuantity ?? 0,
+            openingReading: item.openingReading ?? null,
+            closingReading: item.closingReading ?? null,
             booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
             notes: data.notes?.trim() || null,
             itemDescription: item.itemDescription,
@@ -257,6 +313,7 @@ export async function POST(
     data.quantity,
     data.rate,
     data.gstPercent,
+    data.debitQuantity ?? 0,
   );
   const backdated = isBackdated(data.date);
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
@@ -275,6 +332,9 @@ export async function POST(
       billNumber: data.billNumber ?? null,
       billDate: data.billDate ? parseDateOnly(data.billDate) : null,
       gstin: data.gstin?.trim() || null,
+      debitQuantity: data.debitQuantity ?? 0,
+      openingReading: data.openingReading ?? null,
+      closingReading: data.closingReading ?? null,
       booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
       notes: data.notes?.trim() || null,
       itemDescription: data.itemDescription,

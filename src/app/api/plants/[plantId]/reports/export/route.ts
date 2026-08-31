@@ -91,7 +91,7 @@ export async function GET(
   const byUser = ownOnly ? { enteredById: session.user.id } : {};
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Cable Junction";
+  workbook.creator = "Atlanta Telecables";
   const sheetName =
     kind === "factoryRent"
       ? "Factory Rent"
@@ -104,12 +104,16 @@ export async function GET(
     if (!canViewPnl(session.user.globalRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const ownEntriesOnly = !isAdminOrHead(session.user.globalRole);
+    const isAdminOrHeadUser = isAdminOrHead(session.user.globalRole);
+    const ownEntriesOnly = !isAdminOrHeadUser;
     const pnl = await calculatePlantPnlStatement(
       plantId,
       from,
       to,
-      ownEntriesOnly ? { enteredById: session.user.id } : undefined,
+      {
+        ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
+        approvedOnly: isAdminOrHeadUser,
+      },
     );
     sheet.columns = [
       { header: "Section", key: "section", width: 16 },

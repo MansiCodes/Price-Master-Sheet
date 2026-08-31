@@ -550,14 +550,24 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
-              <label className="login-remember-me">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                />
-                <span>{t("rememberMe")}</span>
-              </label>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: "0.5rem", marginBottom: "0.75rem" }}>
+                <label className="login-remember-me" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>{t("rememberMe")}</span>
+                </label>
+                <button
+                  type="button"
+                  className="login-link-btn"
+                  onClick={() => router.push(phone.trim() ? `/forgot-password?phone=${encodeURIComponent(phone.trim())}` : "/forgot-password")}
+                  style={{ fontSize: "0.85rem", fontWeight: "bold" }}
+                >
+                  {t("forgotPassword")}
+                </button>
+              </div>
               <button
                 className="btn btn-primary login-submit"
                 type="submit"

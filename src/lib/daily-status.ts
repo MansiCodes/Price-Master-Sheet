@@ -72,6 +72,7 @@ export async function refreshDailyStatus(
     ...(accountantId !== undefined
       ? { accountantId: accountantId ?? null }
       : {}),
+    ...(allComplete ? { rejectedByHead: false, rejectedByAdmin: false } : {}),
   };
 
   return prisma.dailyEntryStatus.upsert({

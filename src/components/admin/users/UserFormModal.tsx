@@ -255,8 +255,8 @@ export function UserFormModal({
                 ref={firstFieldRef}
                 id="user-email"
                 type="email"
-                required={!editingId}
-                disabled={Boolean(editingId) || saving}
+                required
+                disabled={saving}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="off"

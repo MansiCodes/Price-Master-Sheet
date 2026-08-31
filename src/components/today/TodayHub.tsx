@@ -136,6 +136,9 @@ type LineItem = {
   inMeter?: string;
   qtyMtr?: string;
   meterUnit?: string;
+  openingReading?: string;
+  closingReading?: string;
+  debitQuantity?: string;
 };
 
 const CUSTOMERS = [
@@ -198,6 +201,9 @@ function newLine(unit = "Kg", itemDescription = ""): LineItem {
     inMeter: "",
     qtyMtr: "",
     meterUnit: "",
+    openingReading: "",
+    closingReading: "",
+    debitQuantity: "",
   };
 }
 
@@ -263,17 +269,44 @@ export function TodayHub({
         : [...getExpenseHeads(plantCode)],
     [plantCode, hasExpenseSections, expenseSection],
   );
-  const farVendorOptions = useMemo(() => Array.from(new Set([...PVC_FAR_VENDORS, "Other"])), []);
+  const [customSuppliers, setCustomSuppliers] = useState<string[]>([]);
+  const [customCustomers, setCustomCustomers] = useState<string[]>([]);
+  const [customStockItems, setCustomStockItems] = useState<string[]>([]);
+  const [customFarVendors, setCustomFarVendors] = useState<string[]>([]);
+
+  const farVendorOptions = useMemo(
+    () => {
+      const base = (PVC_FAR_VENDORS as readonly string[]).filter((x) => x !== "Other" && x !== "Others");
+      const custom = customFarVendors.filter((x) => x !== "Other" && x !== "Others");
+      return Array.from(new Set([...base, ...custom, "Other"]));
+    },
+    [customFarVendors],
+  );
   const cat6SupplierOptions = useMemo(
-    () => Array.from(new Set([...purchaseCatalog.suppliers, "Other"])),
-    [purchaseCatalog.suppliers],
+    () => {
+      const base = purchaseCatalog.suppliers.filter((x) => x !== "Other" && x !== "Others");
+      const custom = customSuppliers.filter((x) => x !== "Other" && x !== "Others");
+      return Array.from(new Set([...base, ...custom, "Other"]));
+    },
+    [purchaseCatalog.suppliers, customSuppliers],
   );
   const cat6CustomerOptions = useMemo(
-    () => Array.from(new Set([...customers, "Other"])),
-    [customers],
+    () => {
+      const base = customers.filter((x) => x !== "Other" && x !== "Others");
+      const custom = customCustomers.filter((x) => x !== "Other" && x !== "Others");
+      return Array.from(new Set([...base, ...custom, "Other"]));
+    },
+    [customers, customCustomers],
   );
-  const stockParticulars = Array.from(
-    new Set(stockCatalog.particulars.map((x) => (x === "Others" ? "Other" : x)))
+  const stockParticulars = useMemo(
+    () => {
+      const base = stockCatalog.particulars
+        .map((x) => (x === "Others" ? "Other" : x))
+        .filter((x) => x !== "Other" && x !== "Others");
+      const custom = customStockItems.filter((x) => x !== "Other" && x !== "Others");
+      return Array.from(new Set([...base, ...custom, "Other"]));
+    },
+    [stockCatalog.particulars, customStockItems],
   );
 
   const entryOptions = useMemo(
@@ -374,6 +407,7 @@ export function TodayHub({
   const [expenseOpeningReading, setExpenseOpeningReading] = useState("");
   const [expenseClosingReading, setExpenseClosingReading] = useState("");
   const [expensePhotos, setExpensePhotos] = useState<string[]>([]);
+  const [expenseRate, setExpenseRate] = useState("");
   const [expenseMonth, setExpenseMonth] = useState(() => new Date().toISOString().slice(0, 7));
   const [rentCoveredArea, setRentCoveredArea] = useState("");
   const [rentRatePerSqft, setRentRatePerSqft] = useState("12");
@@ -412,6 +446,17 @@ export function TodayHub({
         .catch(() => setFetchedPurchaseKg(0));
     }
   }, [isPvcStyleExpense, kind, expenseHead, entryDate, plantId]);
+
+  useEffect(() => {
+    if (expenseHead === "Electricity" || expenseHead === "Fuel & Power") {
+      const opening = Number(expenseOpeningReading) || 0;
+      const closing = Number(expenseClosingReading) || 0;
+      const rate = Number(expenseRate) || 0;
+      const consumed = Math.max(0, closing - opening);
+      const calculatedAmt = consumed * rate;
+      setExpenseAmount(calculatedAmt > 0 ? String(calculatedAmt.toFixed(2)) : "");
+    }
+  }, [expenseOpeningReading, expenseClosingReading, expenseRate, expenseHead]);
 
   const currentPurchaseKg = purchaseLines.reduce(
     (sum, l) => sum + (Number(l.quantity) || 0),
@@ -529,6 +574,7 @@ export function TodayHub({
     setExpenseDesc(isCat6 ? "Salary" : "");
     setExpenseOpeningReading("");
     setExpenseClosingReading("");
+    setExpenseRate("");
     setExpensePhotos([]);
     setExpenseMonth(entryDate.slice(0, 7) || today.slice(0, 7));
     setRentCoveredArea("");
@@ -574,6 +620,12 @@ export function TodayHub({
     }));
   }, [shiftModules]);
 
+  useEffect(() => {
+    if (plantId) {
+      void syncChecklistFromServer();
+    }
+  }, [plantId, date]);
+
   function markModuleFilled(moduleKey: TodayModuleKey, entryShift: ShiftKey) {
     setChecklist((prev) => ({
       ...prev,
@@ -596,7 +648,16 @@ export function TodayHub({
           ShiftKey,
           { modules: { key: TodayModuleKey; filled: boolean }[] }
         >;
+        customSuppliers?: string[];
+        customCustomers?: string[];
+        customStockItems?: string[];
+        customFarVendors?: string[];
       };
+      if (json.customSuppliers) setCustomSuppliers(json.customSuppliers);
+      if (json.customCustomers) setCustomCustomers(json.customCustomers);
+      if (json.customStockItems) setCustomStockItems(json.customStockItems);
+      if (json.customFarVendors) setCustomFarVendors(json.customFarVendors);
+
       if (!json.shifts) return;
       setChecklist((prev) => ({
         DAY: prev.DAY.map((mod) => {
@@ -653,6 +714,9 @@ export function TodayHub({
           itemDescription: l.itemDescription.trim(),
           unit: l.unit.trim() || "KGS",
           quantity: Number(l.quantity),
+          debitQuantity: l.debitQuantity ? Number(l.debitQuantity) : 0,
+          openingReading: l.openingReading ? Number(l.openingReading) : null,
+          closingReading: l.closingReading ? Number(l.closingReading) : null,
           rate: Number(l.rate),
           gstPercent: isCat6 ? 0 : Number(l.gstPercent) || 0,
         }))
@@ -670,10 +734,6 @@ export function TodayHub({
       }
       if (purchaseType === "OTHERS" && !purchaseTypeOther.trim()) {
         fail("Describe the purchase type for Others.");
-        return;
-      }
-      if (billPhotos.length === 0) {
-        fail("Please upload at least one bill/challan image.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/purchases`, {
@@ -724,10 +784,6 @@ export function TodayHub({
       }
       if (!isCat6 && saleType === "OTHERS" && !saleTypeOther.trim()) {
         fail("Describe the sales type for Others.");
-        return;
-      }
-      if (invoicePhotos.length === 0) {
-        fail("Please upload at least one invoice/bill image.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/sales`, {
@@ -790,25 +846,6 @@ export function TodayHub({
         photoUrls: stockPhotos,
       });
     } else if (kind === "expense") {
-      if (
-        expenseHead !== "Factory Rent" &&
-        expenseHead !== "Electricity" &&
-        expenseHead !== "Fuel & Power" &&
-        expenseHead !== "FAR" &&
-        expenseHead !== "Depreciation (FAR)"
-      ) {
-        if (expenseHead === "Petty Cash") {
-          if (pettyCashPhotos.length === 0) {
-            fail("Please upload at least one petty cash bill/receipt photo.");
-            return;
-          }
-        } else {
-          if (expensePhotos.length === 0) {
-            fail("Please upload at least one bill/receipt photo.");
-            return;
-          }
-        }
-      }
       if (expenseHead === "Factory Rent") {
         const area =
           rentCoveredArea === "" ? null : Number(rentCoveredArea);
@@ -1375,7 +1412,7 @@ export function TodayHub({
                     <SelectMenu
                       id="p-vendor"
                       value={vendorName}
-                      options={isCat6 ? cat6SupplierOptions : purchaseCatalog.suppliers}
+                      options={cat6SupplierOptions}
                       required
                       placeholder="Select supplier"
                       onChange={(next) => {
@@ -1433,6 +1470,7 @@ export function TodayHub({
                   }
                   unitOptions={isCat6 ? CAT6_LINE_UNITS : PRODUCT_UNITS}
                   showGst={!isCat6 && purchaseSource !== "atcl"}
+                  showDebitQty={true}
                 />
                 <div className="field">
                   <label htmlFor="p-remarks">{isCat6 ? "Notes" : "Remarks"}</label>
@@ -1469,7 +1507,7 @@ export function TodayHub({
                   <SelectMenu
                     id="s-cust"
                     value={customerName}
-                    options={customers}
+                    options={cat6CustomerOptions}
                     required
                     onChange={(next) => {
                       setCustomerName(next);
@@ -1503,9 +1541,12 @@ export function TodayHub({
                     <SelectMenu
                       id="s-cust"
                       value={customerName}
-                      options={customers}
+                      options={cat6CustomerOptions}
                       required
-                      onChange={(next) => setCustomerName(next)}
+                      onChange={(next) => {
+                        setCustomerName(next);
+                        if (next !== "Other") setCustomerNameOther("");
+                      }}
                     />
                   </div>
                 </div>
@@ -1734,6 +1775,7 @@ export function TodayHub({
                       if (next !== "Electricity" && next !== "Fuel & Power") {
                         setExpenseOpeningReading("");
                         setExpenseClosingReading("");
+                        setExpenseRate("");
                       }
                       if (
                         next === "Unloading of MT" ||
@@ -1852,14 +1894,26 @@ export function TodayHub({
                         </span>
                       </p>
                     ) : null}
-                    <div className="field">
-                      <label htmlFor="e-amt">Electricity bill Amt</label>
-                      <DecimalInput
-                        id="e-amt"
-                        required
-                        value={expenseAmount}
-                        onChange={setExpenseAmount}
-                      />
+                    <div className="prod-fields__row">
+                      <div className="field">
+                        <label htmlFor="e-rate">Rate (₹/unit)</label>
+                        <DecimalInput
+                          id="e-rate"
+                          required
+                          value={expenseRate}
+                          onChange={setExpenseRate}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="e-amt">Electricity bill Amt</label>
+                        <input
+                          id="e-amt"
+                          readOnly
+                          style={{ backgroundColor: "#f3f4f6" }}
+                          value={expenseAmount}
+                          placeholder="Calculated automatically"
+                        />
+                      </div>
                     </div>
                     <div className="field expense-desc">
                       <label htmlFor="e-desc">{t("remarksNotes")}</label>
@@ -2327,6 +2381,7 @@ function LineEditor({
   resolveUnitForItem,
   showGst = false,
   showCat6MeterFields = false,
+  showDebitQty = false,
 }: {
   lines: LineItem[];
   onChange: (lines: LineItem[]) => void;
@@ -2338,165 +2393,225 @@ function LineEditor({
   resolveUnitForItem?: (item: string) => string | undefined;
   showGst?: boolean;
   showCat6MeterFields?: boolean;
+  showDebitQty?: boolean;
 }) {
   return (
     <div className="line-stack">
       {lines.map((line, idx) => (
-          <div key={line.id} className="line-stack__card">
-            <div className="line-stack__row line-stack__row--item">
-              <div className="field" style={{ margin: 0, flex: 1 }}>
-                <label htmlFor={`line-item-${line.id}`}>{itemLabel}</label>
-                {itemOptions ? (
-                  <SelectMenu
-                    id={`line-item-${line.id}`}
-                    value={line.itemDescription}
-                    options={itemOptions}
-                    required={idx === 0}
-                    placeholder={itemPlaceholder ?? `Select ${itemLabel.toLowerCase()}`}
-                    onChange={(next) => {
-                      const copy = [...lines];
-                      const unit = next ? resolveUnitForItem?.(next) : undefined;
-                      copy[idx] = {
-                        ...line,
-                        itemDescription: next,
-                        ...(unit ? { unit } : {}),
-                      };
-                      onChange(copy);
-                    }}
-                  />
-                ) : (
-                  <input
-                    id={`line-item-${line.id}`}
-                    required={idx === 0}
-                    value={line.itemDescription}
-                    onChange={(e) => {
-                      const next = [...lines];
-                      next[idx] = { ...line, itemDescription: e.target.value };
-                      onChange(next);
-                    }}
-                    placeholder={itemLabel}
-                  />
-                )}
-              </div>
-              {lines.length > 1 ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost line-stack__remove"
-                  aria-label="Remove line"
-                  onClick={() => onChange(lines.filter((l) => l.id !== line.id))}
-                >
-                  ✕
-                </button>
-              ) : null}
+        <div key={line.id} className="line-stack__card">
+          <div className="line-stack__row line-stack__row--item">
+            <div className="field" style={{ margin: 0, flex: 1 }}>
+              <label htmlFor={`line-item-${line.id}`}>{itemLabel}</label>
+              {itemOptions ? (
+                <SelectMenu
+                  id={`line-item-${line.id}`}
+                  value={
+                    itemOptions.includes(line.itemDescription)
+                      ? line.itemDescription
+                      : line.itemDescription === ""
+                        ? ""
+                        : itemOptions.includes("Other")
+                          ? "Other"
+                          : itemOptions.includes("Others")
+                            ? "Others"
+                            : ""
+                  }
+                  options={itemOptions}
+                  required={idx === 0}
+                  placeholder={itemPlaceholder ?? `Select ${itemLabel.toLowerCase()}`}
+                  onChange={(next) => {
+                    const copy = [...lines];
+                    const unit = next ? resolveUnitForItem?.(next) : undefined;
+                    copy[idx] = {
+                      ...line,
+                      itemDescription: next,
+                      ...(unit ? { unit } : {}),
+                    };
+                    onChange(copy);
+                  }}
+                />
+              ) : (
+                <input
+                  id={`line-item-${line.id}`}
+                  required={idx === 0}
+                  value={line.itemDescription}
+                  onChange={(e) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, itemDescription: e.target.value };
+                    onChange(next);
+                  }}
+                  placeholder={itemLabel}
+                />
+              )}
             </div>
+            {lines.length > 1 ? (
+              <button
+                type="button"
+                className="btn btn-ghost line-stack__remove"
+                aria-label="Remove line"
+                onClick={() => onChange(lines.filter((l) => l.id !== line.id))}
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
 
-            <div className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}`}>
-              {unitOptions ? (
-                <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-unit-${line.id}`}>Unit</label>
-                  <SelectMenu
-                    id={`line-unit-${line.id}`}
-                    value={
-                      unitOptions.some((u) => u === line.unit)
-                        ? line.unit
-                        : unitOptions[0] || line.unit
-                    }
-                    options={unitOptions}
-                    required={idx === 0}
-                    onChange={(unit) => {
-                      const next = [...lines];
-                      next[idx] = { ...line, unit };
-                      onChange(next);
-                    }}
-                  />
-                </div>
-              ) : null}
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-qty-${line.id}`}>Qty</label>
-                <DecimalInput
-                  id={`line-qty-${line.id}`}
+          {itemOptions &&
+          (line.itemDescription === "Other" ||
+            line.itemDescription === "Others" ||
+            (line.itemDescription !== "" &&
+              !itemOptions.includes(line.itemDescription))) ? (
+            <div className="line-stack__row" style={{ marginTop: "0.2rem", marginBottom: "0.5rem" }}>
+              <div className="field" style={{ margin: 0, flex: 1 }}>
+                <label htmlFor={`line-item-custom-${line.id}`}>
+                  Custom Description <span style={{ color: "red" }}>*</span>
+                </label>
+                <input
+                  id={`line-item-custom-${line.id}`}
                   required={idx === 0}
-                  value={line.quantity}
-                  onChange={(quantity) => {
+                  value={
+                    line.itemDescription === "Other" ||
+                    line.itemDescription === "Others"
+                      ? ""
+                      : line.itemDescription
+                  }
+                  onChange={(e) => {
                     const next = [...lines];
-                    next[idx] = { ...line, quantity };
+                    next[idx] = {
+                      ...line,
+                      itemDescription:
+                        e.target.value ||
+                        (itemOptions.includes("Other") ? "Other" : "Others"),
+                    };
                     onChange(next);
                   }}
+                  placeholder="Enter custom description"
                 />
               </div>
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
-                <DecimalInput
-                  id={`line-rate-${line.id}`}
-                  required={idx === 0}
-                  value={line.rate}
-                  onChange={(rate) => {
-                    const next = [...lines];
-                    next[idx] = { ...line, rate };
-                    onChange(next);
-                  }}
-                />
-              </div>
-              {showGst ? (
-                <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-gst-${line.id}`}>GST %</label>
-                  <DecimalInput
-                    id={`line-gst-${line.id}`}
-                    value={line.gstPercent}
-                    onChange={(gstPercent) => {
-                      const next = [...lines];
-                      next[idx] = { ...line, gstPercent };
-                      onChange(next);
-                    }}
-                  />
-                </div>
-              ) : null}
             </div>
-            {showCat6MeterFields ? (
-              <div className="line-stack__row line-stack__row--meta line-stack__row--meter">
-                <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-in-meter-${line.id}`}>In Meter</label>
-                  <DecimalInput
-                    id={`line-in-meter-${line.id}`}
-                    value={line.inMeter ?? ""}
-                    onChange={(inMeter) => {
-                      const next = [...lines];
-                      next[idx] = { ...line, inMeter };
-                      onChange(next);
-                    }}
-                  />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-qty-mtr-${line.id}`}>QTY-MTR</label>
-                  <DecimalInput
-                    id={`line-qty-mtr-${line.id}`}
-                    value={line.qtyMtr ?? ""}
-                    onChange={(qtyMtr) => {
-                      const next = [...lines];
-                      next[idx] = { ...line, qtyMtr };
-                      onChange(next);
-                    }}
-                  />
-                </div>
-                <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-meter-unit-${line.id}`}>Unit (MTR)</label>
-                  <SelectMenu
-                    id={`line-meter-unit-${line.id}`}
-                    value={line.meterUnit?.trim() || "MTR"}
-                    options={["MTR", "FT", "—"]}
-                    onChange={(meterUnit) => {
-                      const next = [...lines];
-                      next[idx] = {
-                        ...line,
-                        meterUnit: meterUnit === "—" ? "" : meterUnit,
-                      };
-                      onChange(next);
-                    }}
-                  />
-                </div>
+          ) : null}
+
+          <div className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}${showDebitQty ? " has-debit" : ""}`}>
+            {unitOptions ? (
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-unit-${line.id}`}>Unit</label>
+                <SelectMenu
+                  id={`line-unit-${line.id}`}
+                  value={
+                    unitOptions.some((u) => u === line.unit)
+                      ? line.unit
+                      : unitOptions[0] || line.unit
+                  }
+                  options={unitOptions}
+                  required={idx === 0}
+                  onChange={(unit) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, unit };
+                    onChange(next);
+                  }}
+                />
+              </div>
+            ) : null}
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor={`line-qty-${line.id}`}>Qty</label>
+              <DecimalInput
+                id={`line-qty-${line.id}`}
+                required={idx === 0}
+                value={line.quantity}
+                onChange={(quantity) => {
+                  const next = [...lines];
+                  next[idx] = { ...line, quantity };
+                  onChange(next);
+                }}
+              />
+            </div>
+            {showDebitQty ? (
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
+                <DecimalInput
+                  id={`line-debit-qty-${line.id}`}
+                  value={line.debitQuantity ?? ""}
+                  onChange={(debitQuantity) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, debitQuantity };
+                    onChange(next);
+                  }}
+                />
+              </div>
+            ) : null}
+            <div className="field" style={{ margin: 0 }}>
+              <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+              <DecimalInput
+                id={`line-rate-${line.id}`}
+                required={idx === 0}
+                value={line.rate}
+                onChange={(rate) => {
+                  const next = [...lines];
+                  next[idx] = { ...line, rate };
+                  onChange(next);
+                }}
+              />
+            </div>
+            {showGst ? (
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-gst-${line.id}`}>GST %</label>
+                <DecimalInput
+                  id={`line-gst-${line.id}`}
+                  value={line.gstPercent}
+                  onChange={(gstPercent) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, gstPercent };
+                    onChange(next);
+                  }}
+                />
               </div>
             ) : null}
           </div>
+          {showCat6MeterFields ? (
+            <div className="line-stack__row line-stack__row--meta line-stack__row--meter">
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-in-meter-${line.id}`}>In Meter</label>
+                <DecimalInput
+                  id={`line-in-meter-${line.id}`}
+                  value={line.inMeter ?? ""}
+                  onChange={(inMeter) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, inMeter };
+                    onChange(next);
+                  }}
+                />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-qty-mtr-${line.id}`}>QTY-MTR</label>
+                <DecimalInput
+                  id={`line-qty-mtr-${line.id}`}
+                  value={line.qtyMtr ?? ""}
+                  onChange={(qtyMtr) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, qtyMtr };
+                    onChange(next);
+                  }}
+                />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-meter-unit-${line.id}`}>Unit (MTR)</label>
+                <SelectMenu
+                  id={`line-meter-unit-${line.id}`}
+                  value={line.meterUnit?.trim() || "MTR"}
+                  options={["MTR", "FT", "—"]}
+                  onChange={(meterUnit) => {
+                    const next = [...lines];
+                    next[idx] = {
+                      ...line,
+                      meterUnit: meterUnit === "—" ? "" : meterUnit,
+                    };
+                    onChange(next);
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
       ))}
       <Button
         type="button"

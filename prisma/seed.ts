@@ -209,6 +209,8 @@ async function main() {
     "Coaxial",
     "Power",
     "Fiber",
+    "8.0 mm Copper Rod",
+    "12.5 mm copper Rod",
     "Others",
   ];
   const defaultCableSizes = [

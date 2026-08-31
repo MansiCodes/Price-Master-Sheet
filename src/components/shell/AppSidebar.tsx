@@ -26,6 +26,8 @@ function navItemLabel(
   switch (key) {
     case "dashboard":
       return t("dashboard");
+    case "approvals":
+      return "Approvals";
     case "pnl":
       return t("pnl");
     case "price-sheet":

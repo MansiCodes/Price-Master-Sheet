@@ -32,12 +32,14 @@ export function PnlReportsShell({
   plantCode,
   plantManagerName,
   isSuperAdmin = false,
+  userRole,
 }: {
   plantId: string;
   plantName?: string;
   plantCode?: string;
   plantManagerName?: string | null;
   isSuperAdmin?: boolean;
+  userRole?: string;
 }) {
   const [tab, setTab] = useState<ReportTab>("pnl");
   const cat6 = isCat6Plant(plantCode);
@@ -126,10 +128,10 @@ export function PnlReportsShell({
           />
         ) : null}
         {tab === "sales" ? (
-          <SalesReport plantId={plantId} plantCode={plantCode} from={from} to={to} />
+          <SalesReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
         ) : null}
         {tab === "purchase" ? (
-          <PurchaseReport plantId={plantId} plantCode={plantCode} from={from} to={to} />
+          <PurchaseReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
         ) : null}
         {tab === "stock" ? (
           <StockReport
@@ -137,13 +139,14 @@ export function PnlReportsShell({
             plantCode={plantCode}
             from={from}
             to={to}
+            userRole={userRole}
           />
         ) : null}
         {tab === "expense" ? (
           pvc ? (
             <PvcExpenseRegisterReport plantId={plantId} from={from} to={to} />
           ) : (
-            <ExpenseReport plantId={plantId} plantCode={plantCode} from={from} to={to} />
+            <ExpenseReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
           )
         ) : null}
         {tab === "electricityRent" ? (

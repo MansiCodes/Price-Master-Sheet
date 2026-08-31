@@ -18,7 +18,7 @@ const body = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Cable Junction Ops",
+  title: "Atlanta Telecables Ops",
   description: "Plant P&L daily entry and operations",
 };
 

@@ -19,6 +19,7 @@ const indiaPhoneSchema = z
   .transform((v) => (v.length === 12 ? `+${v}` : `+91${v}`));
 
 const patchSchema = z.object({
+  email: z.string().email().optional(),
   name: z.string().min(1).max(120).optional().nullable(),
   phone: indiaPhoneSchema.optional(),
   globalRole: z.enum(GlobalRole).optional(),
@@ -80,6 +81,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     );
   }
   const data = parsed.data;
+  if (data.email) {
+    const trimmedEmail = data.email.toLowerCase().trim();
+    const emailTaken = await prisma.user.findFirst({
+      where: { email: trimmedEmail, NOT: { id: userId } },
+      select: { id: true },
+    });
+    if (emailTaken) {
+      return NextResponse.json(
+        { ok: false, message: "Email address already registered" },
+        { status: 409 },
+      );
+    }
+  }
   if (data.phone) {
     const phoneTaken = await prisma.user.findFirst({
       where: { phone: data.phone, NOT: { id: userId } },
@@ -135,6 +149,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const user = await tx.user.update({
       where: { id: userId },
       data: {
+        ...(data.email ? { email: data.email.toLowerCase().trim() } : {}),
         ...(data.name !== undefined ? { name: data.name?.trim() || null } : {}),
         ...(data.phone ? { phone: data.phone } : {}),
         ...(data.globalRole ? { globalRole: data.globalRole } : {}),

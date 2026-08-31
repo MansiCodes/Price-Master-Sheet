@@ -114,7 +114,7 @@ function addDays(dateStr: string, days: number): string {
 
 export async function getDashboardMetrics(
   plantIds: string[],
-  options: { includePnl: boolean; enteredById?: string },
+  options: { includePnl: boolean; enteredById?: string; approvedOnly?: boolean },
 ): Promise<DashboardMetrics> {
   const today = todayDateString();
   const todayDate = parseDateOnly(today);
@@ -180,10 +180,34 @@ export async function getDashboardMetrics(
 
   if (plantIds.length === 0) return empty;
 
+  const approvedStatuses = options.approvedOnly
+    ? await prisma.dailyEntryStatus.findMany({
+        where: {
+          plantId: { in: plantIds },
+          date: { gte: prevWeekStart, lte: todayDate },
+          approvedByHead: true,
+        },
+        select: { plantId: true, date: true, shift: true },
+      })
+    : [];
+
+  const approvedFilter = options.approvedOnly
+    ? (approvedStatuses.length > 0
+        ? {
+            OR: approvedStatuses.map((s) => ({
+              plantId: s.plantId,
+              date: s.date,
+              shift: s.shift,
+            })),
+          }
+        : { id: "none" })
+    : {};
+
   const plantFilter = { plantId: { in: plantIds } };
   const entryFilter = {
     ...plantFilter,
     ...(options.enteredById ? { enteredById: options.enteredById } : {}),
+    ...approvedFilter,
   };
   const scoped = Boolean(options.enteredById);
 

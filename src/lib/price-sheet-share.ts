@@ -66,7 +66,7 @@ export function buildWhatsAppShareMessage(rows: CableRate[]): string {
     year: "numeric",
     timeZone: "Asia/Kolkata",
   });
-  return `Cable Junction Price Sheet (${dateLabel})\n\n${formatPriceSheetSummary(rows)}`;
+  return `Atlanta Telecables Price Sheet (${dateLabel})\n\n${formatPriceSheetSummary(rows)}`;
 }
 
 export function whatsAppShareUrl(phoneE164: string, message: string): string {

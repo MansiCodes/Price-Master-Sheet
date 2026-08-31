@@ -13,7 +13,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Bump when Prisma schema fields change so the cached client is rebuilt. */
-const PRISMA_CLIENT_GEN = 13;
+const PRISMA_CLIENT_GEN = 14;
 
 /** Normalize Vercel/.env paste mistakes that cause pg "Invalid URL". */
 function resolveDatabaseUrl(): string {

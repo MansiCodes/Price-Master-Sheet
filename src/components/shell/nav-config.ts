@@ -94,6 +94,16 @@ export function getNavSections(flags: NavFlags): NavSection[] {
           href: "/",
           icon: "home",
         },
+        ...(showAdmin
+          ? [
+              {
+                key: "approvals",
+                label: "Approvals",
+                href: "/approvals",
+                icon: "today" as const,
+              },
+            ]
+          : []),
         ...(showMachineProduction
           ? [
               {

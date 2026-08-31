@@ -85,6 +85,34 @@ export async function GET(
     enteredById: scopedUserId,
   });
 
+  const [purchases, sales, stocks, assets] = await Promise.all([
+    prisma.purchase.findMany({
+      where: { plantId },
+      select: { vendorName: true },
+      distinct: ["vendorName"],
+    }),
+    prisma.sale.findMany({
+      where: { plantId },
+      select: { customerName: true },
+      distinct: ["customerName"],
+    }),
+    prisma.stockEntry.findMany({
+      where: { plantId },
+      select: { itemName: true },
+      distinct: ["itemName"],
+    }),
+    prisma.fixedAsset.findMany({
+      where: { plantId, vendor: { not: null } },
+      select: { vendor: true },
+      distinct: ["vendor"],
+    }),
+  ]);
+
+  const customSuppliers = Array.from(new Set(purchases.map((p) => p.vendorName).filter(Boolean)));
+  const customCustomers = Array.from(new Set(sales.map((s) => s.customerName).filter(Boolean)));
+  const customStockItems = Array.from(new Set(stocks.map((s) => s.itemName).filter(Boolean)));
+  const customFarVendors = Array.from(new Set(assets.map((a) => a.vendor).filter(Boolean))) as string[];
+
   return NextResponse.json({
     plant,
     date: dateStr,
@@ -105,5 +133,9 @@ export async function GET(
       },
     },
     allComplete: shifts.DAY.allComplete && shifts.NIGHT.allComplete,
+    customSuppliers,
+    customCustomers,
+    customStockItems,
+    customFarVendors,
   });
 }

@@ -27,11 +27,11 @@ export function buildPriceSheetPdf(rows: CableRate[]): {
     timeZone: "Asia/Kolkata",
   });
   const stamp = new Date().toISOString().slice(0, 10);
-  const filename = `cable-junction-price-sheet-${stamp}.pdf`;
+  const filename = `atlanta-telecables-price-sheet-${stamp}.pdf`;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("Cable Junction — Price Sheet", 14, 14);
+  doc.text("Atlanta Telecables — Price Sheet", 14, 14);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);

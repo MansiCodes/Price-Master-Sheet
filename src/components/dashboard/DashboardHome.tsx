@@ -9,6 +9,7 @@ import { MachineProductionHome } from "@/components/machine-production/MachinePr
 import type { DashboardMetrics } from "@/lib/dashboard/metrics";
 import type { MpHomeMetrics } from "@/lib/machine-production/home-metrics";
 import { localeToBcp47, type AppLocale } from "@/i18n/config";
+import { PendingApprovalsTable } from "@/components/dashboard/PendingApprovalsTable";
 
 function formatDay(dateStr: string, locale: AppLocale): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -28,6 +29,8 @@ export async function DashboardHome({
   shiftModules,
   scope,
   machineProductionMetrics = null,
+  userRole = "",
+  pendingApprovals = [],
 }: {
   metrics: DashboardMetrics;
   dateStr: string;
@@ -37,6 +40,16 @@ export async function DashboardHome({
   shiftModules: ShiftModulesMap;
   scope: "org" | "plant";
   machineProductionMetrics?: MpHomeMetrics | null;
+  userRole?: string;
+  pendingApprovals?: Array<{
+    id: string;
+    plantId: string;
+    date: string;
+    shift: string;
+    approvedByHead: boolean;
+    approvedByAdmin: boolean;
+    plant: { name: string };
+  }>;
 }) {
   const t = await getTranslations("dashboard");
   const tCommon = await getTranslations("common");
@@ -151,6 +164,14 @@ export async function DashboardHome({
           </section>
         </div>
       </div>
+
+      {pendingApprovals && pendingApprovals.length > 0 ? (
+        <PendingApprovalsTable
+          pendingApprovals={pendingApprovals}
+          userRole={userRole}
+          locale={locale}
+        />
+      ) : null}
 
       <div className="dash-merged__pair">
         <section className="mis-panel week-panel">

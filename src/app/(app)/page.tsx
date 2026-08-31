@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { GlobalRole } from "@prisma/client";
 import { getDashboardMetrics } from "@/lib/dashboard/metrics";
 import {
   canEnterData,
@@ -85,10 +86,11 @@ export default async function DashboardPage() {
   const showPnl = canViewPnl(user.globalRole);
   const dateStr = todayDateString();
 
-  const ownEntriesOnly = !isSuperAdmin(user.globalRole);
+  const ownEntriesOnly = user.globalRole !== GlobalRole.SUPER_ADMIN && user.globalRole !== GlobalRole.BUSINESS_HEAD;
   const metrics = await getDashboardMetrics(scopedPlantIds, {
     includePnl: showPnl,
     enteredById: ownEntriesOnly ? user.id : undefined,
+    approvedOnly: !ownEntriesOnly,
   });
   const showNet = showPnl && metrics.mtdNetProfit != null;
 
@@ -111,6 +113,33 @@ export default async function DashboardPage() {
     ? await getMachineProductionHomeMetrics()
     : null;
 
+  const pendingApprovals = (user.globalRole === GlobalRole.SUPER_ADMIN || user.globalRole === GlobalRole.BUSINESS_HEAD)
+    ? await prisma.dailyEntryStatus.findMany({
+        where: {
+          plantId: { in: plantIds },
+          allComplete: true,
+          ...(user.globalRole === GlobalRole.BUSINESS_HEAD
+            ? { approvedByHead: false }
+            : { approvedByHead: true, approvedByAdmin: false }),
+        },
+        include: {
+          plant: { select: { name: true } },
+        },
+        orderBy: { date: "desc" },
+        take: 20,
+      })
+    : [];
+
+  const serializedApprovals = pendingApprovals.map((p) => ({
+    id: p.id,
+    plantId: p.plantId,
+    date: p.date.toISOString(),
+    shift: p.shift,
+    approvedByHead: p.approvedByHead,
+    approvedByAdmin: p.approvedByAdmin,
+    plant: { name: p.plant.name },
+  }));
+
   return (
     <DashboardHome
       metrics={metrics}
@@ -121,6 +150,8 @@ export default async function DashboardPage() {
       shiftModules={shiftModules}
       scope={primary ? "plant" : "org"}
       machineProductionMetrics={machineProductionMetrics}
+      userRole={user.globalRole}
+      pendingApprovals={serializedApprovals}
     />
   );
 }

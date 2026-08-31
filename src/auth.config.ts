@@ -41,6 +41,8 @@ export const authConfig = {
 
       if (
         pathname.startsWith("/login") ||
+        pathname.startsWith("/forgot-password") ||
+        pathname.startsWith("/reset-password") ||
         pathname.startsWith("/api/auth") ||
         pathname.startsWith("/api/cron")
       ) {

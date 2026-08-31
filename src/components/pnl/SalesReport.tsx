@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
@@ -29,6 +30,8 @@ type SaleRow = {
   meterUnit?: string | null;
   billPhotoUrl?: string | null;
   billPhotoUrls?: string[];
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
 };
 
 function formatBillDate(value: string | Date | null | undefined) {
@@ -67,11 +70,13 @@ export function SalesReport({
   plantCode,
   from,
   to,
+  userRole,
 }: {
   plantId: string;
   plantCode?: string;
   from: string;
   to: string;
+  userRole?: string;
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
@@ -170,6 +175,46 @@ export function SalesReport({
       render: (r) => formatBillDate(r.billDate || r.date),
     },
     {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
+            color: r.approvedByHead ? "#10b981" : "#d97706",
+          }}
+        >
+          {r.approvedByHead ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
+            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
+          }}
+        >
+          {r.approvedByAdmin ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
       key: "photos",
       label: "Bill",
       compact: true,
@@ -256,6 +301,80 @@ export function SalesReport({
       render: (r) => r.meterUnit?.trim() || "—",
     },
     {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByHead;
+        const isApproved = r.approvedByHead;
+        let label = "Pending";
+        let bg = "#d9770615";
+        let fg = "#d97706";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByAdmin;
+        const isApproved = r.approvedByAdmin;
+        let label = "Pending";
+        let bg = "#3b82f615";
+        let fg = "#3b82f6";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
       key: "photos",
       label: "Image",
       compact: true,
@@ -265,12 +384,20 @@ export function SalesReport({
     },
   ];
 
+  const activeColumns = useMemo(() => {
+    const baseCols = cat6 ? cat6Columns : pvcColumns;
+    if (userRole === "SUPER_ADMIN" || userRole === "BUSINESS_HEAD") {
+      return baseCols.filter(c => c.key !== "approvedByHead" && c.key !== "approvedByAdmin");
+    }
+    return baseCols;
+  }, [cat6, cat6Columns, pvcColumns, userRole]);
+
   return (
     <section className="pnl-report-panel">
       <h3 className="pnl-report-panel__title">{t("salesTitle")}</h3>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={[...(cat6 ? cat6Columns : pvcColumns), actionCol]}
+        columns={[...activeColumns, actionCol]}
         rows={rows}
         loading={loading}
         variant="register"

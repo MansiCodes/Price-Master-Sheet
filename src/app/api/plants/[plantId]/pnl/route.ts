@@ -39,13 +39,17 @@ export async function GET(
   }
 
   try {
-    const ownEntriesOnly = !isAdminOrHead(session.user.globalRole);
+    const isAdminOrHeadUser = isAdminOrHead(session.user.globalRole);
+    const ownEntriesOnly = !isAdminOrHeadUser;
     const [pnl, plant] = await Promise.all([
       calculatePlantPnlStatement(
         plantId,
         parseDateOnly(fromStr),
         parseDateOnly(toStr),
-        ownEntriesOnly ? { enteredById: session.user.id } : undefined,
+        {
+          ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
+          approvedOnly: isAdminOrHeadUser,
+        },
       ),
       prisma.plant.findUnique({
         where: { id: plantId },

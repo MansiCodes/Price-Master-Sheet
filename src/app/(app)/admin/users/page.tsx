@@ -156,6 +156,7 @@ export default function AdminUsersPage() {
     try {
       if (editing) {
         const body: Record<string, unknown> = {
+          email: payload.email.trim(),
           name: payload.name.trim() || null,
           phone: payload.phone,
           globalRole: payload.globalRole,

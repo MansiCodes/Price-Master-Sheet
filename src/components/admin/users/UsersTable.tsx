@@ -36,8 +36,10 @@ export function UsersTable({
         <table>
           <thead>
             <tr>
+              <th>S.No.</th>
               <th>{t("name")}</th>
               <th>{t("email")}</th>
+              <th>Phone Number</th>
               <th>{t("role")}</th>
               <th>{t("plantsCol")}</th>
               <th>{t("priceSheet")}</th>
@@ -48,13 +50,14 @@ export function UsersTable({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="empty">
+                <td colSpan={9} className="empty">
                   {emptyMessage ?? t("noUsers")}
                 </td>
               </tr>
             ) : (
-              rows.map((u) => (
+              rows.map((u, index) => (
                 <tr key={u.id}>
+                  <td>{String((page - 1) * pageSize + index + 1)}</td>
                   <td>
                     <div className="users-name-cell">
                       <span className="users-avatar" aria-hidden>
@@ -64,6 +67,7 @@ export function UsersTable({
                     </div>
                   </td>
                   <td>{u.email}</td>
+                  <td>{u.phone || tCommon("dash")}</td>
                   <td>
                     <span className="users-pill users-pill--role">
                       {ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ??

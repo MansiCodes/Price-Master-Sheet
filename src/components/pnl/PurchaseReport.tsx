@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
@@ -24,6 +24,7 @@ type PurchaseRow = {
   vendorName: string;
   itemDescription: string;
   quantity: string | number;
+  debitQuantity?: string | number | null;
   unit: string;
   rate: string | number;
   basicValue: string | number;
@@ -32,6 +33,8 @@ type PurchaseRow = {
   invoiceValue: string | number;
   billPhotoUrl?: string | null;
   billPhotoUrls?: string[];
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
 };
 
 function formatBillDate(value: string | Date | null | undefined) {
@@ -55,11 +58,13 @@ export function PurchaseReport({
   plantCode,
   from,
   to,
+  userRole,
 }: {
   plantId: string;
   plantCode?: string;
   from: string;
   to: string;
+  userRole?: string;
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
@@ -146,6 +151,13 @@ export function PurchaseReport({
       render: (r) => formatQty(r.quantity),
     },
     {
+      key: "debitQty",
+      label: "Debit Qty",
+      align: "right",
+      compact: true,
+      render: (r) => r.debitQuantity ? formatQty(r.debitQuantity) : "—",
+    },
+    {
       key: "rate",
       label: "Rate",
       align: "right",
@@ -153,10 +165,16 @@ export function PurchaseReport({
       render: (r) => formatQty(r.rate),
     },
     {
+      key: "debitValue",
+      label: "Debit Value",
+      align: "right",
+      render: (r) => r.debitQuantity ? formatINR(num(r.debitQuantity) * num(r.rate)) : "—",
+    },
+    {
       key: "basic",
       label: "Basic value",
       align: "right",
-      render: (r) => formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
+      render: (r) => formatINR(num(r.basicValue) || (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
     },
     {
       key: "gst",
@@ -185,6 +203,46 @@ export function PurchaseReport({
       key: "billDate",
       label: "Bill date",
       render: (r) => formatBillDate(r.billDate || r.date),
+    },
+    {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
+            color: r.approvedByHead ? "#10b981" : "#d97706",
+          }}
+        >
+          {r.approvedByHead ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
+            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
+          }}
+        >
+          {r.approvedByAdmin ? "Approved" : "Pending"}
+        </span>
+      ),
     },
     {
       key: "photos",
@@ -239,6 +297,13 @@ export function PurchaseReport({
       render: (r) => formatQty(r.quantity),
     },
     {
+      key: "debitQty",
+      label: "Debit Qty",
+      align: "right",
+      compact: true,
+      render: (r) => r.debitQuantity ? formatQty(r.debitQuantity) : "—",
+    },
+    {
       key: "unit",
       label: "Unit",
       compact: true,
@@ -252,17 +317,63 @@ export function PurchaseReport({
       render: (r) => formatQty(r.rate),
     },
     {
+      key: "debitAmt",
+      label: "Debit Amt",
+      align: "right",
+      render: (r) => r.debitQuantity ? formatINR(num(r.debitQuantity) * num(r.rate)) : "—",
+    },
+    {
       key: "amt",
       label: "Purchase Amt",
       align: "right",
       render: (r) =>
-        formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
+        formatINR(num(r.basicValue) || (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
     },
     {
       key: "notes",
       label: "Notes",
       wrap: "wide",
       render: (r) => r.notes?.trim() || "—",
+    },
+    {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
+            color: r.approvedByHead ? "#10b981" : "#d97706",
+          }}
+        >
+          {r.approvedByHead ? "Approved" : "Pending"}
+        </span>
+      ),
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => (
+        <span
+          style={{
+            display: "inline-block",
+            padding: "0.15rem 0.4rem",
+            borderRadius: "0.25rem",
+            fontSize: "0.75rem",
+            fontWeight: 600,
+            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
+            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
+          }}
+        >
+          {r.approvedByAdmin ? "Approved" : "Pending"}
+        </span>
+      ),
     },
     {
       key: "photos",
@@ -319,6 +430,80 @@ export function PurchaseReport({
       render: (r) => formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
     },
     {
+      key: "approvedByHead",
+      label: "Business Head Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByHead;
+        const isApproved = r.approvedByHead;
+        let label = "Pending";
+        let bg = "#d9770615";
+        let fg = "#d97706";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
+      key: "approvedByAdmin",
+      label: "Super Admin Status",
+      compact: true,
+      render: (r: any) => {
+        const isRejected = r.rejectedByAdmin;
+        const isApproved = r.approvedByAdmin;
+        let label = "Pending";
+        let bg = "#3b82f615";
+        let fg = "#3b82f6";
+        if (isRejected) {
+          label = "Rejected";
+          bg = "#ef444415";
+          fg = "#ef4444";
+        } else if (isApproved) {
+          label = "Approved";
+          bg = "#10b98115";
+          fg = "#10b981";
+        }
+        return (
+          <span
+            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
+            style={{
+              display: "inline-block",
+              padding: "0.15rem 0.4rem",
+              borderRadius: "0.25rem",
+              fontSize: "0.75rem",
+              fontWeight: 600,
+              backgroundColor: bg,
+              color: fg,
+            }}
+          >
+            {label}
+          </span>
+        );
+      },
+    },
+    {
       key: "photos",
       label: "Image",
       compact: true,
@@ -328,11 +513,17 @@ export function PurchaseReport({
     },
   ];
 
-  const columnsToUse = cat6
-    ? cat6Columns
-    : purchaseView === "atcl"
-      ? atclColumns
-      : pvcColumns;
+  const activeColumns = useMemo(() => {
+    const baseCols = cat6
+      ? cat6Columns
+      : purchaseView === "atcl"
+        ? atclColumns
+        : pvcColumns;
+    if (userRole === "SUPER_ADMIN" || userRole === "BUSINESS_HEAD") {
+      return baseCols.filter(c => c.key !== "approvedByHead" && c.key !== "approvedByAdmin");
+    }
+    return baseCols;
+  }, [cat6, cat6Columns, atclColumns, pvcColumns, purchaseView, userRole]);
 
   return (
     <section className="pnl-report-panel">
@@ -369,7 +560,7 @@ export function PurchaseReport({
       </div>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={[...columnsToUse, actionCol]}
+        columns={[...activeColumns, actionCol]}
         rows={rows}
         loading={loading}
         variant="register"

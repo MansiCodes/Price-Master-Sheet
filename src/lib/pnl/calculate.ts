@@ -28,6 +28,32 @@ const INCOME_TAX_RATE = 0.25;
 const PVC_INCOME_TAX_BASE = 2_525_000;
 const PVC_UNLOADING_RATE_PER_MT = 70;
 
+async function getApprovedFilter(plantId: string, approvedOnly?: boolean, from?: Date, to?: Date) {
+  if (!approvedOnly) return {};
+  const approvedStatuses = await prisma.dailyEntryStatus.findMany({
+    where: {
+      plantId,
+      approvedByHead: true,
+      ...(from || to ? {
+        date: {
+          ...(from ? { gte: from } : {}),
+          ...(to ? { lte: to } : {}),
+        }
+      } : {})
+    },
+    select: { date: true, shift: true },
+  });
+
+  return approvedStatuses.length > 0
+    ? {
+        OR: approvedStatuses.map((s) => ({
+          date: s.date,
+          shift: s.shift,
+        })),
+      }
+    : { id: "none" };
+}
+
 // Excel quirk for CAT6:
 // - P&L header ends 22-MAY-26, but Sales account includes sales up to 03-JUN-26
 // - Purchases account includes purchases up to 20-MAY-26
@@ -56,12 +82,15 @@ function round4(n: number) {
 async function openingStockFromLastSnapshot(
   plantId: string,
   before: Date,
+  approvedOnly?: boolean,
+  approvedFilter?: any,
 ): Promise<number> {
   const latest = await prisma.stockEntry.findFirst({
     where: {
       plantId,
       date: { lte: before },
       notes: { startsWith: "Closing stock" },
+      ...approvedFilter,
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { date: true },
@@ -72,6 +101,7 @@ async function openingStockFromLastSnapshot(
       plantId,
       date: latest.date,
       notes: { startsWith: "Closing stock" },
+      ...approvedFilter,
     },
     _sum: { closingValue: true },
   });
@@ -82,23 +112,27 @@ async function openingStockFromLastSnapshot(
 async function pvcClosingStockSnapshot(
   plantId: string,
   asOf: Date,
+  approvedOnly?: boolean,
+  approvedFilter?: any,
 ): Promise<number> {
   const latest = await prisma.stockEntry.findFirst({
     where: {
       plantId,
       date: { lte: asOf },
       notes: { startsWith: "Closing stock" },
+      ...approvedFilter,
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { date: true },
   });
-  if (!latest) return stockValueAsOf(plantId, asOf);
+  if (!latest) return stockValueAsOf(plantId, asOf, approvedOnly, approvedFilter);
 
   const agg = await prisma.stockEntry.aggregate({
     where: {
       plantId,
       date: latest.date,
       notes: { startsWith: "Closing stock" },
+      ...approvedFilter,
     },
     _sum: { closingValue: true },
   });
@@ -111,6 +145,7 @@ async function buildPvcDynamic(
   to: Date,
   scoped: boolean,
   enteredById?: string,
+  approvedOnly?: boolean,
 ): Promise<PlantPnlStatement> {
   const byUser = enteredById ? { enteredById } : {};
   const months = monthStartsInRange(from, to);
@@ -120,6 +155,9 @@ async function buildPvcDynamic(
       (m) => m.getUTCFullYear() === 2026 && m.getUTCMonth() >= 1,
     ).length,
   );
+
+  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
+  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
 
   const [
     salesAgg,
@@ -133,7 +171,7 @@ async function buildPvcDynamic(
   ] = await Promise.all([
     // Excel P&L: Sales!J223 — entire outward register, not date-filtered.
     prisma.sale.aggregate({
-      where: { plantId, ...byUser },
+      where: { plantId, ...byUser, ...globalApprovedFilter },
       _sum: { salesValue: true },
     }),
     prisma.purchase.findMany({
@@ -142,6 +180,7 @@ async function buildPvcDynamic(
         ...byUser,
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
+        ...approvedFilter,
       },
       select: { quantity: true, basicValue: true, vendorName: true, notes: true },
     }),
@@ -152,11 +191,12 @@ async function buildPvcDynamic(
             plantId,
             date: { gte: from, lte: to },
             ...atclStockEntryFilter(),
+            ...approvedFilter,
           },
           _sum: { closingValue: true },
         }),
     prisma.pettyCashEntry.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
       select: {
         entryType: true,
         amount: true,
@@ -184,8 +224,8 @@ async function buildPvcDynamic(
             depreciationPercent: true,
           },
         }),
-    scoped ? Promise.resolve(0) : pvcClosingStockSnapshot(plantId, to),
-    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from),
+    scoped ? Promise.resolve(0) : pvcClosingStockSnapshot(plantId, to, approvedOnly, globalApprovedFilter),
+    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
@@ -453,11 +493,17 @@ function line(
 }
 
 /** Latest closing stock value per item as of a given date (inclusive). */
-async function stockValueAsOf(plantId: string, asOf: Date): Promise<number> {
+async function stockValueAsOf(
+  plantId: string,
+  asOf: Date,
+  approvedOnly?: boolean,
+  approvedFilter?: any,
+): Promise<number> {
   const entries = await prisma.stockEntry.findMany({
     where: {
       plantId,
       date: { lte: asOf },
+      ...approvedFilter,
     },
     orderBy: [{ itemName: "asc" }, { date: "desc" }, { createdAt: "desc" }],
     select: {
@@ -509,12 +555,13 @@ export async function calculatePlantPnlStatement(
   plantId: string,
   fromDate: Date,
   toDate: Date,
-  options?: { enteredById?: string },
+  options?: { enteredById?: string; approvedOnly?: boolean },
 ): Promise<PlantPnlStatement> {
   const from = startOfUtcDay(fromDate);
   const to = startOfUtcDay(toDate);
   const enteredById = options?.enteredById;
   const scoped = Boolean(enteredById);
+  const approvedOnly = options?.approvedOnly;
 
   if (from.getTime() > to.getTime()) {
     throw new Error("fromDate must be on or before toDate");
@@ -526,14 +573,14 @@ export async function calculatePlantPnlStatement(
   });
 
   if (isCat6Plant(plant?.code)) {
-    return buildCat6Dynamic(plantId, from, to, scoped, enteredById);
+    return buildCat6Dynamic(plantId, from, to, scoped, enteredById, approvedOnly);
   }
 
   if (plant?.code?.toUpperCase() === "PVC") {
-    return buildPvcDynamic(plantId, from, to, scoped, enteredById);
+    return buildPvcDynamic(plantId, from, to, scoped, enteredById, approvedOnly);
   }
 
-  return buildDynamic(plantId, from, to, scoped, enteredById, plant?.code);
+  return buildDynamic(plantId, from, to, scoped, enteredById, plant?.code, approvedOnly);
 }
 
 /** Build P&L statement from pre-computed override values. */
@@ -697,6 +744,7 @@ async function buildCat6Dynamic(
   to: Date,
   scoped: boolean,
   enteredById?: string,
+  approvedOnly?: boolean,
 ): Promise<PlantPnlStatement> {
   const byUser = enteredById ? { enteredById } : {};
   const farMonths = Math.max(1, monthStartsInRange(from, to).length);
@@ -705,6 +753,11 @@ async function buildCat6Dynamic(
     to.getUTCFullYear() === 2026 && to.getUTCMonth() === 4 && to.getUTCDate() === 22;
   const salesTo = isExcelCat6Period ? CAT6_EXCEL_SALES_TO : to;
   const purchasesTo = isExcelCat6Period ? CAT6_EXCEL_PURCHASES_TO : to;
+
+  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
+  const salesApprovedFilter = await getApprovedFilter(plantId, approvedOnly, from, salesTo);
+  const purchasesApprovedFilter = await getApprovedFilter(plantId, approvedOnly, from, purchasesTo);
+  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
 
   const [
     salesAgg,
@@ -715,7 +768,7 @@ async function buildCat6Dynamic(
     fixedAssets,
   ] = await Promise.all([
       prisma.sale.aggregate({
-        where: { plantId, ...byUser, date: { gte: from, lte: salesTo } },
+        where: { plantId, ...byUser, date: { gte: from, lte: salesTo }, ...salesApprovedFilter },
         _sum: { salesValue: true },
       }),
       prisma.purchase.aggregate({
@@ -724,11 +777,12 @@ async function buildCat6Dynamic(
           ...byUser,
           date: { gte: from, lte: purchasesTo },
           type: { in: COGS_PURCHASE_TYPES },
+          ...purchasesApprovedFilter,
         },
         _sum: { basicValue: true },
       }),
       prisma.pettyCashEntry.findMany({
-        where: { plantId, ...byUser, date: { gte: from, lte: to } },
+        where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
         select: {
           entryType: true,
           amount: true,
@@ -743,11 +797,12 @@ async function buildCat6Dynamic(
               plantId,
               itemName: CAT6_PNL_ONLY_STOCK_ITEMS[0],
               date: { lte: to },
+              ...globalApprovedFilter,
             },
             orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             select: { closingValue: true },
           }),
-      scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from),
+      scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
       scoped
         ? Promise.resolve([])
         : prisma.fixedAsset.findMany({
@@ -774,6 +829,7 @@ async function buildCat6Dynamic(
           plantId,
           date: { lte: to },
           itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
+          ...globalApprovedFilter,
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
         select: { date: true },
@@ -786,6 +842,7 @@ async function buildCat6Dynamic(
             plantId,
             date: latestClosingDateRow.date,
             itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
+            ...globalApprovedFilter,
           },
           _sum: { closingValue: true },
         });
@@ -902,6 +959,7 @@ async function buildDynamic(
   scoped: boolean,
   enteredById?: string,
   plantCode?: string | null,
+  approvedOnly?: boolean,
 ): Promise<PlantPnlStatement> {
   const isPvc = plantCode?.toUpperCase() === "PVC";
   const byUser = enteredById ? { enteredById } : {};
@@ -918,6 +976,9 @@ async function buildDynamic(
       )
     : Math.max(1, months.length);
 
+  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
+  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
+
   const [
     salesAgg,
     purchaseRowsScoped,
@@ -932,7 +993,7 @@ async function buildDynamic(
     openingStockManualRaw,
   ] = await Promise.all([
     prisma.sale.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
       _sum: { salesValue: true },
     }),
     prisma.purchase.findMany({
@@ -941,11 +1002,12 @@ async function buildDynamic(
         ...byUser,
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
+        ...approvedFilter,
       },
       select: { basicValue: true, vendorName: true, notes: true },
     }),
     prisma.purchase.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
       _sum: { quantity: true },
     }),
     scoped
@@ -955,15 +1017,16 @@ async function buildDynamic(
             plantId,
             date: { gte: from, lte: to },
             ...atclStockEntryFilter(),
+            ...approvedFilter,
           },
           _sum: { closingValue: true },
         }),
     prisma.manpowerEntry.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
       _sum: { totalCost: true },
     }),
     prisma.pettyCashEntry.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
       select: {
         entryType: true,
         amount: true,
@@ -998,9 +1061,9 @@ async function buildDynamic(
             depreciationPercent: true,
           },
         }),
-    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, dayBeforeFrom),
-    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, to),
-    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from),
+    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, dayBeforeFrom, approvedOnly, globalApprovedFilter),
+    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, to, approvedOnly, globalApprovedFilter),
+    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));

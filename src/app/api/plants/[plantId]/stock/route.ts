@@ -114,8 +114,42 @@ export async function GET(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
-  const { slice, ...pageInfo } = paginate(entries, page, pageSize);
-  const totals = entries.reduce(
+  // Filter and map statuses
+  const dailyStatuses = entries.length > 0
+    ? await prisma.dailyEntryStatus.findMany({
+        where: {
+          plantId,
+          OR: entries.map(e => ({
+            date: e.date,
+            shift: e.shift
+          }))
+        },
+        select: { date: true, shift: true, approvedByHead: true, approvedByAdmin: true, rejectedByHead: true, rejectedByAdmin: true }
+      })
+    : [];
+
+  const statusMap = new Map<string, { approvedByHead: boolean; approvedByAdmin: boolean; rejectedByHead: boolean; rejectedByAdmin: boolean }>();
+  for (const s of dailyStatuses) {
+    const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
+    statusMap.set(key, {
+      approvedByHead: s.approvedByHead,
+      approvedByAdmin: s.approvedByAdmin,
+      rejectedByHead: s.rejectedByHead,
+      rejectedByAdmin: s.rejectedByAdmin
+    });
+  }
+
+  let filteredEntries = entries;
+  if (session.user.globalRole === "SUPER_ADMIN") {
+    filteredEntries = entries.filter((e) => {
+      const key = `${e.date.toISOString().slice(0, 10)}_${e.shift}`;
+      const status = statusMap.get(key);
+      return status?.approvedByHead === true;
+    });
+  }
+
+  const { slice, ...pageInfo } = paginate(filteredEntries, page, pageSize);
+  const totals = filteredEntries.reduce(
     (acc, row) => {
       acc.quantity += Number(row.quantity) || 0;
       acc.closingValue += Number(row.closingValue) || 0;
@@ -124,7 +158,19 @@ export async function GET(
     { quantity: 0, closingValue: 0 },
   );
 
-  return NextResponse.json({ rows: slice, ...pageInfo, totals });
+  const rowsWithStatus = slice.map((e) => {
+    const key = `${e.date.toISOString().slice(0, 10)}_${e.shift}`;
+    const status = statusMap.get(key);
+    return {
+      ...e,
+      approvedByHead: status?.approvedByHead ?? false,
+      approvedByAdmin: status?.approvedByAdmin ?? false,
+      rejectedByHead: status?.rejectedByHead ?? false,
+      rejectedByAdmin: status?.rejectedByAdmin ?? false,
+    };
+  });
+
+  return NextResponse.json({ rows: rowsWithStatus, ...pageInfo, totals });
 }
 
 export async function POST(

@@ -377,6 +377,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.line-stack__row--meta.has-debit {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
 .line-stack__row--meta.has-unit .field:nth-child(3),
 .line-stack__row--meta.has-gst .field:nth-child(3),
 .line-stack__row--meta.has-gst.has-unit .field:nth-child(3),
@@ -560,6 +564,24 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.bill-upload__doc-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  gap: 4px;
+  background-color: rgba(20, 184, 166, 0.08); /* 8% opacity teal background */
+}
+
+.bill-upload__doc-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #127269;
+  letter-spacing: 0.05em;
 }
 
 .bill-upload__remove {

@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 
-const MAX_PHOTOS = 1;
+const MAX_PHOTOS = 20;
 const MAX_BYTES = 8 * 1024 * 1024;
-const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif";
+const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 type SignPayload = {
   cloudName: string;
@@ -29,7 +29,7 @@ async function uploadToCloudinary(file: File): Promise<string> {
   form.append("folder", signed.folder);
 
   const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${signed.cloudName}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${signed.cloudName}/auto/upload`,
     { method: "POST", body: form },
   );
   const json = (await res.json()) as {
@@ -45,7 +45,7 @@ async function uploadToCloudinary(file: File): Promise<string> {
 export function LivePhotoUpload({
   urls,
   onChange,
-  label = "Live photo",
+  label = "Upload photos/documents",
 }: {
   urls: string[];
   onChange: (urls: string[]) => void;
@@ -61,15 +61,21 @@ export function LivePhotoUpload({
     if (!files?.length || remaining <= 0) return;
     setError(null);
     setBusy(true);
+    const next = [...urls];
     try {
-      const file = files[0]!;
-      if (file.size > MAX_BYTES) {
-        throw new Error("Photo must be 8 MB or smaller");
+      for (const file of Array.from(files).slice(0, remaining)) {
+        if (file.size > MAX_BYTES) {
+          throw new Error("Each file must be 8 MB or smaller");
+        }
+        const isImage = file.type && file.type.startsWith("image/");
+        const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+        const isDoc = file.name.toLowerCase().endsWith(".doc") || file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".xls") || file.name.toLowerCase().endsWith(".xlsx");
+        if (!isImage && !isPdf && !isDoc) {
+          throw new Error("Only images (JPG, PNG, WEBP) or documents (PDF, DOC, XLS) are allowed");
+        }
+        next.push(await uploadToCloudinary(file));
       }
-      if (file.type && !file.type.startsWith("image/")) {
-        throw new Error("Use a JPG, PNG, or WEBP image");
-      }
-      onChange([await uploadToCloudinary(file)]);
+      onChange(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -87,20 +93,34 @@ export function LivePhotoUpload({
         </span>
       </div>
       <div className="bill-upload__row">
-        {urls.map((url) => (
-          <div key={url} className="bill-upload__thumb">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={url} alt="Live production photo" />
-            <button
-              type="button"
-              className="bill-upload__remove"
-              aria-label="Remove photo"
-              onClick={() => onChange([])}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {urls.map((url) => {
+          const isPdf = url.toLowerCase().includes(".pdf");
+          const isDoc = url.toLowerCase().includes(".doc") || url.toLowerCase().includes(".docx") || url.toLowerCase().includes(".xls") || url.toLowerCase().includes(".xlsx");
+          return (
+            <div key={url} className="bill-upload__thumb">
+              {isPdf || isDoc ? (
+                <div className="bill-upload__doc-preview">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: "#127269" }}>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                  <span className="bill-upload__doc-label">{isPdf ? "PDF" : "DOC"}</span>
+                </div>
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt="Live production file" />
+              )}
+              <button
+                type="button"
+                className="bill-upload__remove"
+                aria-label="Remove file"
+                onClick={() => onChange(urls.filter((u) => u !== url))}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
         {remaining > 0 ? (
           <button
             type="button"
@@ -108,7 +128,7 @@ export function LivePhotoUpload({
             disabled={busy}
             onClick={() => inputRef.current?.click()}
           >
-            {busy ? "Uploading…" : "📷 Capture / upload"}
+            {busy ? "Uploading…" : "+ Add photo / doc"}
           </button>
         ) : null}
       </div>
@@ -116,7 +136,7 @@ export function LivePhotoUpload({
         ref={inputRef}
         type="file"
         accept={ACCEPT}
-        capture="environment"
+        multiple
         hidden
         onChange={(e) => void onPick(e.target.files)}
       />

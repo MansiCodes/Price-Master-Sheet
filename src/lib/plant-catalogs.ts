@@ -212,6 +212,26 @@ export function getPurchaseCatalog(plantCode: string): {
     };
   }
 
+  if (plantCode.toUpperCase() === "UPCAST") {
+    return {
+      suppliers: DEFAULT_SUPPLIERS,
+      goods: [
+        "Copper Cathode",
+        "Coper Scrap-Dori",
+        "Copper Scrap-Strip",
+        "Copper Scrap-Rassa",
+        "copper Scrap Pipe",
+        "copper Scrap -Teli",
+        "copper Scrap -Plan Copper",
+        "copper Scrap -Burn/Jla copper",
+        "copper Scrap -RBD Scrap",
+        "Charcoal / Covering Agent",
+        "Graphite Die / Consumables",
+        "Other",
+      ],
+    };
+  }
+
   const segment = getPlantSegment(plantCode);
   if (segment && !isCat6Plant(plantCode)) {
     return {

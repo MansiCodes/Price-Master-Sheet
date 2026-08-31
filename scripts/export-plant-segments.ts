@@ -16,7 +16,7 @@ async function main() {
   const outPath = resolve(outDir, "plant-rm-fg-step1.xlsx");
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Cable Junction";
+  wb.creator = "Atlanta Telecables";
   wb.created = new Date();
 
   const summary = wb.addWorksheet("Plants summary");

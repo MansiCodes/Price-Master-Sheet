@@ -98,19 +98,63 @@ export async function GET(
     }),
   ]);
 
-  const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+  // Filter and map statuses
+  const dailyStatuses = entries.length > 0
+    ? await prisma.dailyEntryStatus.findMany({
+        where: {
+          plantId,
+          OR: entries.map(e => ({
+            date: e.date,
+            shift: e.shift
+          }))
+        },
+        select: { date: true, shift: true, approvedByHead: true, approvedByAdmin: true, rejectedByHead: true, rejectedByAdmin: true }
+      })
+    : [];
+
+  const statusMap = new Map<string, { approvedByHead: boolean; approvedByAdmin: boolean; rejectedByHead: boolean; rejectedByAdmin: boolean }>();
+  for (const s of dailyStatuses) {
+    const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
+    statusMap.set(key, {
+      approvedByHead: s.approvedByHead,
+      approvedByAdmin: s.approvedByAdmin,
+      rejectedByHead: s.rejectedByHead,
+      rejectedByAdmin: s.rejectedByAdmin
+    });
+  }
+
+  let filteredEntries = entries;
+  if (session.user.globalRole === "SUPER_ADMIN") {
+    filteredEntries = entries.filter((e) => {
+      const key = `${e.date.toISOString().slice(0, 10)}_${e.shift}`;
+      const status = statusMap.get(key);
+      return status?.approvedByHead === true;
+    });
+  }
+
+  const { slice, ...pageInfo } = paginate(filteredEntries, page, pageSize);
   const expenses = Number(aggregate._sum.amount ?? 0);
   const contractorSalary = Number(aggregate._sum.contractorSalary ?? 0);
   const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
 
-  return NextResponse.json({
-    rows: slice.map((entry) => ({
+  const rowsWithStatus = slice.map((entry) => {
+    const key = `${entry.date.toISOString().slice(0, 10)}_${entry.shift}`;
+    const status = statusMap.get(key);
+    return {
       ...entry,
       nature: entry.nature,
       location: entry.location,
       checkedBy: entry.checkedBy,
       approvedBy: entry.approvedBy,
-    })),
+      approvedByHead: status?.approvedByHead ?? false,
+      approvedByAdmin: status?.approvedByAdmin ?? false,
+      rejectedByHead: status?.rejectedByHead ?? false,
+      rejectedByAdmin: status?.rejectedByAdmin ?? false,
+    };
+  });
+
+  return NextResponse.json({
+    rows: rowsWithStatus,
     ...pageInfo,
     totals: {
       expenses,

@@ -63,6 +63,7 @@ export default async function PlantPnlPage({ params }: PageProps) {
       plantCode={plant.code}
       plantManagerName={plantManagerName}
       isSuperAdmin={isSuperAdmin}
+      userRole={session.user.globalRole}
     />
   );
 }

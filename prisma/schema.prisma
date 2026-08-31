@@ -170,6 +170,9 @@ model Purchase {
   gstAmount       Decimal       @db.Decimal(18, 2) @default(0)
   invoiceValue    Decimal       @db.Decimal(18, 2)
   gstin           String?
+  debitQuantity   Decimal?      @db.Decimal(18, 4)
+  openingReading  Decimal?      @db.Decimal(18, 4)
+  closingReading  Decimal?      @db.Decimal(18, 4)
   booksDate       DateTime?     @db.Date
   notes           String?
   billPhotoUrl    String?
@@ -381,6 +384,13 @@ model DailyEntryStatus {
   allComplete      Boolean       @default(false)
   completedAt      DateTime?
   coinsAwarded     Boolean       @default(false)
+  approvedByHead   Boolean       @default(false)
+  approvedByAdmin  Boolean       @default(false)
+  rejectedByHead   Boolean       @default(false)
+  rejectedByAdmin  Boolean       @default(false)
+  rejectionReason  String?
+  approvedByHeadId String?
+  approvedByAdminId String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   plant            Plant         @relation(fields: [plantId], references: [id])
@@ -639,6 +649,8 @@ model MachineProductionEntry {
   helpers           Int
   totalManpower     Int
   remarks           String?
+  coilNo            String?
+  weight            Decimal?               @db.Decimal(18, 4)
   photoUrls         String[]               @default([])
   submittedAt       DateTime               @default(now())
   createdAt         DateTime               @default(now())
@@ -653,3 +665,14 @@ model MachineProductionEntry {
   @@index([cableType])
   @@index([currentProcess])
 }
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+

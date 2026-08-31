@@ -56,7 +56,7 @@ export function buildMachineProductionRecordsPdf(opts: {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("Cable Junction — Machine Production Records", 14, 14);
+  doc.text("Atlanta Telecables — Machine Production Records", 14, 14);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);

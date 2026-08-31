@@ -14,6 +14,7 @@ const COMPLETION_ROLES: ReadonlySet<GlobalRole> = new Set([
 function statusFields(
   status:
     | {
+        id: string;
         purchaseFilled: boolean;
         saleFilled: boolean;
         stockFilled: boolean;
@@ -21,10 +22,13 @@ function statusFields(
         pettyCashFilled: boolean;
         allComplete: boolean;
         completedAt: Date | null;
+        approvedByHead: boolean;
+        approvedByAdmin: boolean;
       }
     | undefined,
 ) {
   return {
+    id: status?.id ?? null,
     purchaseFilled: status?.purchaseFilled ?? false,
     saleFilled: status?.saleFilled ?? false,
     stockFilled: status?.stockFilled ?? false,
@@ -32,6 +36,8 @@ function statusFields(
     pettyCashFilled: status?.pettyCashFilled ?? false,
     allComplete: status?.allComplete ?? false,
     completedAt: status?.completedAt ?? null,
+    approvedByHead: status?.approvedByHead ?? false,
+    approvedByAdmin: status?.approvedByAdmin ?? false,
   };
 }
 

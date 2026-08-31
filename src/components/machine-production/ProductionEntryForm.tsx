@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { SlideOver } from "@/components/ui/SlideOver";
-import { deleteJson, postJson } from "@/lib/client-forms";
+import { deleteJson, postJson, todayLocalISO } from "@/lib/client-forms";
 
 export type MachineCard = {
   id: string;
@@ -71,15 +71,15 @@ export function ProductionEntryForm({
   const [catalogBusy, setCatalogBusy] = useState(false);
 
   const cableTypes = useMemo(() => {
-    const names = cableTypeRows.map((t) => t.name);
-    if (!names.includes(OTHERS)) names.push(OTHERS);
+    const names = cableTypeRows.map((t) => t.name).filter((name) => name !== OTHERS);
+    names.push(OTHERS);
     return names;
   }, [cableTypeRows]);
 
   const cableSizes = useMemo(() => {
     if (cableType === OTHERS) return [OTHERS];
-    const names = cableSizeRows.map((s) => s.name);
-    if (!names.includes(OTHERS)) names.push(OTHERS);
+    const names = cableSizeRows.map((s) => s.name).filter((name) => name !== OTHERS);
+    names.push(OTHERS);
     return names;
   }, [cableSizeRows, cableType]);
 
@@ -128,6 +128,10 @@ export function ProductionEntryForm({
     }
   }, []);
 
+  const [coilNo, setCoilNo] = useState("");
+  const [weight, setWeight] = useState("");
+  const [entryDate, setEntryDate] = useState("");
+
   useEffect(() => {
     if (!open || !machine?.id || !processName) return;
     setCableType(TYPE_PLACEHOLDER);
@@ -140,9 +144,12 @@ export function ProductionEntryForm({
     setOperators("1");
     setHelpers("0");
     setRemarks("");
+    setCoilNo("");
+    setWeight("");
+    setEntryDate(viewSlot?.entryDate ? viewSlot.entryDate.split("T")[0] : todayLocalISO());
     setPhotoUrls([]);
     void loadTypes();
-  }, [open, machine?.id, processName, loadTypes]);
+  }, [open, machine?.id, processName, loadTypes, viewSlot]);
 
   useEffect(() => {
     if (!open) return;
@@ -404,7 +411,7 @@ export function ProductionEntryForm({
       "/api/machine-production/entries",
       {
         machineId: machine.id,
-        entryDate: viewSlot.entryDate,
+        entryDate,
         shift: viewSlot.shift,
         slotStartHour: viewSlot.slotStartHour,
         currentProcess: processName,
@@ -415,6 +422,8 @@ export function ProductionEntryForm({
         operators: ops,
         helpers: helps,
         remarks: remarks.trim() || null,
+        coilNo: coilNo.trim() || null,
+        weight: weight ? Number(weight) : null,
         photoUrls,
       },
     );
@@ -572,6 +581,28 @@ export function ProductionEntryForm({
             </label>
           </div>
 
+          <div className="mp-form__row">
+            <label className="mp-field">
+              <span>Coil No.</span>
+              <input
+                type="text"
+                value={coilNo}
+                onChange={(e) => setCoilNo(e.target.value)}
+                disabled={busy}
+                placeholder="Enter coil number"
+              />
+            </label>
+            <label className="mp-field">
+              <span>Weight (kg)</span>
+              <DecimalInput
+                value={weight}
+                onChange={setWeight}
+                disabled={busy}
+                placeholder="Enter weight"
+              />
+            </label>
+          </div>
+
           <label className="mp-field">
             <span>Efficiency %</span>
             <input value={efficiency.toFixed(2)} readOnly />
@@ -608,8 +639,15 @@ export function ProductionEntryForm({
           </label>
 
           <label className="mp-field">
-            <span>Date & time</span>
-            <input value={dateTimeLabel} readOnly />
+            <span>Date</span>
+            <input
+              type="date"
+              required
+              max={todayLocalISO()}
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+              disabled={busy}
+            />
           </label>
 
           <label className="mp-field">

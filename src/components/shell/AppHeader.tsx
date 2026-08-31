@@ -98,6 +98,8 @@ export function AppHeader({
     switch (activeItem.key) {
       case "dashboard":
         return tNav("dashboard");
+      case "approvals":
+        return "Approvals";
       case "pnl":
         return tNav("pnl");
       case "price-sheet":
