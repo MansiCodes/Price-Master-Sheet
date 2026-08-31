@@ -140,13 +140,6 @@ export async function GET(
   }
 
   let filteredEntries = entries;
-  if (session.user.globalRole === "SUPER_ADMIN") {
-    filteredEntries = entries.filter((e) => {
-      const key = `${e.date.toISOString().slice(0, 10)}_${e.shift}`;
-      const status = statusMap.get(key);
-      return status?.approvedByHead === true;
-    });
-  }
 
   const { slice, ...pageInfo } = paginate(filteredEntries, page, pageSize);
   const totals = filteredEntries.reduce(

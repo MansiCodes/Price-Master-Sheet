@@ -141,13 +141,6 @@ export async function GET(
   }
 
   let filteredSales = sales;
-  if (session.user.globalRole === "SUPER_ADMIN") {
-    filteredSales = sales.filter((s) => {
-      const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
-      const status = statusMap.get(key);
-      return status?.approvedByHead === true;
-    });
-  }
 
   const { slice, ...pageInfo } = paginate(filteredSales, page, pageSize);
   const totals = filteredSales.reduce(
