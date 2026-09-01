@@ -45,7 +45,7 @@ async function uploadToCloudinary(file: File): Promise<string> {
 export function LivePhotoUpload({
   urls,
   onChange,
-  label = "Upload photos/documents",
+  label = "Upload photos/documents (optional)",
 }: {
   urls: string[];
   onChange: (urls: string[]) => void;

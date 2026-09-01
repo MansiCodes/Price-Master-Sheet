@@ -45,8 +45,8 @@ function resolveDatabaseUrl(): string {
     const url = new URL(raw);
     const mode = (url.searchParams.get("sslmode") ?? "").toLowerCase();
 
-    if (raw.includes("rds.amazonaws.com")) {
-      // Force no-verify for AWS RDS so self-signed cert chain is accepted
+    if (raw.includes("rds.amazonaws.com") || raw.includes("neon.tech")) {
+      // Force no-verify for cloud Postgres so self-signed cert chain is accepted
       url.searchParams.set("sslmode", "no-verify");
     } else if (mode === "require" || mode === "prefer" || mode === "verify-ca") {
       url.searchParams.set("sslmode", "verify-full");
@@ -59,11 +59,13 @@ function resolveDatabaseUrl(): string {
 
 function createPrismaClient() {
   const connectionString = resolveDatabaseUrl();
-  const isRds = connectionString.includes("rds.amazonaws.com");
+  const needsSsl =
+    connectionString.includes("rds.amazonaws.com") ||
+    connectionString.includes("neon.tech");
 
   const pool = new Pool({
     connectionString,
-    ssl: isRds ? { rejectUnauthorized: false } : undefined,
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
   });
 
   const adapter = new PrismaPg(pool);

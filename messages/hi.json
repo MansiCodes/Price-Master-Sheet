@@ -124,7 +124,15 @@
     "units": "{count} यूनिट",
     "creditScore": "क्रेडिट स्कोर",
     "weekCompare": "इस सप्ताह बनाम पिछले सप्ताह",
-    "ariaMonthMetrics": "मासिक मेट्रिक्स"
+    "ariaMonthMetrics": "अवधि मेट्रिक्स",
+    "periodFilter": "समय अवधि",
+    "periodWeekly": "साप्ताहिक",
+    "periodMonthly": "मासिक",
+    "periodQuarterly": "त्रैमासिक",
+    "periodYearly": "वार्षिक",
+    "periodHintPlant": "{plant} · {period}",
+    "salesVsPurchasesWeek": "सेल्स बनाम परचेज़ · पिछले 7 दिन",
+    "salesVsPurchasesPeriod": "सेल्स बनाम परचेज़ · {period}"
   },
   "today": {
     "title": "आज की एंट्री",
@@ -145,7 +153,7 @@
     "billNumber": "बिल नंबर",
     "invoiceNo": "इनवॉइस नंबर",
     "remarksNotes": "टिप्पणी / नोट्स",
-    "uploadBill": "छवियाँ अपलोड करें",
+    "uploadBill": "छवियाँ अपलोड करें (वैकल्पिक)",
     "category": "श्रेणी",
     "amount": "राशि",
     "paidTo": "भुगतान किसे",

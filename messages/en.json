@@ -124,7 +124,15 @@
     "units": "{count} units",
     "creditScore": "Credit score",
     "weekCompare": "This week vs last week",
-    "ariaMonthMetrics": "Month metrics"
+    "ariaMonthMetrics": "Period metrics",
+    "periodFilter": "Time period",
+    "periodWeekly": "Weekly",
+    "periodMonthly": "Monthly",
+    "periodQuarterly": "Quarterly",
+    "periodYearly": "Yearly",
+    "periodHintPlant": "{plant} · {period}",
+    "salesVsPurchasesWeek": "Sales vs purchases · last 7 days",
+    "salesVsPurchasesPeriod": "Sales vs purchases · {period}"
   },
   "today": {
     "title": "Today's entry",
@@ -145,7 +153,7 @@
     "billNumber": "Bill number",
     "invoiceNo": "Invoice no.",
     "remarksNotes": "Remarks / notes",
-    "uploadBill": "Upload Images",
+    "uploadBill": "Upload images (optional)",
     "category": "Category",
     "amount": "Amount",
     "paidTo": "Paid to",

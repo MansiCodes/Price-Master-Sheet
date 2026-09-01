@@ -10,6 +10,8 @@ import type { DashboardMetrics } from "@/lib/dashboard/metrics";
 import type { MpHomeMetrics } from "@/lib/machine-production/home-metrics";
 import { localeToBcp47, type AppLocale } from "@/i18n/config";
 import { PendingApprovalsTable } from "@/components/dashboard/PendingApprovalsTable";
+import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
+import type { DashboardPeriod } from "@/lib/dashboard/period";
 
 function formatDay(dateStr: string, locale: AppLocale): string {
   const d = new Date(`${dateStr}T00:00:00Z`);
@@ -22,6 +24,7 @@ function formatDay(dateStr: string, locale: AppLocale): string {
 
 export async function DashboardHome({
   metrics,
+  period,
   dateStr,
   canEnter,
   showNet,
@@ -33,6 +36,7 @@ export async function DashboardHome({
   pendingApprovals = [],
 }: {
   metrics: DashboardMetrics;
+  period: DashboardPeriod;
   dateStr: string;
   canEnter: boolean;
   showNet: boolean;
@@ -57,11 +61,19 @@ export async function DashboardHome({
 
   const kpiHint =
     scope === "plant" && plant
-      ? t("monthToDatePlant", { plant: plant.name })
-      : t("monthToDate");
+      ? t("periodHintPlant", { plant: plant.name, period: metrics.periodLabel })
+      : metrics.periodLabel;
+
+  const chartTitle =
+    period === "week"
+      ? t("salesVsPurchasesWeek")
+      : t("salesVsPurchasesPeriod", { period: metrics.periodLabel });
 
   return (
     <div className="dashboard mis dash-merged">
+      <div className="dashboard-period-toolbar">
+        <DashboardPeriodFilter active={period} />
+      </div>
       <section
         className="mis-kpi-grid mis-kpi-grid--six"
         aria-label={t("ariaMonthMetrics")}
@@ -176,9 +188,7 @@ export async function DashboardHome({
       <div className="dash-merged__pair">
         <section className="mis-panel week-panel">
           <div className="dash-panel__head">
-            <h2 className="section-label">
-              {t("sales")} vs {t("purchases")}
-            </h2>
+            <h2 className="section-label">{chartTitle}</h2>
             <div className="dash-panel__head-meta">
               <div className="legend">
                 <span className="legend__item legend__item--teal">

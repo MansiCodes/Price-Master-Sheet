@@ -11,7 +11,7 @@ export function BillPhotosCell({ urls, fallbackUrl }: BillPhotosCellProps) {
   const t = useTranslations("pnl");
   const photos = Array.from(
     new Set([...(urls ?? []), ...(fallbackUrl ? [fallbackUrl] : [])].filter(Boolean)),
-  ).slice(0, 3);
+  );
 
   if (photos.length === 0) {
     return <span className="pnl-no-bill-photo">{t("noUploadedImage")}</span>;

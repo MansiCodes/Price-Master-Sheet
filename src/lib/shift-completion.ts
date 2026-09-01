@@ -51,7 +51,7 @@ export async function computeShiftCompletion(params: {
     prisma.stockEntry.count({ where }),
     prisma.productionEntry.count({ where }),
     prisma.pettyCashEntry.count({
-      where: { ...where, entryType: "EXPENSE" },
+      where: { ...where, entryType: { in: ["EXPENSE", "PETTY_CASH"] } },
     }),
   ]);
 

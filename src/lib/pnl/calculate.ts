@@ -28,30 +28,15 @@ const INCOME_TAX_RATE = 0.25;
 const PVC_INCOME_TAX_BASE = 2_525_000;
 const PVC_UNLOADING_RATE_PER_MT = 70;
 
+import { buildApprovedEntryWhere } from "@/lib/entry-approval";
+
 async function getApprovedFilter(plantId: string, approvedOnly?: boolean, from?: Date, to?: Date) {
   if (!approvedOnly) return {};
-  const approvedStatuses = await prisma.dailyEntryStatus.findMany({
-    where: {
-      plantId,
-      approvedByHead: true,
-      ...(from || to ? {
-        date: {
-          ...(from ? { gte: from } : {}),
-          ...(to ? { lte: to } : {}),
-        }
-      } : {})
-    },
-    select: { date: true, shift: true },
-  });
 
-  return approvedStatuses.length > 0
-    ? {
-        OR: approvedStatuses.map((s) => ({
-          date: s.date,
-          shift: s.shift,
-        })),
-      }
-    : { id: "none" };
+  return {
+    plantId,
+    ...buildApprovedEntryWhere(from, to),
+  };
 }
 
 // Excel quirk for CAT6:

@@ -43,6 +43,7 @@ export default async function AppLayout({
           showMachineProduction: true,
           isMachineSupervisor: true,
           showAdmin: false,
+          showApprovals: false,
           showSuper: false,
           isManager: false,
           primaryPlantId: null,
@@ -106,6 +107,7 @@ export default async function AppLayout({
       })
     : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
+  const showApprovals = role === GlobalRole.BUSINESS_HEAD;
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
   const canEnter = role ? canEnterData(role) : false;
@@ -118,6 +120,7 @@ export default async function AppLayout({
         showPriceSheet,
         showMachineProduction,
         showAdmin,
+        showApprovals,
         showSuper,
         isManager,
         primaryPlantId,

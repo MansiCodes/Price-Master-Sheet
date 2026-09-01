@@ -10,7 +10,8 @@ import {
   todayDateString,
 } from "@/lib/dates";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
-import { canViewPnl, isAdminOrHead } from "@/lib/rbac";
+import { GlobalRole } from "@prisma/client";
+import { canViewPnl, isSuperAdmin } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -30,17 +31,16 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const fromParam = request.nextUrl.searchParams.get("from")?.trim();
+  const toParam = request.nextUrl.searchParams.get("to")?.trim();
   const fromStr =
-    request.nextUrl.searchParams.get("from") ?? todayDateString();
-  const toStr = request.nextUrl.searchParams.get("to") ?? fromStr;
-
-  if (!dateOnlyRegex.test(fromStr) || !dateOnlyRegex.test(toStr)) {
-    return jsonError("Invalid from/to date", 400);
-  }
+    fromParam && dateOnlyRegex.test(fromParam) ? fromParam : "2025-01-01";
+  const toStr =
+    toParam && dateOnlyRegex.test(toParam) ? toParam : todayDateString();
 
   try {
-    const isAdminOrHeadUser = isAdminOrHead(session.user.globalRole);
-    const ownEntriesOnly = !isAdminOrHeadUser;
+    const isAdminOrHeadUser = isSuperAdmin(session.user.globalRole);
+    const ownEntriesOnly = !isAdminOrHeadUser && session.user.globalRole !== GlobalRole.BUSINESS_HEAD;
     const [pnl, plant] = await Promise.all([
       calculatePlantPnlStatement(
         plantId,
@@ -48,7 +48,7 @@ export async function GET(
         parseDateOnly(toStr),
         {
           ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
-          approvedOnly: false,
+          approvedOnly: isSuperAdmin(session.user.globalRole),
         },
       ),
       prisma.plant.findUnique({

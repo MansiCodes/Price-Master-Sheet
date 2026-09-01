@@ -19,7 +19,7 @@ const patchSchema = z.object({
   operators: z.number().int().nonnegative().optional(),
   helpers: z.number().int().nonnegative().optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
-  photoUrls: z.array(z.string().url()).max(3).optional(),
+  photoUrls: z.array(z.string().url()).max(20).optional(),
 });
 
 type Ctx = { params: Promise<{ entryId: string }> };

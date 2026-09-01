@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
   requireMachineProductionAdmin,
@@ -7,6 +7,7 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { paginate } from "@/lib/ui/paginate";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -40,7 +41,7 @@ async function allocateUniqueCode(name: string): Promise<string> {
   return `${base}-${Date.now().toString(36).toUpperCase()}`;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
@@ -48,22 +49,37 @@ export async function GET() {
   if (denied) return denied;
 
   const isAdmin = session.user.globalRole === "SUPER_ADMIN";
+  const where = isAdmin ? undefined : { isActive: true };
+  const sp = request.nextUrl.searchParams;
+  const all = sp.get("all") === "1";
+
   const machines = await prisma.machine.findMany({
-    where: isAdmin ? undefined : { isActive: true },
+    where,
     orderBy: [{ isActive: "desc" }, { name: "asc" }],
   });
 
+  const mapped = machines.map((m) => ({
+    id: m.id,
+    name: m.name,
+    code: m.code,
+    description: m.description,
+    isActive: m.isActive,
+    createdAt: m.createdAt.toISOString(),
+    updatedAt: m.updatedAt.toISOString(),
+  }));
+
+  if (all) {
+    return NextResponse.json({ ok: true, machines: mapped });
+  }
+
+  const page = Number(sp.get("page")) || 1;
+  const pageSize = Math.min(Math.max(Number(sp.get("pageSize")) || 10, 1), 100);
+  const { slice, ...pageInfo } = paginate(mapped, page, pageSize);
+
   return NextResponse.json({
     ok: true,
-    machines: machines.map((m) => ({
-      id: m.id,
-      name: m.name,
-      code: m.code,
-      description: m.description,
-      isActive: m.isActive,
-      createdAt: m.createdAt.toISOString(),
-      updatedAt: m.updatedAt.toISOString(),
-    })),
+    machines: slice,
+    ...pageInfo,
   });
 }
 

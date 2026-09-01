@@ -1,0 +1,119 @@
+/* Shared date range filter — P&L toolbar, Approvals, etc. */
+
+.pnl-date-filter {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.pnl-date-filter__field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.pnl-date-filter__field label {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #5b6b66);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pnl-date-filter__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pnl-date-filter__field input[type="date"] {
+  width: 8.6rem;
+  min-width: 0;
+  height: 2.35rem;
+  padding: 0 2rem 0 0.5rem;
+  border: 1px solid var(--border, #d7e0dc);
+  border-radius: 10px;
+  background: var(--bg-elevated, #fff);
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--fg, #1a2421);
+  box-sizing: border-box;
+  accent-color: var(--teal, #127269);
+  color-scheme: light;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pnl-date-filter__field input[type="date"]:hover {
+  border-color: var(--teal, #127269);
+}
+
+.pnl-date-filter__field input[type="date"]:focus {
+  outline: none;
+  border-color: var(--teal, #127269);
+  box-shadow: 0 0 0 3px rgb(18 114 105 / 15%);
+}
+
+.pnl-date-filter__field input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.45rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+  opacity: 0.85;
+  filter: invert(32%) sepia(28%) saturate(1200%) hue-rotate(128deg) brightness(92%)
+    contrast(92%);
+}
+
+.pnl-date-filter__clear {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  padding: 0 0.65rem;
+  height: 2.35rem;
+  border-radius: 10px;
+  border: 1px solid var(--border, #d7e0dc);
+  background: var(--bg-elevated, #fff);
+  color: var(--teal-ink, #0e5a54);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.pnl-date-filter__clear:hover {
+  border-color: var(--teal, #127269);
+  background: var(--teal-soft, #d8f3ef);
+}
+
+/* P&L toolbar: From, To, Export on one aligned row */
+.pnl-reports__actions .pnl-date-filter {
+  margin-top: 0;
+  align-items: center;
+}
+
+.pnl-reports__actions .pnl-export-btn {
+  height: 2.35rem;
+  align-self: center;
+}
+
+/* Approvals page: spacing below intro text */
+.approvals-page .pnl-date-filter {
+  margin-top: 1rem;
+}
+
+@media (max-width: 560px) {
+  .pnl-date-filter {
+    flex-wrap: wrap;
+  }
+
+  .pnl-date-filter__field input[type="date"] {
+    width: 100%;
+    min-width: 8.5rem;
+  }
+}

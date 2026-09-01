@@ -4,6 +4,7 @@ import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { GlobalRole } from "@prisma/client";
 import { getDashboardMetrics } from "@/lib/dashboard/metrics";
+import { parseDashboardPeriod } from "@/lib/dashboard/period";
 import {
   canEnterData,
   canViewPnl,
@@ -20,6 +21,7 @@ import {
   type ShiftModulesMap,
 } from "@/components/today/TodayHub";
 import { computeDayShiftCompletions } from "@/lib/shift-completion";
+import { refreshDailyStatusForDate } from "@/lib/daily-status";
 import "@/components/dashboard/dashboard.css";
 
 const MODULES: { key: TodayModuleStatus["key"]; label: string }[] = [
@@ -54,9 +56,16 @@ function toModuleList(
   }));
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
+
+  const { period: periodParam } = await searchParams;
+  const period = parseDashboardPeriod(periodParam);
 
   const user = session.user;
   if (isMachineSupervisorOnly(user.globalRole)) {
@@ -82,7 +91,11 @@ export default async function DashboardPage() {
         })
       : [];
 
-  const primary = plants[0] ?? null;
+  const primary = selectedPlantId
+    ? (plants.find((p) => p.id === selectedPlantId) ?? null)
+    : plants.length === 1
+      ? plants[0]
+      : null;
   const showPnl = canViewPnl(user.globalRole);
   const dateStr = todayDateString();
 
@@ -91,6 +104,7 @@ export default async function DashboardPage() {
     includePnl: showPnl,
     enteredById: ownEntriesOnly ? user.id : undefined,
     approvedOnly: false,
+    period,
   });
   const showNet = showPnl && metrics.mtdNetProfit != null;
 
@@ -98,6 +112,7 @@ export default async function DashboardPage() {
 
   if (primary) {
     const day = parseDateOnly(dateStr);
+    await refreshDailyStatusForDate(primary.id, day);
     const completions = await computeDayShiftCompletions({
       plantId: primary.id,
       date: day,
@@ -113,36 +128,10 @@ export default async function DashboardPage() {
     ? await getMachineProductionHomeMetrics()
     : null;
 
-  const pendingApprovals = (user.globalRole === GlobalRole.SUPER_ADMIN || user.globalRole === GlobalRole.BUSINESS_HEAD)
-    ? await prisma.dailyEntryStatus.findMany({
-        where: {
-          plantId: { in: plantIds },
-          allComplete: true,
-          ...(user.globalRole === GlobalRole.BUSINESS_HEAD
-            ? { approvedByHead: false }
-            : { approvedByHead: true, approvedByAdmin: false }),
-        },
-        include: {
-          plant: { select: { name: true } },
-        },
-        orderBy: { date: "desc" },
-        take: 20,
-      })
-    : [];
-
-  const serializedApprovals = pendingApprovals.map((p) => ({
-    id: p.id,
-    plantId: p.plantId,
-    date: p.date.toISOString(),
-    shift: p.shift,
-    approvedByHead: p.approvedByHead,
-    approvedByAdmin: p.approvedByAdmin,
-    plant: { name: p.plant.name },
-  }));
-
   return (
     <DashboardHome
       metrics={metrics}
+      period={period}
       dateStr={dateStr}
       canEnter={canEnterData(user.globalRole)}
       showNet={showNet}
@@ -151,7 +140,7 @@ export default async function DashboardPage() {
       scope={primary ? "plant" : "org"}
       machineProductionMetrics={machineProductionMetrics}
       userRole={user.globalRole}
-      pendingApprovals={serializedApprovals}
+      pendingApprovals={[]}
     />
   );
 }

@@ -45,6 +45,7 @@ export type NavFlags = {
   /** Machine Supervisor: home is machine production, not plant P&L dashboard. */
   isMachineSupervisor?: boolean;
   showAdmin: boolean;
+  showApprovals: boolean;
   showSuper: boolean;
   isManager: boolean;
   primaryPlantId: string | null;
@@ -59,6 +60,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
     showMachineProduction,
     isMachineSupervisor = false,
     showAdmin,
+    showApprovals,
     showSuper,
     primaryPlantId,
   } = flags;
@@ -94,7 +96,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
           href: "/",
           icon: "home",
         },
-        ...(showAdmin
+        ...(showApprovals
           ? [
               {
                 key: "approvals",

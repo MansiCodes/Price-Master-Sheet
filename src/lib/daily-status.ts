@@ -34,7 +34,7 @@ export async function refreshDailyStatus(
     prisma.stockEntry.count({ where }),
     prisma.productionEntry.count({ where }),
     prisma.pettyCashEntry.count({
-      where: { ...where, entryType: "EXPENSE" },
+      where: { ...where, entryType: { in: ["EXPENSE", "PETTY_CASH"] } },
     }),
     prisma.dailyEntryStatus.findUnique({
       where: {
@@ -101,4 +101,15 @@ export async function refreshDailyStatusForDate(
     refreshDailyStatus(plantId, date, "DAY", accountantId),
     refreshDailyStatus(plantId, date, "NIGHT", accountantId),
   ]);
+}
+
+/** Avoid 500 after entry save if status refresh fails; dashboard will reconcile on next load. */
+export async function safeRefreshDailyStatus(
+  ...args: Parameters<typeof refreshDailyStatus>
+) {
+  try {
+    return await refreshDailyStatus(...args);
+  } catch (err) {
+    console.error("refreshDailyStatus failed", err);
+  }
 }

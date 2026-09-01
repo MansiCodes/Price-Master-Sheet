@@ -1,12 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { postJson, todayLocalISO } from "@/lib/client-forms";
 import { formatINR } from "@/lib/format/inr";
+import { postJson, todayLocalISO } from "@/lib/client-forms";
 import {
   OPEN_TODAY_ENTRY_EVENT,
   readStoredEntryDate,
@@ -35,6 +34,7 @@ import {
   getCat6PettyCatalog,
   getCustomerCatalog,
   getPurchaseCatalog,
+  getQuadVendorsForMaterial,
   getSalesCatalog,
   getStockCatalog,
   pvcStockEntryNotes,
@@ -252,6 +252,7 @@ export function TodayHub({
   );
   const isPvc = plantCode.toUpperCase() === "PVC";
   const isUpcast = plantCode.toUpperCase() === "UPCAST";
+  const isQuad = plantCode.toUpperCase() === "QUAD";
   const isPvcStyleExpense = isPvc || isUpcast;
   /** Closing stock with RM/WIP/FG + rate × value (Excel ERS / PVC style). */
   const usesStockLedger = isPvc || isUpcast;
@@ -342,6 +343,22 @@ export function TodayHub({
   const [purchaseLines, setPurchaseLines] = useState<LineItem[]>([
     newLine(isCat6Plant(plantCode) ? "NOS" : "KGS", ""),
   ]);
+  const quadSelectedMaterial = useMemo(() => {
+    const desc = purchaseLines[0]?.itemDescription?.trim() ?? "";
+    if (!desc || desc === "Other" || desc === "Others") return "";
+    return desc;
+  }, [purchaseLines]);
+  const quadSupplierOptions = useMemo(() => {
+    if (!quadSelectedMaterial) return [];
+    const base = getQuadVendorsForMaterial(quadSelectedMaterial).filter(
+      (x) => x !== "Other" && x !== "Others",
+    );
+    const custom = customSuppliers.filter((x) => x !== "Other" && x !== "Others");
+    return Array.from(new Set([...base, ...custom, "Other"]));
+  }, [quadSelectedMaterial, customSuppliers]);
+  const purchaseSupplierOptions = isQuad
+    ? quadSupplierOptions
+    : cat6SupplierOptions;
 
   // Sale
   const [customerName, setCustomerName] = useState("");
@@ -366,14 +383,98 @@ export function TodayHub({
   const [stockUnit, setStockUnit] = useState("KGS");
   const [stockRate, setStockRate] = useState("");
   const [stockValue, setStockValue] = useState("");
+  const [stockPurchaseRate, setStockPurchaseRate] = useState<number | null>(null);
+  const [stockPurchaseRateLoading, setStockPurchaseRateLoading] = useState(false);
   const [stockNotes, setStockNotes] = useState("");
   const [stockType, setStockType] = useState<PvcStockEntryType>("closing");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!isQuad) return;
+    if (!quadSelectedMaterial) {
+      if (vendorName) {
+        setVendorName("");
+        setVendorNameOther("");
+      }
+      return;
+    }
+    if (
+      vendorName &&
+      vendorName !== "Other" &&
+      !quadSupplierOptions.includes(vendorName)
+    ) {
+      setVendorName("");
+      setVendorNameOther("");
+    }
+  }, [isQuad, quadSelectedMaterial, quadSupplierOptions, vendorName]);
+
+  useEffect(() => {
     setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
     setStockUnit(stockCatalog.defaultUnit);
   }, [stockCatalog]);
+
+  const resolvedStockItemName = useMemo(() => {
+    return stockItem === "Others" || stockItem === "Other"
+      ? stockItemOther.trim()
+      : stockItem.trim();
+  }, [stockItem, stockItemOther]);
+
+  useEffect(() => {
+    if (!isUpcast || kind !== "stock") {
+      setStockPurchaseRate(null);
+      setStockPurchaseRateLoading(false);
+      return;
+    }
+    if (!resolvedStockItemName || !entryDate) {
+      setStockPurchaseRate(null);
+      return;
+    }
+    let cancelled = false;
+    setStockPurchaseRateLoading(true);
+    void (async () => {
+      try {
+        const qs = new URLSearchParams({
+          itemName: resolvedStockItemName,
+          date: entryDate,
+        });
+        const res = await fetch(
+          `/api/plants/${plantId}/stock/average-rate?${qs}`,
+        );
+        const json = (await res.json()) as {
+          rate?: number | null;
+          error?: string;
+        };
+        if (cancelled) return;
+        if (!res.ok) {
+          setStockPurchaseRate(null);
+          return;
+        }
+        setStockPurchaseRate(
+          json.rate != null && Number.isFinite(json.rate) ? json.rate : null,
+        );
+      } catch {
+        if (!cancelled) setStockPurchaseRate(null);
+      } finally {
+        if (!cancelled) setStockPurchaseRateLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isUpcast, kind, resolvedStockItemName, entryDate, plantId]);
+
+  useEffect(() => {
+    if (!isUpcast) return;
+    if (stockPurchaseRate == null || stockQty === "") {
+      setStockRate("");
+      setStockValue("");
+      return;
+    }
+    const qty = Number(stockQty);
+    if (!Number.isFinite(qty)) return;
+    setStockRate(String(stockPurchaseRate));
+    setStockValue((qty * stockPurchaseRate).toFixed(2));
+  }, [isUpcast, stockPurchaseRate, stockQty]);
 
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
@@ -646,7 +747,9 @@ export function TodayHub({
       const json = (await res.json()) as {
         shifts?: Record<
           ShiftKey,
-          { modules: { key: TodayModuleKey; filled: boolean }[] }
+          {
+            modules: { key: TodayModuleKey; filled: boolean }[];
+          }
         >;
         customSuppliers?: string[];
         customCustomers?: string[];
@@ -709,6 +812,29 @@ export function TodayHub({
     if (kind === "purchase") {
       const resolvedVendorName =
         vendorName === "Other" ? vendorNameOther.trim() : vendorName.trim();
+
+      for (let i = 0; i < purchaseLines.length; i++) {
+        const l = purchaseLines[i];
+        const desc = l.itemDescription.trim();
+        const qty = Number(l.quantity);
+        const rate = Number(l.rate);
+
+        if (purchaseLines.length === 1 || desc || l.quantity || l.rate) {
+          if (!desc) {
+            fail(`Select or enter description for item ${i + 1}.`);
+            return;
+          }
+          if (!(qty > 0)) {
+            fail(`Enter a valid quantity greater than 0 for item ${i + 1}.`);
+            return;
+          }
+          if (!(rate >= 0) || isNaN(rate)) {
+            fail(`Enter a valid rate for item ${i + 1}.`);
+            return;
+          }
+        }
+      }
+
       const items = purchaseLines
         .map((l) => ({
           itemDescription: l.itemDescription.trim(),
@@ -763,6 +889,29 @@ export function TodayHub({
         customerName === "Other"
           ? customerNameOther.trim()
           : customerName.trim();
+
+      for (let i = 0; i < saleLines.length; i++) {
+        const l = saleLines[i];
+        const desc = l.itemDescription.trim();
+        const qty = Number(l.quantity);
+        const rate = Number(l.rate);
+
+        if (saleLines.length === 1 || desc || l.quantity || l.rate) {
+          if (!desc) {
+            fail(`Select or enter product details for item ${i + 1}.`);
+            return;
+          }
+          if (!(qty > 0)) {
+            fail(`Enter a valid quantity greater than 0 for item ${i + 1}.`);
+            return;
+          }
+          if (!(rate >= 0) || isNaN(rate)) {
+            fail(`Enter a valid rate for item ${i + 1}.`);
+            return;
+          }
+        }
+      }
+
       const items = saleLines
         .map((l) => ({
           itemDescription: l.itemDescription.trim(),
@@ -799,32 +948,36 @@ export function TodayHub({
         items,
       });
     } else if (kind === "stock") {
-      const resolvedItem =
-        stockItem === "Others" || stockItem === "Other"
-          ? stockItemOther.trim()
-          : stockItem.trim();
-      const closingQty = Number(stockQty);
-      const closingRate = Number(stockRate);
-      const closingValue = closingQty * closingRate;
+      const resolvedItem = resolvedStockItemName;
+      const issuedQty = Number(stockQty);
+      const purchaseRate = isUpcast ? stockPurchaseRate : null;
+      const manualRate = Number(stockRate);
+      const closingRate =
+        isUpcast && purchaseRate != null ? purchaseRate : manualRate;
+      const closingValue = issuedQty * closingRate;
       if (
         !resolvedItem ||
         stockQty === "" ||
-        stockRate === ""
+        (!isUpcast && stockRate === "")
       ) {
         fail(
           (stockItem === "Others" || stockItem === "Other") &&
             !stockItemOther.trim()
             ? "Enter the other item name."
-            : "Enter stock category, item, quantity, unit, and rate.",
+            : isUpcast
+              ? "Enter stock category, item, and issued quantity."
+              : "Enter stock category, item, quantity, unit, and rate.",
         );
         return;
       }
-      if (!(closingQty >= 0) || !(closingRate >= 0)) {
-        fail("Quantity and rate must be zero or more.");
+      if (isUpcast && purchaseRate == null) {
+        fail(
+          "No purchase rate found for this item. Add a purchase entry first.",
+        );
         return;
       }
-      if (stockPhotos.length === 0) {
-        fail("Please upload a photo of the stock.");
+      if (!(issuedQty >= 0) || !(closingRate >= 0)) {
+        fail("Quantity and rate must be zero or more.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/stock`, {
@@ -837,12 +990,15 @@ export function TodayHub({
           : isCat6
             ? stockUnit || stockCatalog.defaultUnit || "NOS"
             : "kg",
-        quantity: closingQty,
+        quantity: issuedQty,
         rate: closingRate,
         value: closingValue,
         notes: isPvc
           ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
-          : stockNotes.trim() || `Closing stock as on ${entryDate}`,
+          : isUpcast
+            ? stockNotes.trim() ||
+              `Issued quantity as on ${entryDate}`
+            : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
     } else if (kind === "expense") {
@@ -864,6 +1020,10 @@ export function TodayHub({
           rentRatePerSqft: rate,
           rentAmount,
           notes: expenseDesc.trim() || null,
+          dailyDate: entryDate,
+          shift,
+          expenseHead: "Factory Rent",
+          payMode: expensePayMode,
         });
       } else if (
         expenseHead === "Electricity" ||
@@ -896,6 +1056,10 @@ export function TodayHub({
           consumedUnits: consumed,
           billAmount,
           notes: expenseDesc.trim() || null,
+          dailyDate: entryDate,
+          shift,
+          expenseHead: expenseHead,
+          payMode: expensePayMode,
         });
       } else if (
         expenseHead === "FAR" ||
@@ -976,7 +1140,7 @@ export function TodayHub({
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
           date: entryDate,
           shift,
-          entryType: "PETTY_CASH",
+          entryType: "EXPENSE",
           payMode: expensePayMode,
           expenseHead: isUpcast ? "Contractor Wages" : "Labour Contractor",
           description:
@@ -997,7 +1161,7 @@ export function TodayHub({
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
           date: entryDate,
           shift,
-          entryType: "PETTY_CASH",
+          entryType: "EXPENSE",
           payMode: expensePayMode,
           expenseHead: "Salary Expenses",
           description:
@@ -1019,6 +1183,7 @@ export function TodayHub({
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
           date: entryDate,
           shift,
+          entryType: "EXPENSE",
           payMode: expensePayMode,
           expenseHead: nature,
           nature,
@@ -1094,6 +1259,7 @@ export function TodayHub({
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
           date: entryDate,
           shift,
+          entryType: "EXPENSE",
           payMode: isCat6
             ? "CASH"
             : isPvcStyleExpense
@@ -1234,10 +1400,6 @@ export function TodayHub({
             );
           })}
         </ul>
-
-        <Link href={`/plants/${plantId}/pnl`} className="today-card__all">
-          View All Reports →
-        </Link>
 
         {!canEnter ? (
           <p className="page-sub" style={{ marginTop: "1rem", marginBottom: 0 }}>
@@ -1403,18 +1565,36 @@ export function TodayHub({
                   />
                 </div>
                 ) : null}
+                {isQuad && purchaseSource !== "atcl" ? (
+                  <LineEditor
+                    lines={purchaseLines}
+                    onChange={setPurchaseLines}
+                    defaultUnit="KGS"
+                    itemLabel="Raw Material"
+                    itemOptions={["", ...purchaseCatalog.goods]}
+                    itemPlaceholder="Select raw material"
+                    unitOptions={PRODUCT_UNITS}
+                    showGst={true}
+                    showDebitQty={true}
+                  />
+                ) : null}
                 {purchaseSource === "atcl" ? null : (
                 <div className="form-grid two">
                   <div className="field">
                     <label htmlFor="p-vendor">
-                      {isCat6 ? "Vendor's Name" : "Supplier name"}
+                      {isCat6 || isQuad ? "Vendor's Name" : "Supplier name"}
                     </label>
                     <SelectMenu
                       id="p-vendor"
                       value={vendorName}
-                      options={cat6SupplierOptions}
+                      options={purchaseSupplierOptions}
                       required
-                      placeholder="Select supplier"
+                      disabled={isQuad && !quadSelectedMaterial}
+                      placeholder={
+                        isQuad && !quadSelectedMaterial
+                          ? "Select raw material first"
+                          : "Select supplier"
+                      }
                       onChange={(next) => {
                         setVendorName(next);
                         if (next !== "Other") setVendorNameOther("");
@@ -1453,6 +1633,7 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
+                {!isQuad || purchaseSource === "atcl" ? (
                 <LineEditor
                   lines={purchaseLines}
                   onChange={setPurchaseLines}
@@ -1472,6 +1653,7 @@ export function TodayHub({
                   showGst={!isCat6 && purchaseSource !== "atcl"}
                   showDebitQty={true}
                 />
+                ) : null}
                 <div className="field">
                   <label htmlFor="p-remarks">{isCat6 ? "Notes" : "Remarks"}</label>
                   <input
@@ -1667,7 +1849,11 @@ export function TodayHub({
                 <div className="prod-fields__row">
                   <div className="field">
                     <label htmlFor="st-qty">
-                      {usesStockLedger ? "Closing Stock" : "Quantity"}
+                      {isUpcast
+                        ? "Issued quantity"
+                        : usesStockLedger
+                          ? "Closing Stock"
+                          : "Quantity"}
                     </label>
                     <DecimalInput
                       id="st-qty"
@@ -1675,14 +1861,16 @@ export function TodayHub({
                       value={stockQty}
                       onChange={(next) => {
                         setStockQty(next);
-                        const qty = Number(next);
-                        const rate = Number(stockRate);
-                        if (
-                          usesStockLedger &&
-                          Number.isFinite(qty) &&
-                          Number.isFinite(rate)
-                        ) {
-                          setStockValue((qty * rate).toFixed(2));
+                        if (!isUpcast) {
+                          const qty = Number(next);
+                          const rate = Number(stockRate);
+                          if (
+                            usesStockLedger &&
+                            Number.isFinite(qty) &&
+                            Number.isFinite(rate)
+                          ) {
+                            setStockValue((qty * rate).toFixed(2));
+                          }
                         }
                       }}
                     />
@@ -1706,17 +1894,33 @@ export function TodayHub({
                     )}
                   </div>
                 </div>
-                <div className="prod-fields__row">
-                  <div className="field">
-                    <label htmlFor="st-rate">Rate</label>
-                    <DecimalInput
-                      id="st-rate"
-                      required
-                      value={stockRate}
-                      onChange={setStockRate}
-                    />
+                {isUpcast ? (
+                  <p className="field-hint">
+                    {stockPurchaseRateLoading
+                      ? "Loading rate from purchases…"
+                      : stockPurchaseRate != null
+                        ? `Rate from purchases: ₹${stockPurchaseRate.toFixed(2)}/${stockUnit || "KGS"}${
+                            stockValue
+                              ? ` · Value: ${formatINR(Number(stockValue))}`
+                              : ""
+                          }`
+                        : resolvedStockItemName
+                          ? "No purchase data for this item yet — add a purchase entry first."
+                          : "Select an item to calculate rate from purchases."}
+                  </p>
+                ) : (
+                  <div className="prod-fields__row">
+                    <div className="field">
+                      <label htmlFor="st-rate">Rate</label>
+                      <DecimalInput
+                        id="st-rate"
+                        required
+                        value={stockRate}
+                        onChange={setStockRate}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="field expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea
@@ -1727,7 +1931,7 @@ export function TodayHub({
                   />
                 </div>
                 <BillUpload
-                  label="Upload stock images"
+                  label="Upload stock images (optional)"
                   urls={stockPhotos}
                   onChange={setStockPhotos}
                 />
@@ -2417,7 +2621,6 @@ function LineEditor({
                             : ""
                   }
                   options={itemOptions}
-                  required={idx === 0}
                   placeholder={itemPlaceholder ?? `Select ${itemLabel.toLowerCase()}`}
                   onChange={(next) => {
                     const copy = [...lines];
@@ -2433,7 +2636,6 @@ function LineEditor({
               ) : (
                 <input
                   id={`line-item-${line.id}`}
-                  required={idx === 0}
                   value={line.itemDescription}
                   onChange={(e) => {
                     const next = [...lines];
@@ -2468,7 +2670,6 @@ function LineEditor({
                 </label>
                 <input
                   id={`line-item-custom-${line.id}`}
-                  required={idx === 0}
                   value={
                     line.itemDescription === "Other" ||
                     line.itemDescription === "Others"
@@ -2503,7 +2704,6 @@ function LineEditor({
                       : unitOptions[0] || line.unit
                   }
                   options={unitOptions}
-                  required={idx === 0}
                   onChange={(unit) => {
                     const next = [...lines];
                     next[idx] = { ...line, unit };
@@ -2516,7 +2716,6 @@ function LineEditor({
               <label htmlFor={`line-qty-${line.id}`}>Qty</label>
               <DecimalInput
                 id={`line-qty-${line.id}`}
-                required={idx === 0}
                 value={line.quantity}
                 onChange={(quantity) => {
                   const next = [...lines];
@@ -2543,7 +2742,6 @@ function LineEditor({
               <label htmlFor={`line-rate-${line.id}`}>Rate</label>
               <DecimalInput
                 id={`line-rate-${line.id}`}
-                required={idx === 0}
                 value={line.rate}
                 onChange={(rate) => {
                   const next = [...lines];

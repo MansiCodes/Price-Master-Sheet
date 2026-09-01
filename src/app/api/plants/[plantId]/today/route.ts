@@ -10,7 +10,8 @@ import {
   todayDateString,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { isSuperAdmin } from "@/lib/rbac";
+import { isShiftApprovalRequired, resolveShiftApprovalFlags } from "@/lib/shift-approval-policy";
+import { isAdminOrHead } from "@/lib/rbac";
 import {
   computeDayShiftCompletions,
   type ShiftKey,
@@ -71,19 +72,160 @@ export async function GET(
     return NextResponse.json({ error: "Plant not found" }, { status: 404 });
   }
 
-  const scopedUserId = isSuperAdmin(session.user.globalRole)
+  const scopedUserId = isAdminOrHead(session.user.globalRole)
     ? undefined
     : session.user.id;
 
-  if (!scopedUserId) {
-    await refreshDailyStatusForDate(plantId, day);
-  }
+  await refreshDailyStatusForDate(plantId, day);
 
   const shifts = await computeDayShiftCompletions({
     plantId,
     date: day,
     enteredById: scopedUserId,
   });
+
+  const dailyStatuses = await prisma.dailyEntryStatus.findMany({
+    where: { plantId, date: day },
+    select: {
+      id: true,
+      shift: true,
+      allComplete: true,
+      purchaseFilled: true,
+      saleFilled: true,
+      stockFilled: true,
+      productionFilled: true,
+      pettyCashFilled: true,
+      approvedByHead: true,
+      approvedByAdmin: true,
+      rejectedByHead: true,
+      rejectedByAdmin: true,
+      rejectionReason: true,
+    },
+  });
+
+  const statusByShift = new Map(
+    dailyStatuses.map((row) => [row.shift, row]),
+  );
+
+  const entryWhere = {
+    plantId,
+    date: day,
+    ...(scopedUserId ? { enteredById: scopedUserId } : {}),
+  };
+
+  const [purchaseRows, saleRows, stockRows, expenseRows] = await Promise.all([
+    prisma.purchase.findMany({
+      where: entryWhere,
+      select: {
+        id: true,
+        shift: true,
+        itemDescription: true,
+        invoiceValue: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }),
+    prisma.sale.findMany({
+      where: entryWhere,
+      select: {
+        id: true,
+        shift: true,
+        customerName: true,
+        salesValue: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }),
+    prisma.stockEntry.findMany({
+      where: entryWhere,
+      select: {
+        id: true,
+        shift: true,
+        itemName: true,
+        closingValue: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }),
+    prisma.pettyCashEntry.findMany({
+      where: { ...entryWhere, entryType: { in: ["EXPENSE", "PETTY_CASH"] } },
+      select: {
+        id: true,
+        shift: true,
+        expenseHead: true,
+        amount: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    }),
+  ]);
+
+  type TodayEntryRow = {
+    id: string;
+    shift: string;
+    kind: string;
+    label: string;
+    amount: number;
+    createdAt: string;
+  };
+
+  const recentEntries: TodayEntryRow[] = [
+    ...purchaseRows.map((row) => ({
+      id: row.id,
+      shift: row.shift,
+      kind: "Purchase",
+      label: row.itemDescription,
+      amount: Number(row.invoiceValue) || 0,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    ...saleRows.map((row) => ({
+      id: row.id,
+      shift: row.shift,
+      kind: "Sales",
+      label: row.customerName,
+      amount: Number(row.salesValue) || 0,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    ...stockRows.map((row) => ({
+      id: row.id,
+      shift: row.shift,
+      kind: "Stock",
+      label: row.itemName,
+      amount: Number(row.closingValue) || 0,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    ...expenseRows.map((row) => ({
+      id: row.id,
+      shift: row.shift,
+      kind: "Expense",
+      label: row.expenseHead,
+      amount: Number(row.amount) || 0,
+      createdAt: row.createdAt.toISOString(),
+    })),
+  ]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 40);
+
+  function approvalPayload(shift: ShiftKey) {
+    const row = statusByShift.get(shift);
+    if (!row) return null;
+    const flags = resolveShiftApprovalFlags(day, row);
+    return {
+      id: row.id,
+      allComplete: row.allComplete,
+      purchaseFilled: row.purchaseFilled,
+      saleFilled: row.saleFilled,
+      stockFilled: row.stockFilled,
+      productionFilled: row.productionFilled,
+      pettyCashFilled: row.pettyCashFilled,
+      ...flags,
+      rejectionReason: isShiftApprovalRequired(day) ? row.rejectionReason : null,
+    };
+  }
 
   const [purchases, sales, stocks, assets] = await Promise.all([
     prisma.purchase.findMany({
@@ -123,6 +265,7 @@ export async function GET(
         total: shifts.DAY.total,
         allComplete: shifts.DAY.allComplete,
         checklist: buildChecklist("DAY", shifts.DAY.modules),
+        approval: approvalPayload("DAY"),
       },
       NIGHT: {
         modules: shifts.NIGHT.modules,
@@ -130,8 +273,10 @@ export async function GET(
         total: shifts.NIGHT.total,
         allComplete: shifts.NIGHT.allComplete,
         checklist: buildChecklist("NIGHT", shifts.NIGHT.modules),
+        approval: approvalPayload("NIGHT"),
       },
     },
+    recentEntries,
     allComplete: shifts.DAY.allComplete && shifts.NIGHT.allComplete,
     customSuppliers,
     customCustomers,

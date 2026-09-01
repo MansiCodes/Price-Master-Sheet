@@ -1074,3 +1074,49 @@
     grid-template-columns: 1fr;
   }
 }
+
+.dashboard-period-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.85rem;
+}
+
+@media (max-width: 880px) {
+  .dashboard-period-toolbar {
+    justify-content: center;
+  }
+}
+
+.dashboard-period-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.dashboard-period-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--stone);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dashboard-period-filter__btn:hover {
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+}
+
+.dashboard-period-filter__btn.is-active {
+  color: #fff;
+  background: var(--teal);
+}

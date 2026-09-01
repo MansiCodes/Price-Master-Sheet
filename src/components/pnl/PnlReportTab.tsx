@@ -27,8 +27,12 @@ export function PnlReportTab({
     setLoading(true);
     setError(null);
     try {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const qs = params.toString();
       const res = await fetch(
-        `/api/plants/${plantId}/pnl?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+        `/api/plants/${plantId}/pnl${qs ? `?${qs}` : ""}`,
       );
       const json = await res.json();
       if (!res.ok) {

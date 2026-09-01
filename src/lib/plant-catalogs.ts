@@ -81,6 +81,90 @@ const PVC_PURCHASE_GOODS = [
   "Other",
 ] as const;
 
+/** Quad plant — raw materials (purchase description dropdown). */
+export const QUAD_RAW_MATERIALS = [
+  "COPPER",
+  "HDPE",
+  "P.E.M.B",
+  "P.P BINDER",
+  "POLYESTER TAPE",
+  "DUMMY",
+  "FILLING JELLY",
+  "POLYAL TAPE",
+  "FLOODING JELLY",
+  "HOT MELT GLUE",
+  "LDPE (I/S)",
+  "ALUMINIUM STRIP",
+  "B.C. TAPE",
+  "PVC GREY (SHEATH)",
+  "GAL. STEEL TAPE ZN",
+  "GAL. STEEL TAPE NZN",
+  "PVC BLACK (O/S)",
+  "DRUM",
+  "Other",
+] as const;
+
+/** Quad plant — vendors mapped to each raw material (without "Other"). */
+export const QUAD_RAW_MATERIAL_VENDORS: Record<string, readonly string[]> = {
+  COPPER: ["Metatech CCR", "Yatharth", "Shreeram Nexa", "Bhawani"],
+  HDPE: ["BLS", "Vijay Plastic", "3R Polymer"],
+  "P.E.M.B": ["Sag Polymer"],
+  "P.P BINDER": ["Agarwal Insulation", "Bells Insulation"],
+  "POLYESTER TAPE": ["Agarwal Insulation", "Bells Insulation", "PC Lamination"],
+  DUMMY: ["Vinpol", "Shiv Industries"],
+  "FILLING JELLY": ["Coral Petro", "BLS"],
+  "POLYAL TAPE": ["PC Lamination", "Bells Insulation"],
+  "FLOODING JELLY": ["Petrolgel"],
+  "HOT MELT GLUE": ["Paraglu"],
+  "LDPE (I/S)": ["Vinpol", "Shiv Industries"],
+  "ALUMINIUM STRIP": ["Wire House"],
+  "B.C. TAPE": ["Agarwal Insulation", "Bells Insulation"],
+  "PVC GREY (SHEATH)": ["In House PVC Plant"],
+  "GAL. STEEL TAPE ZN": ["Bhusan Steel"],
+  "GAL. STEEL TAPE NZN": ["Jain Iron", "Power Steel", "Bansal"],
+  "PVC BLACK (O/S)": ["In House PVC Plant"],
+  DRUM: [
+    "Aggarwal Industries",
+    "Paras Industries",
+    "Right Choice",
+    "SS Industries",
+    "Bharat Packers",
+  ],
+};
+
+/** Quad plant — stock item dropdown options. */
+export const QUAD_STOCK_PARTICULARS = [
+  "6 Quad x 0.9m",
+  "Insulation",
+  "Single Quad Blue",
+  "Single Quad Orange",
+  "Single Quad Green",
+  "Single Quad Brown",
+  "Single Quad Yellow",
+  "Single Quad Black",
+  "*Laying:",
+  "*Inner:",
+  "*Screening:",
+  "Inter:-",
+  "DST:-",
+  "Outer:-",
+  "Other",
+] as const;
+
+export function getQuadVendorsForMaterial(material: string): readonly string[] {
+  const key = material.trim();
+  if (!key || key === "Other") {
+    const all = new Set<string>();
+    for (const vendors of Object.values(QUAD_RAW_MATERIAL_VENDORS)) {
+      for (const vendor of vendors) all.add(vendor);
+    }
+    return [...all, "Other"];
+  }
+  const mapped = QUAD_RAW_MATERIAL_VENDORS[key];
+  if (!mapped) return ["Other"];
+  return [...mapped, "Other"];
+}
+
 export const PVC_STOCK_PARTICULARS = [
   "CPW",
   "Thermal",
@@ -180,6 +264,14 @@ export function getStockCatalog(plantCode: string): {
     };
   }
 
+  if (plantCode.toUpperCase() === "QUAD") {
+    return {
+      particulars: QUAD_STOCK_PARTICULARS,
+      defaultUnit: "KGS",
+      units: ["PCS", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"],
+    };
+  }
+
   const segment = getPlantSegment(plantCode);
   if (segment) {
     const particulars = [
@@ -229,6 +321,13 @@ export function getPurchaseCatalog(plantCode: string): {
         "Graphite Die / Consumables",
         "Other",
       ],
+    };
+  }
+
+  if (plantCode.toUpperCase() === "QUAD") {
+    return {
+      suppliers: getQuadVendorsForMaterial(""),
+      goods: QUAD_RAW_MATERIALS,
     };
   }
 

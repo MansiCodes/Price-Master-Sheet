@@ -32,23 +32,31 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "approve_head") {
-    if (role !== GlobalRole.BUSINESS_HEAD && role !== GlobalRole.SUPER_ADMIN) {
-      return NextResponse.json({ error: "Only Plant Head can approve at this level" }, { status: 403 });
+    if (role !== GlobalRole.BUSINESS_HEAD) {
+      return NextResponse.json(
+        { error: "Only Business Head can approve shifts" },
+        { status: 403 },
+      );
     }
     const updated = await prisma.dailyEntryStatus.update({
       where: { id },
       data: {
         approvedByHead: true,
         approvedByHeadId: session.user.id,
+        approvedByAdmin: true,
         rejectedByHead: false,
+        rejectedByAdmin: false,
       },
     });
     return NextResponse.json({ success: true, status: updated });
   }
 
   if (action === "reject_head") {
-    if (role !== GlobalRole.BUSINESS_HEAD && role !== GlobalRole.SUPER_ADMIN) {
-      return NextResponse.json({ error: "Only Plant Head can reject at this level" }, { status: 403 });
+    if (role !== GlobalRole.BUSINESS_HEAD) {
+      return NextResponse.json(
+        { error: "Only Business Head can reject shifts" },
+        { status: 403 },
+      );
     }
     const updated = await prisma.dailyEntryStatus.update({
       where: { id },

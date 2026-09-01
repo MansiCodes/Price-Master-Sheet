@@ -10,8 +10,6 @@ type ApprovalItem = {
   plantId: string;
   date: string;
   shift: string;
-  approvedByHead: boolean;
-  approvedByAdmin: boolean;
   plant: { name: string };
 };
 
@@ -32,7 +30,6 @@ function formatDay(dateStr: string, locale: AppLocale): string {
 
 export function PendingApprovalsTable({
   pendingApprovals,
-  userRole,
   locale,
 }: PendingApprovalsTableProps) {
   const [selectedShift, setSelectedShift] = useState<ApprovalItem | null>(null);
@@ -57,32 +54,6 @@ export function PendingApprovalsTable({
             <tbody>
               {pendingApprovals.map((app) => {
                 const dateFormatted = formatDay(app.date.slice(0, 10), locale);
-                const isHead = userRole === "BUSINESS_HEAD";
-                const isAdmin = userRole === "SUPER_ADMIN";
-
-                let statusText = "";
-                let badgeColor = "";
-                let showAction = false;
-                let actionType: "approve_head" | "approve_admin" = "approve_head";
-                let actionLabel = "";
-
-                if (!app.approvedByHead) {
-                  statusText = "Pending Plant Head";
-                  badgeColor = "#d97706"; // Amber
-                  if (isHead || isAdmin) {
-                    showAction = true;
-                    actionType = "approve_head";
-                    actionLabel = "Approve (Plant Head)";
-                  }
-                } else if (!app.approvedByAdmin) {
-                  statusText = "Pending Super Admin";
-                  badgeColor = "#2563eb"; // Blue
-                  if (isAdmin) {
-                    showAction = true;
-                    actionType = "approve_admin";
-                    actionLabel = "Approve (Super Admin)";
-                  }
-                }
 
                 return (
                   <tr key={app.id} style={{ borderBottom: "1px solid var(--border-color, #f3f4f6)" }}>
@@ -99,11 +70,11 @@ export function PendingApprovalsTable({
                           borderRadius: "0.25rem",
                           fontSize: "0.75rem",
                           fontWeight: 600,
-                          backgroundColor: badgeColor + "15",
-                          color: badgeColor,
+                          backgroundColor: "#d9770615",
+                          color: "#d97706",
                         }}
                       >
-                        {statusText}
+                        Pending Business Head
                       </span>
                     </td>
                     <td style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>
@@ -124,14 +95,12 @@ export function PendingApprovalsTable({
                         >
                           View Details
                         </button>
-                        {showAction ? (
-                          <ApproveRejectGroup
-                            statusId={app.id}
-                            role={userRole || ""}
-                          />
-                        ) : (
-                          <span style={{ color: "#9ca3af", fontSize: "0.85rem" }}>No action needed</span>
-                        )}
+                        <ApproveRejectGroup
+                          statusId={app.id}
+                          role="BUSINESS_HEAD"
+                          approveAction="approve_head"
+                          rejectAction="reject_head"
+                        />
                       </div>
                     </td>
                   </tr>

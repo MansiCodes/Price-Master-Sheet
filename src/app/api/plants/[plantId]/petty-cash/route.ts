@@ -9,7 +9,8 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
-import { refreshDailyStatus } from "@/lib/daily-status";
+import { entryApprovalCreateData, entryApprovalResetOnEdit, resolveEntryApprovalFlags } from "@/lib/entry-approval";
+import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
@@ -36,7 +37,7 @@ const pettyCashSchema = z.object({
   contractorSalary: z.coerce.number().nonnegative().default(0),
   supervisorSalary: z.coerce.number().nonnegative().default(0),
   billPhotoUrl: z.string().url().optional().nullable(),
-  billPhotoUrls: z.array(z.string().url()).max(3).optional(),
+  billPhotoUrls: z.array(z.string().url()).max(20).optional(),
 });
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -87,6 +88,7 @@ export async function GET(
     prisma.pettyCashEntry.findMany({
       where,
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      include: { enteredBy: { select: { globalRole: true } } },
     }),
     prisma.pettyCashEntry.aggregate({
       where,
@@ -98,53 +100,19 @@ export async function GET(
     }),
   ]);
 
-  // Filter and map statuses
-  const dailyStatuses = entries.length > 0
-    ? await prisma.dailyEntryStatus.findMany({
-        where: {
-          plantId,
-          OR: entries.map(e => ({
-            date: e.date,
-            shift: e.shift
-          }))
-        },
-        select: { date: true, shift: true, approvedByHead: true, approvedByAdmin: true, rejectedByHead: true, rejectedByAdmin: true }
-      })
-    : [];
-
-  const statusMap = new Map<string, { approvedByHead: boolean; approvedByAdmin: boolean; rejectedByHead: boolean; rejectedByAdmin: boolean }>();
-  for (const s of dailyStatuses) {
-    const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
-    statusMap.set(key, {
-      approvedByHead: s.approvedByHead,
-      approvedByAdmin: s.approvedByAdmin,
-      rejectedByHead: s.rejectedByHead,
-      rejectedByAdmin: s.rejectedByAdmin
-    });
-  }
-
-  let filteredEntries = entries;
-
-  const { slice, ...pageInfo } = paginate(filteredEntries, page, pageSize);
+  const { slice, ...pageInfo } = paginate(entries, page, pageSize);
   const expenses = Number(aggregate._sum.amount ?? 0);
   const contractorSalary = Number(aggregate._sum.contractorSalary ?? 0);
   const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
 
-  const rowsWithStatus = slice.map((entry) => {
-    const key = `${entry.date.toISOString().slice(0, 10)}_${entry.shift}`;
-    const status = statusMap.get(key);
-    return {
-      ...entry,
-      nature: entry.nature,
-      location: entry.location,
-      checkedBy: entry.checkedBy,
-      approvedBy: entry.approvedBy,
-      approvedByHead: status?.approvedByHead ?? false,
-      approvedByAdmin: status?.approvedByAdmin ?? false,
-      rejectedByHead: status?.rejectedByHead ?? false,
-      rejectedByAdmin: status?.rejectedByAdmin ?? false,
-    };
-  });
+  const rowsWithStatus = slice.map((entry) => ({
+    ...entry,
+    nature: entry.nature,
+    location: entry.location,
+    checkedBy: entry.checkedBy,
+    approvedBy: entry.approvedBy,
+    ...resolveEntryApprovalFlags(entry, entry.enteredBy.globalRole),
+  }));
 
   return NextResponse.json({
     rows: rowsWithStatus,
@@ -185,6 +153,11 @@ export async function POST(
   const data = parsed.data;
   const backdated = isBackdated(data.date);
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
+  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
+  const approvalFields = {
+    ...approval,
+    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
+  };
 
   const entry = await prisma.pettyCashEntry.create({
     data: {
@@ -221,6 +194,7 @@ export async function POST(
       billPhotoUrls: photos.billPhotoUrls,
       enteredById: session.user.id,
       isBackdated: backdated,
+      ...approvalFields,
     },
   });
 
@@ -234,7 +208,7 @@ export async function POST(
     isBackdated: backdated,
   });
 
-  await refreshDailyStatus(
+  await safeRefreshDailyStatus(
     plantId,
     parseDateOnly(data.date),
     data.shift,
@@ -286,6 +260,10 @@ export async function PATCH(
   }
 
   const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
+  const approvalReset = entryApprovalResetOnEdit(
+    session.user.globalRole,
+    dateStr,
+  );
 
   const entry = await prisma.pettyCashEntry.update({
     where: { id: existing.id },
@@ -306,6 +284,7 @@ export async function PATCH(
       contractorSalary: data.contractorSalary,
       supervisorSalary: data.supervisorSalary,
       isBackdated: isBackdated(dateStr),
+      ...approvalReset,
     },
   });
 
@@ -363,7 +342,7 @@ export async function DELETE(
     plantId,
   });
   await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
-  await refreshDailyStatus(plantId, existing.date, existing.shift);
+  await safeRefreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

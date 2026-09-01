@@ -202,7 +202,6 @@ export function SelectMenu({
         id={fieldId}
         tabIndex={-1}
         aria-hidden
-        required={required || undefined}
         value={value}
         onChange={() => undefined}
         className="select-menu__native"

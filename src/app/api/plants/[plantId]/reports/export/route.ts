@@ -12,7 +12,7 @@ import {
   formatMonthLabel,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { canViewPnl, isAdminOrHead } from "@/lib/rbac";
+import { canViewPnl, isAdminOrHead, isSuperAdmin } from "@/lib/rbac";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 
@@ -112,7 +112,7 @@ export async function GET(
       to,
       {
         ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
-        approvedOnly: isAdminOrHeadUser,
+        approvedOnly: isSuperAdmin(session.user.globalRole),
       },
     );
     sheet.columns = [

@@ -8,6 +8,7 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { paginate } from "@/lib/ui/paginate";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -41,28 +42,41 @@ export async function GET(request: NextRequest) {
     },
   });
 
+  const mapped = processes.map((p) => {
+    const links = isAdmin
+      ? p.machines
+      : p.machines.filter((link) => link.machine.isActive);
+    return {
+      id: p.id,
+      name: p.name,
+      sortOrder: p.sortOrder,
+      isActive: p.isActive,
+      machineCount: links.length,
+      machineIds: links.map((link) => link.machineId),
+      machines: links.map((link) => ({
+        id: link.machine.id,
+        name: link.machine.name,
+        code: link.machine.code,
+        isActive: link.machine.isActive,
+      })),
+    };
+  });
+
+  if (all) {
+    return NextResponse.json({ ok: true, processes: mapped });
+  }
+
+  const page = Number(request.nextUrl.searchParams.get("page")) || 1;
+  const pageSize = Math.min(
+    Math.max(Number(request.nextUrl.searchParams.get("pageSize")) || 10, 1),
+    100,
+  );
+  const { slice, ...pageInfo } = paginate(mapped, page, pageSize);
+
   return NextResponse.json({
     ok: true,
-    processes: processes.map((p) => {
-      // Supervisors only ever act on active machines; admin needs the full set.
-      const links = isAdmin
-        ? p.machines
-        : p.machines.filter((link) => link.machine.isActive);
-      return {
-        id: p.id,
-        name: p.name,
-        sortOrder: p.sortOrder,
-        isActive: p.isActive,
-        machineCount: links.length,
-        machineIds: links.map((link) => link.machineId),
-        machines: links.map((link) => ({
-          id: link.machine.id,
-          name: link.machine.name,
-          code: link.machine.code,
-          isActive: link.machine.isActive,
-        })),
-      };
-    }),
+    processes: slice,
+    ...pageInfo,
   });
 }
 

@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/db";
 import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { refreshDailyStatusForDate } from "@/lib/daily-status";
+import { getShiftApprovalStartDate } from "@/lib/shift-approval-policy";
 import { calculatePlantPnl } from "@/lib/pnl/calculate";
+import {
+  bucketDateForPeriod,
+  formatPeriodLabel,
+  getDashboardPeriodBounds,
+  parseDashboardPeriod,
+  type DashboardPeriod,
+} from "@/lib/dashboard/period";
 import {
   REQUIRED_SHIFT_FORM_COUNT,
   countRequiredShiftForms,
@@ -55,6 +63,8 @@ export type DailyReportRow = {
 };
 
 export type DashboardMetrics = {
+  period: DashboardPeriod;
+  periodLabel: string;
   today: string;
   monthLabel: string;
   todaySales: number;
@@ -114,18 +124,23 @@ function addDays(dateStr: string, days: number): string {
 
 export async function getDashboardMetrics(
   plantIds: string[],
-  options: { includePnl: boolean; enteredById?: string; approvedOnly?: boolean },
+  options: {
+    includePnl: boolean;
+    enteredById?: string;
+    approvedOnly?: boolean;
+    period?: DashboardPeriod | string | null;
+  },
 ): Promise<DashboardMetrics> {
+  const period = parseDashboardPeriod(options.period);
   const today = todayDateString();
   const todayDate = parseDateOnly(today);
+  const bounds = getDashboardPeriodBounds(period, today);
+  const periodStart = bounds.periodStart;
+  const periodLabel = formatPeriodLabel(period, bounds);
   const weekStartStr = addDays(today, -6);
   const weekStart = parseDateOnly(weekStartStr);
-  const prevWeekStartStr = addDays(today, -13);
-  const prevWeekStart = parseDateOnly(prevWeekStartStr);
-  const prevWeekEnd = parseDateOnly(addDays(today, -7));
-  const monthStart = new Date(
-    Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1),
-  );
+  const statusRangeStart =
+    bounds.previousStart < weekStart ? bounds.previousStart : weekStart;
 
   const emptyFormBars: FormFillBar[] = TODAY_MODULES.map((m) => ({
     label: m.label,
@@ -142,6 +157,8 @@ export async function getDashboardMetrics(
   });
 
   const empty: DashboardMetrics = {
+    period,
+    periodLabel,
     today,
     monthLabel,
     todaySales: 0,
@@ -157,8 +174,8 @@ export async function getDashboardMetrics(
     formsCompleteToday: 0,
     formsTotalToday: Math.max(1, plantIds.length) * TODAY_MODULE_COUNT * 2,
     plantsTracked: plantIds.length,
-    weekSeries: Array.from({ length: 7 }, (_, i) => ({
-      date: addDays(weekStartStr, i),
+    weekSeries: bounds.bucketKeys.map((date) => ({
+      date,
       sales: 0,
       purchases: 0,
     })),
@@ -166,7 +183,7 @@ export async function getDashboardMetrics(
     weekPurchaseTotal: 0,
     weekSalesChangePct: 0,
     weekPurchaseChangePct: 0,
-    weekCompletion: Array.from({ length: 7 }, () => 0),
+    weekCompletion: Array.from({ length: bounds.bucketKeys.length }, () => 0),
     dailyReportRows: [],
     plantToday: [],
     formBars: emptyFormBars,
@@ -180,11 +197,16 @@ export async function getDashboardMetrics(
 
   if (plantIds.length === 0) return empty;
 
+  const approvalStart = getShiftApprovalStartDate();
+
   const approvedStatuses = options.approvedOnly
     ? await prisma.dailyEntryStatus.findMany({
         where: {
           plantId: { in: plantIds },
-          date: { gte: prevWeekStart, lte: todayDate },
+          date: {
+            gte: approvalStart > statusRangeStart ? approvalStart : statusRangeStart,
+            lte: todayDate,
+          },
           approvedByHead: true,
         },
         select: { plantId: true, date: true, shift: true },
@@ -192,15 +214,21 @@ export async function getDashboardMetrics(
     : [];
 
   const approvedFilter = options.approvedOnly
-    ? (approvedStatuses.length > 0
-        ? {
-            OR: approvedStatuses.map((s) => ({
-              plantId: s.plantId,
-              date: s.date,
-              shift: s.shift,
-            })),
-          }
-        : { id: "none" })
+    ? (() => {
+        const orClauses: Array<Record<string, unknown>> = [];
+        if (statusRangeStart < approvalStart) {
+          orClauses.push({
+            date: { gte: statusRangeStart, lt: approvalStart },
+          });
+        }
+        for (const s of approvedStatuses) {
+          orClauses.push({
+            date: s.date,
+            shift: s.shift,
+          });
+        }
+        return orClauses.length > 0 ? { OR: orClauses } : { id: "none" };
+      })()
     : {};
 
   const plantFilter = { plantId: { in: plantIds } };
@@ -270,23 +298,23 @@ export async function getDashboardMetrics(
       _count: true,
     }),
     prisma.sale.aggregate({
-      where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { salesValue: true },
     }),
     prisma.purchase.aggregate({
-      where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { invoiceValue: true },
     }),
     prisma.pettyCashEntry.aggregate({
-      where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { amount: true, contractorSalary: true, supervisorSalary: true },
     }),
     prisma.manpowerEntry.aggregate({
-      where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { totalCost: true },
     }),
     prisma.stockEntry.aggregate({
-      where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { closingValue: true },
     }),
     // Guard: stale Prisma client without ProductionEntry must not crash the dashboard.
@@ -302,36 +330,36 @@ export async function getDashboardMetrics(
             };
           }
         ).productionEntry.aggregate({
-          where: { ...entryFilter, date: { gte: monthStart, lte: todayDate } },
+          where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
           _sum: { quantity: true },
         })
       : Promise.resolve({ _sum: { quantity: 0 } }),
     prisma.sale.groupBy({
       by: ["date"],
-      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { salesValue: true },
     }),
     prisma.purchase.groupBy({
       by: ["date"],
-      where: { ...entryFilter, date: { gte: weekStart, lte: todayDate } },
+      where: { ...entryFilter, date: { gte: periodStart, lte: todayDate } },
       _sum: { invoiceValue: true },
     }),
     prisma.sale.aggregate({
       where: {
         ...entryFilter,
-        date: { gte: prevWeekStart, lte: prevWeekEnd },
+        date: { gte: bounds.previousStart, lte: bounds.previousEnd },
       },
       _sum: { salesValue: true },
     }),
     prisma.purchase.aggregate({
       where: {
         ...entryFilter,
-        date: { gte: prevWeekStart, lte: prevWeekEnd },
+        date: { gte: bounds.previousStart, lte: bounds.previousEnd },
       },
       _sum: { invoiceValue: true },
     }),
     prisma.dailyEntryStatus.findMany({
-      where: { ...plantFilter, date: { gte: weekStart, lte: todayDate } },
+      where: { ...plantFilter, date: { gte: periodStart, lte: todayDate } },
       select: {
         plantId: true,
         date: true,
@@ -480,27 +508,35 @@ export async function getDashboardMetrics(
     ? plants.length * TODAY_MODULE_COUNT
     : TODAY_MODULE_COUNT;
 
-  const salesMap = new Map(
-    weekSales.map((r) => [
-      r.date.toISOString().slice(0, 10),
-      toNum(r._sum.salesValue),
-    ]),
-  );
-  const purchaseMap = new Map(
-    weekPurchases.map((r) => [
-      r.date.toISOString().slice(0, 10),
-      toNum(r._sum.invoiceValue),
-    ]),
-  );
+  const salesMap = new Map<string, number>();
+  for (const r of weekSales) {
+    const dateStr = r.date.toISOString().slice(0, 10);
+    const key = bucketDateForPeriod(
+      dateStr,
+      bounds.bucketGranularity,
+      periodStart,
+    );
+    salesMap.set(key, (salesMap.get(key) ?? 0) + toNum(r._sum.salesValue));
+  }
+  const purchaseMap = new Map<string, number>();
+  for (const r of weekPurchases) {
+    const dateStr = r.date.toISOString().slice(0, 10);
+    const key = bucketDateForPeriod(
+      dateStr,
+      bounds.bucketGranularity,
+      periodStart,
+    );
+    purchaseMap.set(
+      key,
+      (purchaseMap.get(key) ?? 0) + toNum(r._sum.invoiceValue),
+    );
+  }
 
-  const weekSeries: DayPoint[] = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(weekStartStr, i);
-    return {
-      date,
-      sales: salesMap.get(date) ?? 0,
-      purchases: purchaseMap.get(date) ?? 0,
-    };
-  });
+  const weekSeries: DayPoint[] = bounds.bucketKeys.map((date) => ({
+    date,
+    sales: salesMap.get(date) ?? 0,
+    purchases: purchaseMap.get(date) ?? 0,
+  }));
   const weekSalesTotal = weekSeries.reduce((sum, d) => sum + d.sales, 0);
   const weekPurchaseTotal = weekSeries.reduce((sum, d) => sum + d.purchases, 0);
   const weekSalesChangePct = pctChange(
@@ -653,13 +689,14 @@ export async function getDashboardMetrics(
     statusSlots += TODAY_MODULE_COUNT;
     statusFilled += countStatusRequiredFilled(s);
   }
+  const bucketCount = Math.max(bounds.bucketKeys.length, 1);
   for (const p of weekSeries) {
     if (p.sales > 0) daysWithSale += 1;
     if (p.purchases > 0) daysWithPurchase += 1;
   }
 
-  const weekCompletion = Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(weekStartStr, i);
+  const weekCompletion = bounds.bucketKeys.map((date) => {
+    if (bounds.bucketGranularity !== "day") return 0;
     const slots = perShiftFormTotal * 2;
     if (slots === 0) return 0;
     const filled =
@@ -671,7 +708,7 @@ export async function getDashboardMetrics(
   if (options.includePnl) {
     const pnls = await Promise.all(
       plantIds.map((id) =>
-        calculatePlantPnl(id, monthStart, todayDate, {
+        calculatePlantPnl(id, periodStart, todayDate, {
           enteredById: options.enteredById,
         }),
       ),
@@ -716,6 +753,8 @@ export async function getDashboardMetrics(
     toNum(mtdPettyAgg._sum.supervisorSalary);
 
   return {
+    period,
+    periodLabel,
     today,
     monthLabel,
     todaySales: toNum(todaySalesAgg._sum.salesValue),
@@ -743,8 +782,8 @@ export async function getDashboardMetrics(
     kra: {
       dailyEntryRate:
         statusSlots > 0 ? Math.round((statusFilled / statusSlots) * 100) : 0,
-      salesCoverage: Math.round((daysWithSale / 7) * 100),
-      purchaseDiscipline: Math.round((daysWithPurchase / 7) * 100),
+      salesCoverage: Math.round((daysWithSale / bucketCount) * 100),
+      purchaseDiscipline: Math.round((daysWithPurchase / bucketCount) * 100),
       checklistToday:
         formsTotal > 0 ? Math.round((formsFilled / formsTotal) * 100) : 0,
     },

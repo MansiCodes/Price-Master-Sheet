@@ -9,6 +9,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
 import { isCat6Plant } from "@/lib/plant-layout";
+import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
@@ -35,6 +36,7 @@ type PurchaseRow = {
   billPhotoUrls?: string[];
   approvedByHead?: boolean;
   approvedByAdmin?: boolean;
+  approvalRequired?: boolean;
 };
 
 function formatBillDate(value: string | Date | null | undefined) {
@@ -206,43 +208,9 @@ export function PurchaseReport({
     },
     {
       key: "approvedByHead",
-      label: "Business Head Status",
+      label: "Approval Status",
       compact: true,
-      render: (r: any) => (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "0.15rem 0.4rem",
-            borderRadius: "0.25rem",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
-            color: r.approvedByHead ? "#10b981" : "#d97706",
-          }}
-        >
-          {r.approvedByHead ? "Approved" : "Pending"}
-        </span>
-      ),
-    },
-    {
-      key: "approvedByAdmin",
-      label: "Super Admin Status",
-      compact: true,
-      render: (r: any) => (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "0.15rem 0.4rem",
-            borderRadius: "0.25rem",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
-            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
-          }}
-        >
-          {r.approvedByAdmin ? "Approved" : "Pending"}
-        </span>
-      ),
+      render: (r) => <PnlApprovalBadge row={r} level="head" />,
     },
     {
       key: "photos",
@@ -337,43 +305,9 @@ export function PurchaseReport({
     },
     {
       key: "approvedByHead",
-      label: "Business Head Status",
+      label: "Approval Status",
       compact: true,
-      render: (r: any) => (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "0.15rem 0.4rem",
-            borderRadius: "0.25rem",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            backgroundColor: r.approvedByHead ? "#10b98115" : "#d9770615",
-            color: r.approvedByHead ? "#10b981" : "#d97706",
-          }}
-        >
-          {r.approvedByHead ? "Approved" : "Pending"}
-        </span>
-      ),
-    },
-    {
-      key: "approvedByAdmin",
-      label: "Super Admin Status",
-      compact: true,
-      render: (r: any) => (
-        <span
-          style={{
-            display: "inline-block",
-            padding: "0.15rem 0.4rem",
-            borderRadius: "0.25rem",
-            fontSize: "0.75rem",
-            fontWeight: 600,
-            backgroundColor: r.approvedByAdmin ? "#10b98115" : "#3b82f615",
-            color: r.approvedByAdmin ? "#10b981" : "#3b82f6",
-          }}
-        >
-          {r.approvedByAdmin ? "Approved" : "Pending"}
-        </span>
-      ),
+      render: (r) => <PnlApprovalBadge row={r} level="head" />,
     },
     {
       key: "photos",
@@ -431,77 +365,9 @@ export function PurchaseReport({
     },
     {
       key: "approvedByHead",
-      label: "Business Head Status",
+      label: "Approval Status",
       compact: true,
-      render: (r: any) => {
-        const isRejected = r.rejectedByHead;
-        const isApproved = r.approvedByHead;
-        let label = "Pending";
-        let bg = "#d9770615";
-        let fg = "#d97706";
-        if (isRejected) {
-          label = "Rejected";
-          bg = "#ef444415";
-          fg = "#ef4444";
-        } else if (isApproved) {
-          label = "Approved";
-          bg = "#10b98115";
-          fg = "#10b981";
-        }
-        return (
-          <span
-            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
-            style={{
-              display: "inline-block",
-              padding: "0.15rem 0.4rem",
-              borderRadius: "0.25rem",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              backgroundColor: bg,
-              color: fg,
-            }}
-          >
-            {label}
-          </span>
-        );
-      },
-    },
-    {
-      key: "approvedByAdmin",
-      label: "Super Admin Status",
-      compact: true,
-      render: (r: any) => {
-        const isRejected = r.rejectedByAdmin;
-        const isApproved = r.approvedByAdmin;
-        let label = "Pending";
-        let bg = "#3b82f615";
-        let fg = "#3b82f6";
-        if (isRejected) {
-          label = "Rejected";
-          bg = "#ef444415";
-          fg = "#ef4444";
-        } else if (isApproved) {
-          label = "Approved";
-          bg = "#10b98115";
-          fg = "#10b981";
-        }
-        return (
-          <span
-            title={isRejected && r.rejectionReason ? r.rejectionReason : undefined}
-            style={{
-              display: "inline-block",
-              padding: "0.15rem 0.4rem",
-              borderRadius: "0.25rem",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              backgroundColor: bg,
-              color: fg,
-            }}
-          >
-            {label}
-          </span>
-        );
-      },
+      render: (r) => <PnlApprovalBadge row={r} level="head" />,
     },
     {
       key: "photos",
@@ -514,16 +380,12 @@ export function PurchaseReport({
   ];
 
   const activeColumns = useMemo(() => {
-    const baseCols = cat6
+    return cat6
       ? cat6Columns
       : purchaseView === "atcl"
         ? atclColumns
         : pvcColumns;
-    if (userRole === "SUPER_ADMIN" || userRole === "BUSINESS_HEAD") {
-      return baseCols.filter(c => c.key !== "approvedByHead" && c.key !== "approvedByAdmin");
-    }
-    return baseCols;
-  }, [cat6, cat6Columns, atclColumns, pvcColumns, purchaseView, userRole]);
+  }, [cat6, cat6Columns, atclColumns, pvcColumns, purchaseView]);
 
   return (
     <section className="pnl-report-panel">

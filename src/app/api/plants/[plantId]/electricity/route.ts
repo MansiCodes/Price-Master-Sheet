@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { ManpowerShift } from "@prisma/client";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { canAccessPlant, canEnterData } from "@/lib/rbac";
-import { toIsoDateString } from "@/lib/dates";
+import { toIsoDateString, parseDateOnly, dateOnlyRegex } from "@/lib/dates";
+import { syncDailyExpenseMarker } from "@/lib/daily-expense-marker";
 
 type Ctx = { params: Promise<{ plantId: string }> };
 
@@ -18,6 +20,11 @@ const upsertSchema = z.object({
   coveredAreaSqft: z.number().nonnegative().nullable().optional(),
   rentRatePerSqft: z.number().nonnegative().nullable().optional(),
   notes: z.string().max(500).nullable().optional(),
+  /** Daily shift marker for dashboard checklist (optional). */
+  dailyDate: z.string().regex(dateOnlyRegex).optional(),
+  shift: z.enum(ManpowerShift).optional(),
+  expenseHead: z.string().min(1).optional(),
+  payMode: z.string().min(1).optional(),
 });
 
 function parseMonth(input: string): Date | null {
@@ -157,6 +164,25 @@ export async function POST(request: Request, context: Ctx) {
     actorId: session.user.id,
     plantId,
   });
+
+  if (parsed.data.dailyDate && parsed.data.shift) {
+    const markerAmount =
+      parsed.data.billAmount ??
+      (computedRent > 0 ? computedRent : toNum(existing?.billAmount) ?? 0);
+    const markerHead =
+      parsed.data.expenseHead?.trim() ||
+      (computedRent > 0 ? "Factory Rent" : "Electricity");
+    await syncDailyExpenseMarker({
+      plantId,
+      date: parseDateOnly(parsed.data.dailyDate),
+      shift: parsed.data.shift,
+      expenseHead: markerHead,
+      amount: markerAmount,
+      enteredById: session.user.id,
+      description: parsed.data.notes ?? null,
+      payMode: parsed.data.payMode,
+    });
+  }
 
   return NextResponse.json({ ok: true, row });
 }

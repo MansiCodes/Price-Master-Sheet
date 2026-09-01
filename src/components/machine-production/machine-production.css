@@ -751,9 +751,23 @@
 
 .mp-table {
   width: 100%;
-  min-width: 72rem;
+  min-width: 0;
   border-collapse: collapse;
   font-size: 0.88rem;
+}
+
+.mp-table--wide {
+  min-width: 72rem;
+}
+
+.mp-table--daywise {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.mp-table thead {
+  background: color-mix(in srgb, var(--bg) 70%, white);
 }
 
 .mp-table th,
@@ -770,7 +784,7 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: var(--stone);
-  background: color-mix(in srgb, var(--bg) 70%, white);
+  background: transparent;
 }
 
 .mp-table__row {
@@ -793,44 +807,332 @@
   gap: 1rem;
 }
 
-.mp-cable-admin {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+.mp-admin-machines--stacked {
+  grid-template-columns: 1fr;
 }
 
-.mp-cable-scope {
-  grid-column: 1 / -1;
+.mp-admin-machines--full {
+  grid-template-columns: 1fr;
+  width: 100%;
+}
+
+.mp-admin-machines--stacked .mp-machine-form {
+  max-width: 28rem;
+}
+
+.mp-machines-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.65rem;
+}
+
+.mp-inline-form {
+  width: 100%;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-sizing: border-box;
+}
+
+.mp-inline-form__title {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.mp-inline-form__hint {
+  margin: -0.35rem 0 0.75rem;
+}
+
+.mp-inline-form--machine {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
   align-items: flex-end;
-  padding: 0.75rem 1rem;
-  border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--teal-soft) 35%, transparent);
+  gap: 0.75rem 1rem;
 }
 
-.mp-cable-scope label {
+.mp-inline-form--machine .mp-inline-form__title {
+  flex: 1 1 100%;
+  margin-bottom: 0;
+}
+
+.mp-inline-form__field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.85rem;
-  min-width: 200px;
+  flex: 1 1 16rem;
+  min-width: 0;
+  font-size: 0.88rem;
 }
 
-.mp-cable-scope select {
-  min-height: 2.25rem;
-  padding: 0.35rem 0.5rem;
+.mp-inline-form--machine .mp-inline-form__field {
+  flex: 0 1 20rem;
+  max-width: 20rem;
 }
 
-.mp-cable-scope .mp-muted {
-  flex: 1 1 220px;
+.mp-inline-form__field input {
+  min-height: 2.75rem;
+  padding: 0.7rem 1.05rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.mp-inline-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mp-inline-form--process {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+}
+
+.mp-inline-form--process .mp-inline-form__title,
+.mp-inline-form--process .mp-inline-form__hint {
+  flex: 1 1 100%;
+}
+
+.mp-inline-form--process .mp-inline-form__row--actions {
+  flex: 1 1 100%;
+  align-items: flex-end;
+}
+
+.mp-inline-form--process .mp-inline-form__actions {
+  flex: 0 0 auto;
+  margin-top: 0;
+  margin-left: auto;
+}
+
+.mp-inline-form--process .mp-inline-form__field--name {
+  flex: 1 1 16rem;
+  max-width: 28rem;
+  margin-bottom: 0;
+}
+
+.mp-inline-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.mp-inline-form--process .mp-inline-form__field--machines {
+  flex: 1 1 20rem;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.mp-inline-form--process .mp-inline-form__field--machines .select-menu__trigger {
+  min-height: 2.75rem;
+}
+
+.mp-inline-form--cable-scope .mp-inline-form__title {
+  margin-bottom: 0;
+}
+
+.mp-inline-form--cable-scope .mp-inline-form__hint {
+  flex: 1 1 100%;
+}
+
+.mp-inline-form__field .select-menu {
+  width: 100%;
+}
+
+.mp-inline-form__field .select-menu__trigger {
+  min-height: 2.35rem;
+  width: 100%;
+}
+
+.mp-inline-form__hint--inline {
+  flex: 1 1 100%;
+  margin: -0.35rem 0 0;
+}
+
+.mp-machine-multi__list {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.mp-machine-multi__search {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.mp-machine-multi__search input {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.mp-machine-multi__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.mp-machine-multi__option:hover,
+.mp-machine-multi__option.is-selected {
+  background: var(--teal-soft);
+}
+
+.mp-machine-multi__option input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.mp-machine-multi__empty {
   margin: 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
 }
 
-.mp-cable-admin .mp-admin-machines {
-  grid-template-columns: 1fr;
+.mp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--bg-elevated);
+  color: var(--teal);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.mp-icon-btn:hover {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+}
+
+.mp-icon-btn--add {
+  background: var(--teal);
+  color: #fff;
+  border-color: var(--teal);
+}
+
+.mp-icon-btn--add:hover {
+  background: color-mix(in srgb, var(--teal) 88%, black);
+  border-color: color-mix(in srgb, var(--teal) 88%, black);
+}
+
+.mp-table-wrap--full {
+  width: 100%;
+}
+
+.mp-table--admin {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.mp-table--admin th:nth-child(1),
+.mp-table--admin td:nth-child(1) {
+  width: 22%;
+}
+
+.mp-table--admin th:nth-child(2),
+.mp-table--admin td:nth-child(2) {
+  width: auto;
+}
+
+.mp-table--admin th:nth-child(3),
+.mp-table--admin td:nth-child(3) {
+  width: 7rem;
+}
+
+.mp-table--admin th:nth-child(4),
+.mp-table--admin td:nth-child(4) {
+  width: 7rem;
+}
+
+.mp-table--processes th:nth-child(1),
+.mp-table--processes td:nth-child(1) {
+  width: 8rem;
+}
+
+.mp-table--processes th:nth-child(3),
+.mp-table--processes td:nth-child(3) {
+  width: 7rem;
+}
+
+.mp-table--processes th:nth-child(4),
+.mp-table--processes td:nth-child(4) {
+  width: 7rem;
+}
+
+.mp-table--processes th:nth-child(5),
+.mp-table--processes td:nth-child(5) {
+  width: 7rem;
+}
+
+.mp-process-form {
+  max-width: none;
+}
+
+.mp-cable-admin {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.mp-cable-admin > .mp-inline-form--cable-scope {
+  grid-column: 1 / -1;
+}
+
+.mp-cable-panel--form {
+  margin-bottom: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  align-self: stretch;
+}
+
+.mp-cable-panel--table {
+  min-width: 0;
+  width: 100%;
+  min-height: 14rem;
+  align-self: stretch;
+}
+
+.mp-cable-admin .mp-inline-form--machine .mp-inline-form__field {
+  flex: 1 1 auto;
+  max-width: none;
+  min-width: 0;
+}
+
+.mp-cable-form-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  min-height: 1.25rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.mp-cable-panel--table .mp-table {
+  width: 100%;
 }
 
 .mp-field__extra {
@@ -1228,11 +1530,62 @@
 }
 
 .mp-table--daywise {
-  max-width: 720px;
+  max-width: 100%;
 }
 
 .mp-table__row--total td {
   font-weight: 650;
   border-top: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
   background: color-mix(in srgb, var(--teal-soft) 55%, transparent);
+}
+
+.mp-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.mp-toggle__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.mp-toggle__track {
+  width: 2.5rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--stone) 35%, white);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.mp-toggle__track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  transition: transform 0.15s ease;
+}
+
+.mp-toggle__input:checked + .mp-toggle__track {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.mp-toggle__input:checked + .mp-toggle__track::after {
+  transform: translateX(1.1rem);
+}
+
+.mp-toggle__input:focus-visible + .mp-toggle__track {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
 }

@@ -102,6 +102,10 @@ export function isAdminOrHead(role: GlobalRole | Role): boolean {
   );
 }
 
+export function isBusinessHead(role: GlobalRole | Role): boolean {
+  return role === GlobalRole.BUSINESS_HEAD;
+}
+
 export function canCombineMachineSupervise(role: GlobalRole | Role): boolean {
   return HYBRID_MACHINE_SUPERVISE_ROLES.has(role);
 }

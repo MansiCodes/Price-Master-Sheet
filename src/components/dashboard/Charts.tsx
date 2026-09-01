@@ -75,6 +75,13 @@ export function WeekCompareChart({
   const sales = points.map((p) => p.sales);
   const purchases = points.map((p) => p.purchases);
   const labels = points.map((p) => {
+    if (/^\d{4}-\d{2}$/.test(p.date)) {
+      const [yy, mm] = p.date.split("-");
+      return new Date(Date.UTC(Number(yy), Number(mm) - 1, 1)).toLocaleDateString(
+        "en-GB",
+        { month: "short", timeZone: "UTC" },
+      );
+    }
     const d = new Date(`${p.date}T00:00:00Z`);
     return d.toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -108,7 +115,7 @@ export function WeekCompareChart({
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="xMinYMin meet"
       role="img"
-      aria-label="7-day sales vs purchases"
+      aria-label="Sales vs purchases trend"
     >
       {ticks.map((tick) => {
         const y = padT + plotH - (tick / max) * plotH;

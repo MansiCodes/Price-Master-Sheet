@@ -21,6 +21,7 @@ import {
   shiftDisplayLabel,
   slotWindowLabel,
 } from "@/lib/machine-production/slots";
+import { paginate } from "@/lib/ui/paginate";
 
 const createSchema = z.object({
   machineId: z.string().min(1),
@@ -140,7 +141,8 @@ export async function GET(request: NextRequest) {
   const supervisorId = sp.get("supervisorId");
   const cableType = sp.get("cableType");
   const statusFilter = sp.get("status");
-  const take = Math.min(Number(sp.get("take") ?? 100) || 100, 300);
+  const page = Number(sp.get("page")) || 1;
+  const pageSize = Math.min(Math.max(Number(sp.get("pageSize")) || 20, 1), 500);
 
   const where: Prisma.MachineProductionEntryWhereInput = {};
   if (!isAdmin) {
@@ -165,7 +167,6 @@ export async function GET(request: NextRequest) {
   const rows = await prisma.machineProductionEntry.findMany({
     where,
     orderBy: [{ entryDate: "desc" }, { submittedAt: "desc" }],
-    take,
     include: {
       machine: { select: { id: true, name: true, code: true } },
       supervisor: { select: { id: true, name: true, email: true } },
@@ -224,6 +225,8 @@ export async function GET(request: NextRequest) {
         d.count === 0 ? 0 : Math.round((d.effSum / d.count) * 100) / 100,
     }));
 
+  const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+
   return NextResponse.json({
     ok: true,
     summary: {
@@ -236,7 +239,8 @@ export async function GET(request: NextRequest) {
       averageEfficiency: avgEff,
     },
     dayWise,
-    entries,
+    entries: slice,
+    ...pageInfo,
   });
 }
 

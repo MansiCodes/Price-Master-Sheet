@@ -1,31 +1,88 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useMemo, useState, useEffect, Component, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import "./image-viewer.css";
 
-function ImageViewer() {
-  const searchParams = useSearchParams();
-  const [index, setIndex] = useState(0);
-  const [urls, setUrls] = useState<string[]>([]);
+class ViewerErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="viewer-error">
+          <p>Could not display the image or document.</p>
+          <button onClick={() => window.close()} className="viewer-btn">
+            Close Window
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-  useEffect(() => {
+function parseViewerUrls(searchParams: ReturnType<typeof useSearchParams>): string[] {
+  const rawUrls = searchParams.get("urls");
+  const singleUrl = searchParams.get("url");
+  let list: string[] = [];
+
+  if (rawUrls) {
     try {
-      const idx = parseInt(searchParams.get("index") || "0", 10);
-      const rawUrls = searchParams.get("urls");
-      if (rawUrls) {
-        const decoded = JSON.parse(decodeURIComponent(rawUrls));
-        if (Array.isArray(decoded)) {
-          setUrls(decoded.filter(Boolean));
-          setIndex(idx >= 0 && idx < decoded.length ? idx : 0);
+      const parsed = JSON.parse(rawUrls);
+      if (Array.isArray(parsed)) {
+        list = parsed.map(String).filter(Boolean);
+      } else if (typeof parsed === "string" && parsed.trim()) {
+        list = [parsed.trim()];
+      }
+    } catch {
+      try {
+        const decodedStr = decodeURIComponent(rawUrls);
+        const parsed = JSON.parse(decodedStr);
+        if (Array.isArray(parsed)) {
+          list = parsed.map(String).filter(Boolean);
+        } else if (typeof parsed === "string" && parsed.trim()) {
+          list = [parsed.trim()];
+        }
+      } catch {
+        if (rawUrls.trim()) {
+          // Handle comma-separated or raw string
+          list = rawUrls.split(",").map((s) => s.trim().replace(/^["']|["']$/g, "")).filter(Boolean);
         }
       }
-    } catch (e) {
-      console.error("Failed to parse image-viewer params", e);
     }
-  }, [searchParams]);
+  }
 
-  if (urls.length === 0) {
+  if (singleUrl && !list.includes(singleUrl.trim())) {
+    list.push(singleUrl.trim());
+  }
+
+  return list;
+}
+
+function ImageViewer() {
+  const searchParams = useSearchParams();
+  const parsedUrls = useMemo(() => parseViewerUrls(searchParams), [searchParams]);
+  const initialIndex = useMemo(() => {
+    const idx = parseInt(searchParams.get("index") || "0", 10);
+    return idx >= 0 && idx < parsedUrls.length ? idx : 0;
+  }, [searchParams, parsedUrls.length]);
+
+  const [index, setIndex] = useState(initialIndex);
+
+  useEffect(() => {
+    setIndex(initialIndex);
+  }, [initialIndex]);
+
+  if (parsedUrls.length === 0) {
     return (
       <div className="viewer-error">
         <p>No valid images provided.</p>
@@ -36,33 +93,23 @@ function ImageViewer() {
     );
   }
 
-  const currentUrl = urls[index];
+  const safeIndex = Math.min(Math.max(0, index), parsedUrls.length - 1);
+  const currentUrl = parsedUrls[safeIndex] || "";
 
   const handlePrev = () => {
-    setIndex((prev) => (prev === 0 ? urls.length - 1 : prev - 1));
+    setIndex((prev) => (prev === 0 ? parsedUrls.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
-    setIndex((prev) => (prev === urls.length - 1 ? 0 : prev + 1));
+    setIndex((prev) => (prev === parsedUrls.length - 1 ? 0 : prev + 1));
   };
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") handlePrev();
-      if (e.key === "ArrowRight") handleNext();
-      if (e.key === "Escape") window.close();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [urls, index]);
 
   return (
     <div className="viewer-container">
       {/* Top Header */}
       <header className="viewer-header">
         <div className="viewer-info">
-          Image {index + 1} of {urls.length}
+          Image {safeIndex + 1} of {parsedUrls.length}
         </div>
         <button onClick={() => window.close()} className="viewer-close-btn" aria-label="Close tab">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -74,7 +121,7 @@ function ImageViewer() {
 
       {/* Main Content Area */}
       <main className="viewer-main">
-        {urls.length > 1 && (
+        {parsedUrls.length > 1 && (
           <button onClick={handlePrev} className="viewer-nav-btn viewer-nav-btn--left" aria-label="Previous image">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="15 18 9 12 15 6"></polyline>
@@ -83,8 +130,17 @@ function ImageViewer() {
         )}
 
         {(() => {
-          const isPdf = currentUrl.toLowerCase().includes(".pdf");
-          const isDoc = currentUrl.toLowerCase().includes(".doc") || currentUrl.toLowerCase().includes(".docx") || currentUrl.toLowerCase().includes(".xls") || currentUrl.toLowerCase().includes(".xlsx");
+          if (!currentUrl) {
+            return (
+              <div className="viewer-error">
+                <p>Invalid image link.</p>
+              </div>
+            );
+          }
+
+          const urlLower = currentUrl.toLowerCase();
+          const isPdf = urlLower.includes(".pdf");
+          const isDoc = urlLower.includes(".doc") || urlLower.includes(".docx") || urlLower.includes(".xls") || urlLower.includes(".xlsx");
 
           if (isPdf) {
             return (
@@ -113,12 +169,27 @@ function ImageViewer() {
 
           return (
             <div className="viewer-image-wrapper">
-              <img src={currentUrl} alt={`Uploaded file ${index + 1}`} className="viewer-image" />
+              <img
+                src={currentUrl}
+                alt={`Uploaded file ${safeIndex + 1}`}
+                className="viewer-image"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = "none";
+                  const fallback = e.currentTarget.parentElement?.querySelector(".viewer-fallback");
+                  if (fallback) (fallback as HTMLElement).style.display = "flex";
+                }}
+              />
+              <div className="viewer-fallback" style={{ display: "none", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <p style={{ color: "#9ca3af" }}>Image failed to load in preview.</p>
+                <a href={currentUrl} target="_blank" rel="noreferrer" className="viewer-btn" style={{ textDecoration: "none" }}>
+                  Open Direct Link
+                </a>
+              </div>
             </div>
           );
         })()}
 
-        {urls.length > 1 && (
+        {parsedUrls.length > 1 && (
           <button onClick={handleNext} className="viewer-nav-btn viewer-nav-btn--right" aria-label="Next image">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
@@ -132,8 +203,10 @@ function ImageViewer() {
 
 export default function ImageViewerPage() {
   return (
-    <Suspense fallback={<div className="viewer-loading">Loading...</div>}>
-      <ImageViewer />
-    </Suspense>
+    <ViewerErrorBoundary>
+      <Suspense fallback={<div className="viewer-loading">Loading...</div>}>
+        <ImageViewer />
+      </Suspense>
+    </ViewerErrorBoundary>
   );
 }

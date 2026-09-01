@@ -7,17 +7,26 @@ import { toast } from "sonner";
 type ApproveRejectGroupProps = {
   statusId: string;
   role: "BUSINESS_HEAD" | "SUPER_ADMIN" | string;
+  approveAction?: "approve_head" | "approve_admin";
+  rejectAction?: "reject_head" | "reject_admin";
 };
 
-export function ApproveRejectGroup({ statusId, role }: ApproveRejectGroupProps) {
+export function ApproveRejectGroup({
+  statusId,
+  role,
+  approveAction,
+  rejectAction,
+}: ApproveRejectGroupProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [reason, setReason] = useState("");
 
   const isHead = role === "BUSINESS_HEAD";
-  const actionApprove = isHead ? "approve_head" : "approve_admin";
-  const actionReject = isHead ? "reject_head" : "reject_admin";
+  const actionApprove =
+    approveAction ?? (isHead ? "approve_head" : "approve_admin");
+  const actionReject =
+    rejectAction ?? (isHead ? "reject_head" : "reject_admin");
 
   const handleAction = (action: string, rejectReason?: string) => {
     startTransition(async () => {

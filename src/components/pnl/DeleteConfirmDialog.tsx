@@ -7,11 +7,17 @@ export function DeleteConfirmDialog({
   deleting,
   onYes,
   onNo,
+  title = "Delete data?",
+  message = "Are you sure you want to delete the data? This cannot be undone.",
+  yesLabel,
 }: {
   open: boolean;
   deleting?: boolean;
   onYes: () => void;
   onNo: () => void;
+  title?: string;
+  message?: string;
+  yesLabel?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -41,10 +47,10 @@ export function DeleteConfirmDialog({
         aria-describedby="pnl-delete-copy"
       >
         <h2 id="pnl-delete-title" className="pnl-delete-dialog__title">
-          Delete data?
+          {title}
         </h2>
         <p id="pnl-delete-copy" className="pnl-delete-dialog__copy">
-          Are you sure you want to delete the data? This cannot be undone.
+          {message}
         </p>
         <div className="pnl-delete-dialog__actions">
           <button
@@ -61,7 +67,7 @@ export function DeleteConfirmDialog({
             onClick={onYes}
             disabled={deleting}
           >
-            {deleting ? "Deleting…" : "Yes"}
+            {deleting ? "Please wait…" : (yesLabel ?? "Yes")}
           </button>
         </div>
       </div>

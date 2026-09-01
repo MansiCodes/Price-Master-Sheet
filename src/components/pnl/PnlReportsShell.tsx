@@ -15,16 +15,7 @@ import { PvcExpenseRegisterReport } from "@/components/pnl/PvcExpenseRegisterRep
 import { ContactListReport } from "@/components/pnl/ContactListReport";
 import { useReportRange } from "@/components/pnl/useReportRange";
 import type { ReportTab } from "@/components/pnl/types";
-import { isCat6Plant } from "@/lib/plant-layout";
 import "@/components/pnl/pnl-reports.css";
-
-function todayMonthRange(): { from: string; to: string } {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return { from: `${y}-${m}-01`, to: `${y}-${m}-${d}` };
-}
 
 export function PnlReportsShell({
   plantId,
@@ -42,17 +33,9 @@ export function PnlReportsShell({
   userRole?: string;
 }) {
   const [tab, setTab] = useState<ReportTab>("pnl");
-  const cat6 = isCat6Plant(plantCode);
   const pvc = plantCode?.toUpperCase() === "PVC";
 
-  const userRange = todayMonthRange();
-  const todayStr = userRange.to;
-  const { from, to, setFrom, setTo } = useReportRange(
-    isSuperAdmin
-      ? pvc ? "2026-01-01" : cat6 ? "2025-04-01" : undefined
-      : userRange.from,
-    isSuperAdmin ? todayStr : userRange.to,
-  );
+  const { from, to, setFrom, setTo } = useReportRange();
 
   const allowedTabs = useMemo<ReportTab[]>(
     () =>

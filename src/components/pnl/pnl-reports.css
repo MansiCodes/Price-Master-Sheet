@@ -109,6 +109,11 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
+  align-items: center;
+}
+
+.pnl-reports__actions .pnl-export-btn {
+  height: 2.35rem;
 }
 
 .pnl-reports__body {

@@ -10,7 +10,8 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { writeAuditLog } from "@/lib/audit";
-import { refreshDailyStatus } from "@/lib/daily-status";
+import { entryApprovalCreateData, entryApprovalResetOnEdit, resolveEntryApprovalFlags } from "@/lib/entry-approval";
+import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
@@ -33,7 +34,7 @@ const purchaseHeaderFields = {
   booksDate: z.string().regex(dateOnlyRegex).optional().nullable(),
   notes: z.string().optional().nullable(),
   billPhotoUrl: z.string().url().optional().nullable(),
-  billPhotoUrls: z.array(z.string().url()).max(3).optional(),
+  billPhotoUrls: z.array(z.string().url()).max(20).optional(),
 };
 
 const purchaseItemSchema = z.object({
@@ -121,6 +122,7 @@ export async function GET(
         : {}),
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    include: { enteredBy: { select: { globalRole: true } } },
   });
 
   if (excludeAtcl || atclOnly) {
@@ -129,35 +131,8 @@ export async function GET(
     );
   }
 
-  // Filter and map statuses
-  const dailyStatuses = purchases.length > 0
-    ? await prisma.dailyEntryStatus.findMany({
-        where: {
-          plantId,
-          OR: purchases.map(p => ({
-            date: p.date,
-            shift: p.shift
-          }))
-        },
-        select: { date: true, shift: true, approvedByHead: true, approvedByAdmin: true, rejectedByHead: true, rejectedByAdmin: true }
-      })
-    : [];
-
-  const statusMap = new Map<string, { approvedByHead: boolean; approvedByAdmin: boolean; rejectedByHead: boolean; rejectedByAdmin: boolean }>();
-  for (const s of dailyStatuses) {
-    const key = `${s.date.toISOString().slice(0, 10)}_${s.shift}`;
-    statusMap.set(key, {
-      approvedByHead: s.approvedByHead,
-      approvedByAdmin: s.approvedByAdmin,
-      rejectedByHead: s.rejectedByHead,
-      rejectedByAdmin: s.rejectedByAdmin
-    });
-  }
-
-  let filteredPurchases = purchases;
-
-  const { slice, ...pageInfo } = paginate(filteredPurchases, page, pageSize);
-  const totals = filteredPurchases.reduce(
+  const { slice, ...pageInfo } = paginate(purchases, page, pageSize);
+  const totals = purchases.reduce(
     (acc, row) => {
       acc.quantity += Number(row.quantity) || 0;
       acc.basicValue += Number(row.basicValue) || 0;
@@ -169,17 +144,10 @@ export async function GET(
   );
   const unloadingExpense = round2((totals.quantity / 1000) * unloadingRate);
 
-  const rowsWithStatus = slice.map((p) => {
-    const key = `${p.date.toISOString().slice(0, 10)}_${p.shift}`;
-    const status = statusMap.get(key);
-    return {
-      ...p,
-      approvedByHead: status?.approvedByHead ?? false,
-      approvedByAdmin: status?.approvedByAdmin ?? false,
-      rejectedByHead: status?.rejectedByHead ?? false,
-      rejectedByAdmin: status?.rejectedByAdmin ?? false,
-    };
-  });
+  const rowsWithStatus = slice.map((p) => ({
+    ...p,
+    ...resolveEntryApprovalFlags(p, p.enteredBy.globalRole),
+  }));
 
   return NextResponse.json({
     rows: rowsWithStatus,
@@ -227,6 +195,14 @@ export async function POST(
       data.billPhotoUrl,
     );
 
+    const approval = entryApprovalCreateData(session.user.globalRole, data.date);
+    const approvalFields = {
+      ...approval,
+      ...(approval.approvedByHead
+        ? { approvedByHeadId: session.user.id }
+        : {}),
+    };
+
     const purchases = await prisma.$transaction(
       data.items.map((item) => {
         const gstPercent = item.gstPercent ?? headerGst;
@@ -267,6 +243,7 @@ export async function POST(
             billPhotoUrls: photos.billPhotoUrls,
             enteredById: session.user.id,
             isBackdated: backdated,
+            ...approvalFields,
           },
         });
       }),
@@ -292,7 +269,7 @@ export async function POST(
       isBackdated: backdated,
     });
 
-    await refreshDailyStatus(plantId, day, data.shift, session.user.id);
+    await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
     await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
 
     return NextResponse.json({ purchases }, { status: 201 });
@@ -310,6 +287,11 @@ export async function POST(
   );
   const backdated = isBackdated(data.date);
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
+  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
+  const approvalFields = {
+    ...approval,
+    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
+  };
 
   const purchase = await prisma.purchase.create({
     data: {
@@ -342,6 +324,7 @@ export async function POST(
       billPhotoUrls: photos.billPhotoUrls,
       enteredById: session.user.id,
       isBackdated: backdated,
+      ...approvalFields,
     },
   });
 
@@ -355,7 +338,7 @@ export async function POST(
     isBackdated: backdated,
   });
 
-  await refreshDailyStatus(
+  await safeRefreshDailyStatus(
     plantId,
     parseDateOnly(data.date),
     data.shift,
@@ -411,6 +394,10 @@ export async function PATCH(
   const gstPercent = data.gstPercent ?? Number(existing.gstPercent);
   const totals = lineTotals(quantity, rate, gstPercent);
   const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
+  const approvalReset = entryApprovalResetOnEdit(
+    session.user.globalRole,
+    dateStr,
+  );
 
   const purchase = await prisma.purchase.update({
     where: { id: existing.id },
@@ -443,6 +430,7 @@ export async function PATCH(
       gstAmount: totals.gstAmount,
       invoiceValue: totals.invoiceValue,
       isBackdated: isBackdated(dateStr),
+      ...approvalReset,
     },
   });
 
@@ -500,7 +488,7 @@ export async function DELETE(
     plantId,
   });
   await maybeRevokeCreditScore(existing.enteredById, plantId, existing.date, existing.shift);
-  await refreshDailyStatus(plantId, existing.date, existing.shift);
+  await safeRefreshDailyStatus(plantId, existing.date, existing.shift);
 
   return NextResponse.json({ ok: true });
 }

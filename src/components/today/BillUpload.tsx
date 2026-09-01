@@ -45,7 +45,7 @@ async function uploadToCloudinary(file: File): Promise<string> {
 export function BillUpload({
   urls,
   onChange,
-  label = "Upload bill/document",
+  label = "Upload bill/document (optional)",
 }: {
   urls: string[];
   onChange: (urls: string[]) => void;

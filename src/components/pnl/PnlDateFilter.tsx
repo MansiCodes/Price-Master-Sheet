@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import "@/components/ui/date-filter.css";
 
 function todayISO(): string {
   const d = new Date();
@@ -25,25 +26,42 @@ export function PnlDateFilter({
     <div className="pnl-date-filter" aria-label="Date range filter">
       <div className="pnl-date-filter__field">
         <label htmlFor="pnl-from">{t("from")}</label>
-        <input
-          id="pnl-from"
-          type="date"
-          value={from}
-          max={to}
-          onChange={(e) => onFromChange(e.target.value)}
-        />
+        <div className="pnl-date-filter__input-wrap">
+          <input
+            id="pnl-from"
+            type="date"
+            value={from}
+            max={to || today}
+            onChange={(e) => onFromChange(e.target.value)}
+          />
+        </div>
       </div>
       <div className="pnl-date-filter__field">
         <label htmlFor="pnl-to">{t("to")}</label>
-        <input
-          id="pnl-to"
-          type="date"
-          value={to}
-          min={from}
-          max={today}
-          onChange={(e) => onToChange(e.target.value)}
-        />
+        <div className="pnl-date-filter__input-wrap">
+          <input
+            id="pnl-to"
+            type="date"
+            value={to}
+            min={from || undefined}
+            max={today}
+            onChange={(e) => onToChange(e.target.value)}
+          />
+        </div>
       </div>
+      {from || to ? (
+        <button
+          type="button"
+          className="pnl-date-filter__clear"
+          onClick={() => {
+            onFromChange("");
+            onToChange("");
+          }}
+          title="Clear date filter to show all data"
+        >
+          Clear
+        </button>
+      ) : null}
     </div>
   );
 }

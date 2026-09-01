@@ -11,6 +11,9 @@ import {
 } from "@/components/pnl/EntryEditDrawer";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { TablePageLoadingSkeleton } from "@/components/loading/CoreLoadingSkeleton";
+import { Pagination } from "@/components/ui/Pagination";
+import { DEFAULT_REPORT_PAGE_SIZE } from "@/components/pnl/usePaginatedReport";
+import { MachineMultiSelect } from "@/components/machine-production/MachineMultiSelect";
 import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
 import { todayIstYmd } from "@/lib/machine-production/slots";
 import "@/components/pnl/pnl-reports.css";
@@ -99,8 +102,8 @@ type Filters = {
 };
 
 const EMPTY_FILTERS: Filters = {
-  dateFrom: todayIstYmd(),
-  dateTo: todayIstYmd(),
+  dateFrom: "",
+  dateTo: "",
   shift: "",
   machineId: "",
   supervisorId: "",
@@ -131,7 +134,11 @@ export function AdminDashboard() {
     "records" | "machines" | "processes" | "cable"
   >("records");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
   const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [entriesPage, setEntriesPage] = useState(1);
+  const [entriesPageSize, setEntriesPageSize] = useState(DEFAULT_REPORT_PAGE_SIZE);
+  const [entriesTotal, setEntriesTotal] = useState(0);
   const [dayWise, setDayWise] = useState<DayWiseRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [boardSummary, setBoardSummary] = useState<Summary | null>(null);
@@ -164,20 +171,45 @@ export function AdminDashboard() {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(
     null,
   );
+  const [pendingToggleMachine, setPendingToggleMachine] = useState<{
+    machine: MachineRow;
+    nextActive: boolean;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [togglingMachine, setTogglingMachine] = useState(false);
 
   const [machineForm, setMachineForm] = useState({ name: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [machineSaving, setMachineSaving] = useState(false);
+  const [machinesTable, setMachinesTable] = useState<MachineRow[]>([]);
+  const [machinesPage, setMachinesPage] = useState(1);
+  const [machinesPageSize, setMachinesPageSize] = useState(
+    DEFAULT_REPORT_PAGE_SIZE,
+  );
+  const [machinesTotal, setMachinesTotal] = useState(0);
+  const [machinesTableLoading, setMachinesTableLoading] = useState(false);
   const [processForm, setProcessForm] = useState({ name: "" });
   const [editingProcessId, setEditingProcessId] = useState<string | null>(
     null,
   );
+  const [processSaving, setProcessSaving] = useState(false);
+  const [processesTable, setProcessesTable] = useState<ProcessRow[]>([]);
+  const [processesPage, setProcessesPage] = useState(1);
+  const [processesPageSize, setProcessesPageSize] = useState(
+    DEFAULT_REPORT_PAGE_SIZE,
+  );
+  const [processesTotal, setProcessesTotal] = useState(0);
+  const [processesTableLoading, setProcessesTableLoading] = useState(false);
+  const [pendingToggleProcess, setPendingToggleProcess] = useState<{
+    process: ProcessRow;
+    nextActive: boolean;
+  } | null>(null);
+  const [togglingProcess, setTogglingProcess] = useState(false);
   /** Machines ticked for the process being created or edited. */
   const [processMachineIds, setProcessMachineIds] = useState<string[]>([]);
-  const [machineSearch, setMachineSearch] = useState("");
 
-  const loadMachines = useCallback(async () => {
-    const res = await fetch("/api/machine-production/machines");
+  const loadAllMachines = useCallback(async () => {
+    const res = await fetch("/api/machine-production/machines?all=1");
     const json = (await res.json()) as {
       machines?: MachineRow[];
       error?: string;
@@ -189,7 +221,39 @@ export function AdminDashboard() {
     setMachines(json.machines ?? []);
   }, []);
 
-  const loadProcesses = useCallback(async () => {
+  const loadMachinesTable = useCallback(async () => {
+    setMachinesTableLoading(true);
+    try {
+      const sp = new URLSearchParams({
+        page: String(machinesPage),
+        pageSize: String(machinesPageSize),
+      });
+      const res = await fetch(`/api/machine-production/machines?${sp}`);
+      const json = (await res.json()) as {
+        machines?: MachineRow[];
+        total?: number;
+        page?: number;
+        pageSize?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Failed to load machines");
+        return;
+      }
+      setMachinesTable(json.machines ?? []);
+      setMachinesTotal(json.total ?? 0);
+      if (json.page) setMachinesPage(json.page);
+      if (json.pageSize) setMachinesPageSize(json.pageSize);
+    } finally {
+      setMachinesTableLoading(false);
+    }
+  }, [machinesPage, machinesPageSize]);
+
+  const refreshMachines = useCallback(async () => {
+    await Promise.all([loadAllMachines(), loadMachinesTable()]);
+  }, [loadAllMachines, loadMachinesTable]);
+
+  const loadAllProcesses = useCallback(async () => {
     const res = await fetch("/api/machine-production/processes?all=1");
     const json = (await res.json()) as {
       processes?: ProcessRow[];
@@ -201,6 +265,38 @@ export function AdminDashboard() {
     }
     setProcesses(json.processes ?? []);
   }, []);
+
+  const loadProcessesTable = useCallback(async () => {
+    setProcessesTableLoading(true);
+    try {
+      const sp = new URLSearchParams({
+        page: String(processesPage),
+        pageSize: String(processesPageSize),
+      });
+      const res = await fetch(`/api/machine-production/processes?${sp}`);
+      const json = (await res.json()) as {
+        processes?: ProcessRow[];
+        total?: number;
+        page?: number;
+        pageSize?: number;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Failed to load processes");
+        return;
+      }
+      setProcessesTable(json.processes ?? []);
+      setProcessesTotal(json.total ?? 0);
+      if (json.page) setProcessesPage(json.page);
+      if (json.pageSize) setProcessesPageSize(json.pageSize);
+    } finally {
+      setProcessesTableLoading(false);
+    }
+  }, [processesPage, processesPageSize]);
+
+  const refreshProcesses = useCallback(async () => {
+    await Promise.all([loadAllProcesses(), loadProcessesTable()]);
+  }, [loadAllProcesses, loadProcessesTable]);
 
   const loadCableTypes = useCallback(async () => {
     if (!cableProcessId || !cableMachineId) {
@@ -257,72 +353,90 @@ export function AdminDashboard() {
     return machines.filter((m) => process.machineIds.includes(m.id));
   }, [processes, machines, cableProcessId]);
 
-  const loadEntries = useCallback(async () => {
-    setLoading(true);
-    const sp = new URLSearchParams();
-    if (filters.dateFrom) sp.set("dateFrom", filters.dateFrom);
-    if (filters.dateTo) sp.set("dateTo", filters.dateTo);
-    if (filters.shift) sp.set("shift", filters.shift);
-    if (filters.machineId) sp.set("machineId", filters.machineId);
-    if (filters.supervisorId) sp.set("supervisorId", filters.supervisorId);
-    if (filters.cableType) sp.set("cableType", filters.cableType);
-    if (filters.status) sp.set("status", filters.status);
+  const loadEntries = useCallback(
+    async (opts?: { page?: number; pageSize?: number; filters?: Filters }) => {
+      setLoading(true);
+      const activeFilters = opts?.filters ?? appliedFilters;
+      const page = opts?.page ?? entriesPage;
+      const pageSize = opts?.pageSize ?? entriesPageSize;
+      const sp = new URLSearchParams();
+      if (activeFilters.dateFrom) sp.set("dateFrom", activeFilters.dateFrom);
+      if (activeFilters.dateTo) sp.set("dateTo", activeFilters.dateTo);
+      if (activeFilters.shift) sp.set("shift", activeFilters.shift);
+      if (activeFilters.machineId) sp.set("machineId", activeFilters.machineId);
+      if (activeFilters.supervisorId) sp.set("supervisorId", activeFilters.supervisorId);
+      if (activeFilters.cableType) sp.set("cableType", activeFilters.cableType);
+      if (activeFilters.status) sp.set("status", activeFilters.status);
+      sp.set("page", String(page));
+      sp.set("pageSize", String(pageSize));
 
-    try {
-      const [entriesRes, summaryRes] = await Promise.all([
-        fetch(`/api/machine-production/entries?${sp}`),
-        fetch(
-          `/api/machine-production/summary?date=${filters.dateFrom || todayIstYmd()}${
-            filters.shift ? `&shift=${filters.shift}` : ""
-          }`,
-        ),
-      ]);
-      const entriesJson = (await entriesRes.json()) as {
-        entries?: EntryRow[];
-        dayWise?: DayWiseRow[];
-        summary?: Summary;
-        error?: string;
-      };
-      const summaryJson = (await summaryRes.json()) as {
-        summary?: Summary;
-        error?: string;
-      };
-      if (!entriesRes.ok) {
-        toast.error(entriesJson.error ?? "Failed to load records");
-      } else {
-        setEntries(entriesJson.entries ?? []);
-        setDayWise(entriesJson.dayWise ?? []);
-        setSummary(entriesJson.summary ?? null);
-        const unique = new Map<string, string>();
-        for (const e of entriesJson.entries ?? []) {
-          if (e.supervisor) {
-            unique.set(
-              e.supervisor.id,
-              e.supervisor.name?.trim() || e.supervisor.email,
-            );
+      try {
+        const [entriesRes, summaryRes] = await Promise.all([
+          fetch(`/api/machine-production/entries?${sp}`),
+          fetch(
+            `/api/machine-production/summary?date=${activeFilters.dateFrom || todayIstYmd()}${
+              activeFilters.shift ? `&shift=${activeFilters.shift}` : ""
+            }`,
+          ),
+        ]);
+        const entriesJson = (await entriesRes.json()) as {
+          entries?: EntryRow[];
+          dayWise?: DayWiseRow[];
+          summary?: Summary;
+          page?: number;
+          pageSize?: number;
+          total?: number;
+          error?: string;
+        };
+        const summaryJson = (await summaryRes.json()) as {
+          summary?: Summary;
+          error?: string;
+        };
+        if (!entriesRes.ok) {
+          toast.error(entriesJson.error ?? "Failed to load records");
+        } else {
+          setEntries(entriesJson.entries ?? []);
+          setDayWise(entriesJson.dayWise ?? []);
+          setSummary(entriesJson.summary ?? null);
+          setEntriesTotal(entriesJson.total ?? 0);
+          if (entriesJson.page) setEntriesPage(entriesJson.page);
+          if (entriesJson.pageSize) setEntriesPageSize(entriesJson.pageSize);
+          const unique = new Map<string, string>();
+          for (const e of entriesJson.entries ?? []) {
+            if (e.supervisor) {
+              unique.set(
+                e.supervisor.id,
+                e.supervisor.name?.trim() || e.supervisor.email,
+              );
+            }
           }
+          setSupervisors(
+            [...unique.entries()].map(([id, label]) => ({ id, label })),
+          );
         }
-        setSupervisors(
-          [...unique.entries()].map(([id, label]) => ({ id, label })),
-        );
+        if (summaryRes.ok) setBoardSummary(summaryJson.summary ?? null);
+      } finally {
+        setLoading(false);
       }
-      if (summaryRes.ok) setBoardSummary(summaryJson.summary ?? null);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+    },
+    [appliedFilters, entriesPage, entriesPageSize],
+  );
 
   useEffect(() => {
-    void loadMachines();
-  }, [loadMachines]);
+    void loadAllMachines();
+  }, [loadAllMachines]);
+
+  useEffect(() => {
+    if (tab === "machines") void loadMachinesTable();
+  }, [tab, machinesPage, machinesPageSize, loadMachinesTable]);
 
   useEffect(() => {
     if (tab === "records") void loadEntries();
     if (tab === "cable") {
-      void loadProcesses();
+      void loadAllProcesses();
       void loadCableTypes();
     }
-  }, [tab, loadEntries, loadCableTypes, loadProcesses]);
+  }, [tab, appliedFilters, entriesPage, entriesPageSize, loadEntries, loadCableTypes, loadAllProcesses]);
 
   useEffect(() => {
     if (tab !== "cable") return;
@@ -330,8 +444,12 @@ export function AdminDashboard() {
   }, [tab, selectedCableTypeId, loadCableSizes]);
 
   useEffect(() => {
-    if (tab === "processes") void loadProcesses();
-  }, [tab, loadProcesses]);
+    void loadAllProcesses();
+  }, [loadAllProcesses]);
+
+  useEffect(() => {
+    if (tab === "processes") void loadProcessesTable();
+  }, [tab, processesPage, processesPageSize, loadProcessesTable]);
 
   useEffect(() => {
     if (!cableProcessId) {
@@ -344,37 +462,51 @@ export function AdminDashboard() {
     );
   }, [cableProcessId, cableMachinesForProcess]);
 
-  async function saveMachine(e: FormEvent) {
-    e.preventDefault();
+  function startEditMachine(m: MachineRow) {
+    setEditingId(m.id);
+    setMachineForm({ name: m.name });
+  }
+
+  function resetMachineForm() {
+    setEditingId(null);
+    setMachineForm({ name: "" });
+  }
+
+  async function saveMachine() {
     const name = machineForm.name.trim();
     if (!name) {
       toast.error("Name is required");
       return;
     }
-    if (editingId) {
-      const res = await patchJson<{ ok: boolean; error?: string }>(
-        `/api/machine-production/machines/${editingId}`,
-        { name },
-      );
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
+    setMachineSaving(true);
+    try {
+      if (editingId) {
+        const res = await patchJson<{ ok: boolean; error?: string }>(
+          `/api/machine-production/machines/${editingId}`,
+          { name },
+        );
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Machine updated");
+      } else {
+        const res = await postJson<{ ok: boolean; error?: string }>(
+          "/api/machine-production/machines",
+          { name },
+        );
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Machine created");
+        setMachinesPage(1);
       }
-      toast.success("Machine updated");
-    } else {
-      const res = await postJson<{ ok: boolean; error?: string }>(
-        "/api/machine-production/machines",
-        { name },
-      );
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success("Machine created");
+      resetMachineForm();
+      await refreshMachines();
+    } finally {
+      setMachineSaving(false);
     }
-    setEditingId(null);
-    setMachineForm({ name: "" });
-    void loadMachines();
   }
 
   async function toggleActive(m: MachineRow) {
@@ -384,14 +516,25 @@ export function AdminDashboard() {
     );
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      return false;
     }
     toast.success(m.isActive ? "Machine deactivated" : "Machine activated");
-    void loadMachines();
+    await refreshMachines();
+    return true;
   }
 
-  async function saveProcess(e: FormEvent) {
-    e.preventDefault();
+  async function confirmToggleMachine() {
+    if (!pendingToggleMachine || togglingMachine) return;
+    setTogglingMachine(true);
+    try {
+      const ok = await toggleActive(pendingToggleMachine.machine);
+      if (ok) setPendingToggleMachine(null);
+    } finally {
+      setTogglingMachine(false);
+    }
+  }
+
+  async function saveProcess() {
     const name = processForm.name.trim();
     if (!name) {
       toast.error("Process name is required");
@@ -402,30 +545,35 @@ export function AdminDashboard() {
       return;
     }
     const payload = { name, machineIds: processMachineIds };
-
-    if (editingProcessId) {
-      const res = await patchJson<{ ok: boolean; error?: string }>(
-        `/api/machine-production/processes/${editingProcessId}`,
-        payload,
-      );
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
+    setProcessSaving(true);
+    try {
+      if (editingProcessId) {
+        const res = await patchJson<{ ok: boolean; error?: string }>(
+          `/api/machine-production/processes/${editingProcessId}`,
+          payload,
+        );
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Process updated");
+      } else {
+        const res = await postJson<{ ok: boolean; error?: string }>(
+          "/api/machine-production/processes",
+          payload,
+        );
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success("Process added");
+        setProcessesPage(1);
       }
-      toast.success("Process updated");
-    } else {
-      const res = await postJson<{ ok: boolean; error?: string }>(
-        "/api/machine-production/processes",
-        payload,
-      );
-      if (!res.ok) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success("Process added");
+      resetProcessForm();
+      await refreshProcesses();
+    } finally {
+      setProcessSaving(false);
     }
-    resetProcessForm();
-    void loadProcesses();
   }
 
   async function toggleProcessActive(p: ProcessRow) {
@@ -435,24 +583,34 @@ export function AdminDashboard() {
     );
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      return false;
     }
     toast.success(p.isActive ? "Process deactivated" : "Process activated");
-    void loadProcesses();
+    await refreshProcesses();
+    return true;
+  }
+
+  async function confirmToggleProcess() {
+    if (!pendingToggleProcess || togglingProcess) return;
+    setTogglingProcess(true);
+    try {
+      const ok = await toggleProcessActive(pendingToggleProcess.process);
+      if (ok) setPendingToggleProcess(null);
+    } finally {
+      setTogglingProcess(false);
+    }
   }
 
   function editProcess(p: ProcessRow) {
     setEditingProcessId(p.id);
     setProcessForm({ name: p.name });
     setProcessMachineIds(p.machineIds);
-    setMachineSearch("");
   }
 
   function resetProcessForm() {
     setEditingProcessId(null);
     setProcessForm({ name: "" });
     setProcessMachineIds([]);
-    setMachineSearch("");
   }
 
   /**
@@ -474,16 +632,10 @@ export function AdminDashboard() {
     );
     if (!res.ok) {
       toast.error(res.error);
-      void loadProcesses();
+      await refreshProcesses();
+      return;
     }
-  }
-
-  function toggleProcessMachine(machineId: string) {
-    setProcessMachineIds((prev) =>
-      prev.includes(machineId)
-        ? prev.filter((id) => id !== machineId)
-        : [...prev, machineId],
-    );
+    await refreshProcesses();
   }
 
   async function saveCableType(e: FormEvent) {
@@ -764,14 +916,11 @@ export function AdminDashboard() {
       setSelected((s) => (s?.id === id ? null : s));
       void loadEntries();
     } else if (kind === "machine") {
-      if (editingId === id) {
-        setEditingId(null);
-        setMachineForm({ name: "" });
-      }
-      void loadMachines();
+      if (editingId === id) resetMachineForm();
+      await refreshMachines();
     } else if (kind === "process") {
       if (editingProcessId === id) resetProcessForm();
-      void loadProcesses();
+      await refreshProcesses();
     } else if (kind === "cableType") {
       if (editingCableTypeId === id) {
         setEditingCableTypeId(null);
@@ -790,21 +939,49 @@ export function AdminDashboard() {
   const displaySummary = tab === "records" ? summary ?? boardSummary : boardSummary ?? summary;
 
   async function downloadRecordsPdf() {
-    if (entries.length === 0) {
+    if (entriesTotal === 0) {
       toast.error("No records to export");
       return;
     }
     try {
+      const sp = new URLSearchParams();
+      if (appliedFilters.dateFrom) sp.set("dateFrom", appliedFilters.dateFrom);
+      if (appliedFilters.dateTo) sp.set("dateTo", appliedFilters.dateTo);
+      if (appliedFilters.shift) sp.set("shift", appliedFilters.shift);
+      if (appliedFilters.machineId) sp.set("machineId", appliedFilters.machineId);
+      if (appliedFilters.supervisorId) sp.set("supervisorId", appliedFilters.supervisorId);
+      if (appliedFilters.cableType) sp.set("cableType", appliedFilters.cableType);
+      if (appliedFilters.status) sp.set("status", appliedFilters.status);
+      sp.set("page", "1");
+      sp.set("pageSize", String(entriesTotal));
+
+      const res = await fetch(`/api/machine-production/entries?${sp}`);
+      const json = (await res.json()) as {
+        entries?: EntryRow[];
+        dayWise?: DayWiseRow[];
+        summary?: Summary;
+        error?: string;
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? "Failed to load records for export");
+        return;
+      }
+      const allEntries = json.entries ?? [];
+      if (allEntries.length === 0) {
+        toast.error("No records to export");
+        return;
+      }
+
       const { buildMachineProductionRecordsPdf } = await import(
         "@/lib/machine-production/records-pdf"
       );
       const { blob, filename } = buildMachineProductionRecordsPdf({
-        dateFrom: filters.dateFrom,
-        dateTo: filters.dateTo,
-        plannedTotal: summary?.plannedProduction ?? 0,
-        actualTotal: summary?.actualProduction ?? 0,
-        dayWise,
-        entries: entries.map((e) => ({
+        dateFrom: appliedFilters.dateFrom,
+        dateTo: appliedFilters.dateTo,
+        plannedTotal: json.summary?.plannedProduction ?? 0,
+        actualTotal: json.summary?.actualProduction ?? 0,
+        dayWise: json.dayWise ?? dayWise,
+        entries: allEntries.map((e) => ({
           entryDate: e.entryDate,
           machineName: e.machine?.name ?? "—",
           machineCode: e.machine?.code ?? "",
@@ -1029,9 +1206,28 @@ export function AdminDashboard() {
                 &nbsp;
               </span>
               <div className="mp-filters__apply-actions">
-                <Button type="button" onClick={() => void loadEntries()}>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setAppliedFilters(filters);
+                    setEntriesPage(1);
+                  }}
+                >
                   Apply
                 </Button>
+                {(filters.dateFrom || filters.dateTo || filters.shift || filters.machineId || filters.supervisorId || filters.cableType || filters.status) ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setFilters(EMPTY_FILTERS);
+                      setAppliedFilters(EMPTY_FILTERS);
+                      setEntriesPage(1);
+                    }}
+                  >
+                    Clear
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   variant="secondary"
@@ -1054,13 +1250,6 @@ export function AdminDashboard() {
             <>
               {dayWise.length > 0 ? (
                 <div className="mp-daywise">
-                  <div className="mp-daywise__head">
-                    <h2>Day-wise totals</h2>
-                    <p className="mp-muted">
-                      Planned and actual production summed by date for the
-                      current filters.
-                    </p>
-                  </div>
                   <div className="mp-table-wrap">
                     <table className="mp-table mp-table--daywise">
                       <thead>
@@ -1098,7 +1287,7 @@ export function AdminDashboard() {
               ) : null}
 
               <div className="mp-table-wrap">
-                <table className="mp-table">
+                <table className="mp-table mp-table--wide">
                   <thead>
                     <tr>
                       <th>Date</th>
@@ -1169,14 +1358,32 @@ export function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={entriesPage}
+                pageSize={entriesPageSize}
+                total={entriesTotal}
+                onPageChange={setEntriesPage}
+                onPageSizeChange={(nextSize) => {
+                  setEntriesPageSize(nextSize);
+                  setEntriesPage(1);
+                }}
+              />
             </>
           )}
         </>
       ) : tab === "machines" ? (
-        <div className="mp-admin-machines">
-          <form className="mp-machine-form" onSubmit={(e) => void saveMachine(e)}>
-            <h2>{editingId ? "Edit machine" : "Add machine"}</h2>
-            <label>
+        <div className="mp-admin-machines mp-admin-machines--full">
+          <form
+            className="mp-inline-form mp-inline-form--machine"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveMachine();
+            }}
+          >
+            <h2 className="mp-inline-form__title">
+              {editingId ? "Edit machine" : "Add machine"}
+            </h2>
+            <label className="mp-inline-form__field">
               Name
               <input
                 required
@@ -1187,295 +1394,338 @@ export function AdminDashboard() {
                 placeholder="e.g. 100MM"
               />
             </label>
-            <div className="mp-form__actions">
+            <div className="mp-inline-form__actions">
               {editingId ? (
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    setEditingId(null);
-                    setMachineForm({ name: "" });
-                  }}
+                  onClick={resetMachineForm}
+                  disabled={machineSaving}
                 >
                   Cancel
                 </Button>
               ) : null}
-              <Button type="submit">{editingId ? "Save" : "Add machine"}</Button>
-            </div>
-          </form>
-
-          <div className="mp-table-wrap">
-            <table className="mp-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {machines.map((m) => (
-                  <tr key={m.id}>
-                    <td>{m.code}</td>
-                    <td>
-                      {m.name}
-                      {m.description ? (
-                        <div className="mp-muted">{m.description}</div>
-                      ) : null}
-                    </td>
-                    <td>{m.isActive ? "Active" : "Inactive"}</td>
-                    <td className="mp-table__actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingId(m.id);
-                          setMachineForm({ name: m.name });
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => void toggleActive(m)}
-                      >
-                        {m.isActive ? "Deactivate" : "Activate"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() =>
-                          setPendingDelete({ kind: "machine", id: m.id })
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : tab === "processes" ? (
-        <div className="mp-admin-machines">
-          <form
-            className="mp-machine-form mp-process-form"
-            onSubmit={(e) => void saveProcess(e)}
-          >
-            <h2>{editingProcessId ? "Edit process" : "Add process"}</h2>
-            <p className="mp-muted">
-              Supervisors pick a process first, then a machine inside it.
-            </p>
-            <label>
-              Process name
-              <input
-                required
-                value={processForm.name}
-                onChange={(e) => setProcessForm({ name: e.target.value })}
-                placeholder="e.g. Aluminium Stranding"
-              />
-            </label>
-
-            <div className="mp-machine-picker">
-              <div className="mp-machine-picker__head">
-                <span>
-                  Machines in this process ({processMachineIds.length})
-                </span>
-                <input
-                  type="search"
-                  value={machineSearch}
-                  onChange={(e) => setMachineSearch(e.target.value)}
-                  placeholder="Search machines…"
-                />
-              </div>
-              <div className="mp-machine-picker__list">
-                {machines
-                  .filter((m) => {
-                    const q = machineSearch.trim().toLowerCase();
-                    if (!q) return true;
-                    return (
-                      m.name.toLowerCase().includes(q) ||
-                      m.code.toLowerCase().includes(q)
-                    );
-                  })
-                  .map((m) => (
-                    <label key={m.id} className="mp-machine-picker__item">
-                      <input
-                        type="checkbox"
-                        checked={processMachineIds.includes(m.id)}
-                        onChange={() => toggleProcessMachine(m.id)}
-                      />
-                      <span>
-                        {m.name}
-                        <span className="mp-muted"> · {m.code}</span>
-                        {!m.isActive ? (
-                          <span className="mp-muted"> (inactive)</span>
-                        ) : null}
-                      </span>
-                    </label>
-                  ))}
-                {machines.length === 0 ? (
-                  <p className="mp-muted">
-                    No machines yet — add them on the Machines tab first.
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mp-form__actions">
-              {editingProcessId ? (
-                <Button type="button" variant="ghost" onClick={resetProcessForm}>
-                  Cancel
-                </Button>
-              ) : null}
-              <Button type="submit">
-                {editingProcessId ? "Save process" : "Add process"}
+              <Button type="submit" disabled={machineSaving}>
+                {machineSaving
+                  ? "Saving…"
+                  : editingId
+                    ? "Save"
+                    : "Add machine"}
               </Button>
             </div>
           </form>
 
-          <div className="mp-table-wrap">
-            <table className="mp-table">
-              <thead>
-                <tr>
-                  <th>Order</th>
-                  <th>Process</th>
-                  <th>Machines</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {processes.map((p, i) => (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="mp-reorder">
-                        <span className="mp-reorder__num">{i + 1}</span>
-                        <button
-                          type="button"
-                          className="mp-reorder__btn"
-                          aria-label={`Move ${p.name} up`}
-                          disabled={i === 0}
-                          onClick={() => void moveProcess(i, -1)}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          className="mp-reorder__btn"
-                          aria-label={`Move ${p.name} down`}
-                          disabled={i === processes.length - 1}
-                          onClick={() => void moveProcess(i, 1)}
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </td>
-                    <td>{p.name}</td>
-                    <td>{p.machineCount}</td>
-                    <td>{p.isActive ? "Active" : "Inactive"}</td>
-                    <td className="mp-table__actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => editProcess(p)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => void toggleProcessActive(p)}
-                      >
-                        {p.isActive ? "Deactivate" : "Activate"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() =>
-                          setPendingDelete({ kind: "process", id: p.id })
-                        }
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {processes.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="mp-muted">
-                      No processes yet.
-                    </td>
-                  </tr>
+          {machinesTableLoading ? (
+            <TablePageLoadingSkeleton
+              rows={6}
+              label="Loading machines"
+              showChrome={false}
+            />
+          ) : (
+            <>
+              <div className="mp-table-wrap mp-table-wrap--full">
+                <table className="mp-table mp-table--admin">
+                  <thead>
+                    <tr>
+                      <th>Code</th>
+                      <th>Name</th>
+                      <th>Active</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {machinesTable.map((m) => (
+                      <tr key={m.id}>
+                        <td>{m.code}</td>
+                        <td>
+                          {m.name}
+                          {m.description ? (
+                            <div className="mp-muted">{m.description}</div>
+                          ) : null}
+                        </td>
+                        <td>
+                          <label
+                            className="mp-toggle"
+                            title={m.isActive ? "Active" : "Inactive"}
+                          >
+                            <input
+                              type="checkbox"
+                              className="mp-toggle__input"
+                              checked={m.isActive}
+                              onChange={() => {
+                                setPendingToggleMachine({
+                                  machine: m,
+                                  nextActive: !m.isActive,
+                                });
+                              }}
+                            />
+                            <span className="mp-toggle__track" aria-hidden="true" />
+                          </label>
+                        </td>
+                        <td className="mp-table__actions">
+                          <ReportRowActions
+                            onEdit={() => startEditMachine(m)}
+                            onDelete={() =>
+                              setPendingDelete({ kind: "machine", id: m.id })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                    {machinesTable.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="mp-muted">
+                          No machines yet. Add one using the form above.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={machinesPage}
+                pageSize={machinesPageSize}
+                total={machinesTotal}
+                onPageChange={setMachinesPage}
+                onPageSizeChange={(nextSize) => {
+                  setMachinesPageSize(nextSize);
+                  setMachinesPage(1);
+                }}
+              />
+            </>
+          )}
+        </div>
+      ) : tab === "processes" ? (
+        <div className="mp-admin-machines mp-admin-machines--full">
+          <form
+            className="mp-inline-form mp-inline-form--process"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void saveProcess();
+            }}
+          >
+            <h2 className="mp-inline-form__title">
+              {editingProcessId ? "Edit process" : "Add process"}
+            </h2>
+            <p className="mp-muted mp-inline-form__hint">
+              Supervisors pick a process first, then a machine inside it.
+            </p>
+            <div className="mp-inline-form__row mp-inline-form__row--actions">
+              <label className="mp-inline-form__field mp-inline-form__field--name">
+                Process name
+                <input
+                  required
+                  value={processForm.name}
+                  onChange={(e) => setProcessForm({ name: e.target.value })}
+                  placeholder="e.g. Aluminium Stranding"
+                />
+              </label>
+              <div className="mp-inline-form__field mp-inline-form__field--machines">
+                Machines ({processMachineIds.length})
+                <MachineMultiSelect
+                  machines={machines}
+                  value={processMachineIds}
+                  onChange={setProcessMachineIds}
+                  placeholder="Select machines…"
+                  searchPlaceholder="Search machines…"
+                />
+              </div>
+              <div className="mp-inline-form__actions">
+                {editingProcessId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={resetProcessForm}
+                    disabled={processSaving}
+                  >
+                    Cancel
+                  </Button>
                 ) : null}
-              </tbody>
-            </table>
-          </div>
+                <Button type="submit" disabled={processSaving}>
+                  {processSaving
+                    ? "Saving…"
+                    : editingProcessId
+                      ? "Save process"
+                      : "Add process"}
+                </Button>
+              </div>
+            </div>
+          </form>
+
+          {processesTableLoading ? (
+            <TablePageLoadingSkeleton
+              rows={6}
+              label="Loading processes"
+              showChrome={false}
+            />
+          ) : (
+            <>
+              <div className="mp-table-wrap mp-table-wrap--full">
+                <table className="mp-table mp-table--admin mp-table--processes">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Process</th>
+                      <th>Machines</th>
+                      <th>Active</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {processesTable.map((p, i) => {
+                      const globalIndex =
+                        (processesPage - 1) * processesPageSize + i;
+                      return (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="mp-reorder">
+                              <span className="mp-reorder__num">
+                                {globalIndex + 1}
+                              </span>
+                              <button
+                                type="button"
+                                className="mp-reorder__btn"
+                                aria-label={`Move ${p.name} up`}
+                                disabled={globalIndex === 0}
+                                onClick={() => void moveProcess(globalIndex, -1)}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                className="mp-reorder__btn"
+                                aria-label={`Move ${p.name} down`}
+                                disabled={globalIndex >= processes.length - 1}
+                                onClick={() => void moveProcess(globalIndex, 1)}
+                              >
+                                ↓
+                              </button>
+                            </div>
+                          </td>
+                          <td>{p.name}</td>
+                          <td>{p.machineCount}</td>
+                          <td>
+                            <label
+                              className="mp-toggle"
+                              title={p.isActive ? "Active" : "Inactive"}
+                            >
+                              <input
+                                type="checkbox"
+                                className="mp-toggle__input"
+                                checked={p.isActive}
+                                onChange={() => {
+                                  setPendingToggleProcess({
+                                    process: p,
+                                    nextActive: !p.isActive,
+                                  });
+                                }}
+                              />
+                              <span
+                                className="mp-toggle__track"
+                                aria-hidden="true"
+                              />
+                            </label>
+                          </td>
+                          <td className="mp-table__actions">
+                            <ReportRowActions
+                              onEdit={() => editProcess(p)}
+                              onDelete={() =>
+                                setPendingDelete({ kind: "process", id: p.id })
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {processesTable.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="mp-muted">
+                          No processes yet. Add one using the form above.
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination
+                page={processesPage}
+                pageSize={processesPageSize}
+                total={processesTotal}
+                onPageChange={setProcessesPage}
+                onPageSizeChange={(nextSize) => {
+                  setProcessesPageSize(nextSize);
+                  setProcessesPage(1);
+                }}
+              />
+            </>
+          )}
         </div>
       ) : (
         <div className="mp-cable-admin">
-          <div className="mp-cable-scope">
-            <label>
-              Process
-              <select
-                value={cableProcessId}
-                onChange={(e) => {
-                  setCableProcessId(e.target.value);
-                  setEditingCableTypeId(null);
-                  setEditingCableSizeId(null);
-                  setCableTypeForm({ name: "" });
-                  setCableSizeForm({ name: "" });
-                }}
-              >
-                <option value="">Select process</option>
-                {processes
-                  .filter((p) => p.isActive)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              Machine
-              <select
-                value={cableMachineId}
-                onChange={(e) => {
-                  setCableMachineId(e.target.value);
-                  setEditingCableTypeId(null);
-                  setEditingCableSizeId(null);
-                  setCableTypeForm({ name: "" });
-                  setCableSizeForm({ name: "" });
-                }}
-                disabled={!cableProcessId}
-              >
-                <option value="">Select machine</option>
-                {cableMachinesForProcess.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="mp-muted">
+          <div className="mp-inline-form mp-inline-form--cable-scope">
+            <h2 className="mp-inline-form__title">Process &amp; machine</h2>
+            <p className="mp-muted mp-inline-form__hint">
               Cable type and size lists are linked to this process + machine.
               Supervisors only see these options when filling that form.
             </p>
+            <div className="mp-inline-form__row">
+              <label className="mp-inline-form__field" htmlFor="cable-process">
+                Process
+                <SelectMenu
+                  id="cable-process"
+                  value={cableProcessId}
+                  placeholder="Select process"
+                  items={processes
+                    .filter((p) => p.isActive)
+                    .map((p) => ({ value: p.id, label: p.name }))}
+                  onChange={(next) => {
+                    setCableProcessId(next);
+                    setEditingCableTypeId(null);
+                    setEditingCableSizeId(null);
+                    setCableTypeForm({ name: "" });
+                    setCableSizeForm({ name: "" });
+                  }}
+                />
+              </label>
+              <label className="mp-inline-form__field" htmlFor="cable-machine">
+                Machine
+                <SelectMenu
+                  id="cable-machine"
+                  value={cableMachineId}
+                  placeholder="Select machine"
+                  disabled={!cableProcessId}
+                  items={cableMachinesForProcess.map((m) => ({
+                    value: m.id,
+                    label: m.name,
+                  }))}
+                  onChange={(next) => {
+                    setCableMachineId(next);
+                    setEditingCableTypeId(null);
+                    setEditingCableSizeId(null);
+                    setCableTypeForm({ name: "" });
+                    setCableSizeForm({ name: "" });
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
-          <div className="mp-admin-machines">
-            <form
-              className="mp-machine-form"
-              onSubmit={(e) => void saveCableType(e)}
+          <form
+            className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
+            onSubmit={(e) => void saveCableType(e)}
+          >
+            <h2 className="mp-inline-form__title">
+              {editingCableTypeId ? "Edit cable type" : "Add cable type"}
+            </h2>
+            <p
+              className="mp-muted mp-inline-form__hint mp-inline-form__hint--inline mp-cable-form-hint"
+              aria-hidden={!cableProcessId || !cableMachineId}
             >
-              <h2>
-                {editingCableTypeId ? "Edit cable type" : "Add cable type"}
-              </h2>
-              <label>
+              {cableProcessId && cableMachineId
+                ? "Types for the selected process + machine"
+                : "\u00a0"}
+            </p>
+            <label className="mp-inline-form__field">
                 Name
                 <input
                   required
@@ -1485,7 +1735,7 @@ export function AdminDashboard() {
                   disabled={!cableProcessId || !cableMachineId}
                 />
               </label>
-              <div className="mp-form__actions">
+              <div className="mp-inline-form__actions">
                 {editingCableTypeId ? (
                   <Button
                     type="button"
@@ -1513,74 +1763,126 @@ export function AdminDashboard() {
                   {editingCableTypeId ? "Save" : "Add type"}
                 </Button>
               </div>
-            </form>
+          </form>
 
-            <div className="mp-table-wrap">
-              <table className="mp-table">
-                <thead>
+          <form
+            className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
+            onSubmit={(e) => void saveCableSize(e)}
+          >
+            <h2 className="mp-inline-form__title">
+              {editingCableSizeId ? "Edit cable size" : "Add cable size"}
+            </h2>
+            <p className="mp-muted mp-inline-form__hint mp-inline-form__hint--inline mp-cable-form-hint">
+              {selectedCableTypeId
+                ? `For type: ${
+                    cableTypes.find((t) => t.id === selectedCableTypeId)
+                      ?.name ?? "—"
+                  }`
+                : "Select a cable type on the left first."}
+            </p>
+            <label className="mp-inline-form__field">
+              Size name
+              <input
+                required
+                value={cableSizeForm.name}
+                onChange={(e) => setCableSizeForm({ name: e.target.value })}
+                placeholder="e.g. 2 Core x 2.5 sqmm"
+                disabled={!selectedCableTypeId}
+              />
+            </label>
+            <div className="mp-inline-form__actions">
+              {editingCableSizeId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingCableSizeId(null);
+                    setCableSizeForm({ name: "" });
+                  }}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!selectedCableTypeId}
+                onClick={() => void addOthersCableSize()}
+              >
+                Add Others
+              </Button>
+              <Button type="submit" disabled={!selectedCableTypeId}>
+                {editingCableSizeId ? "Save" : "Add size"}
+              </Button>
+            </div>
+          </form>
+
+          <div className="mp-table-wrap mp-cable-panel mp-cable-panel--table">
+            <table className="mp-table">
+              <thead>
+                <tr>
+                  <th>Cable type</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!cableProcessId || !cableMachineId ? (
                   <tr>
-                    <th>Cable type</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <td colSpan={3} className="mp-muted">
+                      Select process and machine above.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {!cableProcessId || !cableMachineId ? (
-                    <tr>
-                      <td colSpan={3} className="mp-muted">
-                        Select process and machine above.
-                      </td>
-                    </tr>
-                  ) : (
-                    cableTypes.map((t) => (
-                      <tr
-                        key={t.id}
-                        className={
-                          selectedCableTypeId === t.id
-                            ? "mp-table__row mp-table__row--selected"
-                            : "mp-table__row"
-                        }
-                        onClick={() => {
-                          setSelectedCableTypeId(t.id);
-                          setEditingCableSizeId(null);
-                          setCableSizeForm({ name: "" });
-                        }}
-                      >
-                        <td>{t.name}</td>
-                        <td>{t.isActive ? "Active" : "Inactive"}</td>
-                        <td className="mp-table__actions">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingCableTypeId(t.id);
-                              setCableTypeForm({ name: t.name });
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void toggleCableType(t);
-                            }}
-                          >
-                            {t.isActive ? "Deactivate" : "Activate"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void removeCableType(t);
-                            }}
-                          >
-                            Remove
-                          </Button>
-                          <Button
+                ) : (
+                  cableTypes.map((t) => (
+                    <tr
+                      key={t.id}
+                      className={
+                        selectedCableTypeId === t.id
+                          ? "mp-table__row mp-table__row--selected"
+                          : "mp-table__row"
+                      }
+                      onClick={() => {
+                        setSelectedCableTypeId(t.id);
+                        setEditingCableSizeId(null);
+                        setCableSizeForm({ name: "" });
+                      }}
+                    >
+                      <td>{t.name}</td>
+                      <td>{t.isActive ? "Active" : "Inactive"}</td>
+                      <td className="mp-table__actions">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingCableTypeId(t.id);
+                            setCableTypeForm({ name: t.name });
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleCableType(t);
+                          }}
+                        >
+                          {t.isActive ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void removeCableType(t);
+                          }}
+                        >
+                          Remove
+                        </Button>
+                        <Button
                           type="button"
                           variant="ghost"
                           onClick={(e) => {
@@ -1591,136 +1893,81 @@ export function AdminDashboard() {
                           Delete
                         </Button>
                       </td>
-                      </tr>
-                    ))
-                  )}
-                  {cableProcessId &&
-                  cableMachineId &&
-                  cableTypes.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="mp-muted">
-                        No cable types linked yet for this process + machine.
-                      </td>
                     </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+                {cableProcessId &&
+                cableMachineId &&
+                cableTypes.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="mp-muted">
+                      No cable types linked yet for this process + machine.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
 
-          <div className="mp-admin-machines">
-            <form
-              className="mp-machine-form"
-              onSubmit={(e) => void saveCableSize(e)}
-            >
-              <h2>
-                {editingCableSizeId ? "Edit cable size" : "Add cable size"}
-              </h2>
-              <p className="mp-muted">
-                {selectedCableTypeId
-                  ? `For type: ${
-                      cableTypes.find((t) => t.id === selectedCableTypeId)
-                        ?.name ?? "—"
-                    }`
-                  : "Select a cable type on the left first."}
-              </p>
-              <label>
-                Size name
-                <input
-                  required
-                  value={cableSizeForm.name}
-                  onChange={(e) => setCableSizeForm({ name: e.target.value })}
-                  placeholder="e.g. 2 Core x 2.5 sqmm"
-                  disabled={!selectedCableTypeId}
-                />
-              </label>
-              <div className="mp-form__actions">
-                {editingCableSizeId ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setEditingCableSizeId(null);
-                      setCableSizeForm({ name: "" });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!selectedCableTypeId}
-                  onClick={() => void addOthersCableSize()}
-                >
-                  Add Others
-                </Button>
-                <Button type="submit" disabled={!selectedCableTypeId}>
-                  {editingCableSizeId ? "Save" : "Add size"}
-                </Button>
-              </div>
-            </form>
-
-            <div className="mp-table-wrap">
-              <table className="mp-table">
-                <thead>
+          <div className="mp-table-wrap mp-cable-panel mp-cable-panel--table">
+            <table className="mp-table">
+              <thead>
+                <tr>
+                  <th>Size</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!selectedCableTypeId ? (
                   <tr>
-                    <th>Size</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <td colSpan={3} className="mp-muted">
+                      Select a cable type to manage its sizes.
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {!selectedCableTypeId ? (
-                    <tr>
-                      <td colSpan={3} className="mp-muted">
-                        Select a cable type to manage its sizes.
+                ) : (
+                  cableSizes.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.name}</td>
+                      <td>{s.isActive ? "Active" : "Inactive"}</td>
+                      <td className="mp-table__actions">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingCableSizeId(s.id);
+                            setCableSizeForm({ name: s.name });
+                          }}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void toggleCableSize(s)}
+                        >
+                          {s.isActive ? "Deactivate" : "Activate"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => void removeCableSize(s)}
+                        >
+                          Remove
+                        </Button>
                       </td>
                     </tr>
-                  ) : (
-                    cableSizes.map((s) => (
-                      <tr key={s.id}>
-                        <td>{s.name}</td>
-                        <td>{s.isActive ? "Active" : "Inactive"}</td>
-                        <td className="mp-table__actions">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                              setEditingCableSizeId(s.id);
-                              setCableSizeForm({ name: s.name });
-                            }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            onClick={() => void toggleCableSize(s)}
-                          >
-                            {s.isActive ? "Deactivate" : "Activate"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => void removeCableSize(s)}
-                          >
-                            Remove
-                          </Button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                  {selectedCableTypeId && cableSizes.length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="mp-muted">
-                        No sizes for this cable type yet.
-                      </td>
-                    </tr>
-                  ) : null}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+                {selectedCableTypeId && cableSizes.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="mp-muted">
+                      No sizes for this cable type yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -1852,6 +2099,46 @@ export function AdminDashboard() {
           if (!deleting) setPendingDelete(null);
         }}
         onYes={() => void confirmDelete()}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingToggleMachine)}
+        deleting={togglingMachine}
+        title={
+          pendingToggleMachine?.nextActive
+            ? "Activate machine?"
+            : "Deactivate machine?"
+        }
+        message={
+          pendingToggleMachine?.nextActive
+            ? "Are you sure you want to activate?"
+            : "Are you sure you want to deactivate?"
+        }
+        yesLabel={pendingToggleMachine?.nextActive ? "Activate" : "Deactivate"}
+        onNo={() => {
+          if (!togglingMachine) setPendingToggleMachine(null);
+        }}
+        onYes={() => void confirmToggleMachine()}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingToggleProcess)}
+        deleting={togglingProcess}
+        title={
+          pendingToggleProcess?.nextActive
+            ? "Activate process?"
+            : "Deactivate process?"
+        }
+        message={
+          pendingToggleProcess?.nextActive
+            ? "Are you sure you want to activate?"
+            : "Are you sure you want to deactivate?"
+        }
+        yesLabel={pendingToggleProcess?.nextActive ? "Activate" : "Deactivate"}
+        onNo={() => {
+          if (!togglingProcess) setPendingToggleProcess(null);
+        }}
+        onYes={() => void confirmToggleProcess()}
       />
     </div>
   );

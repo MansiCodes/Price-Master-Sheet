@@ -207,7 +207,6 @@ export function PlantMultiSelect({
         id={fieldId}
         tabIndex={-1}
         aria-hidden
-        required={required || undefined}
         value={displayValue}
         onChange={() => undefined}
         className="select-menu__native"
