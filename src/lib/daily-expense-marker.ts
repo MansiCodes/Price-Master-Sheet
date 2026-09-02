@@ -1,6 +1,10 @@
 import type { ManpowerShift } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { refreshDailyStatus } from "@/lib/daily-status";
+import {
+  entryApprovalCreateData,
+  entryApprovalResetOnEdit,
+} from "@/lib/entry-approval";
+import { safeRefreshDailyStatus } from "@/lib/daily-status";
 
 function startOfUtcDay(date: Date): Date {
   return new Date(
@@ -26,7 +30,13 @@ export async function syncDailyExpenseMarker(params: {
   if (!(params.amount > 0)) return;
 
   const day = startOfUtcDay(params.date);
-  const payMode = params.payMode?.trim() || "CASH";
+  const payMode = params.payMode?.trim() || "Cash";
+
+  const enteredBy = await prisma.user.findUnique({
+    where: { id: params.enteredById },
+    select: { globalRole: true },
+  });
+  if (!enteredBy) return;
 
   const existing = await prisma.pettyCashEntry.findFirst({
     where: {
@@ -48,11 +58,19 @@ export async function syncDailyExpenseMarker(params: {
   };
 
   if (existing) {
+    const approvalReset = entryApprovalResetOnEdit(
+      enteredBy.globalRole,
+      day,
+    );
     await prisma.pettyCashEntry.update({
       where: { id: existing.id },
-      data: rowData,
+      data: {
+        ...rowData,
+        ...approvalReset,
+      },
     });
   } else {
+    const approval = entryApprovalCreateData(enteredBy.globalRole, day);
     await prisma.pettyCashEntry.create({
       data: {
         plantId: params.plantId,
@@ -62,9 +80,29 @@ export async function syncDailyExpenseMarker(params: {
         expenseHead: params.expenseHead,
         enteredById: params.enteredById,
         ...rowData,
+        ...approval,
+        ...(approval.approvedByHead
+          ? { approvedByHeadId: params.enteredById }
+          : {}),
       },
     });
   }
 
-  await refreshDailyStatus(params.plantId, day, params.shift, params.enteredById);
+  await safeRefreshDailyStatus(
+    params.plantId,
+    day,
+    params.shift,
+    params.enteredById,
+  );
+}
+
+/** Non-fatal wrapper for electricity / rent saves. */
+export async function safeSyncDailyExpenseMarker(
+  params: Parameters<typeof syncDailyExpenseMarker>[0],
+) {
+  try {
+    await syncDailyExpenseMarker(params);
+  } catch (err) {
+    console.error("syncDailyExpenseMarker failed", err);
+  }
 }

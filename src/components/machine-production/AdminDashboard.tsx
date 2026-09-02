@@ -205,6 +205,16 @@ export function AdminDashboard() {
     nextActive: boolean;
   } | null>(null);
   const [togglingProcess, setTogglingProcess] = useState(false);
+  const [pendingToggleCableType, setPendingToggleCableType] = useState<{
+    type: CableTypeRow;
+    nextActive: boolean;
+  } | null>(null);
+  const [pendingToggleCableSize, setPendingToggleCableSize] = useState<{
+    size: CableSizeRow;
+    nextActive: boolean;
+  } | null>(null);
+  const [togglingCableType, setTogglingCableType] = useState(false);
+  const [togglingCableSize, setTogglingCableSize] = useState(false);
   /** Machines ticked for the process being created or edited. */
   const [processMachineIds, setProcessMachineIds] = useState<string[]>([]);
 
@@ -704,26 +714,6 @@ export function AdminDashboard() {
     void loadCableTypes();
   }
 
-  async function removeCableType(t: CableTypeRow) {
-    if (
-      !window.confirm(
-        `Remove cable type "${t.name}" and all its sizes from this process + machine?`,
-      )
-    ) {
-      return;
-    }
-    const res = await deleteJson<{ ok: boolean; error?: string }>(
-      `/api/machine-production/cable-types/${t.id}`,
-    );
-    if (!res.ok) {
-      toast.error(res.error);
-      return;
-    }
-    toast.success("Cable type removed");
-    if (selectedCableTypeId === t.id) setSelectedCableTypeId("");
-    void loadCableTypes();
-  }
-
   async function toggleCableType(t: CableTypeRow) {
     const res = await patchJson<{ ok: boolean; error?: string }>(
       `/api/machine-production/cable-types/${t.id}`,
@@ -731,10 +721,22 @@ export function AdminDashboard() {
     );
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      return false;
     }
     toast.success(t.isActive ? "Cable type deactivated" : "Cable type activated");
     void loadCableTypes();
+    return true;
+  }
+
+  async function confirmToggleCableType() {
+    if (!pendingToggleCableType || togglingCableType) return;
+    setTogglingCableType(true);
+    try {
+      const ok = await toggleCableType(pendingToggleCableType.type);
+      if (ok) setPendingToggleCableType(null);
+    } finally {
+      setTogglingCableType(false);
+    }
   }
 
   async function saveCableSize(e: FormEvent) {
@@ -795,21 +797,6 @@ export function AdminDashboard() {
     void loadCableSizes(selectedCableTypeId);
   }
 
-  async function removeCableSize(s: CableSizeRow) {
-    if (!window.confirm(`Remove size "${s.name}" from this cable type?`)) {
-      return;
-    }
-    const res = await deleteJson<{ ok: boolean; error?: string }>(
-      `/api/machine-production/cable-sizes/${s.id}`,
-    );
-    if (!res.ok) {
-      toast.error(res.error);
-      return;
-    }
-    toast.success("Cable size removed");
-    void loadCableSizes(selectedCableTypeId);
-  }
-
   async function toggleCableSize(s: CableSizeRow) {
     const res = await patchJson<{ ok: boolean; error?: string }>(
       `/api/machine-production/cable-sizes/${s.id}`,
@@ -817,10 +804,22 @@ export function AdminDashboard() {
     );
     if (!res.ok) {
       toast.error(res.error);
-      return;
+      return false;
     }
     toast.success(s.isActive ? "Cable size deactivated" : "Cable size activated");
     void loadCableSizes(selectedCableTypeId);
+    return true;
+  }
+
+  async function confirmToggleCableSize() {
+    if (!pendingToggleCableSize || togglingCableSize) return;
+    setTogglingCableSize(true);
+    try {
+      const ok = await toggleCableSize(pendingToggleCableSize.size);
+      if (ok) setPendingToggleCableSize(null);
+    } finally {
+      setTogglingCableSize(false);
+    }
   }
 
   function openEntryEdit(e: EntryRow) {
@@ -937,6 +936,18 @@ export function AdminDashboard() {
   }
 
   const displaySummary = tab === "records" ? summary ?? boardSummary : boardSummary ?? summary;
+
+  const cableMachineHint = !cableProcessId
+    ? "Please select the process first"
+    : undefined;
+  const cableTypeHint = !cableProcessId
+    ? "Please select the process first"
+    : !cableMachineId
+      ? "Please select the machine first"
+      : undefined;
+  const cableSizeHint = !selectedCableTypeId
+    ? "Please select a cable type first"
+    : undefined;
 
   async function downloadRecordsPdf() {
     if (entriesTotal === 0) {
@@ -1689,23 +1700,28 @@ export function AdminDashboard() {
               </label>
               <label className="mp-inline-form__field" htmlFor="cable-machine">
                 Machine
-                <SelectMenu
-                  id="cable-machine"
-                  value={cableMachineId}
-                  placeholder="Select machine"
-                  disabled={!cableProcessId}
-                  items={cableMachinesForProcess.map((m) => ({
-                    value: m.id,
-                    label: m.name,
-                  }))}
-                  onChange={(next) => {
-                    setCableMachineId(next);
-                    setEditingCableTypeId(null);
-                    setEditingCableSizeId(null);
-                    setCableTypeForm({ name: "" });
-                    setCableSizeForm({ name: "" });
-                  }}
-                />
+                <span
+                  className={cableMachineHint ? "mp-disabled-hint" : undefined}
+                  title={cableMachineHint}
+                >
+                  <SelectMenu
+                    id="cable-machine"
+                    value={cableMachineId}
+                    placeholder="Select machine"
+                    disabled={!cableProcessId}
+                    items={cableMachinesForProcess.map((m) => ({
+                      value: m.id,
+                      label: m.name,
+                    }))}
+                    onChange={(next) => {
+                      setCableMachineId(next);
+                      setEditingCableTypeId(null);
+                      setEditingCableSizeId(null);
+                      setCableTypeForm({ name: "" });
+                      setCableSizeForm({ name: "" });
+                    }}
+                  />
+                </span>
               </label>
             </div>
           </div>
@@ -1713,6 +1729,7 @@ export function AdminDashboard() {
           <form
             className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
             onSubmit={(e) => void saveCableType(e)}
+            title={cableTypeHint}
           >
             <h2 className="mp-inline-form__title">
               {editingCableTypeId ? "Edit cable type" : "Add cable type"}
@@ -1725,7 +1742,10 @@ export function AdminDashboard() {
                 ? "Types for the selected process + machine"
                 : "\u00a0"}
             </p>
-            <label className="mp-inline-form__field">
+            <label
+              className={`mp-inline-form__field${cableTypeHint ? " mp-disabled-hint" : ""}`}
+              title={cableTypeHint}
+            >
                 Name
                 <input
                   required
@@ -1748,26 +1768,37 @@ export function AdminDashboard() {
                     Cancel
                   </Button>
                 ) : null}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!cableProcessId || !cableMachineId}
-                  onClick={() => void addOthersCableType()}
+                <span
+                  className={cableTypeHint ? "mp-disabled-hint" : undefined}
+                  title={cableTypeHint}
                 >
-                  Add Others
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={!cableProcessId || !cableMachineId}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!cableProcessId || !cableMachineId}
+                    onClick={() => void addOthersCableType()}
+                  >
+                    Add Others
+                  </Button>
+                </span>
+                <span
+                  className={cableTypeHint ? "mp-disabled-hint" : undefined}
+                  title={cableTypeHint}
                 >
-                  {editingCableTypeId ? "Save" : "Add type"}
-                </Button>
+                  <Button
+                    type="submit"
+                    disabled={!cableProcessId || !cableMachineId}
+                  >
+                    {editingCableTypeId ? "Save" : "Add type"}
+                  </Button>
+                </span>
               </div>
           </form>
 
           <form
             className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
             onSubmit={(e) => void saveCableSize(e)}
+            title={cableSizeHint}
           >
             <h2 className="mp-inline-form__title">
               {editingCableSizeId ? "Edit cable size" : "Add cable size"}
@@ -1780,7 +1811,10 @@ export function AdminDashboard() {
                   }`
                 : "Select a cable type on the left first."}
             </p>
-            <label className="mp-inline-form__field">
+            <label
+              className={`mp-inline-form__field${cableSizeHint ? " mp-disabled-hint" : ""}`}
+              title={cableSizeHint}
+            >
               Size name
               <input
                 required
@@ -1803,17 +1837,27 @@ export function AdminDashboard() {
                   Cancel
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!selectedCableTypeId}
-                onClick={() => void addOthersCableSize()}
+              <span
+                className={cableSizeHint ? "mp-disabled-hint" : undefined}
+                title={cableSizeHint}
               >
-                Add Others
-              </Button>
-              <Button type="submit" disabled={!selectedCableTypeId}>
-                {editingCableSizeId ? "Save" : "Add size"}
-              </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!selectedCableTypeId}
+                  onClick={() => void addOthersCableSize()}
+                >
+                  Add Others
+                </Button>
+              </span>
+              <span
+                className={cableSizeHint ? "mp-disabled-hint" : undefined}
+                title={cableSizeHint}
+              >
+                <Button type="submit" disabled={!selectedCableTypeId}>
+                  {editingCableSizeId ? "Save" : "Add size"}
+                </Button>
+              </span>
             </div>
           </form>
 
@@ -1822,7 +1866,7 @@ export function AdminDashboard() {
               <thead>
                 <tr>
                   <th>Cable type</th>
-                  <th>Status</th>
+                  <th>Active</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1849,49 +1893,41 @@ export function AdminDashboard() {
                       }}
                     >
                       <td>{t.name}</td>
-                      <td>{t.isActive ? "Active" : "Inactive"}</td>
-                      <td className="mp-table__actions">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <label
+                          className="mp-toggle"
+                          title={t.isActive ? "Active" : "Inactive"}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mp-toggle__input"
+                            checked={t.isActive}
+                            onChange={() => {
+                              setPendingToggleCableType({
+                                type: t,
+                                nextActive: !t.isActive,
+                              });
+                            }}
+                          />
+                          <span
+                            className="mp-toggle__track"
+                            aria-hidden="true"
+                          />
+                        </label>
+                      </td>
+                      <td
+                        className="mp-table__actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ReportRowActions
+                          onEdit={() => {
                             setEditingCableTypeId(t.id);
                             setCableTypeForm({ name: t.name });
                           }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void toggleCableType(t);
-                          }}
-                        >
-                          {t.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void removeCableType(t);
-                          }}
-                        >
-                          Remove
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingDelete({ kind: "cableType", id: t.id });
-                          }}
-                        >
-                          Delete
-                        </Button>
+                          onDelete={() =>
+                            setPendingDelete({ kind: "cableType", id: t.id })
+                          }
+                        />
                       </td>
                     </tr>
                   ))
@@ -1914,7 +1950,7 @@ export function AdminDashboard() {
               <thead>
                 <tr>
                   <th>Size</th>
-                  <th>Status</th>
+                  <th>Active</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1929,32 +1965,38 @@ export function AdminDashboard() {
                   cableSizes.map((s) => (
                     <tr key={s.id}>
                       <td>{s.name}</td>
-                      <td>{s.isActive ? "Active" : "Inactive"}</td>
+                      <td>
+                        <label
+                          className="mp-toggle"
+                          title={s.isActive ? "Active" : "Inactive"}
+                        >
+                          <input
+                            type="checkbox"
+                            className="mp-toggle__input"
+                            checked={s.isActive}
+                            onChange={() => {
+                              setPendingToggleCableSize({
+                                size: s,
+                                nextActive: !s.isActive,
+                              });
+                            }}
+                          />
+                          <span
+                            className="mp-toggle__track"
+                            aria-hidden="true"
+                          />
+                        </label>
+                      </td>
                       <td className="mp-table__actions">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => {
+                        <ReportRowActions
+                          onEdit={() => {
                             setEditingCableSizeId(s.id);
                             setCableSizeForm({ name: s.name });
                           }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => void toggleCableSize(s)}
-                        >
-                          {s.isActive ? "Deactivate" : "Activate"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => void removeCableSize(s)}
-                        >
-                          Remove
-                        </Button>
+                          onDelete={() =>
+                            setPendingDelete({ kind: "cableSize", id: s.id })
+                          }
+                        />
                       </td>
                     </tr>
                   ))
@@ -2139,6 +2181,50 @@ export function AdminDashboard() {
           if (!togglingProcess) setPendingToggleProcess(null);
         }}
         onYes={() => void confirmToggleProcess()}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingToggleCableType)}
+        deleting={togglingCableType}
+        title={
+          pendingToggleCableType?.nextActive
+            ? "Activate cable type?"
+            : "Deactivate cable type?"
+        }
+        message={
+          pendingToggleCableType?.nextActive
+            ? "Are you sure you want to activate?"
+            : "Are you sure you want to deactivate?"
+        }
+        yesLabel={
+          pendingToggleCableType?.nextActive ? "Activate" : "Deactivate"
+        }
+        onNo={() => {
+          if (!togglingCableType) setPendingToggleCableType(null);
+        }}
+        onYes={() => void confirmToggleCableType()}
+      />
+
+      <DeleteConfirmDialog
+        open={Boolean(pendingToggleCableSize)}
+        deleting={togglingCableSize}
+        title={
+          pendingToggleCableSize?.nextActive
+            ? "Activate cable size?"
+            : "Deactivate cable size?"
+        }
+        message={
+          pendingToggleCableSize?.nextActive
+            ? "Are you sure you want to activate?"
+            : "Are you sure you want to deactivate?"
+        }
+        yesLabel={
+          pendingToggleCableSize?.nextActive ? "Activate" : "Deactivate"
+        }
+        onNo={() => {
+          if (!togglingCableSize) setPendingToggleCableSize(null);
+        }}
+        onYes={() => void confirmToggleCableSize()}
       />
     </div>
   );

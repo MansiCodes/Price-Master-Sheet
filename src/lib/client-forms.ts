@@ -20,12 +20,13 @@ export async function postJson<T>(
     });
     const json = (await res.json().catch(() => ({}))) as {
       error?: string;
+      message?: string;
       details?: unknown;
     };
     if (!res.ok) {
       return {
         ok: false,
-        error: json.error ?? `Request failed (${res.status})`,
+        error: json.error ?? json.message ?? `Request failed (${res.status})`,
       };
     }
     return { ok: true, data: json as T };
@@ -47,11 +48,12 @@ async function sendJson<T>(
     });
     const json = (await res.json().catch(() => ({}))) as {
       error?: string;
+      message?: string;
     };
     if (!res.ok) {
       return {
         ok: false,
-        error: json.error ?? `Request failed (${res.status})`,
+        error: json.error ?? json.message ?? `Request failed (${res.status})`,
       };
     }
     return { ok: true, data: json as T };

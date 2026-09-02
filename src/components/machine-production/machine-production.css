@@ -1589,3 +1589,14 @@
   outline: 2px solid var(--teal);
   outline-offset: 2px;
 }
+
+.mp-disabled-hint {
+  display: block;
+  width: 100%;
+  cursor: not-allowed;
+}
+
+.mp-inline-form__actions .mp-disabled-hint {
+  display: inline-block;
+  width: auto;
+}

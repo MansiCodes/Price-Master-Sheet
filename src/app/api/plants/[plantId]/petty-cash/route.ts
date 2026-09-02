@@ -111,7 +111,7 @@ export async function GET(
     location: entry.location,
     checkedBy: entry.checkedBy,
     approvedBy: entry.approvedBy,
-    ...resolveEntryApprovalFlags(entry, entry.enteredBy.globalRole),
+    ...resolveEntryApprovalFlags(entry, entry.enteredBy?.globalRole ?? null),
   }));
 
   return NextResponse.json({
@@ -159,7 +159,8 @@ export async function POST(
     ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
   };
 
-  const entry = await prisma.pettyCashEntry.create({
+  try {
+    const entry = await prisma.pettyCashEntry.create({
     data: {
       plantId,
       date: parseDateOnly(data.date),
@@ -198,30 +199,36 @@ export async function POST(
     },
   });
 
-  await writeAuditLog({
-    entityType: "PettyCashEntry",
-    entityId: entry.id,
-    field: "create",
-    newValue: entry,
-    actorId: session.user.id,
-    plantId,
-    isBackdated: backdated,
-  });
+    await writeAuditLog({
+      entityType: "PettyCashEntry",
+      entityId: entry.id,
+      field: "create",
+      newValue: entry,
+      actorId: session.user.id,
+      plantId,
+      isBackdated: backdated,
+    });
 
-  await safeRefreshDailyStatus(
-    plantId,
-    parseDateOnly(data.date),
-    data.shift,
-    session.user.id,
-  );
-  await maybeAwardCreditScore(
-    session.user.id,
-    plantId,
-    parseDateOnly(data.date),
-    data.shift,
-  );
+    await safeRefreshDailyStatus(
+      plantId,
+      parseDateOnly(data.date),
+      data.shift,
+      session.user.id,
+    );
+    await maybeAwardCreditScore(
+      session.user.id,
+      plantId,
+      parseDateOnly(data.date),
+      data.shift,
+    );
 
-  return NextResponse.json({ entry }, { status: 201 });
+    return NextResponse.json({ entry }, { status: 201 });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not save expense entry";
+    console.error("petty-cash POST failed", err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function PATCH(

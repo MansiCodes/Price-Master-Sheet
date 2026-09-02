@@ -131,7 +131,7 @@ export async function GET(
 
   const rowsWithStatus = slice.map((s) => ({
     ...s,
-    ...resolveEntryApprovalFlags(s, s.enteredBy.globalRole),
+    ...resolveEntryApprovalFlags(s, s.enteredBy?.globalRole ?? null),
   }));
 
   return NextResponse.json({ rows: rowsWithStatus, ...pageInfo, totals });

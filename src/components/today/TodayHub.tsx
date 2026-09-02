@@ -207,6 +207,18 @@ function newLine(unit = "Kg", itemDescription = ""): LineItem {
   };
 }
 
+async function fetchStockPurchaseRate(
+  plantId: string,
+  itemName: string,
+  date: string,
+): Promise<number | null> {
+  const qs = new URLSearchParams({ itemName, date });
+  const res = await fetch(`/api/plants/${plantId}/stock/average-rate?${qs}`);
+  const json = (await res.json()) as { rate?: number | null };
+  if (!res.ok) return null;
+  return json.rate != null && Number.isFinite(json.rate) ? json.rate : null;
+}
+
 type TodayHubProps = {
   plantId: string;
   plantName: string;
@@ -420,7 +432,7 @@ export function TodayHub({
   }, [stockItem, stockItemOther]);
 
   useEffect(() => {
-    if (!isUpcast || kind !== "stock") {
+    if (kind !== "stock") {
       setStockPurchaseRate(null);
       setStockPurchaseRateLoading(false);
       return;
@@ -433,25 +445,16 @@ export function TodayHub({
     setStockPurchaseRateLoading(true);
     void (async () => {
       try {
-        const qs = new URLSearchParams({
-          itemName: resolvedStockItemName,
-          date: entryDate,
-        });
-        const res = await fetch(
-          `/api/plants/${plantId}/stock/average-rate?${qs}`,
+        const rate = await fetchStockPurchaseRate(
+          plantId,
+          resolvedStockItemName,
+          entryDate,
         );
-        const json = (await res.json()) as {
-          rate?: number | null;
-          error?: string;
-        };
         if (cancelled) return;
-        if (!res.ok) {
-          setStockPurchaseRate(null);
-          return;
+        setStockPurchaseRate(rate);
+        if (rate != null) {
+          setStockRate(String(rate));
         }
-        setStockPurchaseRate(
-          json.rate != null && Number.isFinite(json.rate) ? json.rate : null,
-        );
       } catch {
         if (!cancelled) setStockPurchaseRate(null);
       } finally {
@@ -461,20 +464,17 @@ export function TodayHub({
     return () => {
       cancelled = true;
     };
-  }, [isUpcast, kind, resolvedStockItemName, entryDate, plantId]);
+  }, [kind, resolvedStockItemName, entryDate, plantId]);
 
   useEffect(() => {
-    if (!isUpcast) return;
     if (stockPurchaseRate == null || stockQty === "") {
-      setStockRate("");
-      setStockValue("");
       return;
     }
     const qty = Number(stockQty);
     if (!Number.isFinite(qty)) return;
     setStockRate(String(stockPurchaseRate));
     setStockValue((qty * stockPurchaseRate).toFixed(2));
-  }, [isUpcast, stockPurchaseRate, stockQty]);
+  }, [stockPurchaseRate, stockQty]);
 
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
@@ -950,34 +950,39 @@ export function TodayHub({
     } else if (kind === "stock") {
       const resolvedItem = resolvedStockItemName;
       const issuedQty = Number(stockQty);
-      const purchaseRate = isUpcast ? stockPurchaseRate : null;
+      let purchaseRate = stockPurchaseRate;
+      if (purchaseRate == null && resolvedItem) {
+        purchaseRate = await fetchStockPurchaseRate(
+          plantId,
+          resolvedItem,
+          entryDate,
+        );
+      }
       const manualRate = Number(stockRate);
       const closingRate =
-        isUpcast && purchaseRate != null ? purchaseRate : manualRate;
+        purchaseRate != null && Number.isFinite(purchaseRate)
+          ? purchaseRate
+          : Number.isFinite(manualRate)
+            ? manualRate
+            : NaN;
       const closingValue = issuedQty * closingRate;
-      if (
-        !resolvedItem ||
-        stockQty === "" ||
-        (!isUpcast && stockRate === "")
-      ) {
+      if (!resolvedItem || stockQty === "") {
         fail(
           (stockItem === "Others" || stockItem === "Other") &&
             !stockItemOther.trim()
             ? "Enter the other item name."
-            : isUpcast
-              ? "Enter stock category, item, and issued quantity."
-              : "Enter stock category, item, quantity, unit, and rate.",
+            : "Enter stock category, item, and quantity.",
         );
         return;
       }
-      if (isUpcast && purchaseRate == null) {
+      if (!Number.isFinite(closingRate) || closingRate < 0) {
         fail(
-          "No purchase rate found for this item. Add a purchase entry first.",
+          "Enter a rate, or select an item that already has purchase history for this plant.",
         );
         return;
       }
-      if (!(issuedQty >= 0) || !(closingRate >= 0)) {
-        fail("Quantity and rate must be zero or more.");
+      if (!(issuedQty >= 0)) {
+        fail("Quantity must be zero or more.");
         return;
       }
       result = await postJson(`/api/plants/${plantId}/stock`, {
@@ -1029,7 +1034,6 @@ export function TodayHub({
         expenseHead === "Electricity" ||
         expenseHead === "Fuel & Power"
       ) {
-        const billAmount = Number(expenseAmount);
         const opening =
           expenseOpeningReading === ""
             ? null
@@ -1038,10 +1042,7 @@ export function TodayHub({
           expenseClosingReading === ""
             ? null
             : Number(expenseClosingReading);
-        if (!(billAmount > 0)) {
-          fail("Enter electricity bill amount.");
-          return;
-        }
+        const rate = Number(expenseRate) || 0;
         const consumed =
           opening != null &&
           closing != null &&
@@ -1049,6 +1050,14 @@ export function TodayHub({
           Number.isFinite(closing)
             ? Math.max(0, closing - opening)
             : null;
+        const billAmount =
+          consumed != null && rate > 0
+            ? Math.round(consumed * rate * 100) / 100
+            : Number(expenseAmount);
+        if (!(billAmount > 0)) {
+          fail("Enter rate and readings so the electricity bill amount is calculated.");
+          return;
+        }
         result = await postJson(`/api/plants/${plantId}/electricity`, {
           month: expenseMonth || entryDate.slice(0, 7),
           openingReading: opening,
@@ -1105,7 +1114,9 @@ export function TodayHub({
             : PVC_UNLOADING_RATE_PER_MT;
         const amount = qty * rate;
         if (!(qty > 0) || !(amount > 0)) {
-          fail("Unloading MT is 0. Please enter purchases first for auto-calculation.");
+          fail(
+            "Enter unloading MT manually, or enter purchases for this date to auto-calculate.",
+          );
           return;
         }
         result = await postJson(`/api/plants/${plantId}/petty-cash`, {
@@ -1894,33 +1905,32 @@ export function TodayHub({
                     )}
                   </div>
                 </div>
-                {isUpcast ? (
-                  <p className="field-hint">
-                    {stockPurchaseRateLoading
-                      ? "Loading rate from purchases…"
-                      : stockPurchaseRate != null
-                        ? `Rate from purchases: ₹${stockPurchaseRate.toFixed(2)}/${stockUnit || "KGS"}${
-                            stockValue
-                              ? ` · Value: ${formatINR(Number(stockValue))}`
-                              : ""
-                          }`
-                        : resolvedStockItemName
-                          ? "No purchase data for this item yet — add a purchase entry first."
-                          : "Select an item to calculate rate from purchases."}
-                  </p>
-                ) : (
-                  <div className="prod-fields__row">
-                    <div className="field">
-                      <label htmlFor="st-rate">Rate</label>
-                      <DecimalInput
-                        id="st-rate"
-                        required
-                        value={stockRate}
-                        onChange={setStockRate}
-                      />
-                    </div>
+                <div className="prod-fields__row">
+                  <div className="field">
+                    <label htmlFor="st-rate">Rate</label>
+                    <DecimalInput
+                      id="st-rate"
+                      required
+                      value={stockRate}
+                      onChange={setStockRate}
+                    />
                   </div>
-                )}
+                </div>
+                {stockPurchaseRateLoading ? (
+                  <p className="field-hint">Loading rate from purchase history…</p>
+                ) : null}
+                {stockPurchaseRate != null ? (
+                  <p className="field-hint">
+                    Suggested from purchase history: ₹{stockPurchaseRate.toFixed(2)}/
+                    {stockUnit || "KGS"} (weighted average — edit if needed)
+                    {stockValue ? ` · Value: ${formatINR(Number(stockValue))}` : ""}
+                  </p>
+                ) : resolvedStockItemName ? (
+                  <p className="field-hint">
+                    No purchase history matched this item — enter rate manually (purchase
+                    today is not required).
+                  </p>
+                ) : null}
                 <div className="field expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea
@@ -2692,7 +2702,9 @@ function LineEditor({
             </div>
           ) : null}
 
-          <div className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}${showDebitQty ? " has-debit" : ""}`}>
+          <div
+            className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}`}
+          >
             {unitOptions ? (
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`line-unit-${line.id}`}>Unit</label>
@@ -2724,32 +2736,20 @@ function LineEditor({
                 }}
               />
             </div>
-            {showDebitQty ? (
+            {!showDebitQty ? (
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
+                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
                 <DecimalInput
-                  id={`line-debit-qty-${line.id}`}
-                  value={line.debitQuantity ?? ""}
-                  onChange={(debitQuantity) => {
+                  id={`line-rate-${line.id}`}
+                  value={line.rate}
+                  onChange={(rate) => {
                     const next = [...lines];
-                    next[idx] = { ...line, debitQuantity };
+                    next[idx] = { ...line, rate };
                     onChange(next);
                   }}
                 />
               </div>
             ) : null}
-            <div className="field" style={{ margin: 0 }}>
-              <label htmlFor={`line-rate-${line.id}`}>Rate</label>
-              <DecimalInput
-                id={`line-rate-${line.id}`}
-                value={line.rate}
-                onChange={(rate) => {
-                  const next = [...lines];
-                  next[idx] = { ...line, rate };
-                  onChange(next);
-                }}
-              />
-            </div>
             {showGst ? (
               <div className="field" style={{ margin: 0 }}>
                 <label htmlFor={`line-gst-${line.id}`}>GST %</label>
@@ -2765,6 +2765,34 @@ function LineEditor({
               </div>
             ) : null}
           </div>
+          {showDebitQty ? (
+            <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
+                <DecimalInput
+                  id={`line-debit-qty-${line.id}`}
+                  value={line.debitQuantity ?? ""}
+                  onChange={(debitQuantity) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, debitQuantity };
+                    onChange(next);
+                  }}
+                />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <DecimalInput
+                  id={`line-rate-${line.id}`}
+                  value={line.rate}
+                  onChange={(rate) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, rate };
+                    onChange(next);
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
           {showCat6MeterFields ? (
             <div className="line-stack__row line-stack__row--meta line-stack__row--meter">
               <div className="field" style={{ margin: 0 }}>

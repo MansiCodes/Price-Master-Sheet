@@ -181,6 +181,25 @@ export const PLANT_SEGMENTS: PlantSegment[] = [
       { name: "Star Quad Jelly-filled Cable", kind: "FG", unit: "MTR" },
     ],
   },
+  {
+    code: "CONDUCTOR",
+    name: "Conductor Plant",
+    rmSummary: "Copper · Aluminium · Wire rod",
+    sortOrder: 8,
+    rawMaterials: [
+      { name: "Copper Wire Rod", kind: "RM", unit: "KGS" },
+      { name: "Copper Cathode", kind: "RM", unit: "KGS" },
+      { name: "Aluminium Ingot / Wire Rod", kind: "RM", unit: "KGS" },
+      { name: "Drawing Lubricant", kind: "RM", unit: "KGS" },
+      { name: "Stranding Filler / Binder", kind: "RM", unit: "KGS" },
+    ],
+    finalProducts: [
+      { name: "Copper Conductor (bare)", kind: "FG", unit: "KGS" },
+      { name: "Stranded Copper Conductor", kind: "FG", unit: "KGS" },
+      { name: "Aluminium Conductor (AAC)", kind: "FG", unit: "KGS" },
+      { name: "ACSR Conductor", kind: "FG", unit: "KGS" },
+    ],
+  },
 ];
 
 const byCode = new Map(

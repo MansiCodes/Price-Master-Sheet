@@ -377,8 +377,9 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.line-stack__row--meta.has-debit {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+.line-stack__row--meta.line-stack__row--debit-rate {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.55rem;
 }
 
 .line-stack__row--meta.has-unit .field:nth-child(3),

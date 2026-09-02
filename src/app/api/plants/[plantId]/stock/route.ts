@@ -25,6 +25,7 @@ import {
 import { isAdminOrHead } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
+import { weightedAveragePurchaseRate } from "@/lib/stock/purchase-average-rate";
 
 const stockLineSchema = z.object({
   itemName: z.string().min(1),
@@ -73,6 +74,27 @@ function lineAmounts(quantity: number, rate?: number, value?: number) {
     rate: safeRate,
     closingValue: round2(quantity * safeRate),
   };
+}
+
+async function resolveStockLineAmounts(
+  plantId: string,
+  day: Date,
+  quantity: number,
+  rate?: number,
+  value?: number,
+  itemName?: string,
+) {
+  if (
+    itemName &&
+    (!(rate != null && rate > 0) || value == null) &&
+    quantity > 0
+  ) {
+    const avg = await weightedAveragePurchaseRate(plantId, itemName, day);
+    if (avg && avg.rate > 0) {
+      return lineAmounts(quantity, avg.rate, value);
+    }
+  }
+  return lineAmounts(quantity, rate, value);
 }
 
 export async function GET(
@@ -128,7 +150,7 @@ export async function GET(
 
   const rowsWithStatus = slice.map((e) => ({
     ...e,
-    ...resolveEntryApprovalFlags(e, e.enteredBy.globalRole),
+    ...resolveEntryApprovalFlags(e, e.enteredBy?.globalRole ?? null),
   }));
 
   return NextResponse.json({ rows: rowsWithStatus, ...pageInfo, totals });
@@ -176,10 +198,23 @@ export async function POST(
         : {}),
     };
 
+    const resolved = await Promise.all(
+      data.entries.map(async (line) => ({
+        line,
+        amounts: await resolveStockLineAmounts(
+          plantId,
+          day,
+          line.quantity,
+          line.rate,
+          line.value,
+          line.itemName,
+        ),
+      })),
+    );
+
     const created = await prisma.$transaction(
-      data.entries.map((line) => {
-        const amounts = lineAmounts(line.quantity, line.rate, line.value);
-        return prisma.stockEntry.create({
+      resolved.map(({ line, amounts }) =>
+        prisma.stockEntry.create({
           data: {
             plantId,
             date: day,
@@ -197,8 +232,8 @@ export async function POST(
             isBackdated: backdated,
             ...approvalFields,
           },
-        });
-      }),
+        }),
+      ),
     );
 
     await Promise.all(
@@ -228,7 +263,14 @@ export async function POST(
   const backdated = isBackdated(data.date);
   const day = parseDateOnly(data.date);
   const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
-  const amounts = lineAmounts(data.quantity, data.rate, data.value);
+  const amounts = await resolveStockLineAmounts(
+    plantId,
+    day,
+    data.quantity,
+    data.rate,
+    data.value,
+    data.itemName,
+  );
   const approval = entryApprovalCreateData(session.user.globalRole, data.date);
   const approvalFields = {
     ...approval,
