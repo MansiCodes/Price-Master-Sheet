@@ -81,6 +81,15 @@ export async function writeAuditLog(input: WriteAuditLogInput) {
   });
 }
 
+/** Do not fail the main request if audit logging fails. */
+export async function safeWriteAuditLog(input: WriteAuditLogInput) {
+  try {
+    return await writeAuditLog(input);
+  } catch (err) {
+    console.error("writeAuditLog failed", err);
+  }
+}
+
 function mapAuditLog(log: {
   id: string;
   createdAt: Date;

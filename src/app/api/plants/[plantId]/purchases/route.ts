@@ -9,7 +9,7 @@ import {
   round2,
   zodErrorResponse,
 } from "@/lib/api";
-import { writeAuditLog } from "@/lib/audit";
+import { writeAuditLog, safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData, entryApprovalResetOnEdit, resolveEntryApprovalFlags } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
@@ -73,6 +73,72 @@ function lineTotals(quantity: number, rate: number, gstPercent: number, debitQua
   const gstAmount = round2(basicValue * (gstPercent / 100));
   const invoiceValue = round2(basicValue + gstAmount);
   return { basicValue, gstAmount, invoiceValue, gstPercent };
+}
+
+function purchaseCreateData(
+  plantId: string,
+  enteredById: string,
+  header: {
+    shift: ManpowerShift;
+    type: PurchaseType;
+    typeOther?: string | null;
+    vendorName: string;
+    billNumber?: string | null;
+    billDate?: string | null;
+    gstin?: string | null;
+    booksDate?: string | null;
+    notes?: string | null;
+  },
+  item: z.infer<typeof purchaseItemSchema>,
+  headerGst: number,
+  photos: ReturnType<typeof normalizeBillPhotoUrls>,
+  approvalFields: Record<string, unknown>,
+  backdated: boolean,
+  day: Date,
+) {
+  const gstPercent = item.gstPercent ?? headerGst;
+  const debitQuantity = item.debitQuantity ?? 0;
+  if (debitQuantity > item.quantity) {
+    throw new Error("Debit quantity cannot exceed item quantity");
+  }
+  const { basicValue, gstAmount, invoiceValue } = lineTotals(
+    item.quantity,
+    item.rate,
+    gstPercent,
+    debitQuantity,
+  );
+  return {
+    plantId,
+    date: day,
+    shift: header.shift,
+    type: header.type,
+    typeOther:
+      header.type === PurchaseType.OTHERS
+        ? header.typeOther?.trim() || null
+        : null,
+    vendorName: header.vendorName,
+    billNumber: header.billNumber ?? null,
+    billDate: header.billDate ? parseDateOnly(header.billDate) : null,
+    gstin: header.gstin?.trim() || null,
+    debitQuantity,
+    openingReading: item.openingReading ?? null,
+    closingReading: item.closingReading ?? null,
+    booksDate: header.booksDate ? parseDateOnly(header.booksDate) : null,
+    notes: header.notes?.trim() || null,
+    itemDescription: item.itemDescription,
+    unit: item.unit,
+    quantity: item.quantity,
+    rate: item.rate,
+    basicValue,
+    gstPercent,
+    gstAmount,
+    invoiceValue,
+    billPhotoUrl: photos.billPhotoUrl,
+    billPhotoUrls: photos.billPhotoUrls,
+    enteredById,
+    isBackdated: backdated,
+    ...approvalFields,
+  };
 }
 
 export async function GET(
@@ -187,87 +253,124 @@ export async function POST(
     body !== null &&
     Array.isArray((body as { items?: unknown }).items);
 
-  if (isBatch) {
-    const parsed = purchaseBatchSchema.safeParse(body);
+  try {
+    if (isBatch) {
+      const parsed = purchaseBatchSchema.safeParse(body);
+      if (!parsed.success) return zodErrorResponse(parsed.error);
+
+      const data = parsed.data;
+      const backdated = isBackdated(data.date);
+      const day = parseDateOnly(data.date);
+      const headerGst = data.gstPercent ?? 0;
+      const photos = normalizeBillPhotoUrls(
+        data.billPhotoUrls,
+        data.billPhotoUrl,
+      );
+
+      const approval = entryApprovalCreateData(
+        session.user.globalRole,
+        data.date,
+      );
+      const approvalFields = {
+        ...approval,
+        ...(approval.approvedByHead
+          ? { approvedByHeadId: session.user.id }
+          : {}),
+      };
+
+      const purchases = await prisma.$transaction(async (tx) => {
+        const created = [];
+        for (const item of data.items) {
+          created.push(
+            await tx.purchase.create({
+              data: purchaseCreateData(
+                plantId,
+                session.user.id,
+                data,
+                item,
+                headerGst,
+                photos,
+                approvalFields,
+                backdated,
+                day,
+              ),
+            }),
+          );
+        }
+        return created;
+      });
+
+      await safeWriteAuditLog({
+        entityType: "Purchase",
+        entityId: purchases[0]!.id,
+        field: "create",
+        newValue: {
+          vendorName: data.vendorName,
+          billNumber: data.billNumber ?? null,
+          shift: data.shift,
+          itemCount: purchases.length,
+          items: purchases.map((p) => p.itemDescription),
+          invoiceValue: purchases.reduce(
+            (sum, p) => sum + Number(p.invoiceValue),
+            0,
+          ),
+        },
+        actorId: session.user.id,
+        plantId,
+        isBackdated: backdated,
+      });
+
+      await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
+      await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
+
+      return NextResponse.json({ purchases }, { status: 201 });
+    }
+
+    const parsed = purchaseSingleSchema.safeParse(body);
     if (!parsed.success) return zodErrorResponse(parsed.error);
 
     const data = parsed.data;
     const backdated = isBackdated(data.date);
     const day = parseDateOnly(data.date);
-    const headerGst = data.gstPercent ?? 0;
-    const photos = normalizeBillPhotoUrls(
-      data.billPhotoUrls,
-      data.billPhotoUrl,
-    );
-
+    const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
     const approval = entryApprovalCreateData(session.user.globalRole, data.date);
     const approvalFields = {
       ...approval,
-      ...(approval.approvedByHead
-        ? { approvedByHeadId: session.user.id }
-        : {}),
+      ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
     };
 
-    const purchases = await prisma.$transaction(
-      data.items.map((item) => {
-        const gstPercent = item.gstPercent ?? headerGst;
-        const { basicValue, gstAmount, invoiceValue } = lineTotals(
-          item.quantity,
-          item.rate,
-          gstPercent,
-          item.debitQuantity,
-        );
-        return prisma.purchase.create({
-          data: {
-            plantId,
-            date: day,
-            shift: data.shift,
-            type: data.type,
-            typeOther:
-              data.type === PurchaseType.OTHERS
-                ? data.typeOther?.trim() || null
-                : null,
-            vendorName: data.vendorName,
-            billNumber: data.billNumber ?? null,
-            billDate: data.billDate ? parseDateOnly(data.billDate) : null,
-            gstin: data.gstin?.trim() || null,
-            debitQuantity: item.debitQuantity ?? 0,
-            openingReading: item.openingReading ?? null,
-            closingReading: item.closingReading ?? null,
-            booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
-            notes: data.notes?.trim() || null,
-            itemDescription: item.itemDescription,
-            unit: item.unit,
-            quantity: item.quantity,
-            rate: item.rate,
-            basicValue,
-            gstPercent,
-            gstAmount,
-            invoiceValue,
-            billPhotoUrl: photos.billPhotoUrl,
-            billPhotoUrls: photos.billPhotoUrls,
-            enteredById: session.user.id,
-            isBackdated: backdated,
-            ...approvalFields,
-          },
-        });
-      }),
-    );
+    const purchase = await prisma.purchase.create({
+      data: purchaseCreateData(
+        plantId,
+        session.user.id,
+        data,
+        {
+          itemDescription: data.itemDescription,
+          unit: data.unit,
+          quantity: data.quantity,
+          rate: data.rate,
+          gstPercent: data.gstPercent,
+          debitQuantity: data.debitQuantity ?? 0,
+          openingReading: data.openingReading,
+          closingReading: data.closingReading,
+        },
+        data.gstPercent,
+        photos,
+        approvalFields,
+        backdated,
+        day,
+      ),
+    });
 
-    await writeAuditLog({
+    await safeWriteAuditLog({
       entityType: "Purchase",
-      entityId: purchases[0].id,
+      entityId: purchase.id,
       field: "create",
       newValue: {
-        vendorName: data.vendorName,
-        billNumber: data.billNumber ?? null,
-        shift: data.shift,
-        itemCount: purchases.length,
-        items: purchases.map((p) => p.itemDescription),
-        invoiceValue: purchases.reduce(
-          (sum, p) => sum + Number(p.invoiceValue),
-          0,
-        ),
+        vendorName: purchase.vendorName,
+        billNumber: purchase.billNumber,
+        itemDescription: purchase.itemDescription,
+        invoiceValue: Number(purchase.invoiceValue),
       },
       actorId: session.user.id,
       plantId,
@@ -277,86 +380,13 @@ export async function POST(
     await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
     await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
 
-    return NextResponse.json({ purchases }, { status: 201 });
+    return NextResponse.json({ purchase }, { status: 201 });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not save purchase entry";
+    console.error("purchases POST failed", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const parsed = purchaseSingleSchema.safeParse(body);
-  if (!parsed.success) return zodErrorResponse(parsed.error);
-
-  const data = parsed.data;
-  const { basicValue, gstAmount, invoiceValue, gstPercent } = lineTotals(
-    data.quantity,
-    data.rate,
-    data.gstPercent,
-    data.debitQuantity ?? 0,
-  );
-  const backdated = isBackdated(data.date);
-  const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
-  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
-  const approvalFields = {
-    ...approval,
-    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
-  };
-
-  const purchase = await prisma.purchase.create({
-    data: {
-      plantId,
-      date: parseDateOnly(data.date),
-      shift: data.shift,
-      type: data.type,
-      typeOther:
-        data.type === PurchaseType.OTHERS
-          ? data.typeOther?.trim() || null
-          : null,
-      vendorName: data.vendorName,
-      billNumber: data.billNumber ?? null,
-      billDate: data.billDate ? parseDateOnly(data.billDate) : null,
-      gstin: data.gstin?.trim() || null,
-      debitQuantity: data.debitQuantity ?? 0,
-      openingReading: data.openingReading ?? null,
-      closingReading: data.closingReading ?? null,
-      booksDate: data.booksDate ? parseDateOnly(data.booksDate) : null,
-      notes: data.notes?.trim() || null,
-      itemDescription: data.itemDescription,
-      unit: data.unit,
-      quantity: data.quantity,
-      rate: data.rate,
-      basicValue,
-      gstPercent,
-      gstAmount,
-      invoiceValue,
-      billPhotoUrl: photos.billPhotoUrl,
-      billPhotoUrls: photos.billPhotoUrls,
-      enteredById: session.user.id,
-      isBackdated: backdated,
-      ...approvalFields,
-    },
-  });
-
-  await writeAuditLog({
-    entityType: "Purchase",
-    entityId: purchase.id,
-    field: "create",
-    newValue: purchase,
-    actorId: session.user.id,
-    plantId,
-    isBackdated: backdated,
-  });
-
-  await safeRefreshDailyStatus(
-    plantId,
-    parseDateOnly(data.date),
-    data.shift,
-    session.user.id,
-  );
-  await maybeAwardCreditScore(
-    session.user.id,
-    plantId,
-    parseDateOnly(data.date),
-    data.shift,
-  );
-
-  return NextResponse.json({ purchase }, { status: 201 });
 }
 
 export async function PATCH(
