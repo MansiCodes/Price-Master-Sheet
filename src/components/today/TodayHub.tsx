@@ -472,9 +472,16 @@ export function TodayHub({
     }
     const qty = Number(stockQty);
     if (!Number.isFinite(qty)) return;
-    setStockRate(String(stockPurchaseRate));
-    setStockValue((qty * stockPurchaseRate).toFixed(2));
-  }, [stockPurchaseRate, stockQty]);
+    const manualRate = Number(stockRate);
+    if (!Number.isFinite(manualRate) || manualRate <= 0) {
+      setStockRate(String(stockPurchaseRate));
+    }
+    const rateForValue =
+      Number.isFinite(manualRate) && manualRate > 0
+        ? manualRate
+        : stockPurchaseRate;
+    setStockValue((qty * rateForValue).toFixed(2));
+  }, [stockPurchaseRate, stockQty, stockRate]);
 
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
@@ -950,20 +957,12 @@ export function TodayHub({
     } else if (kind === "stock") {
       const resolvedItem = resolvedStockItemName;
       const issuedQty = Number(stockQty);
-      let purchaseRate = stockPurchaseRate;
-      if (purchaseRate == null && resolvedItem) {
-        purchaseRate = await fetchStockPurchaseRate(
-          plantId,
-          resolvedItem,
-          entryDate,
-        );
-      }
       const manualRate = Number(stockRate);
       const closingRate =
-        purchaseRate != null && Number.isFinite(purchaseRate)
-          ? purchaseRate
-          : Number.isFinite(manualRate)
-            ? manualRate
+        Number.isFinite(manualRate) && manualRate >= 0
+          ? manualRate
+          : stockPurchaseRate != null && Number.isFinite(stockPurchaseRate)
+            ? stockPurchaseRate
             : NaN;
       const closingValue = issuedQty * closingRate;
       if (!resolvedItem || stockQty === "") {
@@ -989,7 +988,8 @@ export function TodayHub({
         date: entryDate,
         shift,
         itemName: resolvedItem,
-        category: stockCategory,
+        category:
+          stockCategory === "Other" ? "RM" : stockCategory,
         unit: usesStockLedger
           ? stockUnit || "KGS"
           : isCat6

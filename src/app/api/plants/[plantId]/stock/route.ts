@@ -10,7 +10,7 @@ import {
   round4,
   zodErrorResponse,
 } from "@/lib/api";
-import { writeAuditLog } from "@/lib/audit";
+import { writeAuditLog, safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData, entryApprovalResetOnEdit, resolveEntryApprovalFlags } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
@@ -95,6 +95,40 @@ async function resolveStockLineAmounts(
     }
   }
   return lineAmounts(quantity, rate, value);
+}
+
+function stockEntryCreateData(
+  plantId: string,
+  enteredById: string,
+  header: {
+    shift: ManpowerShift;
+    photoUrl?: string | null;
+    photoUrls?: string[];
+  },
+  line: z.infer<typeof stockLineSchema>,
+  amounts: ReturnType<typeof lineAmounts>,
+  photos: ReturnType<typeof normalizeBillPhotoUrls>,
+  approvalFields: Record<string, unknown>,
+  backdated: boolean,
+  day: Date,
+) {
+  return {
+    plantId,
+    date: day,
+    shift: header.shift,
+    itemName: line.itemName,
+    category: line.category,
+    unit: line.unit,
+    quantity: amounts.quantity,
+    rate: amounts.rate,
+    closingValue: amounts.closingValue,
+    notes: line.notes ?? null,
+    photoUrl: photos.billPhotoUrl,
+    photoUrls: photos.billPhotoUrls,
+    enteredById,
+    isBackdated: backdated,
+    ...approvalFields,
+  };
 }
 
 export async function GET(
@@ -182,135 +216,145 @@ export async function POST(
     body !== null &&
     Array.isArray((body as { entries?: unknown }).entries);
 
-  if (isBatch) {
-    const parsed = stockBatchSchema.safeParse(body);
+  try {
+    if (isBatch) {
+      const parsed = stockBatchSchema.safeParse(body);
+      if (!parsed.success) return zodErrorResponse(parsed.error);
+
+      const data = parsed.data;
+      const backdated = isBackdated(data.date);
+      const day = parseDateOnly(data.date);
+      const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
+      const approval = entryApprovalCreateData(
+        session.user.globalRole,
+        data.date,
+      );
+      const approvalFields = {
+        ...approval,
+        ...(approval.approvedByHead
+          ? { approvedByHeadId: session.user.id }
+          : {}),
+      };
+
+      const resolved = await Promise.all(
+        data.entries.map(async (line) => ({
+          line,
+          amounts: await resolveStockLineAmounts(
+            plantId,
+            day,
+            line.quantity,
+            line.rate,
+            line.value,
+            line.itemName,
+          ),
+        })),
+      );
+
+      const created = await prisma.$transaction(async (tx) => {
+        const entries = [];
+        for (const { line, amounts } of resolved) {
+          entries.push(
+            await tx.stockEntry.create({
+              data: stockEntryCreateData(
+                plantId,
+                session.user.id,
+                data,
+                line,
+                amounts,
+                photos,
+                approvalFields,
+                backdated,
+                day,
+              ),
+            }),
+          );
+        }
+        return entries;
+      });
+
+      await safeWriteAuditLog({
+        entityType: "StockEntry",
+        entityId: created[0]!.id,
+        field: "create",
+        newValue: {
+          itemCount: created.length,
+          items: created.map((entry) => entry.itemName),
+          closingValue: created.reduce(
+            (sum, entry) => sum + Number(entry.closingValue),
+            0,
+          ),
+        },
+        actorId: session.user.id,
+        plantId,
+        isBackdated: backdated,
+      });
+
+      await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
+      await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
+
+      return NextResponse.json({ entries: created }, { status: 201 });
+    }
+
+    const parsed = stockSingleSchema.safeParse(body);
     if (!parsed.success) return zodErrorResponse(parsed.error);
 
     const data = parsed.data;
     const backdated = isBackdated(data.date);
     const day = parseDateOnly(data.date);
     const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
+    const amounts = await resolveStockLineAmounts(
+      plantId,
+      day,
+      data.quantity,
+      data.rate,
+      data.value,
+      data.itemName,
+    );
     const approval = entryApprovalCreateData(session.user.globalRole, data.date);
     const approvalFields = {
       ...approval,
-      ...(approval.approvedByHead
-        ? { approvedByHeadId: session.user.id }
-        : {}),
+      ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
     };
 
-    const resolved = await Promise.all(
-      data.entries.map(async (line) => ({
-        line,
-        amounts: await resolveStockLineAmounts(
-          plantId,
-          day,
-          line.quantity,
-          line.rate,
-          line.value,
-          line.itemName,
-        ),
-      })),
-    );
-
-    const created = await prisma.$transaction(
-      resolved.map(({ line, amounts }) =>
-        prisma.stockEntry.create({
-          data: {
-            plantId,
-            date: day,
-            shift: data.shift,
-            itemName: line.itemName,
-            category: line.category,
-            unit: line.unit,
-            quantity: amounts.quantity,
-            rate: amounts.rate,
-            closingValue: amounts.closingValue,
-            notes: line.notes ?? null,
-            photoUrl: photos.billPhotoUrl,
-            photoUrls: photos.billPhotoUrls,
-            enteredById: session.user.id,
-            isBackdated: backdated,
-            ...approvalFields,
-          },
-        }),
+    const entry = await prisma.stockEntry.create({
+      data: stockEntryCreateData(
+        plantId,
+        session.user.id,
+        data,
+        data,
+        amounts,
+        photos,
+        approvalFields,
+        backdated,
+        day,
       ),
-    );
+    });
 
-    await Promise.all(
-      created.map((entry) =>
-        writeAuditLog({
-          entityType: "StockEntry",
-          entityId: entry.id,
-          field: "create",
-          newValue: entry,
-          actorId: session.user.id,
-          plantId,
-          isBackdated: backdated,
-        }),
-      ),
-    );
+    await safeWriteAuditLog({
+      entityType: "StockEntry",
+      entityId: entry.id,
+      field: "create",
+      newValue: {
+        itemName: entry.itemName,
+        quantity: Number(entry.quantity),
+        rate: Number(entry.rate),
+        closingValue: Number(entry.closingValue),
+      },
+      actorId: session.user.id,
+      plantId,
+      isBackdated: backdated,
+    });
 
     await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
     await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
 
-    return NextResponse.json({ entries: created }, { status: 201 });
+    return NextResponse.json({ entry }, { status: 201 });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not save stock entry";
+    console.error("stock POST failed", err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const parsed = stockSingleSchema.safeParse(body);
-  if (!parsed.success) return zodErrorResponse(parsed.error);
-
-  const data = parsed.data;
-  const backdated = isBackdated(data.date);
-  const day = parseDateOnly(data.date);
-  const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
-  const amounts = await resolveStockLineAmounts(
-    plantId,
-    day,
-    data.quantity,
-    data.rate,
-    data.value,
-    data.itemName,
-  );
-  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
-  const approvalFields = {
-    ...approval,
-    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
-  };
-
-  const entry = await prisma.stockEntry.create({
-    data: {
-      plantId,
-      date: day,
-      shift: data.shift,
-      itemName: data.itemName,
-      category: data.category,
-      unit: data.unit,
-      quantity: amounts.quantity,
-      rate: amounts.rate,
-      closingValue: amounts.closingValue,
-      notes: data.notes ?? null,
-      photoUrl: photos.billPhotoUrl,
-      photoUrls: photos.billPhotoUrls,
-      enteredById: session.user.id,
-      isBackdated: backdated,
-      ...approvalFields,
-    },
-  });
-
-  await writeAuditLog({
-    entityType: "StockEntry",
-    entityId: entry.id,
-    field: "create",
-    newValue: entry,
-    actorId: session.user.id,
-    plantId,
-    isBackdated: backdated,
-  });
-
-  await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
-  await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
-
-  return NextResponse.json({ entry }, { status: 201 });
 }
 
 export async function PATCH(
