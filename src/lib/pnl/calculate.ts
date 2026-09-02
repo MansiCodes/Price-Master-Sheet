@@ -1007,7 +1007,7 @@ async function buildDynamic(
           _sum: { closingValue: true },
         }),
     prisma.manpowerEntry.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+      where: { plantId, ...byUser, date: { gte: from, lte: to } },
       _sum: { totalCost: true },
     }),
     prisma.pettyCashEntry.findMany({
