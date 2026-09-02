@@ -357,6 +357,10 @@ export async function PATCH(
     session.user.globalRole,
     dateStr,
   );
+  const photos =
+    data.photoUrls !== undefined || data.photoUrl !== undefined
+      ? normalizeBillPhotoUrls(data.photoUrls, data.photoUrl)
+      : null;
 
   const entry = await prisma.stockEntry.update({
     where: { id: existing.id },
@@ -369,6 +373,12 @@ export async function PATCH(
       rate: amounts.rate,
       closingValue: amounts.closingValue,
       notes: data.notes,
+      ...(photos
+        ? {
+            photoUrl: photos.billPhotoUrl,
+            photoUrls: photos.billPhotoUrls,
+          }
+        : {}),
       isBackdated: isBackdated(dateStr),
       ...approvalReset,
     },

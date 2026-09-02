@@ -13,6 +13,7 @@ import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { collectBillPhotoUrls } from "@/lib/bill-photos";
 
 type SaleRow = {
   id: string;
@@ -102,19 +103,23 @@ export function SalesReport({
     render: (r) => (
       <ReportRowActions
         onEdit={() =>
-          crud.openEdit(r, {
-            date: toYmd(r.billDate || r.date),
-            customerName: r.customerName ?? "",
-            billNumber: r.billNumber ?? "",
-            itemDescription: r.itemDescription ?? "",
-            quantity: String(r.quantity ?? ""),
-            unit: r.unit ?? "",
-            rate: String(r.rate ?? ""),
-            inMeter: r.inMeter == null ? "" : String(r.inMeter),
-            qtyMtr: r.qtyMtr == null ? "" : String(r.qtyMtr),
-            meterUnit: r.meterUnit ?? "",
-            notes: r.notes ?? "",
-          })
+          crud.openEdit(
+            r,
+            {
+              date: toYmd(r.billDate || r.date),
+              customerName: r.customerName ?? "",
+              billNumber: r.billNumber ?? "",
+              itemDescription: r.itemDescription ?? "",
+              quantity: String(r.quantity ?? ""),
+              unit: r.unit ?? "",
+              rate: String(r.rate ?? ""),
+              inMeter: r.inMeter == null ? "" : String(r.inMeter),
+              qtyMtr: r.qtyMtr == null ? "" : String(r.qtyMtr),
+              meterUnit: r.meterUnit ?? "",
+              notes: r.notes ?? "",
+            },
+            collectBillPhotoUrls(r),
+          )
         }
         onDelete={() => void crud.remove(r.id)}
       />
@@ -334,6 +339,7 @@ export function SalesReport({
                 { name: "inMeter", label: "In Meter", type: "number" },
                 { name: "qtyMtr", label: "QTY-MTR", type: "number" },
                 { name: "meterUnit", label: "Unit (MTR)" },
+                { name: "notes", label: "Notes", type: "textarea" },
               ]
             : [
                 { name: "date", label: "Bill date", type: "date", required: true },
@@ -343,7 +349,7 @@ export function SalesReport({
                 { name: "quantity", label: "Qty", type: "number", required: true },
                 { name: "unit", label: "Unit", required: true },
                 { name: "rate", label: "Rate", type: "number", required: true },
-                { name: "notes", label: "Remarks" },
+                { name: "notes", label: "Remarks", type: "textarea" },
               ]
         }
         values={crud.values}
@@ -351,6 +357,11 @@ export function SalesReport({
         error={crud.error}
         onChange={crud.setField}
         onClose={crud.closeEdit}
+        upload={{
+          urls: crud.photoUrls,
+          onChange: crud.setPhotoUrls,
+          label: "Upload invoice (optional)",
+        }}
         onSave={() =>
           void crud.save({
             date: crud.values.date,
@@ -365,6 +376,7 @@ export function SalesReport({
             qtyMtr: crud.values.qtyMtr ? Number(crud.values.qtyMtr) : null,
             meterUnit: crud.values.meterUnit || null,
             notes: crud.values.notes || null,
+            billPhotoUrls: crud.photoUrls,
           })
         }
       />

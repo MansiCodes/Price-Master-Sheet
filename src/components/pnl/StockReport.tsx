@@ -13,6 +13,7 @@ import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { collectStockPhotoUrls } from "@/lib/bill-photos";
 import { PVC_STOCK_ENTRY_TYPES } from "@/lib/plant-catalogs";
 
 type StockRow = {
@@ -86,15 +87,20 @@ export function StockReport({
     render: (r) => (
       <ReportRowActions
         onEdit={() =>
-          crud.openEdit(r, {
-            date: toYmd(r.date),
-            itemName: r.itemName ?? "",
-            quantity: String(r.quantity ?? ""),
-            unit: r.unit ?? "",
-            rate: String(r.rate ?? ""),
-            value: String(r.closingValue ?? ""),
-            notes: r.notes ?? "",
-          })
+          crud.openEdit(
+            r,
+            {
+              date: toYmd(r.date),
+              category: r.category ?? "",
+              itemName: r.itemName ?? "",
+              quantity: String(r.quantity ?? ""),
+              unit: r.unit ?? "",
+              rate: String(r.rate ?? ""),
+              value: String(r.closingValue ?? ""),
+              notes: r.notes ?? "",
+            },
+            collectStockPhotoUrls(r),
+          )
         }
         onDelete={() => void crud.remove(r.id)}
       />
@@ -324,6 +330,9 @@ export function StockReport({
         title="Edit stock"
         fields={[
           { name: "date", label: "Date", type: "date", required: true },
+          ...(isPvc
+            ? [{ name: "category", label: "Stock (RM/FG)", required: true }]
+            : []),
           { name: "itemName", label: isPvc ? "Particulars" : "Item Name", required: true },
           { name: "quantity", label: isPvc ? "Closing Stock" : "QTY", type: "number", required: true },
           { name: "unit", label: "Unit", required: true },
@@ -335,17 +344,24 @@ export function StockReport({
         error={crud.error}
         onChange={crud.setField}
         onClose={crud.closeEdit}
+        upload={{
+          urls: crud.photoUrls,
+          onChange: crud.setPhotoUrls,
+          label: "Upload stock images (optional)",
+        }}
         onSave={() => {
           const qty = Number(crud.values.quantity) || 0;
           const rate = Number(crud.values.rate) || 0;
           void crud.save({
             date: crud.values.date,
+            ...(isPvc ? { category: crud.values.category || null } : {}),
             itemName: crud.values.itemName,
             quantity: qty,
             unit: crud.values.unit,
             rate: rate,
             value: qty * rate,
             notes: crud.values.notes || null,
+            photoUrls: crud.photoUrls,
           });
         }}
       />

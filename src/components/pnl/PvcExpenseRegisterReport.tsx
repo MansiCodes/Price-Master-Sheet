@@ -17,6 +17,7 @@ import {
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { collectBillPhotoUrls } from "@/lib/bill-photos";
 
 type PvcExpenseRow = {
   id: string;
@@ -27,6 +28,8 @@ type PvcExpenseRow = {
   details: string | null;
   amount: number;
   source: string;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 function pettyCashIdFromRegister(row: PvcExpenseRow): string | null {
@@ -220,6 +223,7 @@ export function PvcExpenseRegisterReport({
                         description: r.description ?? "",
                         amount: String(r.amount ?? ""),
                       },
+                      collectBillPhotoUrls(r),
                     )
                   }
                   onDelete={() => void crud.remove(entryId)}
@@ -259,12 +263,18 @@ export function PvcExpenseRegisterReport({
         error={crud.error}
         onChange={crud.setField}
         onClose={crud.closeEdit}
+        upload={{
+          urls: crud.photoUrls,
+          onChange: crud.setPhotoUrls,
+          label: "Upload bill/document (optional)",
+        }}
         onSave={() =>
           void crud.save({
             date: crud.values.date,
             expenseHead: crud.values.expenseHead,
             description: crud.values.description || null,
             amount: Number(crud.values.amount),
+            billPhotoUrls: crud.photoUrls,
           })
         }
       />

@@ -11,6 +11,7 @@ export function useReportCrud<T extends { id: string }>(
 ) {
   const [editing, setEditing] = useState<T | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -20,9 +21,14 @@ export function useReportCrud<T extends { id: string }>(
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
-  function openEdit(row: T, nextValues: Record<string, string>) {
+  function openEdit(
+    row: T,
+    nextValues: Record<string, string>,
+    nextPhotoUrls: string[] = [],
+  ) {
     setEditing(row);
     setValues(nextValues);
+    setPhotoUrls(nextPhotoUrls);
     setError(null);
   }
 
@@ -30,6 +36,7 @@ export function useReportCrud<T extends { id: string }>(
     if (saving) return;
     setEditing(null);
     setError(null);
+    setPhotoUrls([]);
   }
 
   async function save(body: Record<string, unknown>) {
@@ -84,6 +91,8 @@ export function useReportCrud<T extends { id: string }>(
   return {
     editing,
     values,
+    photoUrls,
+    setPhotoUrls,
     saving,
     deleting,
     error,

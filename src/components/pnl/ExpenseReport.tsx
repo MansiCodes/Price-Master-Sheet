@@ -26,6 +26,7 @@ import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { collectBillPhotoUrls } from "@/lib/bill-photos";
 import { FixedAssetsReport } from "@/components/pnl/FixedAssetsReport";
 
 type ExpenseRow = {
@@ -287,6 +288,80 @@ export function ExpenseReport({
 
   const activeColumns = useMemo(() => columns, [columns]);
 
+  const expenseEditFields = useMemo(() => {
+    const base: Array<{
+      name: string;
+      label: string;
+      type?: "text" | "number" | "date" | "textarea";
+      required?: boolean;
+    }> = [
+      {
+        name: "date",
+        label: cat6 ? "Months" : t("date"),
+        type: "date",
+        required: true,
+      },
+      { name: "expenseHead", label: t("category"), required: true },
+      {
+        name: "description",
+        label: cat6 ? "Remarks" : t("remarksNotes"),
+        type: "textarea",
+      },
+    ];
+
+    if (isPettyCategory) {
+      base.push(
+        { name: "payMode", label: "Pay Mode" },
+        { name: "nature", label: "Nature" },
+        { name: "location", label: "Location" },
+        { name: "billNumber", label: "Bill Number" },
+        {
+          name: "contractorSalary",
+          label: "Contractor Salary",
+          type: "number",
+        },
+        {
+          name: "supervisorSalary",
+          label: "Supervisor Salary",
+          type: "number",
+        },
+        {
+          name: "amount",
+          label: "Petty Cash Amount",
+          type: "number",
+          required: true,
+        },
+      );
+    } else {
+      base.push({
+        name: "amount",
+        label: cat6 ? "Salary Amt" : t("amount"),
+        type: "number",
+        required: true,
+      });
+      if (!cat6) {
+        base.push(
+          { name: "payMode", label: "Pay Mode" },
+          { name: "nature", label: "Nature" },
+          { name: "location", label: "Location" },
+          { name: "billNumber", label: "Bill Number" },
+          {
+            name: "openingReading",
+            label: "Opening Reading",
+            type: "number",
+          },
+          {
+            name: "closingReading",
+            label: "Closing Reading",
+            type: "number",
+          },
+        );
+      }
+    }
+
+    return base;
+  }, [cat6, isPettyCategory, t]);
+
   function onSectionChange(next: PvcExpenseSection) {
     setSection(next);
     const heads = [...getExpenseHeadsForSection(plantCode, next)];
@@ -396,22 +471,30 @@ export function ExpenseReport({
                 render: (r) => (
                   <ReportRowActions
                     onEdit={() =>
-                      crud.openEdit(r, {
-                        date: toYmd(r.date),
-                        expenseHead: r.expenseHead ?? "",
-                        description: r.description ?? "",
-                        amount: String(r.amount ?? ""),
-                        contractorSalary: String(r.contractorSalary ?? "0"),
-                        supervisorSalary: String(r.supervisorSalary ?? "0"),
-                        ...(isPettyCategory
-                          ? {
-                              payMode: r.payMode ?? "",
-                              nature: r.nature ?? "",
-                              location: r.location ?? "",
-                              billNumber: r.billNumber ?? "",
-                            }
-                          : {}),
-                      })
+                      crud.openEdit(
+                        r,
+                        {
+                          date: toYmd(r.date),
+                          expenseHead: r.expenseHead ?? "",
+                          description: r.description ?? "",
+                          amount: String(r.amount ?? ""),
+                          contractorSalary: String(r.contractorSalary ?? "0"),
+                          supervisorSalary: String(r.supervisorSalary ?? "0"),
+                          payMode: r.payMode ?? "",
+                          nature: r.nature ?? "",
+                          location: r.location ?? "",
+                          billNumber: r.billNumber ?? "",
+                          openingReading:
+                            r.openingReading == null
+                              ? ""
+                              : String(r.openingReading),
+                          closingReading:
+                            r.closingReading == null
+                              ? ""
+                              : String(r.closingReading),
+                        },
+                        collectBillPhotoUrls(r),
+                      )
                     }
                     onDelete={() => void crud.remove(r.id)}
                   />
@@ -442,37 +525,36 @@ export function ExpenseReport({
           <EntryEditDrawer
             open={Boolean(crud.editing)}
             title="Edit expense"
-            fields={[
-              {
-                name: "date",
-                label: cat6 ? "Months" : "Date",
-                type: "date",
-                required: true,
-              },
-              { name: "expenseHead", label: t("category"), required: true },
-              {
-                name: "description",
-                label: cat6 ? "Remarks" : t("remarksNotes"),
-                type: "textarea",
-              },
-              {
-                name: "amount",
-                label: cat6 ? "Salary Amt" : t("amount"),
-                type: "number",
-                required: true,
-              },
-            ]}
+            fields={expenseEditFields}
             values={crud.values}
             saving={crud.saving}
             error={crud.error}
             onChange={crud.setField}
             onClose={crud.closeEdit}
+            upload={{
+              urls: crud.photoUrls,
+              onChange: crud.setPhotoUrls,
+              label: "Upload bill/document (optional)",
+            }}
             onSave={() =>
               void crud.save({
                 date: crud.values.date,
                 expenseHead: crud.values.expenseHead,
                 description: crud.values.description || null,
-                amount: Number(crud.values.amount),
+                amount: Number(crud.values.amount || 0),
+                payMode: crud.values.payMode || undefined,
+                nature: crud.values.nature || null,
+                location: crud.values.location || null,
+                billNumber: crud.values.billNumber || null,
+                contractorSalary: Number(crud.values.contractorSalary || 0),
+                supervisorSalary: Number(crud.values.supervisorSalary || 0),
+                openingReading: crud.values.openingReading
+                  ? Number(crud.values.openingReading)
+                  : null,
+                closingReading: crud.values.closingReading
+                  ? Number(crud.values.closingReading)
+                  : null,
+                billPhotoUrls: crud.photoUrls,
               })
             }
           />

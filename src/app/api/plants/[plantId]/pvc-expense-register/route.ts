@@ -18,6 +18,8 @@ export type PvcExpenseRegisterRow = {
   details: string | null;
   amount: number;
   source: "electricityRent" | "pettyCash" | "fixedAsset";
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
 };
 
 function startOfUtcMonth(d: Date): Date {
@@ -41,6 +43,16 @@ function formatDay(iso: string): string {
     year: "2-digit",
     timeZone: "UTC",
   });
+}
+
+function pettyPhotoFields(row: {
+  billPhotoUrl: string | null;
+  billPhotoUrls: string[];
+}) {
+  return {
+    billPhotoUrl: row.billPhotoUrl,
+    billPhotoUrls: row.billPhotoUrls,
+  };
 }
 
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -166,6 +178,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           details: row.payMode?.trim() || null,
           amount: contractor,
           source: "pettyCash",
+          ...pettyPhotoFields(row),
         });
       }
       if (supervisor > 0) {
@@ -178,6 +191,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           details: row.payMode?.trim() || null,
           amount: supervisor,
           source: "pettyCash",
+          ...pettyPhotoFields(row),
         });
       }
       if (cashAmount > 0) {
@@ -190,6 +204,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           details: row.nature?.trim() || row.payMode?.trim() || null,
           amount: cashAmount,
           source: "pettyCash",
+          ...pettyPhotoFields(row),
         });
       }
       continue;
@@ -226,6 +241,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       })(),
       amount: Number(row.amount) || 0,
       source: "pettyCash",
+      ...pettyPhotoFields(row),
     });
   }
 

@@ -13,6 +13,7 @@ import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { collectBillPhotoUrls } from "@/lib/bill-photos";
 
 type PurchaseRow = {
   id: string;
@@ -97,18 +98,24 @@ export function PurchaseReport({
     render: (r) => (
       <ReportRowActions
         onEdit={() =>
-          crud.openEdit(r, {
-            date: toYmd(r.billDate || r.date),
-            vendorName: r.vendorName ?? "",
-            billNumber: r.billNumber ?? "",
-            gstin: r.gstin ?? "",
-            itemDescription: r.itemDescription ?? "",
-            quantity: String(r.quantity ?? ""),
-            unit: r.unit ?? "",
-            rate: String(r.rate ?? ""),
-            gstPercent: String(r.gstPercent ?? "0"),
-            notes: r.notes ?? "",
-          })
+          crud.openEdit(
+            r,
+            {
+              date: toYmd(r.billDate || r.date),
+              vendorName: r.vendorName ?? "",
+              billNumber: r.billNumber ?? "",
+              gstin: r.gstin ?? "",
+              itemDescription: r.itemDescription ?? "",
+              quantity: String(r.quantity ?? ""),
+              debitQuantity:
+                r.debitQuantity == null ? "" : String(r.debitQuantity),
+              unit: r.unit ?? "",
+              rate: String(r.rate ?? ""),
+              gstPercent: String(r.gstPercent ?? "0"),
+              notes: r.notes ?? "",
+            },
+            collectBillPhotoUrls(r),
+          )
         }
         onDelete={() => void crud.remove(r.id)}
       />
@@ -487,6 +494,11 @@ export function PurchaseReport({
                 { name: "billNumber", label: "Bill Number" },
                 { name: "itemDescription", label: "Item Details", required: true },
                 { name: "quantity", label: "Item QTY", type: "number", required: true },
+                {
+                  name: "debitQuantity",
+                  label: "Debit Qty",
+                  type: "number",
+                },
                 { name: "unit", label: "Unit", required: true },
                 { name: "rate", label: "Rate", type: "number", required: true },
                 { name: "notes", label: "Notes", type: "textarea" },
@@ -497,10 +509,15 @@ export function PurchaseReport({
                 { name: "billNumber", label: "Invoice no. / Challan no." },
                 { name: "itemDescription", label: "Description", required: true },
                 { name: "quantity", label: "Qty", type: "number", required: true },
+                {
+                  name: "debitQuantity",
+                  label: "Debit Qty",
+                  type: "number",
+                },
                 { name: "unit", label: "Unit", required: true },
                 { name: "rate", label: "Rate", type: "number", required: true },
                 { name: "gstPercent", label: "GST %", type: "number" },
-                { name: "notes", label: "Remarks" },
+                { name: "notes", label: "Remarks", type: "textarea" },
               ]
         }
         values={crud.values}
@@ -508,6 +525,11 @@ export function PurchaseReport({
         error={crud.error}
         onChange={crud.setField}
         onClose={crud.closeEdit}
+        upload={{
+          urls: crud.photoUrls,
+          onChange: crud.setPhotoUrls,
+          label: "Upload bill/challan (optional)",
+        }}
         onSave={() =>
           void crud.save({
             date: crud.values.date,
@@ -518,10 +540,12 @@ export function PurchaseReport({
             gstin: crud.values.gstin || null,
             itemDescription: crud.values.itemDescription,
             quantity: Number(crud.values.quantity),
+            debitQuantity: Number(crud.values.debitQuantity || 0),
             unit: crud.values.unit,
             rate: Number(crud.values.rate),
             gstPercent: Number(crud.values.gstPercent || 0),
             notes: crud.values.notes || null,
+            billPhotoUrls: crud.photoUrls,
           })
         }
       />

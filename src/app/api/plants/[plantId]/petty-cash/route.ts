@@ -271,6 +271,10 @@ export async function PATCH(
     session.user.globalRole,
     dateStr,
   );
+  const photos =
+    data.billPhotoUrls !== undefined || data.billPhotoUrl !== undefined
+      ? normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl)
+      : null;
 
   const entry = await prisma.pettyCashEntry.update({
     where: { id: existing.id },
@@ -290,6 +294,12 @@ export async function PATCH(
       amount: data.amount,
       contractorSalary: data.contractorSalary,
       supervisorSalary: data.supervisorSalary,
+      ...(photos
+        ? {
+            billPhotoUrl: photos.billPhotoUrl,
+            billPhotoUrls: photos.billPhotoUrls,
+          }
+        : {}),
       isBackdated: isBackdated(dateStr),
       ...approvalReset,
     },

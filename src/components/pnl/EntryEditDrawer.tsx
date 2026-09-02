@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { SlideOver } from "@/components/ui/SlideOver";
+import { BillUpload } from "@/components/today/BillUpload";
+import "@/components/today/today-hub.css";
 
 export type EditField = {
   name: string;
@@ -27,6 +29,8 @@ export function EntryEditDrawer({
   onChange,
   onClose,
   onSave,
+  upload,
+  children,
 }: {
   open: boolean;
   title: string;
@@ -37,6 +41,12 @@ export function EntryEditDrawer({
   onChange: (name: string, value: string) => void;
   onClose: () => void;
   onSave: () => void;
+  upload?: {
+    urls: string[];
+    onChange: (urls: string[]) => void;
+    label?: string;
+  };
+  children?: ReactNode;
 }) {
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -84,6 +94,14 @@ export function EntryEditDrawer({
             )}
           </div>
         ))}
+        {upload ? (
+          <BillUpload
+            urls={upload.urls}
+            onChange={upload.onChange}
+            label={upload.label ?? "Upload bill/document (optional)"}
+          />
+        ) : null}
+        {children}
       </form>
     </SlideOver>
   );

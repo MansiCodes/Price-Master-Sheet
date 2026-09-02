@@ -397,12 +397,18 @@ export async function PATCH(
   const quantity = data.quantity ?? Number(existing.quantity);
   const rate = data.rate ?? Number(existing.rate);
   const gstPercent = data.gstPercent ?? Number(existing.gstPercent);
-  const totals = lineTotals(quantity, rate, gstPercent);
+  const debitQuantity =
+    data.debitQuantity ?? Number(existing.debitQuantity ?? 0);
+  const totals = lineTotals(quantity, rate, gstPercent, debitQuantity);
   const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
   const approvalReset = entryApprovalResetOnEdit(
     session.user.globalRole,
     dateStr,
   );
+  const photos =
+    data.billPhotoUrls !== undefined || data.billPhotoUrl !== undefined
+      ? normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl)
+      : null;
 
   const purchase = await prisma.purchase.update({
     where: { id: existing.id },
@@ -429,11 +435,18 @@ export async function PATCH(
       itemDescription: data.itemDescription,
       unit: data.unit,
       quantity: data.quantity,
+      debitQuantity: data.debitQuantity,
       rate: data.rate,
       gstPercent: totals.gstPercent,
       basicValue: totals.basicValue,
       gstAmount: totals.gstAmount,
       invoiceValue: totals.invoiceValue,
+      ...(photos
+        ? {
+            billPhotoUrl: photos.billPhotoUrl,
+            billPhotoUrls: photos.billPhotoUrls,
+          }
+        : {}),
       isBackdated: isBackdated(dateStr),
       ...approvalReset,
     },
