@@ -14,15 +14,15 @@ export const authConfig = {
     signIn: "/login",
   },
   providers: [],
-  // Browser-session by default (8h JWT). Remember me extends to 30 days via
-  // dynamic config in auth.ts / middleware when cj.remember-me cookie is set.
+  // JWT ceiling is 30 days so Remember-me tokens stay valid.
+  // Without Remember me, the session cookie is browser-session only (no maxAge).
   session: {
     strategy: "jwt",
-    maxAge: 60 * 60 * 8,
-    updateAge: 60 * 60 * 8,
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
   },
   jwt: {
-    maxAge: 60 * 60 * 8,
+    maxAge: 30 * 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {

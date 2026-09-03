@@ -58,26 +58,7 @@ function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
   });
 }
 
-const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
-const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
-
-const { auth } = NextAuth((req) => {
-  const rememberMe =
-    req?.cookies?.get?.("cj.remember-me")?.value === "true";
-  const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
-  return {
-    ...authConfig,
-    session: {
-      ...authConfig.session,
-      maxAge,
-      updateAge: rememberMe ? 24 * 60 * 60 : SESSION_MAX_AGE,
-    },
-    jwt: {
-      ...authConfig.jwt,
-      maxAge,
-    },
-  };
-});
+const { auth } = NextAuth(authConfig);
 
 /** Auth.js middleware (authorized callback in authConfig handles redirects). */
 const withAuth = auth((req) => {
