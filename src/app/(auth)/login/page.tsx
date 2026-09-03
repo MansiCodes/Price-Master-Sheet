@@ -74,11 +74,15 @@ function clearStaleAuthCookies() {
 }
 
 function setRememberMeCookie(remember: boolean) {
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? "; Secure"
+      : "";
   if (remember) {
     const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
-    document.cookie = `cj.remember-me=true; path=/; expires=${expires}; SameSite=Lax; Secure`;
+    document.cookie = `cj.remember-me=true; path=/; expires=${expires}; SameSite=Lax${secure}`;
   } else {
-    document.cookie = `cj.remember-me=; path=/; max-age=0; SameSite=Lax; Secure`;
+    document.cookie = `cj.remember-me=; path=/; max-age=0; SameSite=Lax${secure}`;
   }
 }
 
@@ -212,6 +216,7 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         phone: e164,
         code: otp.trim(),
+        rememberMe: rememberMe ? "1" : "0",
         redirect: false,
       });
       if (result?.error) {
@@ -237,6 +242,7 @@ export default function LoginPage() {
       const result = await signIn("credentials", {
         email: email.trim(),
         password,
+        rememberMe: rememberMe ? "1" : "0",
         redirect: false,
       });
       if (result?.error) {

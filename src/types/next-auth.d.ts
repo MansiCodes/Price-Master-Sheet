@@ -8,6 +8,7 @@ declare module "next-auth" {
     globalRole: GlobalRole;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    rememberMe?: boolean;
   }
 
   interface Session {
@@ -28,6 +29,7 @@ declare module "next-auth/jwt" {
     globalRole: GlobalRole;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    rememberMe?: boolean;
   }
 }
 

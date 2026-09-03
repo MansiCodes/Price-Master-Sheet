@@ -57,18 +57,24 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
   };
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
-  let rememberMe = false;
-  if (req) {
-    if ("cookies" in req && typeof (req.cookies as any)?.get === "function") {
-      rememberMe = (req.cookies as any).get("cj.remember-me")?.value === "true";
-    } else if (req.headers && typeof req.headers.get === "function") {
-      const cookieHeader = req.headers.get("cookie") || "";
-      rememberMe = cookieHeader.includes("cj.remember-me=true");
-    }
-  }
+const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
 
-  const maxAge = rememberMe ? 30 * 24 * 60 * 60 : 60 * 60 * 8; // 30 days vs 8 hours
+function readRememberMeFromRequest(req: Request | undefined): boolean {
+  if (!req) return false;
+  if ("cookies" in req && typeof (req as any).cookies?.get === "function") {
+    if ((req as any).cookies.get("cj.remember-me")?.value === "true") return true;
+  }
+  if (req.headers && typeof req.headers.get === "function") {
+    const cookieHeader = req.headers.get("cookie") || "";
+    if (cookieHeader.includes("cj.remember-me=true")) return true;
+  }
+  return false;
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
+  const rememberMe = readRememberMeFromRequest(req);
+  const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
 
   return {
     ...authConfig,
@@ -77,7 +83,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
     session: {
       ...authConfig.session,
       maxAge,
-      updateAge: maxAge,
+      // Refresh periodically so a 30-day login stays alive while in use
+      updateAge: rememberMe ? 24 * 60 * 60 : SESSION_MAX_AGE,
     },
     jwt: {
       ...authConfig.jwt,
@@ -89,6 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
         ...authConfig.cookies?.sessionToken,
         options: {
           ...authConfig.cookies?.sessionToken?.options,
+          // Persistent cookie when Remember me is on; browser-session cookie when off
           maxAge: rememberMe ? maxAge : undefined,
         },
       },
@@ -101,13 +109,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
           password: { label: "Password", type: "password" },
           phone: { label: "Phone", type: "text" },
           code: { label: "OTP Code", type: "text" },
+          rememberMe: { label: "Remember me", type: "text" },
         },
         async authorize(credentials) {
           try {
+            const rememberFlag = readCredential(credentials?.rememberMe) === "1";
             const phone = readCredential(credentials?.phone);
             const code = readCredential(credentials?.code);
             if (phone && code) {
-              return await authorizeWithOtp(phone, code);
+              const user = await authorizeWithOtp(phone, code);
+              return user ? { ...user, rememberMe: rememberFlag } : null;
             }
 
             const email = readCredential(credentials?.email).toLowerCase().trim();
@@ -134,6 +145,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
               globalRole: user.globalRole,
               canViewPriceSheet: user.canViewPriceSheet,
               canMachineSupervise: user.canMachineSupervise,
+              rememberMe: rememberFlag,
             };
           } catch (err) {
             console.error("[NextAuth authorize error]", err);
@@ -144,6 +156,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
     ],
     callbacks: {
       ...authConfig.callbacks,
+      jwt({ token, user }) {
+        if (user) {
+          token.id = user.id!;
+          token.email = user.email;
+          token.globalRole = user.globalRole;
+          token.canViewPriceSheet = user.canViewPriceSheet;
+          token.canMachineSupervise = Boolean(user.canMachineSupervise);
+          token.rememberMe = Boolean(
+            (user as { rememberMe?: boolean }).rememberMe,
+          );
+        }
+        return token;
+      },
     },
   };
 });

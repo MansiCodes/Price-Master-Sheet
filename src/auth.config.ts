@@ -14,8 +14,8 @@ export const authConfig = {
     signIn: "/login",
   },
   providers: [],
-  // Browser-session cookie: closing the browser requires login again.
-  // JWT also expires after 8 hours if the tab is left open.
+  // Browser-session by default (8h JWT). Remember me extends to 30 days via
+  // dynamic config in auth.ts / middleware when cj.remember-me cookie is set.
   session: {
     strategy: "jwt",
     maxAge: 60 * 60 * 8,
