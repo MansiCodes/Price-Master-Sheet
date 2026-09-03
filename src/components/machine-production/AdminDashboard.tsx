@@ -15,7 +15,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { DEFAULT_REPORT_PAGE_SIZE } from "@/components/pnl/usePaginatedReport";
 import { MachineMultiSelect } from "@/components/machine-production/MachineMultiSelect";
 import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
-import { todayIstYmd } from "@/lib/machine-production/slots";
+import { todayIstYmd, DAY_SLOT_HOURS, NIGHT_SLOT_HOURS, slotWindowLabel } from "@/lib/machine-production/slots";
 import "@/components/pnl/pnl-reports.css";
 
 type MachineRow = {
@@ -31,6 +31,7 @@ type EntryRow = {
   entryDate: string;
   shift: "DAY" | "NIGHT";
   shiftLabel: string;
+  slotStartHour: number;
   slotLabel: string;
   currentProcess: string;
   cableType: string;
@@ -95,6 +96,7 @@ type Filters = {
   dateFrom: string;
   dateTo: string;
   shift: string;
+  slotStartHour: string;
   machineId: string;
   supervisorId: string;
   cableType: string;
@@ -105,6 +107,7 @@ const EMPTY_FILTERS: Filters = {
   dateFrom: "",
   dateTo: "",
   shift: "",
+  slotStartHour: "",
   machineId: "",
   supervisorId: "",
   cableType: "",
@@ -373,6 +376,9 @@ export function AdminDashboard() {
       if (activeFilters.dateFrom) sp.set("dateFrom", activeFilters.dateFrom);
       if (activeFilters.dateTo) sp.set("dateTo", activeFilters.dateTo);
       if (activeFilters.shift) sp.set("shift", activeFilters.shift);
+      if (activeFilters.slotStartHour) {
+        sp.set("slotStartHour", activeFilters.slotStartHour);
+      }
       if (activeFilters.machineId) sp.set("machineId", activeFilters.machineId);
       if (activeFilters.supervisorId) sp.set("supervisorId", activeFilters.supervisorId);
       if (activeFilters.cableType) sp.set("cableType", activeFilters.cableType);
@@ -959,6 +965,9 @@ export function AdminDashboard() {
       if (appliedFilters.dateFrom) sp.set("dateFrom", appliedFilters.dateFrom);
       if (appliedFilters.dateTo) sp.set("dateTo", appliedFilters.dateTo);
       if (appliedFilters.shift) sp.set("shift", appliedFilters.shift);
+      if (appliedFilters.slotStartHour) {
+        sp.set("slotStartHour", appliedFilters.slotStartHour);
+      }
       if (appliedFilters.machineId) sp.set("machineId", appliedFilters.machineId);
       if (appliedFilters.supervisorId) sp.set("supervisorId", appliedFilters.supervisorId);
       if (appliedFilters.cableType) sp.set("cableType", appliedFilters.cableType);
@@ -1029,6 +1038,22 @@ export function AdminDashboard() {
     ],
     [],
   );
+
+  const slotItems = useMemo(() => {
+    const hours =
+      filters.shift === "DAY"
+        ? DAY_SLOT_HOURS
+        : filters.shift === "NIGHT"
+          ? NIGHT_SLOT_HOURS
+          : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
+    return [
+      { value: "", label: "All" },
+      ...hours.map((h) => ({
+        value: String(h),
+        label: slotWindowLabel(h),
+      })),
+    ];
+  }, [filters.shift]);
 
   const machineItems = useMemo(
     () => [
@@ -1162,7 +1187,36 @@ export function AdminDashboard() {
                 items={shiftItems}
                 placeholder="All"
                 onChange={(value) =>
-                  setFilters((f) => ({ ...f, shift: value }))
+                  setFilters((f) => {
+                    const nextHours =
+                      value === "DAY"
+                        ? DAY_SLOT_HOURS
+                        : value === "NIGHT"
+                          ? NIGHT_SLOT_HOURS
+                          : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
+                    const slotOk =
+                      !f.slotStartHour ||
+                      (nextHours as readonly number[]).includes(
+                        Number(f.slotStartHour),
+                      );
+                    return {
+                      ...f,
+                      shift: value,
+                      slotStartHour: slotOk ? f.slotStartHour : "",
+                    };
+                  })
+                }
+              />
+            </label>
+            <label htmlFor="mp-filter-slot">
+              Slot
+              <SelectMenu
+                id="mp-filter-slot"
+                value={filters.slotStartHour}
+                items={slotItems}
+                placeholder="All"
+                onChange={(value) =>
+                  setFilters((f) => ({ ...f, slotStartHour: value }))
                 }
               />
             </label>
@@ -1303,7 +1357,8 @@ export function AdminDashboard() {
                     <tr>
                       <th>Date</th>
                       <th>Machine</th>
-                      <th>Shift / Slot</th>
+                      <th>Shift</th>
+                      <th>Slot</th>
                       <th>Supervisor</th>
                       <th>Process</th>
                       <th>Cable</th>
@@ -1326,10 +1381,8 @@ export function AdminDashboard() {
                           {e.machine?.name ?? "—"}
                           <div className="mp-muted">{e.machine?.code}</div>
                         </td>
-                        <td>
-                          {e.shiftLabel}
-                          <div className="mp-muted">{e.slotLabel}</div>
-                        </td>
+                        <td>{e.shiftLabel}</td>
+                        <td>{e.slotLabel}</td>
                         <td>
                           {e.supervisor?.name || e.supervisor?.email || "—"}
                         </td>
@@ -1361,7 +1414,7 @@ export function AdminDashboard() {
                     ))}
                     {entries.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="mp-muted">
+                        <td colSpan={12} className="mp-muted">
                           No records for these filters.
                         </td>
                       </tr>
@@ -2065,11 +2118,16 @@ export function AdminDashboard() {
                 </dd>
               </div>
               <div>
-                <dt>Date / Shift / Slot</dt>
-                <dd>
-                  {selected.entryDate} · {selected.shiftLabel} ·{" "}
-                  {selected.slotLabel}
-                </dd>
+                <dt>Date</dt>
+                <dd>{selected.entryDate}</dd>
+              </div>
+              <div>
+                <dt>Shift</dt>
+                <dd>{selected.shiftLabel}</dd>
+              </div>
+              <div>
+                <dt>Slot</dt>
+                <dd>{selected.slotLabel}</dd>
               </div>
               <div>
                 <dt>Submitted</dt>

@@ -111,7 +111,8 @@ export function buildMachineProductionRecordsPdf(opts: {
     head: [[
       "Date",
       "Machine",
-      "Shift / Slot",
+      "Shift",
+      "Slot",
       "Supervisor",
       "Process",
       "Cable",
@@ -122,7 +123,8 @@ export function buildMachineProductionRecordsPdf(opts: {
     body: opts.entries.map((e) => [
       e.entryDate,
       `${e.machineName}\n${e.machineCode}`,
-      `${e.shiftLabel}\n${e.slotLabel}`,
+      e.shiftLabel,
+      e.slotLabel,
       e.supervisor,
       e.currentProcess,
       `${e.cableType}\n${e.cableSize}`,
@@ -133,9 +135,9 @@ export function buildMachineProductionRecordsPdf(opts: {
     styles: { fontSize: 7.5, cellPadding: 1.2, valign: "top" },
     headStyles: { fillColor: [15, 118, 110] },
     columnStyles: {
-      6: { halign: "right" },
       7: { halign: "right" },
       8: { halign: "right" },
+      9: { halign: "right" },
     },
     margin: { left: 14, right: 14 },
   });

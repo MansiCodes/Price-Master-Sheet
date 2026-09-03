@@ -137,6 +137,7 @@ export async function GET(request: NextRequest) {
   const dateFrom = sp.get("dateFrom");
   const dateTo = sp.get("dateTo");
   const shift = sp.get("shift");
+  const slotStartHourRaw = sp.get("slotStartHour");
   const machineId = sp.get("machineId");
   const supervisorId = sp.get("supervisorId");
   const cableType = sp.get("cableType");
@@ -158,6 +159,12 @@ export async function GET(request: NextRequest) {
   }
   if (shift === "DAY" || shift === "NIGHT") {
     where.shift = shift;
+  }
+  if (slotStartHourRaw != null && slotStartHourRaw !== "") {
+    const hour = Number(slotStartHourRaw);
+    if (Number.isInteger(hour) && hour >= 0 && hour <= 23) {
+      where.slotStartHour = hour;
+    }
   }
   if (machineId) where.machineId = machineId;
   if (cableType?.trim()) {

@@ -58,28 +58,14 @@ function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
   });
 }
 
-const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
-const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
+/**
+ * Middleware must use a *static* NextAuth config.
+ * Lazy `NextAuth((req) => config)` makes `auth(wrapper)` return a Promise,
+ * so `withAuth` is not a function at runtime.
+ * Remember-me session length is still applied in `auth.ts` at sign-in.
+ */
+const { auth } = NextAuth(authConfig);
 
-const { auth } = NextAuth((req) => {
-  const rememberMe =
-    req?.cookies?.get?.("cj.remember-me")?.value === "true";
-  const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
-  return {
-    ...authConfig,
-    session: {
-      ...authConfig.session,
-      maxAge,
-      updateAge: rememberMe ? 24 * 60 * 60 : SESSION_MAX_AGE,
-    },
-    jwt: {
-      ...authConfig.jwt,
-      maxAge,
-    },
-  };
-});
-
-/** Auth.js middleware (authorized callback in authConfig handles redirects). */
 const withAuth = auth((req) => {
   const res = NextResponse.next();
   ensureLocaleCookie(req, res);
@@ -87,7 +73,7 @@ const withAuth = auth((req) => {
 });
 
 /**
- * 1) If browser still has old session cookies → expire them and redirect once
+ * 1) If browser still has old session cookies → expire them and continue
  *    (so Auth.js never tries to decrypt them → no JWTSessionError spam).
  * 2) Otherwise run Auth.js middleware as usual.
  */
@@ -105,8 +91,7 @@ export default async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Auth.js middleware typing is overloaded; cast keeps Next middleware signature clean.
-  return (withAuth as (req: NextRequest) => ReturnType<typeof withAuth>)(req);
+  return withAuth(req);
 }
 
 export const config = {
