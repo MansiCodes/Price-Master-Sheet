@@ -58,14 +58,9 @@ function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
   });
 }
 
-/**
- * Middleware must use a *static* NextAuth config.
- * Lazy `NextAuth((req) => config)` makes `auth(wrapper)` return a Promise,
- * so `withAuth` is not a function at runtime.
- * Remember-me session length is still applied in `auth.ts` at sign-in.
- */
 const { auth } = NextAuth(authConfig);
 
+/** Auth.js middleware (authorized callback in authConfig handles redirects). */
 const withAuth = auth((req) => {
   const res = NextResponse.next();
   ensureLocaleCookie(req, res);
