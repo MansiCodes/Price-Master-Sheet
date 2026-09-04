@@ -1519,6 +1519,54 @@ textarea {
   gap: 0.28rem;
 }
 
+.select-menu__list--searchable {
+  padding: 0;
+  gap: 0;
+}
+
+.select-menu__search {
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+  border-radius: 14px 14px 0 0;
+}
+
+.select-menu__search input {
+  width: 100%;
+  min-height: 2rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.select-menu__list--searchable .select-menu__option,
+.select-menu__list--searchable .select-menu__empty {
+  margin: 0 0.35rem;
+}
+
+.select-menu__list--searchable [role="option"]:first-of-type .select-menu__option,
+.select-menu__list--searchable > .select-menu__empty {
+  margin-top: 0.35rem;
+}
+
+.select-menu__list--searchable [role="option"]:last-of-type .select-menu__option,
+.select-menu__list--searchable > .select-menu__empty {
+  margin-bottom: 0.35rem;
+}
+
+.select-menu__empty {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
 .select-menu__option {
   appearance: none;
   width: 100%;

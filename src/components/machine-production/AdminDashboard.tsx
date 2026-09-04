@@ -1075,7 +1075,11 @@ export function AdminDashboard() {
   const machineItems = useMemo(
     () => [
       { value: "", label: "All" },
-      ...machines.map((m) => ({ value: m.id, label: m.name })),
+      ...machines.map((m) => ({
+        value: m.id,
+        label: m.name,
+        searchText: m.code,
+      })),
     ],
     [machines],
   );
@@ -1241,6 +1245,8 @@ export function AdminDashboard() {
                 value={filters.machineId}
                 items={machineItems}
                 placeholder="All"
+                searchable
+                searchPlaceholder="Search machines…"
                 onChange={(value) =>
                   setFilters((f) => ({ ...f, machineId: value }))
                 }
@@ -1782,9 +1788,12 @@ export function AdminDashboard() {
                     value={cableMachineId}
                     placeholder="Select machine"
                     disabled={!cableProcessId}
+                    searchable
+                    searchPlaceholder="Search machines…"
                     items={cableMachinesForProcess.map((m) => ({
                       value: m.id,
                       label: m.name,
+                      searchText: m.code,
                     }))}
                     onChange={(next) => {
                       setCableMachineId(next);
