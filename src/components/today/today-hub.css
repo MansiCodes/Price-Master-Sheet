@@ -373,6 +373,10 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.line-stack__row--meta.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .line-stack__row--meta.has-gst.has-unit {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -382,6 +386,10 @@
   margin-top: 0.55rem;
 }
 
+.line-stack__row--meta.line-stack__row--debit-rate.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .line-stack__row--meta.has-unit .field:nth-child(3),
 .line-stack__row--meta.has-gst .field:nth-child(3),
 .line-stack__row--meta.has-gst.has-unit .field:nth-child(3),
@@ -389,7 +397,7 @@
   grid-column: auto;
 }
 
-.line-stack__row--meta.has-unit:not(.has-gst) .field:nth-child(3) {
+.line-stack__row--meta.has-unit:not(.has-gst):not(.cols-3) .field:nth-child(3) {
   grid-column: 1 / -1;
 }
 

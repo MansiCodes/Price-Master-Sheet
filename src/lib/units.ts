@@ -1,6 +1,7 @@
 /** Shared unit options for Sales + Production (cable plant). */
 export const PRODUCT_UNITS = [
   "PCS",
+  "PACKET",
   "KGS",
   "NOS",
   "KM",

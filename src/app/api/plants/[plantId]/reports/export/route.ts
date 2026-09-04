@@ -222,8 +222,10 @@ export async function GET(
           { header: "Bill Date", key: "billDate", width: 12 },
           { header: "Item Details", key: "description", width: 26 },
           { header: "Item QTY", key: "qty", width: 12 },
+          { header: "Debit Qty", key: "debitQty", width: 12 },
           { header: "Unit", key: "unit", width: 10 },
           { header: "Rate", key: "rate", width: 12 },
+          { header: "Debit Amt", key: "debitValue", width: 14 },
           { header: "Purchase Amt", key: "basic", width: 14 },
           { header: "Notes", key: "notes", width: 20 },
         ]
@@ -235,8 +237,11 @@ export async function GET(
           { header: "Bill date", key: "billDate", width: 12 },
           { header: "Unit", key: "unit", width: 10 },
           { header: "Qty", key: "qty", width: 12 },
+          { header: "Debit Qty", key: "debitQty", width: 12 },
           { header: "Rate", key: "rate", width: 12 },
-          { header: "Basic value", key: "basic", width: 14 },
+          { header: "Debit Value", key: "debitValue", width: 14 },
+          { header: "Basic value", key: "basicGross", width: 14 },
+          { header: "Net value (after debit)", key: "basic", width: 18 },
           { header: "GST %", key: "gstPct", width: 10 },
           { header: "GST amount", key: "gstAmt", width: 12 },
           { header: "Invoice value", key: "invoice", width: 14 },
@@ -244,6 +249,9 @@ export async function GET(
         ];
     styleHeader(sheet.getRow(1));
     rows.forEach((r, i) => {
+      const debitQty = toNum(r.debitQuantity);
+      const qty = toNum(r.quantity);
+      const rate = toNum(r.rate);
       sheet.addRow({
         sno: i + 1,
         books: iso(r.booksDate),
@@ -253,8 +261,11 @@ export async function GET(
         billNo: r.billNumber ?? "",
         billDate: iso(r.billDate ?? r.date),
         unit: r.unit,
-        qty: toNum(r.quantity),
-        rate: toNum(r.rate),
+        qty,
+        debitQty: debitQty > 0 ? debitQty : "",
+        rate,
+        debitValue: debitQty > 0 ? debitQty * rate : "",
+        basicGross: qty * rate,
         basic: toNum(r.basicValue),
         gstPct: toNum(r.gstPercent),
         gstAmt: toNum(r.gstAmount),

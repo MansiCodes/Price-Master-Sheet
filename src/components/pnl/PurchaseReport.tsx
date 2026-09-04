@@ -164,7 +164,8 @@ export function PurchaseReport({
       label: "Debit Qty",
       align: "right",
       compact: true,
-      render: (r) => r.debitQuantity ? formatQty(r.debitQuantity) : "—",
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0 ? formatQty(r.debitQuantity ?? 0) : "—",
     },
     {
       key: "rate",
@@ -177,13 +178,26 @@ export function PurchaseReport({
       key: "debitValue",
       label: "Debit Value",
       align: "right",
-      render: (r) => r.debitQuantity ? formatINR(num(r.debitQuantity) * num(r.rate)) : "—",
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0
+          ? formatINR(num(r.debitQuantity ?? 0) * num(r.rate))
+          : "—",
     },
     {
       key: "basic",
       label: "Basic value",
       align: "right",
-      render: (r) => formatINR(num(r.basicValue) || (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
+      render: (r) => formatINR(num(r.quantity) * num(r.rate)),
+    },
+    {
+      key: "netValue",
+      label: "Net value (after debit)",
+      align: "right",
+      render: (r) =>
+        formatINR(
+          num(r.basicValue) ||
+            (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
+        ),
     },
     {
       key: "gst",
@@ -276,7 +290,8 @@ export function PurchaseReport({
       label: "Debit Qty",
       align: "right",
       compact: true,
-      render: (r) => r.debitQuantity ? formatQty(r.debitQuantity) : "—",
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0 ? formatQty(r.debitQuantity ?? 0) : "—",
     },
     {
       key: "unit",
@@ -295,11 +310,20 @@ export function PurchaseReport({
       key: "debitAmt",
       label: "Debit Amt",
       align: "right",
-      render: (r) => r.debitQuantity ? formatINR(num(r.debitQuantity) * num(r.rate)) : "—",
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0
+          ? formatINR(num(r.debitQuantity ?? 0) * num(r.rate))
+          : "—",
+    },
+    {
+      key: "gross",
+      label: "Basic value",
+      align: "right",
+      render: (r) => formatINR(num(r.quantity) * num(r.rate)),
     },
     {
       key: "amt",
-      label: "Purchase Amt",
+      label: "Net value (after debit)",
       align: "right",
       render: (r) =>
         formatINR(num(r.basicValue) || (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
@@ -434,7 +458,8 @@ export function PurchaseReport({
       label: "Debit Qty",
       align: "right",
       compact: true,
-      render: (r) => (r.debitQuantity ? formatQty(r.debitQuantity) : "—"),
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0 ? formatQty(r.debitQuantity ?? 0) : "—",
     },
     {
       key: "rate",
@@ -444,8 +469,23 @@ export function PurchaseReport({
       render: (r) => formatQty(r.rate),
     },
     {
+      key: "debitValue",
+      label: "Debit Value",
+      align: "right",
+      render: (r) =>
+        num(r.debitQuantity ?? 0) > 0
+          ? formatINR(num(r.debitQuantity ?? 0) * num(r.rate))
+          : "—",
+    },
+    {
       key: "basic",
       label: "Basic value",
+      align: "right",
+      render: (r) => formatINR(num(r.quantity) * num(r.rate)),
+    },
+    {
+      key: "netValue",
+      label: "Net value (after debit)",
       align: "right",
       render: (r) =>
         formatINR(
@@ -658,7 +698,37 @@ export function PurchaseReport({
             billPhotoUrls: crud.photoUrls,
           })
         }
-      />
+      >
+        <div className="field">
+          <label htmlFor="edit-debit-value">Debit Value</label>
+          <input
+            id="edit-debit-value"
+            readOnly
+            value={
+              num(crud.values.debitQuantity || 0) > 0
+                ? formatINR(
+                    num(crud.values.debitQuantity || 0) *
+                      num(crud.values.rate || 0),
+                  )
+                : "—"
+            }
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="edit-net-value">Net value (after debit)</label>
+          <input
+            id="edit-net-value"
+            readOnly
+            value={formatINR(
+              Math.max(
+                0,
+                num(crud.values.quantity || 0) -
+                  num(crud.values.debitQuantity || 0),
+              ) * num(crud.values.rate || 0),
+            )}
+          />
+        </div>
+      </EntryEditDrawer>
       {crud.deleteDialog}
     </section>
   );

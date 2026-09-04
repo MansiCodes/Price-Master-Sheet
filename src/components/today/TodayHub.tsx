@@ -2702,79 +2702,155 @@ function LineEditor({
             </div>
           ) : null}
 
-          <div
-            className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}`}
-          >
-            {unitOptions ? (
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-unit-${line.id}`}>Unit</label>
-                <SelectMenu
-                  id={`line-unit-${line.id}`}
-                  value={
-                    unitOptions.some((u) => u === line.unit)
-                      ? line.unit
-                      : unitOptions[0] || line.unit
-                  }
-                  options={unitOptions}
-                  onChange={(unit) => {
-                    const next = [...lines];
-                    next[idx] = { ...line, unit };
-                    onChange(next);
-                  }}
-                />
-              </div>
-            ) : null}
-            <div className="field" style={{ margin: 0 }}>
-              <label htmlFor={`line-qty-${line.id}`}>Qty</label>
-              <DecimalInput
-                id={`line-qty-${line.id}`}
-                value={line.quantity}
-                onChange={(quantity) => {
-                  const next = [...lines];
-                  next[idx] = { ...line, quantity };
-                  onChange(next);
-                }}
-              />
-            </div>
-            {!showDebitQty ? (
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
-                <DecimalInput
-                  id={`line-rate-${line.id}`}
-                  value={line.rate}
-                  onChange={(rate) => {
-                    const next = [...lines];
-                    next[idx] = { ...line, rate };
-                    onChange(next);
-                  }}
-                />
-              </div>
-            ) : null}
-            {showGst ? (
-              <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-gst-${line.id}`}>GST %</label>
-                <DecimalInput
-                  id={`line-gst-${line.id}`}
-                  value={line.gstPercent}
-                  onChange={(gstPercent) => {
-                    const next = [...lines];
-                    next[idx] = { ...line, gstPercent };
-                    onChange(next);
-                  }}
-                />
-              </div>
-            ) : null}
-          </div>
           {showDebitQty ? (
-            <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
+            <>
+              <div className="line-stack__row line-stack__row--meta has-unit cols-3">
+                {unitOptions ? (
+                  <div className="field" style={{ margin: 0 }}>
+                    <label htmlFor={`line-unit-${line.id}`}>Unit</label>
+                    <SelectMenu
+                      id={`line-unit-${line.id}`}
+                      value={
+                        unitOptions.some((u) => u === line.unit)
+                          ? line.unit
+                          : unitOptions[0] || line.unit
+                      }
+                      options={unitOptions}
+                      onChange={(unit) => {
+                        const next = [...lines];
+                        next[idx] = { ...line, unit };
+                        onChange(next);
+                      }}
+                    />
+                  </div>
+                ) : null}
+                {showGst ? (
+                  <div className="field" style={{ margin: 0 }}>
+                    <label htmlFor={`line-gst-${line.id}`}>GST %</label>
+                    <DecimalInput
+                      id={`line-gst-${line.id}`}
+                      value={line.gstPercent}
+                      onChange={(gstPercent) => {
+                        const next = [...lines];
+                        next[idx] = { ...line, gstPercent };
+                        onChange(next);
+                      }}
+                    />
+                  </div>
+                ) : null}
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-qty-${line.id}`}>Qty</label>
+                  <DecimalInput
+                    id={`line-qty-${line.id}`}
+                    value={line.quantity}
+                    onChange={(quantity) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, quantity };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate cols-3">
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
+                  <DecimalInput
+                    id={`line-debit-qty-${line.id}`}
+                    value={line.debitQuantity ?? ""}
+                    onChange={(debitQuantity) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, debitQuantity };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                  <DecimalInput
+                    id={`line-rate-${line.id}`}
+                    value={line.rate}
+                    onChange={(rate) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, rate };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-debit-value-${line.id}`}>Debit Value</label>
+                  <input
+                    id={`line-debit-value-${line.id}`}
+                    readOnly
+                    value={
+                      Number(line.debitQuantity || 0) > 0 && Number(line.rate || 0) > 0
+                        ? (
+                            Number(line.debitQuantity || 0) * Number(line.rate || 0)
+                          ).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
+                        : "—"
+                    }
+                  />
+                </div>
+              </div>
+              <div className="line-stack__row line-stack__row--meta">
+                <div className="field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  <label htmlFor={`line-net-value-${line.id}`}>
+                    Net value (after debit)
+                  </label>
+                  <input
+                    id={`line-net-value-${line.id}`}
+                    readOnly
+                    value={
+                      Number(line.rate || 0) > 0
+                        ? (
+                            Math.max(
+                              0,
+                              Number(line.quantity || 0) -
+                                Number(line.debitQuantity || 0),
+                            ) * Number(line.rate || 0)
+                          ).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })
+                        : "—"
+                    }
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div
+              className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}`}
+            >
+              {unitOptions ? (
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-unit-${line.id}`}>Unit</label>
+                  <SelectMenu
+                    id={`line-unit-${line.id}`}
+                    value={
+                      unitOptions.some((u) => u === line.unit)
+                        ? line.unit
+                        : unitOptions[0] || line.unit
+                    }
+                    options={unitOptions}
+                    onChange={(unit) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, unit };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+              ) : null}
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
+                <label htmlFor={`line-qty-${line.id}`}>Qty</label>
                 <DecimalInput
-                  id={`line-debit-qty-${line.id}`}
-                  value={line.debitQuantity ?? ""}
-                  onChange={(debitQuantity) => {
+                  id={`line-qty-${line.id}`}
+                  value={line.quantity}
+                  onChange={(quantity) => {
                     const next = [...lines];
-                    next[idx] = { ...line, debitQuantity };
+                    next[idx] = { ...line, quantity };
                     onChange(next);
                   }}
                 />
@@ -2791,8 +2867,22 @@ function LineEditor({
                   }}
                 />
               </div>
+              {showGst ? (
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-gst-${line.id}`}>GST %</label>
+                  <DecimalInput
+                    id={`line-gst-${line.id}`}
+                    value={line.gstPercent}
+                    onChange={(gstPercent) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, gstPercent };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          )}
           {showCat6MeterFields ? (
             <div className="line-stack__row line-stack__row--meta line-stack__row--meter">
               <div className="field" style={{ margin: 0 }}>

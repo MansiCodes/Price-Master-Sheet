@@ -279,10 +279,15 @@ export function getStockCatalog(plantCode: string): {
       ...segment.finalProducts.map((i) => i.name),
       "Other",
     ];
+    const code = plantCode.toUpperCase();
+    const units =
+      code === "SLSSL"
+        ? (["PCS", "PACKET", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"] as const)
+        : (["PCS", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"] as const);
     return {
       particulars,
       defaultUnit: "KGS",
-      units: ["PCS", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"],
+      units,
     };
   }
 
