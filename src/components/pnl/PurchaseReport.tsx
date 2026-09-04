@@ -601,7 +601,7 @@ export function PurchaseReport({
                   ? {
                       supplier: "Total Amount",
                       qty: formatQty(totals.quantity ?? 0),
-                      basic: formatINR(totals.basicValue ?? 0),
+                      netValue: formatINR(totals.basicValue ?? 0),
                       gst: formatINR(totals.gstAmount ?? 0),
                       invoice: formatINR(totals.invoiceValue ?? 0),
                       remarks: "—",
@@ -609,7 +609,7 @@ export function PurchaseReport({
                   : {
                       supplier: "TOTAL",
                       qty: formatQty(totals.quantity ?? 0),
-                      basic: formatINR(totals.basicValue ?? 0),
+                      netValue: formatINR(totals.basicValue ?? 0),
                       gst: formatINR(totals.gstAmount ?? 0),
                       invoice: formatINR(totals.invoiceValue ?? 0),
                     }
