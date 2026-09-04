@@ -95,6 +95,7 @@ export default async function middleware(
   }
 
   // Auth.js wrapper is typed like an App Route handler (req, ctx).
+  // Must pass both args or Amplify `next build` fails (Deployment 57).
   return withAuth(req, event as never);
 }
 
