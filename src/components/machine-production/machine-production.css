@@ -142,44 +142,66 @@
   border-color: transparent;
 }
 
-/* MP Admin: tabs + counts on one row (desktop); tabs 2-up on mobile */
+/* MP Admin: tabs on first row, summary chips on full-width second row */
 .mp-admin-top {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 0.75rem;
   width: 100%;
 }
 
 .mp-admin-top .mp-shift-tabs--admin {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
   overflow: visible;
 }
 
 .mp-admin-top .mp-counts--admin {
-  flex: 1 1 auto;
-  justify-content: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  width: 100%;
   min-width: 0;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  padding-bottom: 0.15rem;
+  overflow: visible;
 }
 
 .mp-counts--admin .mp-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
   flex: 0 0 auto;
   white-space: nowrap;
-  padding: 0.3rem 0.55rem;
-  font-size: 0.74rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  border-radius: 999px;
+  max-width: none;
+  overflow: visible;
+}
+
+.mp-count__label {
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.mp-count__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-count--metric {
+  background: color-mix(in srgb, var(--teal-soft) 55%, white);
+  color: var(--teal-ink);
+  border-color: color-mix(in srgb, var(--teal) 22%, transparent);
 }
 
 .mp-shift-tabs--admin {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.4rem;
-  width: auto;
+  width: 100%;
   max-width: 100%;
 }
 
@@ -191,8 +213,6 @@
 
 @media (max-width: 900px) {
   .mp-admin-top {
-    flex-direction: column;
-    align-items: stretch;
     gap: 0.65rem;
   }
 
@@ -1537,6 +1557,48 @@
   font-weight: 650;
   border-top: 2px solid color-mix(in srgb, var(--ink) 18%, transparent);
   background: color-mix(in srgb, var(--teal-soft) 55%, transparent);
+}
+
+.mp-table__expand-col {
+  width: 1.75rem;
+  padding-right: 0.15rem !important;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.mp-expand-chevron {
+  display: inline-block;
+  font-size: 0.85rem;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  transition: transform 0.15s ease;
+}
+
+.mp-expand-chevron--open {
+  transform: rotate(90deg);
+}
+
+.mp-table__row--machine-day {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mp-table__row--machine-day:hover td {
+  background: color-mix(in srgb, var(--teal-soft) 40%, transparent);
+}
+
+.mp-table__row--slot td {
+  background: color-mix(in srgb, var(--surface, #fff) 92%, var(--teal-soft));
+  font-weight: 400;
+  font-size: 0.92em;
+}
+
+.mp-slot-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  width: 100%;
 }
 
 .mp-toggle {

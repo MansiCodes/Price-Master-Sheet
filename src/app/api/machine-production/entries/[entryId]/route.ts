@@ -18,6 +18,7 @@ const patchSchema = z.object({
   actualProduction: z.number().finite().nonnegative().optional(),
   operators: z.number().int().nonnegative().optional(),
   helpers: z.number().int().nonnegative().optional(),
+  operatorName: z.string().trim().min(1).max(120).optional(),
   remarks: z.string().trim().max(2000).optional().nullable(),
   photoUrls: z.array(z.string().url()).max(20).optional(),
 });
@@ -108,6 +109,9 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       operators,
       helpers,
       totalManpower: operators + helpers,
+      ...(parsed.data.operatorName !== undefined
+        ? { operatorName: parsed.data.operatorName }
+        : {}),
       ...(parsed.data.remarks !== undefined
         ? { remarks: parsed.data.remarks || null }
         : {}),
@@ -128,6 +132,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
       operators: entry.operators,
       helpers: entry.helpers,
       totalManpower: entry.totalManpower,
+      operatorName: entry.operatorName,
       remarks: entry.remarks,
       photoUrls: entry.photoUrls,
     },
