@@ -7,7 +7,7 @@ export type MpPdfEntry = {
   machineCode: string;
   shiftLabel: string;
   slotLabel: string;
-  supervisor: string;
+  operatorName: string;
   currentProcess: string;
   cableType: string;
   cableSize: string;
@@ -25,6 +25,16 @@ export type MpPdfDayTotal = {
   averageEfficiency: number;
 };
 
+export type MpPdfMachineDayTotal = {
+  date: string;
+  machineName: string;
+  machineCode: string;
+  entries: number;
+  plannedProduction: number;
+  actualProduction: number;
+  efficiencyPct: number;
+};
+
 function num(n: number): string {
   return Number(n).toLocaleString("en-IN", {
     maximumFractionDigits: 2,
@@ -37,6 +47,7 @@ export function buildMachineProductionRecordsPdf(opts: {
   dateTo: string;
   entries: MpPdfEntry[];
   dayWise: MpPdfDayTotal[];
+  machineDayWise?: MpPdfMachineDayTotal[];
   plannedTotal: number;
   actualTotal: number;
 }): { blob: Blob; filename: string } {
@@ -53,6 +64,7 @@ export function buildMachineProductionRecordsPdf(opts: {
   });
   const stamp = new Date().toISOString().slice(0, 10);
   const filename = `machine-production-${opts.dateFrom || stamp}-to-${opts.dateTo || stamp}.pdf`;
+  const machineDays = opts.machineDayWise ?? [];
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
@@ -62,7 +74,11 @@ export function buildMachineProductionRecordsPdf(opts: {
   doc.setFontSize(9);
   doc.setTextColor(90, 107, 100);
   doc.text(
-    `Range ${opts.dateFrom || "—"} → ${opts.dateTo || "—"} · ${opts.entries.length} row(s) · Generated ${generated}`,
+    `Range ${opts.dateFrom || "—"} → ${opts.dateTo || "—"} · ${
+      machineDays.length > 0
+        ? `${machineDays.length} machine-day(s)`
+        : `${opts.entries.length} row(s)`
+    } · Generated ${generated}`,
     14,
     20,
   );
@@ -101,9 +117,41 @@ export function buildMachineProductionRecordsPdf(opts: {
         ?.finalY ?? y) + 8;
   }
 
+  if (machineDays.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Machine totals by date", 14, y);
+    y += 2;
+
+    autoTable(doc, {
+      startY: y,
+      head: [["Date", "Machine", "Slots", "Planned", "Actual", "Eff %"]],
+      body: machineDays.map((m) => [
+        m.date,
+        `${m.machineName}\n${m.machineCode}`,
+        String(m.entries),
+        num(m.plannedProduction),
+        num(m.actualProduction),
+        num(m.efficiencyPct),
+      ]),
+      styles: { fontSize: 8, cellPadding: 1.5, valign: "top" },
+      headStyles: { fillColor: [15, 118, 110] },
+      columnStyles: {
+        3: { halign: "right" },
+        4: { halign: "right" },
+        5: { halign: "right" },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    y =
+      ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
+        ?.finalY ?? y) + 8;
+  }
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("Production entries", 14, y);
+  doc.text("Slot entries", 14, y);
   y += 2;
 
   autoTable(doc, {
@@ -113,7 +161,7 @@ export function buildMachineProductionRecordsPdf(opts: {
       "Machine",
       "Shift",
       "Slot",
-      "Supervisor",
+      "Operator",
       "Process",
       "Cable",
       "Planned",
@@ -125,7 +173,7 @@ export function buildMachineProductionRecordsPdf(opts: {
       `${e.machineName}\n${e.machineCode}`,
       e.shiftLabel,
       e.slotLabel,
-      e.supervisor,
+      e.operatorName,
       e.currentProcess,
       `${e.cableType}\n${e.cableSize}`,
       num(e.plannedProduction),

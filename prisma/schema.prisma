@@ -668,6 +668,8 @@ model MachineProductionEntry {
   operators         Int
   helpers           Int
   totalManpower     Int
+  /// Name of the machine operator who ran this slot (entered on the form).
+  operatorName      String?
   remarks           String?
   coilNo            String?
   weight            Decimal?               @db.Decimal(18, 4)
@@ -684,6 +686,7 @@ model MachineProductionEntry {
   @@index([supervisorId, entryDate])
   @@index([cableType])
   @@index([currentProcess])
+  @@index([operatorName])
 }
 
 model PasswordResetToken {

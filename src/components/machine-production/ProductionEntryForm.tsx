@@ -130,6 +130,7 @@ export function ProductionEntryForm({
 
   const [coilNo, setCoilNo] = useState("");
   const [weight, setWeight] = useState("");
+  const [operatorName, setOperatorName] = useState("");
   const [entryDate, setEntryDate] = useState("");
 
   useEffect(() => {
@@ -146,6 +147,7 @@ export function ProductionEntryForm({
     setRemarks("");
     setCoilNo("");
     setWeight("");
+    setOperatorName("");
     setEntryDate(viewSlot?.entryDate ? viewSlot.entryDate.split("T")[0] : todayLocalISO());
     setPhotoUrls([]);
     void loadTypes();
@@ -405,6 +407,10 @@ export function ProductionEntryForm({
       toast.error("Production values must be zero or more");
       return;
     }
+    if (!operatorName.trim()) {
+      toast.error("Enter operator name");
+      return;
+    }
 
     setSaving(true);
     const res = await postJson<{ ok: boolean; error?: string }>(
@@ -421,6 +427,7 @@ export function ProductionEntryForm({
         actualProduction: actualNum,
         operators: ops,
         helpers: helps,
+        operatorName: operatorName.trim(),
         remarks: remarks.trim() || null,
         coilNo: coilNo.trim() || null,
         weight: weight ? Number(weight) : null,
@@ -602,6 +609,18 @@ export function ProductionEntryForm({
               />
             </label>
           </div>
+
+          <label className="mp-field">
+            <span>Operator name</span>
+            <input
+              type="text"
+              value={operatorName}
+              onChange={(e) => setOperatorName(e.target.value)}
+              disabled={busy}
+              placeholder="Enter operator name"
+              required
+            />
+          </label>
 
           <label className="mp-field">
             <span>Efficiency %</span>

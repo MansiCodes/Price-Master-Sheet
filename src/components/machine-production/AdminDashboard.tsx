@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
@@ -42,6 +42,7 @@ type EntryRow = {
   operators: number;
   helpers: number;
   totalManpower: number;
+  operatorName: string | null;
   remarks: string | null;
   photoUrls: string[];
   submittedAt: string;
@@ -92,15 +93,24 @@ type DayWiseRow = {
   averageEfficiency: number;
 };
 
+type MachineDayRow = {
+  date: string;
+  machineId: string;
+  machineName: string;
+  machineCode: string;
+  entries: number;
+  plannedProduction: number;
+  actualProduction: number;
+  efficiencyPct: number;
+  slots: EntryRow[];
+};
+
 type Filters = {
   dateFrom: string;
   dateTo: string;
   shift: string;
   slotStartHour: string;
   machineId: string;
-  supervisorId: string;
-  cableType: string;
-  status: string;
 };
 
 const EMPTY_FILTERS: Filters = {
@@ -109,15 +119,13 @@ const EMPTY_FILTERS: Filters = {
   shift: "",
   slotStartHour: "",
   machineId: "",
-  supervisorId: "",
-  cableType: "",
-  status: "",
 };
 
 const ENTRY_EDIT_FIELDS: EditField[] = [
   { name: "currentProcess", label: "Process", required: true },
   { name: "cableType", label: "Cable type", required: true },
   { name: "cableSize", label: "Cable size", required: true },
+  { name: "operatorName", label: "Operator name", required: true },
   { name: "plannedProduction", label: "Planned production", type: "number", required: true },
   { name: "actualProduction", label: "Actual production", type: "number", required: true },
   { name: "operators", label: "Operators", type: "number", required: true },
@@ -139,6 +147,10 @@ export function AdminDashboard() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
   const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [machineDayWise, setMachineDayWise] = useState<MachineDayRow[]>([]);
+  const [expandedMachineDays, setExpandedMachineDays] = useState<
+    Record<string, boolean>
+  >({});
   const [entriesPage, setEntriesPage] = useState(1);
   const [entriesPageSize, setEntriesPageSize] = useState(DEFAULT_REPORT_PAGE_SIZE);
   const [entriesTotal, setEntriesTotal] = useState(0);
@@ -160,9 +172,6 @@ export function AdminDashboard() {
   const [editingCableSizeId, setEditingCableSizeId] = useState<string | null>(
     null,
   );
-  const [supervisors, setSupervisors] = useState<
-    { id: string; label: string }[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<EntryRow | null>(null);
   const [editingEntry, setEditingEntry] = useState<EntryRow | null>(null);
@@ -380,9 +389,6 @@ export function AdminDashboard() {
         sp.set("slotStartHour", activeFilters.slotStartHour);
       }
       if (activeFilters.machineId) sp.set("machineId", activeFilters.machineId);
-      if (activeFilters.supervisorId) sp.set("supervisorId", activeFilters.supervisorId);
-      if (activeFilters.cableType) sp.set("cableType", activeFilters.cableType);
-      if (activeFilters.status) sp.set("status", activeFilters.status);
       sp.set("page", String(page));
       sp.set("pageSize", String(pageSize));
 
@@ -398,6 +404,7 @@ export function AdminDashboard() {
         const entriesJson = (await entriesRes.json()) as {
           entries?: EntryRow[];
           dayWise?: DayWiseRow[];
+          machineDayWise?: MachineDayRow[];
           summary?: Summary;
           page?: number;
           pageSize?: number;
@@ -411,24 +418,18 @@ export function AdminDashboard() {
         if (!entriesRes.ok) {
           toast.error(entriesJson.error ?? "Failed to load records");
         } else {
-          setEntries(entriesJson.entries ?? []);
+          const groups = entriesJson.machineDayWise ?? [];
+          setMachineDayWise(groups);
+          setEntries(
+            entriesJson.entries ??
+              groups.flatMap((g) => g.slots ?? []),
+          );
           setDayWise(entriesJson.dayWise ?? []);
           setSummary(entriesJson.summary ?? null);
           setEntriesTotal(entriesJson.total ?? 0);
+          setExpandedMachineDays({});
           if (entriesJson.page) setEntriesPage(entriesJson.page);
           if (entriesJson.pageSize) setEntriesPageSize(entriesJson.pageSize);
-          const unique = new Map<string, string>();
-          for (const e of entriesJson.entries ?? []) {
-            if (e.supervisor) {
-              unique.set(
-                e.supervisor.id,
-                e.supervisor.name?.trim() || e.supervisor.email,
-              );
-            }
-          }
-          setSupervisors(
-            [...unique.entries()].map(([id, label]) => ({ id, label })),
-          );
         }
         if (summaryRes.ok) setBoardSummary(summaryJson.summary ?? null);
       } finally {
@@ -836,6 +837,7 @@ export function AdminDashboard() {
       currentProcess: e.currentProcess,
       cableType: e.cableType,
       cableSize: e.cableSize,
+      operatorName: e.operatorName ?? "",
       plannedProduction: String(e.plannedProduction),
       actualProduction: String(e.actualProduction),
       operators: String(e.operators),
@@ -856,6 +858,7 @@ export function AdminDashboard() {
     const actual = Number(entryEditValues.actualProduction);
     const operators = Number(entryEditValues.operators);
     const helpers = Number(entryEditValues.helpers);
+    const operatorName = entryEditValues.operatorName?.trim() ?? "";
     if (
       !Number.isFinite(planned) ||
       !Number.isFinite(actual) ||
@@ -869,6 +872,10 @@ export function AdminDashboard() {
       setEntryEditError("Enter valid production and manpower numbers");
       return;
     }
+    if (!operatorName) {
+      setEntryEditError("Operator name is required");
+      return;
+    }
 
     setEntrySaving(true);
     setEntryEditError(null);
@@ -878,6 +885,7 @@ export function AdminDashboard() {
         currentProcess: entryEditValues.currentProcess?.trim(),
         cableType: entryEditValues.cableType?.trim(),
         cableSize: entryEditValues.cableSize?.trim(),
+        operatorName,
         plannedProduction: planned,
         actualProduction: actual,
         operators,
@@ -969,9 +977,6 @@ export function AdminDashboard() {
         sp.set("slotStartHour", appliedFilters.slotStartHour);
       }
       if (appliedFilters.machineId) sp.set("machineId", appliedFilters.machineId);
-      if (appliedFilters.supervisorId) sp.set("supervisorId", appliedFilters.supervisorId);
-      if (appliedFilters.cableType) sp.set("cableType", appliedFilters.cableType);
-      if (appliedFilters.status) sp.set("status", appliedFilters.status);
       sp.set("page", "1");
       sp.set("pageSize", String(entriesTotal));
 
@@ -979,6 +984,7 @@ export function AdminDashboard() {
       const json = (await res.json()) as {
         entries?: EntryRow[];
         dayWise?: DayWiseRow[];
+        machineDayWise?: MachineDayRow[];
         summary?: Summary;
         error?: string;
       };
@@ -986,8 +992,10 @@ export function AdminDashboard() {
         toast.error(json.error ?? "Failed to load records for export");
         return;
       }
-      const allEntries = json.entries ?? [];
-      if (allEntries.length === 0) {
+      const allGroups = json.machineDayWise ?? [];
+      const allEntries =
+        json.entries ?? allGroups.flatMap((g) => g.slots ?? []);
+      if (allGroups.length === 0 && allEntries.length === 0) {
         toast.error("No records to export");
         return;
       }
@@ -1001,13 +1009,22 @@ export function AdminDashboard() {
         plannedTotal: json.summary?.plannedProduction ?? 0,
         actualTotal: json.summary?.actualProduction ?? 0,
         dayWise: json.dayWise ?? dayWise,
+        machineDayWise: allGroups.map((m) => ({
+          date: m.date,
+          machineName: m.machineName,
+          machineCode: m.machineCode,
+          entries: m.entries,
+          plannedProduction: m.plannedProduction,
+          actualProduction: m.actualProduction,
+          efficiencyPct: m.efficiencyPct,
+        })),
         entries: allEntries.map((e) => ({
           entryDate: e.entryDate,
           machineName: e.machine?.name ?? "—",
           machineCode: e.machine?.code ?? "",
           shiftLabel: e.shiftLabel,
           slotLabel: e.slotLabel,
-          supervisor: e.supervisor?.name?.trim() || e.supervisor?.email || "—",
+          operatorName: e.operatorName?.trim() || "—",
           currentProcess: e.currentProcess || "—",
           cableType: e.cableType,
           cableSize: e.cableSize,
@@ -1058,27 +1075,13 @@ export function AdminDashboard() {
   const machineItems = useMemo(
     () => [
       { value: "", label: "All" },
-      ...machines.map((m) => ({ value: m.id, label: m.name })),
+      ...machines.map((m) => ({
+        value: m.id,
+        label: m.name,
+        searchText: m.code,
+      })),
     ],
     [machines],
-  );
-
-  const supervisorItems = useMemo(
-    () => [
-      { value: "", label: "All" },
-      ...supervisors.map((s) => ({ value: s.id, label: s.label })),
-    ],
-    [supervisors],
-  );
-
-  const statusItems = useMemo(
-    () => [
-      { value: "", label: "All" },
-      { value: "COMPLETED", label: "Completed" },
-      { value: "PENDING", label: "Pending" },
-      { value: "OVERDUE", label: "Overdue" },
-    ],
-    [],
   );
 
   return (
@@ -1132,25 +1135,40 @@ export function AdminDashboard() {
         </div>
 
         {tab === "records" && displaySummary ? (
-          <div className="mp-counts mp-counts--admin">
-            <span className="mp-count">Total {displaySummary.total}</span>
+          <div className="mp-counts mp-counts--admin" aria-label="Production summary">
+            <span className="mp-count">
+              <span className="mp-count__label">Total</span>
+              <span className="mp-count__value">{displaySummary.total}</span>
+            </span>
             <span className="mp-count mp-count--ok">
-              Completed {displaySummary.completed}
+              <span className="mp-count__label">Completed</span>
+              <span className="mp-count__value">{displaySummary.completed}</span>
             </span>
             <span className="mp-count mp-count--pending">
-              Pending {displaySummary.pending}
+              <span className="mp-count__label">Pending</span>
+              <span className="mp-count__value">{displaySummary.pending}</span>
             </span>
             <span className="mp-count mp-count--overdue">
-              Overdue {displaySummary.overdue}
+              <span className="mp-count__label">Overdue</span>
+              <span className="mp-count__value">{displaySummary.overdue}</span>
             </span>
-            <span className="mp-count">
-              Planned {displaySummary.plannedProduction ?? 0}
+            <span className="mp-count mp-count--metric">
+              <span className="mp-count__label">Planned</span>
+              <span className="mp-count__value">
+                {displaySummary.plannedProduction ?? 0}
+              </span>
             </span>
-            <span className="mp-count">
-              Actual {displaySummary.actualProduction}
+            <span className="mp-count mp-count--metric">
+              <span className="mp-count__label">Actual</span>
+              <span className="mp-count__value">
+                {displaySummary.actualProduction}
+              </span>
             </span>
-            <span className="mp-count">
-              Eff {displaySummary.averageEfficiency}%
+            <span className="mp-count mp-count--metric">
+              <span className="mp-count__label">Eff</span>
+              <span className="mp-count__value">
+                {displaySummary.averageEfficiency}%
+              </span>
             </span>
           </div>
         ) : null}
@@ -1227,42 +1245,10 @@ export function AdminDashboard() {
                 value={filters.machineId}
                 items={machineItems}
                 placeholder="All"
+                searchable
+                searchPlaceholder="Search machines…"
                 onChange={(value) =>
                   setFilters((f) => ({ ...f, machineId: value }))
-                }
-              />
-            </label>
-            <label htmlFor="mp-filter-supervisor">
-              Supervisor
-              <SelectMenu
-                id="mp-filter-supervisor"
-                value={filters.supervisorId}
-                items={supervisorItems}
-                placeholder="All"
-                onChange={(value) =>
-                  setFilters((f) => ({ ...f, supervisorId: value }))
-                }
-              />
-            </label>
-            <label>
-              Cable type
-              <input
-                value={filters.cableType}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, cableType: e.target.value }))
-                }
-                placeholder="Filter…"
-              />
-            </label>
-            <label htmlFor="mp-filter-status">
-              Status
-              <SelectMenu
-                id="mp-filter-status"
-                value={filters.status}
-                items={statusItems}
-                placeholder="All"
-                onChange={(value) =>
-                  setFilters((f) => ({ ...f, status: value }))
                 }
               />
             </label>
@@ -1280,7 +1266,11 @@ export function AdminDashboard() {
                 >
                   Apply
                 </Button>
-                {(filters.dateFrom || filters.dateTo || filters.shift || filters.machineId || filters.supervisorId || filters.cableType || filters.status) ? (
+                {(filters.dateFrom ||
+                filters.dateTo ||
+                filters.shift ||
+                filters.slotStartHour ||
+                filters.machineId) ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -1296,7 +1286,7 @@ export function AdminDashboard() {
                 <Button
                   type="button"
                   variant="secondary"
-                  disabled={loading || entries.length === 0}
+                  disabled={loading || entriesTotal === 0}
                   onClick={() => void downloadRecordsPdf()}
                 >
                   Download PDF
@@ -1355,66 +1345,102 @@ export function AdminDashboard() {
                 <table className="mp-table mp-table--wide">
                   <thead>
                     <tr>
+                      <th className="mp-table__expand-col" aria-label="Expand" />
                       <th>Date</th>
                       <th>Machine</th>
-                      <th>Shift</th>
-                      <th>Slot</th>
-                      <th>Supervisor</th>
-                      <th>Process</th>
-                      <th>Cable</th>
+                      <th>Slots</th>
                       <th>Planned</th>
                       <th>Actual</th>
                       <th>Eff %</th>
-                      <th>Status</th>
-                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {entries.map((e) => (
-                      <tr
-                        key={e.id}
-                        className="mp-table__row"
-                        onClick={() => setSelected(e)}
-                      >
-                        <td>{e.entryDate}</td>
-                        <td>
-                          {e.machine?.name ?? "—"}
-                          <div className="mp-muted">{e.machine?.code}</div>
-                        </td>
-                        <td>{e.shiftLabel}</td>
-                        <td>{e.slotLabel}</td>
-                        <td>
-                          {e.supervisor?.name || e.supervisor?.email || "—"}
-                        </td>
-                        <td>{e.currentProcess || "—"}</td>
-                        <td>
-                          {e.cableType}
-                          <div className="mp-muted">{e.cableSize}</div>
-                        </td>
-                        <td>{e.plannedProduction}</td>
-                        <td>{e.actualProduction}</td>
-                        <td>{e.efficiencyPct}</td>
-                        <td>
-                          <span className={`mp-status mp-status--ok`}>
-                            {e.status}
-                          </span>
-                        </td>
-                        <td
-                          className="mp-table__actions"
-                          onClick={(ev) => ev.stopPropagation()}
-                        >
-                          <ReportRowActions
-                            onEdit={() => openEntryEdit(e)}
-                            onDelete={() =>
-                              setPendingDelete({ kind: "entry", id: e.id })
+                    {machineDayWise.map((row) => {
+                      const key = `${row.date}|${row.machineId}`;
+                      const open = Boolean(expandedMachineDays[key]);
+                      return (
+                        <Fragment key={key}>
+                          <tr
+                            className="mp-table__row mp-table__row--machine-day"
+                            onClick={() =>
+                              setExpandedMachineDays((prev) => ({
+                                ...prev,
+                                [key]: !prev[key],
+                              }))
                             }
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                    {entries.length === 0 ? (
+                          >
+                            <td className="mp-table__expand-col">
+                              <span
+                                className={`mp-expand-chevron${open ? " mp-expand-chevron--open" : ""}`}
+                                aria-hidden
+                              >
+                                ▸
+                              </span>
+                            </td>
+                            <td>{row.date}</td>
+                            <td>
+                              {row.machineName}
+                              <div className="mp-muted">{row.machineCode}</div>
+                            </td>
+                            <td>{row.entries}</td>
+                            <td>{row.plannedProduction}</td>
+                            <td>{row.actualProduction}</td>
+                            <td>{row.efficiencyPct}</td>
+                          </tr>
+                          {open
+                            ? (row.slots ?? []).map((e) => (
+                                <tr
+                                  key={`${key}-${e.id}`}
+                                  className="mp-table__row mp-table__row--slot"
+                                  onClick={() => setSelected(e)}
+                                >
+                                  <td />
+                                  <td colSpan={2}>
+                                    <span className="mp-muted">
+                                      {e.shiftLabel} · {e.slotLabel}
+                                    </span>
+                                    <div>
+                                      {e.operatorName?.trim() || "—"}
+                                      {" · "}
+                                      {e.currentProcess || "—"}
+                                    </div>
+                                    <div className="mp-muted">
+                                      {e.cableType} · {e.cableSize}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className="mp-status mp-status--ok">
+                                      {e.status}
+                                    </span>
+                                  </td>
+                                  <td>{e.plannedProduction}</td>
+                                  <td>{e.actualProduction}</td>
+                                  <td
+                                    className="mp-table__actions"
+                                    onClick={(ev) => ev.stopPropagation()}
+                                  >
+                                    <div className="mp-slot-actions">
+                                      <span>{e.efficiencyPct}</span>
+                                      <ReportRowActions
+                                        onEdit={() => openEntryEdit(e)}
+                                        onDelete={() =>
+                                          setPendingDelete({
+                                            kind: "entry",
+                                            id: e.id,
+                                          })
+                                        }
+                                      />
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            : null}
+                        </Fragment>
+                      );
+                    })}
+                    {machineDayWise.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="mp-muted">
+                        <td colSpan={7} className="mp-muted">
                           No records for these filters.
                         </td>
                       </tr>
@@ -1762,9 +1788,12 @@ export function AdminDashboard() {
                     value={cableMachineId}
                     placeholder="Select machine"
                     disabled={!cableProcessId}
+                    searchable
+                    searchPlaceholder="Search machines…"
                     items={cableMachinesForProcess.map((m) => ({
                       value: m.id,
                       label: m.name,
+                      searchText: m.code,
                     }))}
                     onChange={(next) => {
                       setCableMachineId(next);
@@ -2112,10 +2141,8 @@ export function AdminDashboard() {
                 </dd>
               </div>
               <div>
-                <dt>Supervisor</dt>
-                <dd>
-                  {selected.supervisor?.name || selected.supervisor?.email}
-                </dd>
+                <dt>Operator name</dt>
+                <dd>{selected.operatorName?.trim() || "—"}</dd>
               </div>
               <div>
                 <dt>Date</dt>
