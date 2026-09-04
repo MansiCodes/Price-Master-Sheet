@@ -25,6 +25,7 @@ type SaleDetail = {
 type PurchaseDetail = {
   id: string;
   vendorName: string;
+  billNumber?: string | null;
   itemDescription: string;
   quantity: number | string;
   unit: string;
@@ -257,6 +258,7 @@ export function ShiftDetailsModal({
                     <thead>
                       <tr style={{ borderBottom: "2px solid #e5e7eb", color: "#4b5563" }}>
                         <th style={{ padding: "0.5rem" }}>Vendor</th>
+                        <th style={{ padding: "0.5rem" }}>Invoice no.</th>
                         <th style={{ padding: "0.5rem" }}>Item details</th>
                         <th style={{ padding: "0.5rem", textAlign: "right" }}>Qty</th>
                         <th style={{ padding: "0.5rem", textAlign: "right" }}>Rate</th>
@@ -267,7 +269,7 @@ export function ShiftDetailsModal({
                     <tbody>
                       {data.purchases.length === 0 ? (
                         <tr>
-                          <td colSpan={6} style={{ padding: "1rem", textAlign: "center", color: "#9ca3af" }}>
+                          <td colSpan={7} style={{ padding: "1rem", textAlign: "center", color: "#9ca3af" }}>
                             No purchase entries in this shift.
                           </td>
                         </tr>
@@ -275,6 +277,9 @@ export function ShiftDetailsModal({
                         data.purchases.map((p) => (
                           <tr key={p.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                             <td style={{ padding: "0.75rem 0.5rem" }}>{p.vendorName}</td>
+                            <td style={{ padding: "0.75rem 0.5rem" }}>
+                              {p.billNumber?.trim() || "—"}
+                            </td>
                             <td style={{ padding: "0.75rem 0.5rem" }}>{p.itemDescription}</td>
                             <td style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>{Number(p.quantity).toLocaleString()} {p.unit}</td>
                             <td style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>{formatINR(Number(p.rate))}</td>
