@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { GlobalRole } from "@prisma/client";
 import { getDashboardMetrics } from "@/lib/dashboard/metrics";
 import { parseDashboardPeriod } from "@/lib/dashboard/period";
 import {
@@ -11,6 +10,7 @@ import {
   getAccessiblePlantIds,
   isMachineSupervisorOnly,
   isSuperAdmin,
+  seesOwnEntriesOnly,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
@@ -99,7 +99,7 @@ export default async function DashboardPage({
   const showPnl = canViewPnl(user.globalRole);
   const dateStr = todayDateString();
 
-  const ownEntriesOnly = user.globalRole !== GlobalRole.SUPER_ADMIN && user.globalRole !== GlobalRole.BUSINESS_HEAD;
+  const ownEntriesOnly = seesOwnEntriesOnly(user.globalRole);
   const metrics = await getDashboardMetrics(scopedPlantIds, {
     includePnl: showPnl,
     enteredById: ownEntriesOnly ? user.id : undefined,

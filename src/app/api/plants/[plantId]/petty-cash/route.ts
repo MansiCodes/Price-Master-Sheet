@@ -15,7 +15,7 @@ import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-scor
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
-import { isAdminOrHead } from "@/lib/rbac";
+import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -67,7 +67,7 @@ export async function GET(
       ? (requestedType as PettyCashKind)
       : null;
 
-  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
   const expenseHead = sp.get("expenseHead")?.trim() || null;
   const expenseHeads = (sp.get("expenseHeads") ?? "")
     .split(",")

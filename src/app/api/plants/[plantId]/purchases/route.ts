@@ -19,7 +19,7 @@ import { prisma } from "@/lib/db";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { isCat6Plant } from "@/lib/plant-layout";
 import { isAtclPurchase } from "@/lib/plant-catalogs";
-import { isAdminOrHead } from "@/lib/rbac";
+import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 
 const purchaseHeaderFields = {
@@ -170,7 +170,7 @@ export async function GET(
     });
     const cat6 = isCat6Plant(plant?.code);
     const unloadingRate = 70;
-    const ownOnly = !isAdminOrHead(session.user.globalRole);
+    const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
 
     let purchases = await prisma.purchase.findMany({
       where: {

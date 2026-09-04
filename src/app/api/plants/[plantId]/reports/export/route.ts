@@ -12,7 +12,7 @@ import {
   formatMonthLabel,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { canViewPnl, isAdminOrHead, isSuperAdmin } from "@/lib/rbac";
+import { canViewPnl, isSuperAdmin, seesOwnEntriesOnly } from "@/lib/rbac";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 
@@ -87,7 +87,7 @@ export async function GET(
     return NextResponse.json({ error: "Plant not found" }, { status: 404 });
   }
   const cat6 = isCat6Plant(plant.code);
-  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
   const byUser = ownOnly ? { enteredById: session.user.id } : {};
 
   const workbook = new ExcelJS.Workbook();
@@ -104,8 +104,7 @@ export async function GET(
     if (!canViewPnl(session.user.globalRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    const isAdminOrHeadUser = isAdminOrHead(session.user.globalRole);
-    const ownEntriesOnly = !isAdminOrHeadUser;
+    const ownEntriesOnly = seesOwnEntriesOnly(session.user.globalRole);
     const pnl = await calculatePlantPnlStatement(
       plantId,
       from,

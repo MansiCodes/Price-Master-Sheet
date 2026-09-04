@@ -102,6 +102,24 @@ export function isAdminOrHead(role: GlobalRole | Role): boolean {
   );
 }
 
+/**
+ * Roles that see all entries for an accessible plant (not only their own).
+ * Plant managers need full plant P&L so they don't duplicate another manager's day.
+ */
+export function canViewAllPlantEntries(role: GlobalRole | Role): boolean {
+  return (
+    role === GlobalRole.SUPER_ADMIN ||
+    role === GlobalRole.BUSINESS_HEAD ||
+    role === GlobalRole.PLANT_MANAGER ||
+    role === GlobalRole.VIEWER
+  );
+}
+
+/** Inverse of canViewAllPlantEntries — used by report/P&L query scoping. */
+export function seesOwnEntriesOnly(role: GlobalRole | Role): boolean {
+  return !canViewAllPlantEntries(role);
+}
+
 export function isBusinessHead(role: GlobalRole | Role): boolean {
   return role === GlobalRole.BUSINESS_HEAD;
 }

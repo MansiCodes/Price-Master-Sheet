@@ -10,8 +10,7 @@ import {
   todayDateString,
 } from "@/lib/dates";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
-import { GlobalRole } from "@prisma/client";
-import { canViewPnl, isSuperAdmin } from "@/lib/rbac";
+import { canViewPnl, isSuperAdmin, seesOwnEntriesOnly } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -39,8 +38,7 @@ export async function GET(
     toParam && dateOnlyRegex.test(toParam) ? toParam : todayDateString();
 
   try {
-    const isAdminOrHeadUser = isSuperAdmin(session.user.globalRole);
-    const ownEntriesOnly = !isAdminOrHeadUser && session.user.globalRole !== GlobalRole.BUSINESS_HEAD;
+    const ownEntriesOnly = seesOwnEntriesOnly(session.user.globalRole);
     const [pnl, plant] = await Promise.all([
       calculatePlantPnlStatement(
         plantId,
@@ -48,6 +46,7 @@ export async function GET(
         parseDateOnly(toStr),
         {
           ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
+          // Super Admin P&L uses approved entries only; plant managers see all plant data.
           approvedOnly: isSuperAdmin(session.user.globalRole),
         },
       ),

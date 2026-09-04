@@ -11,7 +11,7 @@ import {
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { isShiftApprovalRequired, resolveShiftApprovalFlags } from "@/lib/shift-approval-policy";
-import { isAdminOrHead } from "@/lib/rbac";
+import { canViewAllPlantEntries } from "@/lib/rbac";
 import {
   computeDayShiftCompletions,
   type ShiftKey,
@@ -72,7 +72,7 @@ export async function GET(
     return NextResponse.json({ error: "Plant not found" }, { status: 404 });
   }
 
-  const scopedUserId = isAdminOrHead(session.user.globalRole)
+  const scopedUserId = canViewAllPlantEntries(session.user.globalRole)
     ? undefined
     : session.user.id;
 

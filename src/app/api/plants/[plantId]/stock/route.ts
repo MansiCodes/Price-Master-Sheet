@@ -22,7 +22,7 @@ import {
   atclStockEntryFilter,
   closingStockEntryFilter,
 } from "@/lib/plant-catalogs";
-import { isAdminOrHead } from "@/lib/rbac";
+import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 import { weightedAveragePurchaseRate } from "@/lib/stock/purchase-average-rate";
@@ -157,7 +157,7 @@ export async function GET(
   const cat6 = isCat6Plant(plant?.code);
   const snapshot = sp.get("snapshot") === "1";
   const atcl = sp.get("atcl") === "1";
-  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
 
   const entries = await prisma.stockEntry.findMany({
     where: {

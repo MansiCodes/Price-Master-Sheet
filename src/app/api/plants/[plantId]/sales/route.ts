@@ -17,7 +17,7 @@ import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { isCat6Plant } from "@/lib/plant-layout";
-import { isAdminOrHead } from "@/lib/rbac";
+import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 
@@ -88,7 +88,7 @@ export async function GET(
   });
   const cat6 = isCat6Plant(plant?.code);
   const isPvc = plant?.code?.toUpperCase() === "PVC";
-  const ownOnly = !isAdminOrHead(session.user.globalRole);
+  const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
 
   const sales = await prisma.sale.findMany({
     where: {
