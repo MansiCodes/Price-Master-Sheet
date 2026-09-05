@@ -1,0 +1,27 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - export NODE_TLS_REJECT_UNAUTHORIZED=0
+        - export AUTH_TRUST_HOST=true
+        - env | grep -v '^_' | grep -v '^PATH=' | grep -v '^PWD=' | grep -v '^HOME=' | grep -v '^SHLVL=' | grep -v '^HOSTNAME=' > .env.production
+        - echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env.production
+        - echo "AUTH_TRUST_HOST=true" >> .env.production
+        - npm install
+        - npx prisma generate
+        - npx prisma db push
+    build:
+      commands:
+        - export NODE_TLS_REJECT_UNAUTHORIZED=0
+        - export AUTH_TRUST_HOST=true
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - node_modules/**/*
+

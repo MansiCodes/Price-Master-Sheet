@@ -1,0 +1,43 @@
+import type { Metadata } from "next";
+import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
+import { Toaster } from "@/components/ui/Toaster";
+import "./globals.css";
+
+const display = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  weight: ["500", "600", "700"],
+});
+
+const body = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-jakarta",
+  weight: ["400", "500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: "Atlanta Telecables Ops",
+  description: "Plant P&L daily entry and operations",
+};
+
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+
+  return (
+    <html lang={locale}>
+      <body className={`${display.variable} ${body.variable}`}>
+        <NextIntlClientProvider messages={messages}>
+          {children}
+          <Toaster />
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  );
+}

@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env*
+!.env.example
+
+# Credentials — never commit service account keys
+credentials/*.json
+!credentials/.gitkeep
+
+# Next.js
+.next/
+out/
+
+# Production
+/build
+/dist
+
+# Logs
+logs/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Runtime / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.idea/
+.vscode/
+*.code-workspace
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/
+
+# DB backups (contain production data — do not commit)
+backups/*.sql
+backups/*.dump
+backups/*.rar
+!backups/run-pg-dump.sh
+
+# Generated merge SQL (rebuild with scripts/build-mp-merge-from-dump.ts)
+exports/mp-merge-only.sql
+
+# One-off scratch scripts
+scratch/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

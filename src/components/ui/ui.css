@@ -1,0 +1,180 @@
+/**
+ * Layout-only styles for form/list primitives (SlideOver, DataTable, Pagination,
+ * PageToolbar). Base look (colors, borders, typography) now comes from the
+ * shared .page-toolbar / .data-table / .pagination rules in
+ * apps/web/src/app/globals.css — these just add the BEM sub-parts (__text,
+ * __action, -wrap, __info, __controls) that globals.css doesn't know about.
+ */
+
+.page-toolbar__text .page-title {
+  margin-bottom: 0.2rem;
+}
+
+.page-toolbar__text .page-sub {
+  margin-bottom: 0;
+}
+
+.page-toolbar__action {
+  flex-shrink: 0;
+}
+
+.data-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.data-table__empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--fg-muted);
+  white-space: normal;
+}
+
+.pagination__info {
+  color: var(--fg-muted);
+}
+
+.pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.slide-over-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(28 25 23 / 45%);
+  z-index: 60;
+}
+
+.slide-over {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+  width: min(440px, 100%);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.slide-over__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.35rem;
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.slide-over__title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.slide-over__close {
+  border: 0;
+  background: transparent;
+  color: var(--stone);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+}
+
+.slide-over__close:hover {
+  background: var(--teal-soft);
+  color: var(--teal-ink);
+}
+
+.slide-over__body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.slide-over__content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1.2rem 1.35rem 1.35rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.slide-over__content form,
+.slide-over__content .form-grid,
+.slide-over__content .field,
+.slide-over__content .line-stack,
+.slide-over__content .line-stack__card,
+.slide-over__content .select-menu,
+.slide-over__content .btn {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.slide-over__content input,
+.slide-over__content select,
+.slide-over__content textarea,
+.slide-over__content .select-menu__trigger {
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.slide-over__content input[type="date"] {
+  min-width: 0;
+  width: 100%;
+}
+
+.slide-over__footer {
+  padding: 0.85rem 1.35rem calc(0.85rem + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 0.65rem;
+  background: var(--bg-elevated);
+  box-sizing: border-box;
+}
+
+.slide-over__footer .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+}
+
+@media (max-width: 560px) {
+  .slide-over {
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .slide-over__header,
+  .slide-over__footer {
+    padding-left: max(1.15rem, env(safe-area-inset-left));
+    padding-right: max(1.15rem, env(safe-area-inset-right));
+  }
+
+  .slide-over__content {
+    padding-left: max(1.15rem, env(safe-area-inset-left));
+    padding-right: max(1.15rem, env(safe-area-inset-right));
+  }
+}

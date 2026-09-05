@@ -1,0 +1,709 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GlobalRole {
+  SUPER_ADMIN
+  BUSINESS_HEAD
+  PLANT_MANAGER
+  ACCOUNTANT
+  VIEWER
+  /// Machine Production module only — not used for Plant P&L.
+  MACHINE_SUPERVISOR
+}
+
+enum MachineProductionShift {
+  DAY
+  NIGHT
+}
+
+enum PurchaseType {
+  CONSUMABLE
+  ASSET
+  CAPITAL_GOOD
+  RAW_MATERIAL
+  PACKING
+  OTHERS
+}
+
+enum SaleType {
+  FINISHED_GOOD
+  ALUMINIUM_SCRAP
+  COPPER_SCRAP
+  OTHERS
+}
+
+enum StockCategory {
+  RM
+  WIP
+  FG
+}
+
+enum ManpowerShift {
+  DAY
+  NIGHT
+}
+
+enum PettyCashKind {
+  EXPENSE
+  PETTY_CASH
+}
+
+enum ManpowerRole {
+  MANAGER
+  OPERATOR
+  HELPER
+}
+
+model User {
+  id                 String           @id @default(cuid())
+  email              String           @unique
+  name               String?
+  passwordHash       String?
+  phone              String?
+  globalRole         GlobalRole       @default(ACCOUNTANT)
+  canViewPriceSheet  Boolean          @default(false)
+  /// Extra Machine Production access for Plant Manager / Accountant hybrids.
+  canMachineSupervise Boolean         @default(false)
+  coinsBalance       Int              @default(0)
+  // Credit score is assigned after users complete required forms.
+  // For now it is only initialized for SUPER_ADMIN.
+  creditScore       Int?
+  isActive           Boolean          @default(true)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  plantRoles         UserPlantRole[]
+  purchases          Purchase[]        @relation("PurchaseEnteredBy")
+  sales              Sale[]            @relation("SaleEnteredBy")
+  stockEntries       StockEntry[]      @relation("StockEnteredBy")
+  manpowerEntries    ManpowerEntry[]   @relation("ManpowerEnteredBy")
+  productionEntries  ProductionEntry[] @relation("ProductionEnteredBy")
+  pettyCashEntries   PettyCashEntry[]  @relation("PettyCashEnteredBy")
+  dailyStatuses      DailyEntryStatus[]
+  auditLogs          AuditLog[]
+  coinsLedger        CoinsLedger[]
+  creditScoreAwards  CreditScoreAward[]
+  priceSheetRecipients PriceSheetRecipient[] @relation("PriceSheetRecipientsCreated")
+  otpChallenges      OtpChallenge[]
+  machineProductionEntries MachineProductionEntry[] @relation("MachineProductionSupervisor")
+}
+
+model Plant {
+  id               String                @id @default(cuid())
+  name             String                @unique
+  code             String                @unique
+  isActive         Boolean               @default(true)
+  unloadingRatePerMT Decimal             @db.Decimal(18, 2) @default(70)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  userRoles        UserPlantRole[]
+  purchases         Purchase[]
+  sales             Sale[]
+  stockEntries      StockEntry[]
+  manpowerEntries   ManpowerEntry[]
+  productionEntries ProductionEntry[]
+  pettyCashEntries  PettyCashEntry[]
+  electricityRent   ElectricityRent[]
+  fixedAssets       FixedAsset[]
+  manpowerRates     ManpowerRateSetting[]
+  dailyStatuses     DailyEntryStatus[]
+  creditScoreAwards CreditScoreAward[]
+  pnlOverrides      PlantPnlOverride[]
+  contacts          PlantContact[]
+}
+
+model PlantPnlOverride {
+  id              String   @id @default(cuid())
+  plantId         String
+  plant           Plant    @relation(fields: [plantId], references: [id])
+  periodFrom      DateTime @db.Date
+  periodTo        DateTime @db.Date
+  openingStock    Decimal  @default(0) @db.Decimal(18,2)
+  closingStock    Decimal  @default(0) @db.Decimal(18,2)
+  purchases       Decimal  @default(0) @db.Decimal(18,2)
+  sales           Decimal  @default(0) @db.Decimal(18,2)
+  pettyCash       Decimal  @default(0) @db.Decimal(18,2)
+  wagesSalary     Decimal  @default(0) @db.Decimal(18,2)
+  depreciation    Decimal  @default(0) @db.Decimal(18,2)
+  interestOnTl    Decimal  @default(0) @db.Decimal(18,2)
+  variableCost    Decimal  @default(0) @db.Decimal(18,2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([plantId, periodFrom, periodTo])
+}
+
+model UserPlantRole {
+  id        String     @id @default(cuid())
+  userId    String
+  plantId   String
+  role      GlobalRole
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plant     Plant      @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, plantId])
+  @@index([plantId])
+}
+
+model Purchase {
+  id              String        @id @default(cuid())
+  sourceKey       String?
+  plantId         String
+  date            DateTime      @db.Date
+  shift           ManpowerShift @default(DAY)
+  type            PurchaseType
+  typeOther       String?
+  vendorName      String
+  billNumber      String?
+  billDate        DateTime?     @db.Date
+  itemDescription String
+  unit            String
+  quantity        Decimal       @db.Decimal(18, 4)
+  rate            Decimal       @db.Decimal(18, 4)
+  basicValue      Decimal       @db.Decimal(18, 2)
+  gstPercent      Decimal       @db.Decimal(5, 2) @default(0)
+  gstAmount       Decimal       @db.Decimal(18, 2) @default(0)
+  invoiceValue    Decimal       @db.Decimal(18, 2)
+  gstin           String?
+  debitQuantity   Decimal?      @db.Decimal(18, 4)
+  openingReading  Decimal?      @db.Decimal(18, 4)
+  closingReading  Decimal?      @db.Decimal(18, 4)
+  booksDate       DateTime?     @db.Date
+  notes           String?
+  billPhotoUrl    String?
+  billPhotoUrls   String[]      @default([])
+  enteredById     String
+  isBackdated     Boolean       @default(false)
+  approvedByHead  Boolean       @default(false)
+  approvedByHeadId String?
+  approvedByAdmin Boolean       @default(false)
+  rejectedByHead  Boolean       @default(false)
+  rejectionReason String?
+  excelUploadedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  plant           Plant         @relation(fields: [plantId], references: [id])
+  enteredBy       User          @relation("PurchaseEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+  @@index([sourceKey])
+}
+
+model Sale {
+  id              String        @id @default(cuid())
+  sourceKey       String?
+  plantId         String
+  date            DateTime      @db.Date
+  shift           ManpowerShift @default(DAY)
+  type            SaleType
+  typeOther       String?
+  customerName    String
+  billNumber      String?
+  billDate        DateTime?     @db.Date
+  itemDescription String
+  unit            String
+  quantity        Decimal       @db.Decimal(18, 4)
+  rate            Decimal       @db.Decimal(18, 4)
+  salesValue      Decimal       @db.Decimal(18, 2)
+  inMeter         Decimal?      @db.Decimal(18, 4)
+  qtyMtr          Decimal?      @db.Decimal(18, 4)
+  meterUnit       String?
+  notes           String?
+  billPhotoUrl    String?
+  billPhotoUrls   String[]      @default([])
+  enteredById     String
+  isBackdated     Boolean       @default(false)
+  approvedByHead  Boolean       @default(false)
+  approvedByHeadId String?
+  approvedByAdmin Boolean       @default(false)
+  rejectedByHead  Boolean       @default(false)
+  rejectionReason String?
+  excelUploadedAt DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  plant           Plant         @relation(fields: [plantId], references: [id])
+  enteredBy       User          @relation("SaleEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+  @@index([sourceKey])
+}
+
+model StockEntry {
+  id           String        @id @default(cuid())
+  sourceKey    String?
+  plantId      String
+  date         DateTime      @db.Date
+  shift        ManpowerShift @default(DAY)
+  itemName     String
+  category     StockCategory @default(RM)
+  unit         String        @default("kg")
+  quantity     Decimal       @db.Decimal(18, 4)
+  rate         Decimal       @db.Decimal(18, 4)
+  closingValue Decimal       @db.Decimal(18, 2)
+  notes        String?
+  photoUrl     String?
+  photoUrls    String[]      @default([])
+  enteredById  String
+  isBackdated  Boolean       @default(false)
+  approvedByHead  Boolean       @default(false)
+  approvedByHeadId String?
+  approvedByAdmin Boolean       @default(false)
+  rejectedByHead  Boolean       @default(false)
+  rejectionReason String?
+  excelUploadedAt DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  plant        Plant         @relation(fields: [plantId], references: [id])
+  enteredBy    User          @relation("StockEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+  @@index([plantId, itemName, date])
+  @@index([sourceKey])
+}
+
+model ManpowerEntry {
+  id          String        @id @default(cuid())
+  plantId     String
+  date        DateTime      @db.Date
+  shift       ManpowerShift
+  role        ManpowerRole
+  headcount   Int
+  ratePerDay  Decimal       @db.Decimal(18, 2)
+  totalCost   Decimal       @db.Decimal(18, 2)
+  enteredById String
+  isBackdated Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  plant       Plant         @relation(fields: [plantId], references: [id])
+  enteredBy   User          @relation("ManpowerEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+}
+
+model ProductionEntry {
+  id          String        @id @default(cuid())
+  plantId     String
+  date        DateTime      @db.Date
+  shift       ManpowerShift
+  productName String
+  quantity    Decimal       @db.Decimal(18, 4)
+  unit        String
+  notes       String?
+  enteredById String
+  isBackdated Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  plant       Plant         @relation(fields: [plantId], references: [id])
+  enteredBy   User          @relation("ProductionEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+}
+
+model PettyCashEntry {
+  id                String            @id @default(cuid())
+  sourceKey         String?
+  plantId           String
+  date              DateTime          @db.Date
+  shift             ManpowerShift     @default(DAY)
+  entryType         PettyCashKind     @default(EXPENSE)
+  payMode           String
+  expenseHead       String
+  nature            String?
+  description       String?
+  location          String?
+  checkedBy         String?
+  approvedBy        String?
+  openingReading    Decimal?          @db.Decimal(18, 2)
+  closingReading    Decimal?          @db.Decimal(18, 2)
+  billNumber        String?
+  amount            Decimal           @db.Decimal(18, 4) @default(0)
+  contractorSalary  Decimal           @db.Decimal(18, 2) @default(0)
+  supervisorSalary  Decimal           @db.Decimal(18, 2) @default(0)
+  billPhotoUrl      String?
+  billPhotoUrls     String[]          @default([])
+  enteredById       String
+  isBackdated       Boolean           @default(false)
+  approvedByHead    Boolean           @default(false)
+  approvedByHeadId  String?
+  approvedByAdmin   Boolean           @default(false)
+  rejectedByHead    Boolean           @default(false)
+  rejectionReason   String?
+  excelUploadedAt   DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  plant             Plant             @relation(fields: [plantId], references: [id])
+  enteredBy         User              @relation("PettyCashEnteredBy", fields: [enteredById], references: [id])
+
+  @@index([plantId, date])
+  @@index([plantId, entryType, date])
+  @@index([sourceKey])
+}
+
+model ElectricityRent {
+  id             String   @id @default(cuid())
+  plantId        String
+  month          DateTime @db.Date
+  openingReading Decimal? @db.Decimal(18, 2)
+  closingReading Decimal? @db.Decimal(18, 2)
+  consumedUnits  Decimal? @db.Decimal(18, 2)
+  billAmount     Decimal  @db.Decimal(18, 2) @default(0)
+  rentAmount     Decimal  @db.Decimal(18, 2) @default(0)
+  coveredAreaSqft Decimal? @db.Decimal(18, 2)
+  rentRatePerSqft Decimal? @db.Decimal(18, 4)
+  notes          String?
+  excelUploadedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  plant          Plant    @relation(fields: [plantId], references: [id])
+
+  @@unique([plantId, month])
+}
+
+model FixedAsset {
+  id               String   @id @default(cuid())
+  plantId          String
+  assetDescription String
+  vendor           String?
+  billNumber       String?
+  billDate         DateTime? @db.Date
+  cost             Decimal  @db.Decimal(18, 2)
+  gst              Decimal  @db.Decimal(18, 2) @default(0)
+  /** Billing invoice value used for PVC financial-cost (interest) in P&L. */
+  invoiceValue     Decimal? @db.Decimal(18, 2)
+  depreciationPercent Decimal @db.Decimal(5, 2) @default(0)
+  excelUploadedAt  DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  plant            Plant    @relation(fields: [plantId], references: [id])
+
+  @@index([plantId])
+}
+
+model ManpowerRateSetting {
+  id         String       @id @default(cuid())
+  plantId    String
+  role       ManpowerRole
+  ratePerDay Decimal      @db.Decimal(18, 2)
+  effectiveFrom DateTime  @db.Date @default(now())
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  plant      Plant        @relation(fields: [plantId], references: [id])
+
+  @@unique([plantId, role])
+}
+
+model DailyEntryStatus {
+  id               String        @id @default(cuid())
+  plantId          String
+  date             DateTime      @db.Date
+  shift            ManpowerShift @default(DAY)
+  accountantId     String?
+  purchaseFilled   Boolean       @default(false)
+  saleFilled       Boolean       @default(false)
+  stockFilled      Boolean       @default(false)
+  productionFilled Boolean       @default(false)
+  manpowerFilled   Boolean       @default(false)
+  pettyCashFilled  Boolean       @default(false)
+  allComplete      Boolean       @default(false)
+  completedAt      DateTime?
+  coinsAwarded     Boolean       @default(false)
+  approvedByHead   Boolean       @default(false)
+  approvedByAdmin  Boolean       @default(false)
+  rejectedByHead   Boolean       @default(false)
+  rejectedByAdmin  Boolean       @default(false)
+  rejectionReason  String?
+  approvedByHeadId String?
+  approvedByAdminId String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  plant            Plant         @relation(fields: [plantId], references: [id])
+  accountant       User?         @relation(fields: [accountantId], references: [id])
+
+  @@unique([plantId, date, shift])
+  @@index([date])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  field      String?
+  oldValue   String?
+  newValue   String?
+  actorId    String
+  plantId    String?
+  isBackdated Boolean @default(false)
+  createdAt  DateTime @default(now())
+  actor      User     @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([plantId, createdAt])
+}
+
+model CoinsLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  plantId   String?
+  date      DateTime? @db.Date
+  amount    Int
+  reason    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+/** One +100 credit award per user / plant / date / shift when any form is filled. */
+model CreditScoreAward {
+  id        String        @id @default(cuid())
+  userId    String
+  plantId   String
+  date      DateTime      @db.Date
+  shift     ManpowerShift
+  points    Int           @default(100)
+  whatsappSentAt DateTime?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plant     Plant         @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, plantId, date, shift])
+  @@index([userId, createdAt])
+}
+
+model PlantContact {
+  id          String  @id @default(cuid())
+  plantId     String
+  name        String
+  phone       String?
+  category    String?
+  designation String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  plant       Plant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@index([plantId])
+}
+
+model ReminderLog {
+  id        String   @id @default(cuid())
+  plantId   String
+  date      DateTime @db.Date
+  channel   String
+  audience  String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([plantId, date])
+}
+
+model OtpChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([phone, createdAt])
+}
+
+/** Singleton WhatsApp / AiSensy integration settings (Super Admin only). */
+model AisensyConfig {
+  id                     String   @id @default("default")
+  apiKey                 String?
+  otpCampaignName        String?
+  reminderCampaignName   String?
+  completeCampaignName   String?
+  priceSheetCampaignName String?
+  updatedAt              DateTime @updatedAt
+}
+
+model PriceSheetRecipient {
+  id          String   @id @default(cuid())
+  phone       String   @unique
+  label       String?
+  createdById String
+  createdAt   DateTime @default(now())
+  createdBy   User     @relation("PriceSheetRecipientsCreated", fields: [createdById], references: [id])
+
+  @@index([createdAt])
+}
+
+/// Standalone Machine Production module (independent of Plant P&L).
+model Machine {
+  id          String                   @id @default(cuid())
+  name        String
+  code        String                   @unique
+  description String?
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  entries      MachineProductionEntry[]
+  processes    MachineProcess[]
+  processLinks ProductionProcessMachine[]
+
+  @@index([isActive, name])
+}
+
+/// Legacy per-machine process options. Superseded by ProductionProcess, kept
+/// until its rows have been migrated across — do not write to it.
+model MachineProcess {
+  id        String   @id @default(cuid())
+  machineId String
+  name      String
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, name])
+  @@index([machineId, isActive, sortOrder])
+}
+
+/// Global production process. Supervisors pick a process first, then a machine
+/// within it, so a process owns many machines and a machine can run many processes.
+model ProductionProcess {
+  id        String                     @id @default(cuid())
+  name      String                     @unique
+  sortOrder Int                        @default(0)
+  isActive  Boolean                    @default(true)
+  createdAt DateTime                   @default(now())
+  updatedAt DateTime                   @updatedAt
+  machines  ProductionProcessMachine[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Join table: which machines run a given process.
+model ProductionProcessMachine {
+  id         String                   @id @default(cuid())
+  processId  String
+  machineId  String
+  sortOrder  Int                      @default(0)
+  createdAt  DateTime                 @default(now())
+  process    ProductionProcess        @relation(fields: [processId], references: [id], onDelete: Cascade)
+  machine    Machine                  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  cableTypes ProcessMachineCableType[]
+
+  @@unique([processId, machineId])
+  @@index([machineId])
+  @@index([processId, sortOrder])
+}
+
+/// Cable types for a specific process + machine pair (supervisor only sees these).
+model ProcessMachineCableType {
+  id                String                   @id @default(cuid())
+  processMachineId  String
+  name              String
+  sortOrder         Int                      @default(0)
+  isActive          Boolean                  @default(true)
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  processMachine    ProductionProcessMachine @relation(fields: [processMachineId], references: [id], onDelete: Cascade)
+  sizes             ProcessMachineCableSize[]
+
+  @@unique([processMachineId, name])
+  @@index([processMachineId, isActive, sortOrder])
+}
+
+/// Cable sizes for a process+machine cable type.
+model ProcessMachineCableSize {
+  id          String                 @id @default(cuid())
+  cableTypeId String
+  name        String
+  sortOrder   Int                    @default(0)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  cableType   ProcessMachineCableType @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([cableTypeId, name])
+  @@index([cableTypeId, isActive, sortOrder])
+}
+
+/// Legacy global cable types (kept for old data; new links use ProcessMachineCableType).
+model MachineCableType {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  sortOrder Int               @default(0)
+  isActive  Boolean           @default(true)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  sizes     MachineCableSize[]
+
+  @@index([isActive, sortOrder])
+}
+
+/// Legacy global sizes (kept for old data).
+model MachineCableSize {
+  id          String           @id @default(cuid())
+  cableTypeId String
+  name        String
+  sortOrder   Int              @default(0)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  cableType   MachineCableType @relation(fields: [cableTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([cableTypeId, name])
+  @@index([cableTypeId, isActive, sortOrder])
+}
+
+model MachineProductionEntry {
+  id                String                 @id @default(cuid())
+  machineId         String
+  supervisorId      String
+  /// Calendar date of the shift (for night: the date the 9PM start falls on).
+  entryDate         DateTime               @db.Date
+  shift             MachineProductionShift
+  /// Slot start hour in IST: Day 9/13/17, Night 21/1/5.
+  slotStartHour     Int
+  /// Snapshot of selected process name at submit time.
+  currentProcess    String
+  cableType         String
+  cableSize         String
+  plannedProduction Decimal                @db.Decimal(18, 4)
+  actualProduction  Decimal                @db.Decimal(18, 4)
+  efficiencyPct     Decimal                @db.Decimal(8, 2)
+  operators         Int
+  helpers           Int
+  totalManpower     Int
+  /// Name of the machine operator who ran this slot (entered on the form).
+  operatorName      String?
+  remarks           String?
+  coilNo            String?
+  weight            Decimal?               @db.Decimal(18, 4)
+  photoUrls         String[]               @default([])
+  submittedAt       DateTime               @default(now())
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  machine           Machine                @relation(fields: [machineId], references: [id])
+  supervisor        User                   @relation("MachineProductionSupervisor", fields: [supervisorId], references: [id])
+
+  /// Multiple entries allowed per machine + slot (add more after completed).
+  @@index([machineId, entryDate, shift, slotStartHour])
+  @@index([entryDate, shift])
+  @@index([supervisorId, entryDate])
+  @@index([cableType])
+  @@index([currentProcess])
+  @@index([operatorName])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+

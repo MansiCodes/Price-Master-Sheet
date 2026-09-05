@@ -1,0 +1,50 @@
+# Shift reminders at 08:50 IST (Day) and 20:50 IST (Night).
+#
+# Target window in the API is strict: 08:50–08:54 / 20:50–20:54 IST only.
+# GitHub Actions cron is often several minutes late, so we fire a few
+# back-to-back attempts; ReminderLog claim ids keep WhatsApp to one send.
+#
+# Required GitHub repo secrets:
+#   APP_URL      e.g. https://main.d2zptt1fjuf5sk.amplifyapp.com
+#   CRON_SECRET  same value as the app env CRON_SECRET
+
+name: Shift reminders
+
+on:
+  schedule:
+    # Day: 08:50–08:54 IST = 03:20–03:24 UTC
+    - cron: "20 3 * * *"
+    - cron: "21 3 * * *"
+    - cron: "22 3 * * *"
+    - cron: "23 3 * * *"
+    - cron: "24 3 * * *"
+    # Night: 20:50–20:54 IST = 15:20–15:24 UTC
+    - cron: "20 15 * * *"
+    - cron: "21 15 * * *"
+    - cron: "22 15 * * *"
+    - cron: "23 15 * * *"
+    - cron: "24 15 * * *"
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger daily-reminders cron
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Missing APP_URL or CRON_SECRET repository secrets."
+            echo "GitHub → Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+          BASE="${APP_URL%/}"
+          echo "POST ${BASE}/api/cron/daily-reminders"
+          echo "utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -fsS -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${BASE}/api/cron/daily-reminders"
