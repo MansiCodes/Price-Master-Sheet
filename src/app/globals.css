@@ -95,7 +95,6 @@ textarea {
   flex-direction: column;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
   box-sizing: border-box;
 }
 
@@ -103,11 +102,16 @@ textarea {
   display: flex;
   flex: 1;
   min-height: 0;
+  /* Sit below the fixed header */
+  padding-top: var(--header-h);
+  box-sizing: border-box;
 }
 
 .dash-header {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 50;
   height: var(--header-h);
   flex-shrink: 0;
@@ -338,8 +342,10 @@ textarea {
 .dash-sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  position: sticky;
+  position: fixed;
   top: var(--header-h);
+  left: 0;
+  bottom: 0;
   height: calc(100dvh - var(--header-h));
   display: flex;
   flex-direction: column;
@@ -347,7 +353,7 @@ textarea {
   border-right: 1px solid var(--border);
   transition: width 200ms ease;
   overflow: hidden;
-  z-index: 30;
+  z-index: 40;
 }
 
 .dash-shell--settling .dash-sidebar {
@@ -644,7 +650,20 @@ textarea {
 .dash-main {
   flex: 1;
   min-width: 0;
+  max-width: 100%;
+  margin-left: var(--sidebar-w);
   padding: 1.5rem 2rem 3rem;
+  box-sizing: border-box;
+  overflow-x: auto;
+  transition: margin-left 200ms ease;
+}
+
+.dash-shell--collapsed .dash-main {
+  margin-left: var(--sidebar-w-collapsed);
+}
+
+.dash-shell--settling .dash-main {
+  transition: none;
 }
 
 @media (max-width: 880px) {
@@ -766,7 +785,12 @@ textarea {
   }
 
   .dash-main {
+    margin-left: 0;
     padding: 1.1rem 1.1rem 3rem;
+  }
+
+  .dash-shell--collapsed .dash-main {
+    margin-left: 0;
   }
 
   /* Fit the whole menu in one view — no inner scrolling. */
