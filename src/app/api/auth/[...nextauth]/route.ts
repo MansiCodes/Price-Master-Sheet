@@ -1,3 +1,4 @@
+import type { NextRequest } from "next/server";
 import { handlers, REMEMBER_COOKIE } from "@/auth";
 import { SESSION_COOKIE } from "@/auth.config";
 
@@ -7,7 +8,7 @@ import { SESSION_COOKIE } from "@/auth.config";
  * For Remember-me OFF we strip Expires/Max-Age so the browser treats it as a
  * session cookie (cleared when the browser closes). JWT still expires in 8h.
  */
-async function wantsPersistentSession(req: Request): Promise<boolean> {
+async function wantsPersistentSession(req: NextRequest): Promise<boolean> {
   if (req.method === "POST") {
     try {
       const form = await req.clone().formData();
@@ -19,10 +20,7 @@ async function wantsPersistentSession(req: Request): Promise<boolean> {
     }
   }
 
-  const cookie = req.headers.get("cookie") ?? "";
-  return new RegExp(
-    `(?:^|;\\s*)${REMEMBER_COOKIE.replace(/\./g, "\\.")}=true(?:;|$)`,
-  ).test(cookie);
+  return req.cookies.get(REMEMBER_COOKIE)?.value === "true";
 }
 
 function isSessionTokenCookie(setCookie: string): boolean {
@@ -44,14 +42,15 @@ function toBrowserSessionCookie(setCookie: string): string {
 }
 
 async function withRememberMeCookiePolicy(
-  req: Request,
+  req: NextRequest,
   res: Response,
 ): Promise<Response> {
   if (await wantsPersistentSession(req)) return res;
 
-  const raw = typeof res.headers.getSetCookie === "function"
-    ? res.headers.getSetCookie()
-    : [];
+  const raw =
+    typeof res.headers.getSetCookie === "function"
+      ? res.headers.getSetCookie()
+      : [];
   if (!raw.length) return res;
 
   const headers = new Headers(res.headers);
@@ -70,12 +69,12 @@ async function withRememberMeCookiePolicy(
   });
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const res = await handlers.GET(req);
   return withRememberMeCookiePolicy(req, res);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const res = await handlers.POST(req);
   return withRememberMeCookiePolicy(req, res);
 }
