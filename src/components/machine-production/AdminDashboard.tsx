@@ -952,10 +952,10 @@ export function AdminDashboard() {
   const displaySummary = tab === "records" ? summary ?? boardSummary : boardSummary ?? summary;
 
   const cableMachineHint = !cableProcessId
-    ? "Please select the process first"
+    ? "First select the process"
     : undefined;
   const cableTypeHint = !cableProcessId
-    ? "Please select the process first"
+    ? "First select the process"
     : !cableMachineId
       ? "Please select the machine first"
       : undefined;
@@ -1783,7 +1783,7 @@ export function AdminDashboard() {
                 Machine
                 <span
                   className={cableMachineHint ? "mp-disabled-hint" : undefined}
-                  title={cableMachineHint}
+                  data-hint={cableMachineHint}
                 >
                   <SelectMenu
                     id="cable-machine"
@@ -1813,7 +1813,6 @@ export function AdminDashboard() {
           <form
             className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
             onSubmit={(e) => void saveCableType(e)}
-            title={cableTypeHint}
           >
             <h2 className="mp-inline-form__title">
               {editingCableTypeId ? "Edit cable type" : "Add cable type"}
@@ -1828,9 +1827,9 @@ export function AdminDashboard() {
             </p>
             <label
               className={`mp-inline-form__field${cableTypeHint ? " mp-disabled-hint" : ""}`}
-              title={cableTypeHint}
+              data-hint={cableTypeHint}
             >
-                Name
+                <span className="mp-inline-form__label">Name</span>
                 <input
                   required
                   value={cableTypeForm.name}
@@ -1854,7 +1853,7 @@ export function AdminDashboard() {
                 ) : null}
                 <span
                   className={cableTypeHint ? "mp-disabled-hint" : undefined}
-                  title={cableTypeHint}
+                  data-hint={cableTypeHint}
                 >
                   <Button
                     type="button"
@@ -1867,7 +1866,7 @@ export function AdminDashboard() {
                 </span>
                 <span
                   className={cableTypeHint ? "mp-disabled-hint" : undefined}
-                  title={cableTypeHint}
+                  data-hint={cableTypeHint}
                 >
                   <Button
                     type="submit"
@@ -1882,7 +1881,6 @@ export function AdminDashboard() {
           <form
             className="mp-inline-form mp-inline-form--machine mp-cable-panel mp-cable-panel--form"
             onSubmit={(e) => void saveCableSize(e)}
-            title={cableSizeHint}
           >
             <h2 className="mp-inline-form__title">
               {editingCableSizeId ? "Edit cable size" : "Add cable size"}
@@ -1897,9 +1895,9 @@ export function AdminDashboard() {
             </p>
             <label
               className={`mp-inline-form__field${cableSizeHint ? " mp-disabled-hint" : ""}`}
-              title={cableSizeHint}
+              data-hint={cableSizeHint}
             >
-              Size name
+              <span className="mp-inline-form__label">Size name</span>
               <input
                 required
                 value={cableSizeForm.name}
@@ -1923,7 +1921,7 @@ export function AdminDashboard() {
               ) : null}
               <span
                 className={cableSizeHint ? "mp-disabled-hint" : undefined}
-                title={cableSizeHint}
+                data-hint={cableSizeHint}
               >
                 <Button
                   type="button"
@@ -1936,7 +1934,7 @@ export function AdminDashboard() {
               </span>
               <span
                 className={cableSizeHint ? "mp-disabled-hint" : undefined}
-                title={cableSizeHint}
+                data-hint={cableSizeHint}
               >
                 <Button type="submit" disabled={!selectedCableTypeId}>
                   {editingCableSizeId ? "Save" : "Add size"}

@@ -904,10 +904,17 @@
 .mp-inline-form__field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.55rem;
   flex: 1 1 16rem;
   min-width: 0;
   font-size: 0.88rem;
+}
+
+.mp-cable-panel--form .mp-inline-form__field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
 }
 
 .mp-inline-form--machine .mp-inline-form__field {
@@ -1676,12 +1683,89 @@
 }
 
 .mp-disabled-hint {
+  position: relative;
+  cursor: not-allowed;
+}
+
+/* Wrapper spans around disabled controls — keep field labels as flex columns */
+span.mp-disabled-hint {
   display: block;
   width: 100%;
-  cursor: not-allowed;
+}
+
+/* Let the wrapper receive hover over disabled controls */
+.mp-disabled-hint > .select-menu,
+.mp-disabled-hint > .select-menu .select-menu__trigger,
+.mp-disabled-hint > input,
+.mp-disabled-hint > button,
+.mp-disabled-hint > .btn {
+  pointer-events: none;
+}
+
+.mp-disabled-hint[data-hint]::after {
+  content: attr(data-hint);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
+  z-index: 20;
+  width: max-content;
+  max-width: min(16rem, 90vw);
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  background: var(--teal-ink, #0e5a54);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 550;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  box-shadow: 0 6px 18px rgb(14 90 84 / 22%);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(0.15rem);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease,
+    transform 0.15s ease;
+  pointer-events: none;
+}
+
+.mp-disabled-hint[data-hint]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.2rem);
+  z-index: 21;
+  border: 6px solid transparent;
+  border-top-color: var(--teal-ink, #0e5a54);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+  pointer-events: none;
+}
+
+.mp-disabled-hint[data-hint]:hover::after,
+.mp-disabled-hint[data-hint]:focus-within::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.mp-disabled-hint[data-hint]:hover::before,
+.mp-disabled-hint[data-hint]:focus-within::before {
+  opacity: 1;
+  visibility: visible;
 }
 
 .mp-inline-form__actions .mp-disabled-hint {
   display: inline-block;
   width: auto;
+}
+
+.mp-inline-form__actions .mp-disabled-hint[data-hint]::after {
+  left: 50%;
+  bottom: calc(100% + 0.45rem);
 }
