@@ -21,6 +21,8 @@ import {
 import {
   normalizePvcExpenseHead,
   normalizeUpcastExpenseHead,
+  PVC_ATCL_PURCHASE_NOTE_PREFIX,
+  PVC_ATCL_VENDOR_NAME,
 } from "@/lib/plant-catalogs";
 
 export type ParsedSaleRow = {
@@ -185,8 +187,40 @@ const PURCHASE_ALIASES: Record<string, string[]> = {
   gstPercent: ["gst percent", "gst %", "gstpct"],
   gstin: ["gstin gst no", "gstin", "gst no"],
   type: ["type", "purchase type"],
+  source: [
+    "purchase source",
+    "source",
+    "purchase from",
+    "stock taken from atcl",
+  ],
   notes: ["notes", "remarks", "remark"],
 };
+
+/** Same rules as Today Entry: Vendor vs Stock Taken from ATCL. */
+function applyPurchaseSource(
+  sourceRaw: string,
+  vendorName: string,
+  notes: string | null,
+): { vendorName: string; notes: string | null } {
+  const src = sourceRaw.trim().toLowerCase();
+  const isAtcl =
+    /stock\s*taken\s*from\s*atcl|from\s*atcl|\batcl\b/.test(src) &&
+    !/vendor|purchase from vendor/.test(src);
+  const vendorLooksAtcl = /atcl/i.test(vendorName);
+  if (!isAtcl && !vendorLooksAtcl) {
+    return { vendorName: vendorName || "—", notes };
+  }
+  const taggedNotes =
+    notes && notes.startsWith(PVC_ATCL_PURCHASE_NOTE_PREFIX)
+      ? notes
+      : notes
+        ? `${PVC_ATCL_PURCHASE_NOTE_PREFIX} · ${notes}`
+        : PVC_ATCL_PURCHASE_NOTE_PREFIX;
+  return {
+    vendorName: vendorName.trim() || PVC_ATCL_VENDOR_NAME,
+    notes: taggedNotes,
+  };
+}
 
 const STOCK_ALIASES: Record<string, string[]> = {
   date: ["date", "entry date", "stock date", "as on"],
@@ -768,13 +802,18 @@ export async function parsePnlWorkbook(
           getCell(sheet, r, header.map, "type"),
           item || vendor,
         );
+        const sourced = applyPurchaseSource(
+          str(getCell(sheet, r, header.map, "source")),
+          vendor,
+          str(getCell(sheet, r, header.map, "notes")) || null,
+        );
         result.purchases.push({
           row: r,
           date: ymd(dateRaw),
           shift: parseShift(getCell(sheet, r, header.map, "shift")),
           type,
           typeOther: type === PurchaseType.OTHERS ? item || vendor : null,
-          vendorName: vendor || "—",
+          vendorName: sourced.vendorName,
           billNumber: str(getCell(sheet, r, header.map, "billNumber")) || null,
           billDate: billDate ? ymd(billDate) : null,
           itemDescription: item || vendor || "Purchase item",
@@ -782,7 +821,7 @@ export async function parsePnlWorkbook(
           quantity: qty,
           rate,
           gstPercent,
-          notes: str(getCell(sheet, r, header.map, "notes")) || null,
+          notes: sourced.notes,
         });
       }
     }

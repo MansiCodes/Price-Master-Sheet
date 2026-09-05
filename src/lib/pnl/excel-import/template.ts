@@ -135,10 +135,12 @@ function salesHeaders(family: PlantFamily): string[] {
 }
 
 function purchaseHeaders(family: PlantFamily): string[] {
+  // Purchase source = same as Today Entry: "Purchase from Vendor" | "Stock Taken from ATCL"
   switch (family) {
     case "cat6":
       return [
         "Date",
+        "Purchase source",
         "GSTIN/GST No",
         "Vendor's Name",
         "Bill Number",
@@ -152,6 +154,7 @@ function purchaseHeaders(family: PlantFamily): string[] {
     case "conductor":
       return [
         "Date",
+        "Purchase source",
         "Supplier name",
         "Description of Goods",
         "Invoice no. / Challan no.",
@@ -166,6 +169,7 @@ function purchaseHeaders(family: PlantFamily): string[] {
     case "upcast":
       return [
         "Date",
+        "Purchase source",
         "Supplier Name",
         "Description of Goods",
         "Bill Number",
@@ -179,6 +183,7 @@ function purchaseHeaders(family: PlantFamily): string[] {
     default:
       return [
         "Date",
+        "Purchase source",
         "Supplier name",
         "Description of Goods",
         "Invoice no. / Challan no.",
@@ -234,6 +239,8 @@ function stockHeaders(family: PlantFamily): string[] {
 }
 
 function miscExpenseHeaders(family: PlantFamily): string[] {
+  // Expense section + Expense Head mirror Today Entry (Direct / Indirect → which head).
+  // "Nature" is only a sub-detail (e.g. UPCAST misc / petty) — not Direct vs Indirect.
   switch (family) {
     case "upcast":
       return [
@@ -248,6 +255,7 @@ function miscExpenseHeaders(family: PlantFamily): string[] {
     case "pvc":
       return [
         "Date",
+        "Expense section",
         "Expense Head",
         "Nature",
         "Description",
@@ -260,6 +268,7 @@ function miscExpenseHeaders(family: PlantFamily): string[] {
     case "cat6":
       return [
         "Date",
+        "Expense section",
         "Expense Head",
         "Nature",
         "Description",
@@ -274,6 +283,7 @@ function miscExpenseHeaders(family: PlantFamily): string[] {
     default:
       return [
         "Date",
+        "Expense section",
         "Expense Head",
         "Nature",
         "Description",
@@ -399,25 +409,55 @@ export async function buildPnlImportTemplate(
   guide.addRow([
     "4. Dates: YYYY-MM-DD or DD/MM/YYYY. Sales/Purchase use Bill Date if Date is empty.",
   ]);
+  guide.addRow([
+    "5. Purchase sheet — column \"Purchase source\" (same as Today Entry form):",
+  ]);
+  guide.addRow([
+    "   • Purchase from Vendor → put the real supplier in Supplier / Vendor's Name.",
+  ]);
+  guide.addRow([
+    "   • Stock Taken from ATCL → set Purchase source to that (or put ATCL as supplier). App tags notes as \"Stock from ATCL\" and shows under Stock Taken from ATCL in P&L.",
+  ]);
   if (onlySP) {
     guide.addRow([
-      "5. Accountant login: only Sales and Purchase sheets are imported.",
+      "6. Accountant login: only Sales and Purchase sheets are imported.",
     ]);
   } else {
     guide.addRow([
-      "5. Quantity × Rate is calculated in the app where formulas apply.",
+      "6. Expense — same as Today Entry form (Direct vs Indirect):",
+    ]);
+    guide.addRow([
+      "   • Column \"Expense section\" = Direct Expense or Indirect Expense.",
+    ]);
+    guide.addRow([
+      "   • Column \"Expense Head\" = which line under that section (e.g. Electricity, Salary & Wages, FAR).",
+    ]);
+    guide.addRow([
+      "   • The app places the row on P&L using Expense Head (catalog: which heads are Direct vs Indirect).",
+    ]);
+    guide.addRow([
+      "   • \"Nature\" is only extra detail (not Direct/Indirect). Prefer the dedicated sheets for Electricity / Rent / FAR when applicable.",
+    ]);
+    guide.addRow([
+      `   • ${family === "pvc" ? "Fuel & Power" : "Electricity"} / Rent / FAR sheets still work for those heads.`,
+    ]);
+    if (family === "upcast" || family === "pvc") {
+      guide.addRow(["   • Unloading of MT sheet → unloading charges."]);
+    }
+    guide.addRow([
+      "7. Quantity × Rate is calculated in the app where formulas apply.",
     ]);
     if (family === "upcast") {
       guide.addRow([
-        `6. Misc Exp. natures: ${UPCAST_MISC_NATURES.join(", ")}`,
+        `8. Misc Exp. natures: ${UPCAST_MISC_NATURES.join(", ")}`,
       ]);
     } else if (family === "cat6") {
       guide.addRow([
-        "6. CAT-6 purchase has no GST % column. Sales can use In Meter / QTY-MTR.",
+        "8. CAT-6 purchase has no GST % column. Sales can use In Meter / QTY-MTR.",
       ]);
     } else if (family === "pvc") {
       guide.addRow([
-        "6. Stock Category: RM / WIP / FG. Fuel & Power sheet is for electricity-style entries.",
+        "8. Stock Category: RM / WIP / FG. Fuel & Power sheet is for electricity-style entries.",
       ]);
     }
   }
@@ -432,7 +472,10 @@ export async function buildPnlImportTemplate(
     guide.addRow([
       `Stock items: ${stockCat.particulars.slice(0, 12).join(" · ")}`,
     ]);
-    guide.addRow([`Expense heads: ${expenseHeads.join(" · ")}`]);
+  guide.addRow([`Expense heads: ${expenseHeads.join(" · ")}`]);
+    guide.addRow([
+      "Expense section values: Direct Expense · Indirect Expense (pick head that belongs to that section)",
+    ]);
     if (family === "upcast") {
       guide.addRow([`Misc natures: ${UPCAST_MISC_NATURES.join(" · ")}`]);
     }
