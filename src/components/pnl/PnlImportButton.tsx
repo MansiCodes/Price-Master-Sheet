@@ -13,6 +13,8 @@ type ImportSummary = {
   electricity: number;
   rent: number;
   far: number;
+  duplicates?: number;
+  alreadyUploaded?: boolean;
   skipped: { sheet: string; row: number; reason: string }[];
 };
 
@@ -44,6 +46,38 @@ export function PnlImportButton({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  async function downloadTemplate() {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/plants/${plantId}/import/pnl`);
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(json?.error ?? "Could not download template");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const match = cd.match(/filename="([^"]+)"/i);
+      a.download = match?.[1] ?? "pnl-import-template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(
+        "Plant template downloaded — columns match this plant's forms",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   async function onFile(file: File | undefined) {
     if (!file) return;
@@ -59,9 +93,20 @@ export function PnlImportButton({
         error?: string;
         summary?: ImportSummary;
         skipped?: ImportSummary["skipped"];
+        sheetsFound?: string[];
+        alreadyUploaded?: boolean;
       } | null;
       if (!res.ok) {
-        throw new Error(json?.error ?? "Import failed");
+        if (json?.alreadyUploaded || res.status === 409) {
+          toast.message(
+            json?.error ?? "This file was already uploaded for this plant.",
+          );
+          return;
+        }
+        const extra = json?.sheetsFound?.length
+          ? ` (${json.sheetsFound.join(", ")})`
+          : "";
+        throw new Error(`${json?.error ?? "Import failed"}${extra}`);
       }
       const s = json?.summary;
       if (s) {
@@ -76,12 +121,26 @@ export function PnlImportButton({
           !salesPurchaseOnly && s.rent ? `${s.rent} rent` : null,
           !salesPurchaseOnly && s.far ? `${s.far} FAR` : null,
         ].filter(Boolean);
+        const dup =
+          s.duplicates && s.duplicates > 0
+            ? ` · ${s.duplicates} duplicate${s.duplicates === 1 ? "" : "s"} skipped`
+            : "";
         toast.success(
-          `Imported ${parts.join(", ") || "0 rows"} · upload ${formatUploadTime(s.uploadedAt)}`,
+          `Imported ${parts.join(", ") || "0 new rows"}${dup} · ${formatUploadTime(s.uploadedAt)}`,
         );
-        if (s.skipped.length > 0) {
+        const realSkips = (s.skipped ?? []).filter(
+          (x) =>
+            x.reason &&
+            !/already uploaded/i.test(x.reason) &&
+            !/duplicate row in this file/i.test(x.reason),
+        );
+        if (realSkips.length > 0) {
+          const tip = realSkips
+            .slice(0, 2)
+            .map((x) => `${x.sheet} row ${x.row}: ${x.reason}`)
+            .join("; ");
           toast.message(
-            `${s.skipped.length} row(s) skipped — check headers / required columns`,
+            `${realSkips.length} row(s) skipped — ${tip}`,
           );
         }
       } else {
@@ -102,19 +161,49 @@ export function PnlImportButton({
     <>
       <button
         type="button"
-        className="pnl-export-btn pnl-export-btn--compact pnl-import-btn"
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
+        className="pnl-export-btn pnl-export-btn--compact"
+        onClick={() => void downloadTemplate()}
+        disabled={downloading || busy}
         title={
           salesPurchaseOnly
-            ? "Import Sales and Purchase from Excel"
-            : "Import Sales, Purchase, Stock, Expense from one Excel file"
+            ? "Download Excel template (Sales + Purchase sheets)"
+            : "Download Excel template (Sales, Purchase, Expense, Stock, Electricity, Rent, FAR)"
         }
       >
         <svg
           viewBox="0 0 24 24"
-          width="16"
-          height="16"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+          <path d="M14 3v5h5" />
+          <path d="M12 12v6M9 15l3 3 3-3" />
+        </svg>
+        <span className="pnl-export-btn__label">
+          {downloading ? "…" : "Template"}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="pnl-export-btn pnl-export-btn--compact pnl-import-btn"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy || downloading}
+        title={
+          salesPurchaseOnly
+            ? "Import Sales and Purchase from Excel"
+            : "Import Sales, Purchase, Stock, Expense, FAR from one Excel file"
+        }
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
           fill="none"
           stroke="currentColor"
           strokeWidth="1.8"

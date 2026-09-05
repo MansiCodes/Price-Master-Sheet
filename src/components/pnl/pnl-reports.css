@@ -29,33 +29,48 @@
   flex: 1 1 auto;
 }
 
-/* Desktop/tablet: PDF sits with From/To. Mobile: PDF next to plant name. */
+/* Template + Import Excel — top-right next to plant heading */
+.pnl-reports__header-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+/* Desktop/tablet: PDF stays with From/To. Mobile: PDF joins header actions. */
 .pnl-reports__export--mobile {
   display: none;
 }
 
 .pnl-reports__export--desktop {
-  display: block;
+  display: inline-flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.55rem;
 }
 
 .pnl-reports__header .pnl-export-btn,
+.pnl-reports__header-actions .pnl-export-btn,
 .pnl-reports__actions .pnl-export-btn,
 .pnl-export-btn--compact {
   appearance: none !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 0.4rem !important;
+  gap: 0.3rem !important;
   flex: 0 0 auto !important;
   align-self: center !important;
   width: fit-content !important;
   max-width: none !important;
   min-width: 0 !important;
-  height: 2.1rem !important;
-  padding: 0 0.9rem !important;
+  height: 1.9rem !important;
+  padding: 0 0.7rem !important;
   margin: 0 !important;
-  border-radius: 10px !important;
+  border-radius: 999px !important;
+  font-size: 0.75rem !important;
   box-sizing: border-box !important;
 }
 
@@ -109,7 +124,7 @@
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.45rem;
+  gap: 0.75rem;
   flex: 0 1 auto;
   width: auto;
   max-width: 100%;
@@ -124,7 +139,7 @@
 }
 
 .pnl-reports__actions .pnl-export-btn {
-  height: 2.35rem;
+  height: 1.9rem;
 }
 
 .pnl-import {
@@ -147,8 +162,8 @@
 .pnl-reports__export--desktop,
 .pnl-reports__export--mobile {
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
 }
 
 .pnl-reports__export--desktop {
@@ -404,14 +419,14 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.65rem;
   min-width: 0;
 }
 
 .pnl-date-filter__field {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
@@ -429,13 +444,13 @@
 .pnl-date-filter__field input {
   width: 8.6rem;
   min-width: 0;
-  height: 2.35rem;
+  height: 1.9rem;
   padding: 0 0.5rem;
   border: 1px solid var(--border, #d7e0dc);
-  border-radius: 10px;
+  border-radius: 999px;
   background: #fff;
   font: inherit;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   box-sizing: border-box;
 }
 
@@ -444,17 +459,17 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
   width: fit-content;
   max-width: none;
-  height: 2.1rem;
-  padding: 0 0.9rem;
-  border-radius: 10px;
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  border-radius: 999px;
   border: 1px solid rgba(13, 148, 136, 0.35);
   background: #fff;
   color: var(--teal, #0d9488);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -1255,15 +1270,15 @@
   }
 
   .pnl-reports__header {
-    flex-direction: column !important;
-    flex-wrap: nowrap !important;
-    align-items: stretch !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
     gap: 0.65rem !important;
   }
 
   .pnl-reports__plant-block {
-    flex: none !important;
-    width: 100% !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
     max-width: 100% !important;
     min-width: 0 !important;
   }
@@ -1278,13 +1293,18 @@
     line-height: 1.35 !important;
   }
 
-  .pnl-reports__export--mobile {
+  .pnl-reports__header-actions {
     width: 100% !important;
-    display: inline-flex !important;
+    display: flex !important;
     justify-content: stretch !important;
     gap: 0.5rem !important;
   }
 
+  .pnl-reports__export--mobile {
+    display: contents !important;
+  }
+
+  .pnl-reports__header-actions .pnl-export-btn,
   .pnl-reports__header .pnl-export-btn,
   .pnl-reports__actions .pnl-export-btn,
   .pnl-export-btn--compact {

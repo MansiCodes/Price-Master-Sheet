@@ -194,6 +194,7 @@ export async function GET(
         ]
       : [
           { header: "sNo.", key: "sno", width: 8 },
+          { header: "Customer", key: "customer", width: 24 },
           { header: "Remarks", key: "notes", width: 24 },
           { header: "Invoice no.", key: "invoice", width: 16 },
           { header: "Bill date", key: "billDate", width: 12 },

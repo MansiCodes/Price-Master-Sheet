@@ -135,6 +135,12 @@ export function SalesReport({
         String((page - 1) * pageSize + (index ?? 0) + 1),
     },
     {
+      key: "customer",
+      label: "Customer",
+      wrap: true,
+      render: (r) => r.customerName?.trim() || "—",
+    },
+    {
       key: "remarks",
       label: "Remarks",
       wrap: "wide",
@@ -327,7 +333,7 @@ export function SalesReport({
                   sales: formatINR(totals.salesValue ?? 0),
                 }
               : {
-                  remarks: "TOTAL",
+                  customer: "TOTAL",
                   goods: formatINR(totals.salesValue ?? 0),
                 }
             : undefined

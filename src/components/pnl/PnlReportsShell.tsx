@@ -79,19 +79,21 @@ export function PnlReportsShell({
         ) : (
           <div className="pnl-reports__plant-block" />
         )}
-        <div className="pnl-reports__export pnl-reports__export--mobile">
+        <div className="pnl-reports__header-actions">
           <PnlImportButton
             plantId={plantId}
             canImport={allowImport}
             salesPurchaseOnly={accountantLimited}
             onImported={() => setReloadKey((k) => k + 1)}
           />
-          <PnlExportButton
-            plantId={plantId}
-            kind={tab}
-            from={exportFrom}
-            to={exportTo}
-          />
+          <div className="pnl-reports__export pnl-reports__export--mobile">
+            <PnlExportButton
+              plantId={plantId}
+              kind={tab}
+              from={exportFrom}
+              to={exportTo}
+            />
+          </div>
         </div>
       </div>
 
@@ -109,12 +111,6 @@ export function PnlReportsShell({
             />
           )}
           <div className="pnl-reports__export pnl-reports__export--desktop">
-            <PnlImportButton
-              plantId={plantId}
-              canImport={allowImport}
-              salesPurchaseOnly={accountantLimited}
-              onImported={() => setReloadKey((k) => k + 1)}
-            />
             <PnlExportButton
               plantId={plantId}
               kind={tab}

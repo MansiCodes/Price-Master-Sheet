@@ -8,13 +8,14 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { isAccountantPnlLimited } from "@/lib/rbac";
+import { fileContentHash } from "@/lib/pnl/excel-import/dedupe";
 import { parsePnlWorkbook } from "@/lib/pnl/excel-import/parse";
 import { persistPnlImport } from "@/lib/pnl/excel-import/persist";
 import { buildPnlImportTemplate } from "@/lib/pnl/excel-import/template";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
-/** Download blank multi-sheet import template. */
+/** Download blank multi-sheet import template (columns match this plant's forms). */
 export async function GET(
   _request: NextRequest,
   context: RouteContext,
@@ -26,14 +27,28 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
-  const buf = await buildPnlImportTemplate();
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { id: true, code: true, name: true },
+  });
+  if (!plant) {
+    return NextResponse.json({ error: "Plant not found" }, { status: 404 });
+  }
+
+  const salesPurchaseOnly = isAccountantPnlLimited(session.user.globalRole);
+  const buf = await buildPnlImportTemplate({
+    plantCode: plant.code,
+    plantName: plant.name,
+    salesPurchaseOnly,
+  });
+  const safeCode = plant.code.replace(/[^a-zA-Z0-9_-]+/g, "-");
   return new NextResponse(new Uint8Array(buf), {
     status: 200,
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition":
-        'attachment; filename="pnl-import-template.xlsx"',
+      "Content-Disposition": `attachment; filename="${safeCode}-pnl-import-template.xlsx"`,
+      "Cache-Control": "no-store",
     },
   });
 }
@@ -87,6 +102,29 @@ export async function POST(
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const fileHash = fileContentHash(buffer);
+
+  // Exact same file already imported for this plant
+  const priorFile = await prisma.auditLog.findFirst({
+    where: {
+      plantId,
+      field: "excel-import",
+      newValue: { contains: `"fileHash":"${fileHash}"` },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true, newValue: true },
+  });
+  if (priorFile) {
+    return NextResponse.json(
+      {
+        error: "This file was already uploaded for this plant.",
+        alreadyUploaded: true,
+        uploadedAt: priorFile.createdAt.toISOString(),
+      },
+      { status: 409 },
+    );
+  }
+
   let parsed = await parsePnlWorkbook(buffer, { plantCode: plant.code });
 
   // Accountants may only import Sales + Purchase sheets.
@@ -121,11 +159,22 @@ export async function POST(
     parsed.expenses.length;
 
   if (totalRows === 0) {
+    const skipHint =
+      parsed.skipped.length > 0
+        ? ` Details: ${parsed.skipped
+            .slice(0, 3)
+            .map((s) => `${s.sheet}${s.row ? ` row ${s.row}` : ""} — ${s.reason}`)
+            .join("; ")}`
+        : "";
+    const sheets =
+      parsed.sheetsFound.length > 0
+        ? ` Sheets in file: ${parsed.sheetsFound.join(", ")}.`
+        : "";
     return NextResponse.json(
       {
         error: salesPurchaseOnly
-          ? "No Sales or Purchase rows found. Use sheets named Sales and/or Purchase with a header row."
-          : "No importable rows found. Use sheets named Sales, Purchase, Stock, Expense with a header row.",
+          ? `No Sales or Purchase rows found.${sheets}${skipHint}`
+          : `No importable rows found. The file can be any Excel with recognizable columns (Customer/Item/Quantity for sales, etc.) — template is optional.${sheets}${skipHint}`,
         sheetsFound: parsed.sheetsFound,
         skipped: parsed.skipped,
       },
@@ -146,12 +195,25 @@ export async function POST(
     uploadedAt,
   });
 
+  if (summary.alreadyUploaded) {
+    return NextResponse.json(
+      {
+        error:
+          "All rows in this file were already uploaded (duplicates skipped).",
+        alreadyUploaded: true,
+        summary,
+      },
+      { status: 409 },
+    );
+  }
+
   await writeAuditLog({
     entityType: "Plant",
     entityId: plantId,
     field: "excel-import",
     newValue: {
       fileName: file.name,
+      fileHash,
       batchId,
       uploadedAt: uploadedAt.toISOString(),
       counts: {
@@ -162,6 +224,7 @@ export async function POST(
         electricity: summary.electricity,
         rent: summary.rent,
         far: summary.far,
+        duplicates: summary.duplicates,
       },
     },
     actorId: session.user.id,

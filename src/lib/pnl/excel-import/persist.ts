@@ -1,6 +1,7 @@
 /**
  * Persist parsed P&L Excel rows into Prisma tables.
- * Auto-calcs mirror the create APIs (qty×rate, GST, closing value).
+ * Skips rows that already exist (same content) — re-uploading the same file
+ * or overlapping rows across files will not create duplicates.
  */
 import {
   GlobalRole,
@@ -17,6 +18,13 @@ import {
   round2,
   round4,
 } from "@/lib/pnl/excel-import/cells";
+import {
+  expenseSourceKey,
+  farSourceKey,
+  purchaseSourceKey,
+  saleSourceKey,
+  stockSourceKey,
+} from "@/lib/pnl/excel-import/dedupe";
 import type { ParsedPnlWorkbook } from "@/lib/pnl/excel-import/parse";
 import { PVC_FAR_DEP_PERCENT } from "@/lib/plant-catalogs";
 
@@ -30,15 +38,16 @@ export type ImportSummary = {
   electricity: number;
   rent: number;
   far: number;
+  /** Rows skipped because the same data already exists. */
+  duplicates: number;
+  /** True when every row in the file was already present. */
+  alreadyUploaded: boolean;
   skipped: { sheet: string; row: number; reason: string }[];
   sheetsFound: string[];
 };
 
 function approvalFor(role: GlobalRole, dateYmd: string) {
-  const approval = entryApprovalCreateData(role, dateYmd);
-  return {
-    ...approval,
-  };
+  return entryApprovalCreateData(role, dateYmd);
 }
 
 export async function persistPnlImport(opts: {
@@ -63,21 +72,57 @@ export async function persistPnlImport(opts: {
     electricity: 0,
     rent: 0,
     far: 0,
+    duplicates: 0,
+    alreadyUploaded: false,
     skipped: [...parsed.skipped],
     sheetsFound: parsed.sheetsFound,
   };
 
+  const seenKeys = new Set<string>();
   const daysToRefresh = new Map<string, ManpowerShift>();
+
+  function markDuplicate(sheet: string, row: number, reason: string) {
+    summary.duplicates += 1;
+    summary.skipped.push({ sheet, row, reason });
+  }
 
   // ── Sales ──────────────────────────────────────────────────────────
   for (const row of parsed.sales) {
-    const sourceKey = `excel-import:${batchId}:sale:${row.row}`;
-    const salesValue = round2(row.quantity * row.rate);
+    const sourceKey = saleSourceKey(plantId, row);
+    if (seenKeys.has(sourceKey)) {
+      markDuplicate("Sales", row.row, "Duplicate row in this file");
+      continue;
+    }
+    seenKeys.add(sourceKey);
+
     const day = parseDateOnly(row.date);
+    const existing = await prisma.sale.findFirst({
+      where: {
+        plantId,
+        OR: [
+          { sourceKey },
+          { id: sourceKey },
+          {
+            date: day,
+            customerName: row.customerName,
+            itemDescription: row.itemDescription,
+            quantity: row.quantity,
+            rate: row.rate,
+            ...(row.billNumber ? { billNumber: row.billNumber } : {}),
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      markDuplicate("Sales", row.row, "Already uploaded");
+      continue;
+    }
+
+    const salesValue = round2(row.quantity * row.rate);
     const approval = approvalFor(role, row.date);
-    await prisma.sale.upsert({
-      where: { id: sourceKey },
-      create: {
+    await prisma.sale.create({
+      data: {
         id: sourceKey,
         sourceKey,
         plantId,
@@ -93,27 +138,14 @@ export async function persistPnlImport(opts: {
         quantity: row.quantity,
         rate: row.rate,
         salesValue,
+        inMeter: row.inMeter ?? null,
+        qtyMtr: row.qtyMtr ?? null,
+        meterUnit: row.meterUnit ?? null,
         notes: row.notes,
         enteredById,
         isBackdated: isBackdated(row.date),
         excelUploadedAt: uploadedAt,
         ...approval,
-      },
-      update: {
-        date: day,
-        shift: row.shift,
-        type: row.type,
-        typeOther: row.typeOther,
-        customerName: row.customerName,
-        billNumber: row.billNumber,
-        billDate: row.billDate ? parseDateOnly(row.billDate) : null,
-        itemDescription: row.itemDescription,
-        unit: row.unit,
-        quantity: row.quantity,
-        rate: row.rate,
-        salesValue,
-        notes: row.notes,
-        excelUploadedAt: uploadedAt,
       },
     });
     summary.sales += 1;
@@ -122,15 +154,43 @@ export async function persistPnlImport(opts: {
 
   // ── Purchases ──────────────────────────────────────────────────────
   for (const row of parsed.purchases) {
-    const sourceKey = `excel-import:${batchId}:purchase:${row.row}`;
+    const sourceKey = purchaseSourceKey(plantId, row);
+    if (seenKeys.has(sourceKey)) {
+      markDuplicate("Purchase", row.row, "Duplicate row in this file");
+      continue;
+    }
+    seenKeys.add(sourceKey);
+
+    const day = parseDateOnly(row.date);
+    const existing = await prisma.purchase.findFirst({
+      where: {
+        plantId,
+        OR: [
+          { sourceKey },
+          { id: sourceKey },
+          {
+            date: day,
+            vendorName: row.vendorName,
+            itemDescription: row.itemDescription,
+            quantity: row.quantity,
+            rate: row.rate,
+            ...(row.billNumber ? { billNumber: row.billNumber } : {}),
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      markDuplicate("Purchase", row.row, "Already uploaded");
+      continue;
+    }
+
     const basicValue = round2(row.quantity * row.rate);
     const gstAmount = round2(basicValue * (row.gstPercent / 100));
     const invoiceValue = round2(basicValue + gstAmount);
-    const day = parseDateOnly(row.date);
     const approval = approvalFor(role, row.date);
-    await prisma.purchase.upsert({
-      where: { id: sourceKey },
-      create: {
+    await prisma.purchase.create({
+      data: {
         id: sourceKey,
         sourceKey,
         plantId,
@@ -155,25 +215,6 @@ export async function persistPnlImport(opts: {
         excelUploadedAt: uploadedAt,
         ...approval,
       },
-      update: {
-        date: day,
-        shift: row.shift,
-        type: row.type,
-        typeOther: row.typeOther,
-        vendorName: row.vendorName,
-        billNumber: row.billNumber,
-        billDate: row.billDate ? parseDateOnly(row.billDate) : null,
-        itemDescription: row.itemDescription,
-        unit: row.unit,
-        quantity: row.quantity,
-        rate: row.rate,
-        basicValue,
-        gstPercent: row.gstPercent,
-        gstAmount,
-        invoiceValue,
-        notes: row.notes,
-        excelUploadedAt: uploadedAt,
-      },
     });
     summary.purchases += 1;
     daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
@@ -181,50 +222,55 @@ export async function persistPnlImport(opts: {
 
   // ── Stock ──────────────────────────────────────────────────────────
   for (const row of parsed.stock) {
-    const sourceKey = `excel-import:${batchId}:stock:${row.row}`;
-    const closingValue = round2(row.quantity * row.rate);
+    const sourceKey = stockSourceKey(plantId, row);
+    if (seenKeys.has(sourceKey)) {
+      markDuplicate("Stock", row.row, "Duplicate row in this file");
+      continue;
+    }
+    seenKeys.add(sourceKey);
+
     const day = parseDateOnly(row.date);
-    const approval = approvalFor(role, row.date);
     const existing = await prisma.stockEntry.findFirst({
-      where: { sourceKey },
+      where: {
+        plantId,
+        OR: [
+          { sourceKey },
+          {
+            date: day,
+            itemName: row.itemName,
+            quantity: round4(row.quantity),
+            rate: round4(row.rate),
+          },
+        ],
+      },
       select: { id: true },
     });
-    const data = {
-      sourceKey,
-      plantId,
-      date: day,
-      shift: row.shift,
-      itemName: row.itemName,
-      category: row.category,
-      unit: row.unit,
-      quantity: round4(row.quantity),
-      rate: round4(row.rate),
-      closingValue,
-      notes: row.notes,
-      enteredById,
-      isBackdated: isBackdated(row.date),
-      excelUploadedAt: uploadedAt,
-      ...approval,
-    };
     if (existing) {
-      await prisma.stockEntry.update({
-        where: { id: existing.id },
-        data: {
-          date: day,
-          shift: row.shift,
-          itemName: row.itemName,
-          category: row.category,
-          unit: row.unit,
-          quantity: round4(row.quantity),
-          rate: round4(row.rate),
-          closingValue,
-          notes: row.notes,
-          excelUploadedAt: uploadedAt,
-        },
-      });
-    } else {
-      await prisma.stockEntry.create({ data });
+      markDuplicate("Stock", row.row, "Already uploaded");
+      continue;
     }
+
+    const closingValue = round2(row.quantity * row.rate);
+    const approval = approvalFor(role, row.date);
+    await prisma.stockEntry.create({
+      data: {
+        sourceKey,
+        plantId,
+        date: day,
+        shift: row.shift,
+        itemName: row.itemName,
+        category: row.category,
+        unit: row.unit,
+        quantity: round4(row.quantity),
+        rate: round4(row.rate),
+        closingValue,
+        notes: row.notes,
+        enteredById,
+        isBackdated: isBackdated(row.date),
+        excelUploadedAt: uploadedAt,
+        ...approval,
+      },
+    });
     summary.stock += 1;
     daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
   }
@@ -242,6 +288,19 @@ export async function persistPnlImport(opts: {
           ? Math.max(0, closing - opening)
           : null;
       const billAmount = round2(row.amount);
+
+      const existing = await prisma.electricityRent.findUnique({
+        where: { plantId_month: { plantId, month } },
+        select: { billAmount: true },
+      });
+      if (
+        existing &&
+        Number(existing.billAmount) === billAmount &&
+        billAmount > 0
+      ) {
+        markDuplicate("Electricity", row.row, "Already uploaded");
+        continue;
+      }
 
       await prisma.electricityRent.upsert({
         where: { plantId_month: { plantId, month } },
@@ -293,6 +352,19 @@ export async function persistPnlImport(opts: {
             ? round2(area * rate)
             : round2(row.amount);
 
+      const existing = await prisma.electricityRent.findUnique({
+        where: { plantId_month: { plantId, month } },
+        select: { rentAmount: true },
+      });
+      if (
+        existing &&
+        Number(existing.rentAmount) === rentAmount &&
+        rentAmount > 0
+      ) {
+        markDuplicate("Rent", row.row, "Already uploaded");
+        continue;
+      }
+
       await prisma.electricityRent.upsert({
         where: { plantId_month: { plantId, month } },
         create: {
@@ -334,48 +406,70 @@ export async function persistPnlImport(opts: {
     if (row.target === "far") {
       const cost = round2(row.cost ?? row.amount);
       const gst =
-        row.gst != null
-          ? round2(row.gst)
-          : round2(cost * 0.18);
+        row.gst != null ? round2(row.gst) : round2(cost * 0.18);
       const invoiceValue = round2(cost + gst);
-      const dep =
-        row.depreciationPercent ?? PVC_FAR_DEP_PERCENT;
-      const sourceKey = `excel-import:${batchId}:far:${row.row}`;
+      const dep = row.depreciationPercent ?? PVC_FAR_DEP_PERCENT;
+      const sourceKey = farSourceKey(plantId, {
+        date: row.date,
+        description: row.description || row.expenseHead,
+        vendor: row.vendor,
+        billNumber: row.billNumber,
+        cost,
+      });
+      if (seenKeys.has(sourceKey)) {
+        markDuplicate("FAR", row.row, "Duplicate row in this file");
+        continue;
+      }
+      seenKeys.add(sourceKey);
+
       const existing = await prisma.fixedAsset.findFirst({
         where: {
           plantId,
-          billNumber: row.billNumber ?? undefined,
-          assetDescription: row.description || row.expenseHead,
+          OR: [
+            {
+              billNumber: row.billNumber ?? undefined,
+              assetDescription: row.description || row.expenseHead,
+            },
+            {
+              assetDescription: row.description || row.expenseHead,
+              vendor: row.vendor ?? undefined,
+              cost,
+            },
+          ],
         },
         select: { id: true },
       });
-      const farData = {
-        plantId,
-        assetDescription: row.description || row.expenseHead,
-        vendor: row.vendor,
-        billNumber: row.billNumber,
-        billDate: day,
-        cost,
-        gst,
-        invoiceValue,
-        depreciationPercent: dep,
-        excelUploadedAt: uploadedAt,
-      };
       if (existing) {
-        await prisma.fixedAsset.update({
-          where: { id: existing.id },
-          data: farData,
-        });
-      } else {
-        await prisma.fixedAsset.create({ data: farData });
+        markDuplicate("FAR", row.row, "Already uploaded");
+        continue;
       }
-      void sourceKey;
+
+      await prisma.fixedAsset.create({
+        data: {
+          plantId,
+          assetDescription: row.description || row.expenseHead,
+          vendor: row.vendor,
+          billNumber: row.billNumber,
+          billDate: day,
+          cost,
+          gst,
+          invoiceValue,
+          depreciationPercent: dep,
+          excelUploadedAt: uploadedAt,
+        },
+      });
       summary.far += 1;
       continue;
     }
 
     // Petty / generic expense
-    const sourceKey = `excel-import:${batchId}:expense:${row.row}`;
+    const sourceKey = expenseSourceKey(plantId, row);
+    if (seenKeys.has(sourceKey)) {
+      markDuplicate("Expense", row.row, "Duplicate row in this file");
+      continue;
+    }
+    seenKeys.add(sourceKey);
+
     const approval = approvalFor(role, row.date);
     const total =
       row.amount + row.contractorSalary + row.supervisorSalary;
@@ -387,13 +481,36 @@ export async function persistPnlImport(opts: {
       });
       continue;
     }
+
+    const existing = await prisma.pettyCashEntry.findFirst({
+      where: {
+        plantId,
+        OR: [
+          { sourceKey },
+          { id: sourceKey },
+          {
+            date: day,
+            expenseHead: row.nature || row.expenseHead,
+            amount: round2(row.amount),
+            ...(row.description
+              ? { description: row.description }
+              : {}),
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      markDuplicate("Expense", row.row, "Already uploaded");
+      continue;
+    }
+
     const isPetty =
       /petty/i.test(row.expenseHead) ||
       row.contractorSalary > 0 ||
       row.supervisorSalary > 0;
-    await prisma.pettyCashEntry.upsert({
-      where: { id: sourceKey },
-      create: {
+    await prisma.pettyCashEntry.create({
+      data: {
         id: sourceKey,
         sourceKey,
         plantId,
@@ -415,21 +532,6 @@ export async function persistPnlImport(opts: {
         excelUploadedAt: uploadedAt,
         ...approval,
       },
-      update: {
-        date: day,
-        shift: row.shift,
-        payMode: row.payMode || "Cash",
-        expenseHead: row.nature || row.expenseHead,
-        nature: row.nature,
-        description: row.description,
-        billNumber: row.billNumber,
-        openingReading: row.openingReading,
-        closingReading: row.closingReading,
-        amount: round2(row.amount),
-        contractorSalary: round2(row.contractorSalary),
-        supervisorSalary: round2(row.supervisorSalary),
-        excelUploadedAt: uploadedAt,
-      },
     });
     summary.expenses += 1;
     daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
@@ -444,6 +546,16 @@ export async function persistPnlImport(opts: {
       enteredById,
     );
   }
+
+  const imported =
+    summary.sales +
+    summary.purchases +
+    summary.stock +
+    summary.expenses +
+    summary.electricity +
+    summary.rent +
+    summary.far;
+  summary.alreadyUploaded = imported === 0 && summary.duplicates > 0;
 
   return summary;
 }

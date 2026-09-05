@@ -58,6 +58,8 @@ export function normHeader(v: unknown): string {
 export function asUtcDate(v: unknown): Date | null {
   if (v == null || v === "") return null;
   if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    const y = v.getFullYear();
+    if (y < 2000 || y > 2100) return null;
     return new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()));
   }
   if (typeof v === "number" && Number.isFinite(v)) {
@@ -66,6 +68,8 @@ export function asUtcDate(v: unknown): Date | null {
     const ms = Math.round(v * 86400000);
     const d = new Date(epoch + ms);
     if (!Number.isNaN(d.getTime())) {
+      const y = d.getUTCFullYear();
+      if (y < 2000 || y > 2100) return null;
       return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     }
   }
@@ -80,8 +84,23 @@ export function asUtcDate(v: unknown): Date | null {
     if (year < 100) year += 2000;
     return new Date(Date.UTC(year, month - 1, day));
   }
+  const mon = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (mon) {
+    const months: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+    };
+    const mi = months[mon[2].toLowerCase()];
+    if (mi != null) {
+      let year = +mon[3];
+      if (year < 100) year += 2000;
+      return new Date(Date.UTC(year, mi, +mon[1]));
+    }
+  }
   const d = new Date(s);
   if (!Number.isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    if (y < 2000 || y > 2100) return null;
     return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   }
   return null;
