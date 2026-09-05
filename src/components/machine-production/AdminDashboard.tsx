@@ -1197,61 +1197,63 @@ export function AdminDashboard() {
                 }
               />
             </label>
-            <label htmlFor="mp-filter-shift">
-              Shift
-              <SelectMenu
-                id="mp-filter-shift"
-                value={filters.shift}
-                items={shiftItems}
-                placeholder="All"
-                onChange={(value) =>
-                  setFilters((f) => {
-                    const nextHours =
-                      value === "DAY"
-                        ? DAY_SLOT_HOURS
-                        : value === "NIGHT"
-                          ? NIGHT_SLOT_HOURS
-                          : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
-                    const slotOk =
-                      !f.slotStartHour ||
-                      (nextHours as readonly number[]).includes(
-                        Number(f.slotStartHour),
-                      );
-                    return {
-                      ...f,
-                      shift: value,
-                      slotStartHour: slotOk ? f.slotStartHour : "",
-                    };
-                  })
-                }
-              />
-            </label>
-            <label htmlFor="mp-filter-slot">
-              Slot
-              <SelectMenu
-                id="mp-filter-slot"
-                value={filters.slotStartHour}
-                items={slotItems}
-                placeholder="All"
-                onChange={(value) =>
-                  setFilters((f) => ({ ...f, slotStartHour: value }))
-                }
-              />
-            </label>
-            <label htmlFor="mp-filter-machine">
-              Machine
-              <SelectMenu
-                id="mp-filter-machine"
-                value={filters.machineId}
-                items={machineItems}
-                placeholder="All"
-                searchable
-                searchPlaceholder="Search machines…"
-                onChange={(value) =>
-                  setFilters((f) => ({ ...f, machineId: value }))
-                }
-              />
-            </label>
+            <div className="mp-filters__triad">
+              <label htmlFor="mp-filter-shift">
+                Shift
+                <SelectMenu
+                  id="mp-filter-shift"
+                  value={filters.shift}
+                  items={shiftItems}
+                  placeholder="All"
+                  onChange={(value) =>
+                    setFilters((f) => {
+                      const nextHours =
+                        value === "DAY"
+                          ? DAY_SLOT_HOURS
+                          : value === "NIGHT"
+                            ? NIGHT_SLOT_HOURS
+                            : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
+                      const slotOk =
+                        !f.slotStartHour ||
+                        (nextHours as readonly number[]).includes(
+                          Number(f.slotStartHour),
+                        );
+                      return {
+                        ...f,
+                        shift: value,
+                        slotStartHour: slotOk ? f.slotStartHour : "",
+                      };
+                    })
+                  }
+                />
+              </label>
+              <label htmlFor="mp-filter-slot">
+                Slot
+                <SelectMenu
+                  id="mp-filter-slot"
+                  value={filters.slotStartHour}
+                  items={slotItems}
+                  placeholder="All"
+                  onChange={(value) =>
+                    setFilters((f) => ({ ...f, slotStartHour: value }))
+                  }
+                />
+              </label>
+              <label htmlFor="mp-filter-machine">
+                Machine
+                <SelectMenu
+                  id="mp-filter-machine"
+                  value={filters.machineId}
+                  items={machineItems}
+                  placeholder="All"
+                  searchable
+                  searchPlaceholder="Search machines…"
+                  onChange={(value) =>
+                    setFilters((f) => ({ ...f, machineId: value }))
+                  }
+                />
+              </label>
+            </div>
             <label className="mp-filters__apply">
               <span className="mp-filters__apply-spacer" aria-hidden="true">
                 &nbsp;
