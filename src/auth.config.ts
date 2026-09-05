@@ -14,8 +14,8 @@ export const authConfig = {
     signIn: "/login",
   },
   providers: [],
-  // JWT ceiling is 30 days so Remember-me tokens stay valid.
-  // Without Remember me, the session cookie is browser-session only (no maxAge).
+  // JWT ceiling is 30 days so Remember-me tokens stay valid when decoded at the edge.
+  // Actual cookie / JWT lifetime is set dynamically in `auth.ts` from Remember me.
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60,
@@ -32,6 +32,7 @@ export const authConfig = {
         sameSite: "lax" as const,
         path: "/",
         secure: process.env.NODE_ENV === "production",
+        // Do not set maxAge here — auth.ts sets persistent vs session cookie.
       },
     },
   },

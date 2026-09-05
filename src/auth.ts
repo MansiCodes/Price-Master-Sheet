@@ -20,7 +20,6 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
   });
   if (!user) return null;
 
-  // Find the most recent unconsumed challenge for this phone number
   const challenge = await prisma.otpChallenge.findFirst({
     where: {
       phone,
@@ -34,14 +33,12 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
     return null;
   }
 
-  // Check OTP code validity with bcrypt
   const valid = await bcrypt.compare(code, challenge.codeHash);
   if (!valid) {
     console.warn(`[authorizeWithOtp] Invalid OTP code for ${phone}`);
     return null;
   }
 
-  // Mark challenge as consumed
   await prisma.otpChallenge.update({
     where: { id: challenge.id },
     data: { consumed: true },
@@ -57,23 +54,55 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
   };
 }
 
-const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
-const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
+export const REMEMBER_MAX_AGE = 30 * 24 * 60 * 60; // 30 days
+export const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
+export const REMEMBER_COOKIE = "cj.remember-me";
+
+function readRememberMeFromCookieHeader(cookieHeader: string | null): boolean {
+  if (!cookieHeader) return false;
+  return /(?:^|;\s*)cj\.remember-me=true(?:;|$)/.test(cookieHeader);
+}
 
 function readRememberMeFromRequest(req: Request | undefined): boolean {
   if (!req) return false;
-  if ("cookies" in req && typeof (req as any).cookies?.get === "function") {
-    if ((req as any).cookies.get("cj.remember-me")?.value === "true") return true;
+  if ("cookies" in req && typeof (req as { cookies?: { get?: (n: string) => { value: string } | undefined } }).cookies?.get === "function") {
+    if ((req as { cookies: { get: (n: string) => { value: string } | undefined } }).cookies.get(REMEMBER_COOKIE)?.value === "true") {
+      return true;
+    }
   }
   if (req.headers && typeof req.headers.get === "function") {
-    const cookieHeader = req.headers.get("cookie") || "";
-    if (cookieHeader.includes("cj.remember-me=true")) return true;
+    return readRememberMeFromCookieHeader(req.headers.get("cookie"));
   }
   return false;
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
-  const rememberMe = readRememberMeFromRequest(req);
+async function resolveRememberMe(req: Request | undefined): Promise<boolean> {
+  // Login POST: prefer the form field (source of truth from checkbox).
+  if (req && req.method === "POST") {
+    try {
+      const form = await req.clone().formData();
+      const flag = form.get("rememberMe");
+      if (flag === "1" || flag === "true") return true;
+      if (flag === "0" || flag === "false") return false;
+    } catch {
+      // Not multipart/form-urlencoded (e.g. session fetch) — fall through.
+    }
+  }
+
+  if (req) return readRememberMeFromRequest(req);
+
+  // RSC / signOut helpers: no Request — read the cookie from next/headers.
+  try {
+    const { cookies } = await import("next/headers");
+    const jar = await cookies();
+    return jar.get(REMEMBER_COOKIE)?.value === "true";
+  } catch {
+    return false;
+  }
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
+  const rememberMe = await resolveRememberMe(req);
   const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
 
   return {
@@ -83,8 +112,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
     session: {
       ...authConfig.session,
       maxAge,
-      // Refresh periodically so a 30-day login stays alive while in use
-      updateAge: rememberMe ? 24 * 60 * 60 : SESSION_MAX_AGE,
+      // Keep a 30-day login alive while in use; short sessions refresh near expiry.
+      updateAge: rememberMe ? 24 * 60 * 60 : Math.floor(SESSION_MAX_AGE / 2),
     },
     jwt: {
       ...authConfig.jwt,
@@ -96,7 +125,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth((req) => {
         ...authConfig.cookies?.sessionToken,
         options: {
           ...authConfig.cookies?.sessionToken?.options,
-          // Persistent cookie when Remember me is on; browser-session cookie when off
+          // Persistent cookie when Remember me is on; browser-session cookie when off.
           maxAge: rememberMe ? maxAge : undefined,
         },
       },

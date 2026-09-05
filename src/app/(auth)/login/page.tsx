@@ -427,7 +427,11 @@ export default function LoginPage() {
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setRememberMe(next);
+                      setRememberMeCookie(next);
+                    }}
                   />
                   <span>{t("rememberMe")}</span>
                 </label>
@@ -488,7 +492,11 @@ export default function LoginPage() {
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setRememberMe(next);
+                      setRememberMeCookie(next);
+                    }}
                   />
                   <span>{t("rememberMe")}</span>
                 </label>
@@ -561,7 +569,11 @@ export default function LoginPage() {
                   <input
                     type="checkbox"
                     checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setRememberMe(next);
+                      setRememberMeCookie(next);
+                    }}
                   />
                   <span>{t("rememberMe")}</span>
                 </label>

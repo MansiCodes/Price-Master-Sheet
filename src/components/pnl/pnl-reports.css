@@ -169,11 +169,22 @@
   gap: 0.25rem;
   width: 100%;
   max-width: 100%;
-  padding: 0.28rem;
+  /* Left/top/bottom pad; trailing ::after mirrors the left inset (overflow-safe) */
+  padding: 0.28rem 0 0.28rem 0.28rem;
   border-radius: 14px;
   background: #eef3f1;
   border: 1px solid var(--border, #d7e0dc);
   box-sizing: border-box;
+}
+
+/* Same width as left padding — keeps space after Contact List visible with fit-content/scroll */
+.pnl-tab-nav.pnl-tab-nav--fit::after,
+.pnl-reports__tabs .pnl-tab-nav::after {
+  content: "";
+  flex: 0 0 0.28rem;
+  width: 0.28rem;
+  height: 1px;
+  pointer-events: none;
 }
 
 .pnl-tab-nav button {
@@ -1142,6 +1153,15 @@
     padding: 0.22rem;
   }
 
+  /* Spacer is flex-only; hide it in the phone grid so it doesn’t add a cell */
+  .pnl-tab-nav.pnl-tab-nav--fit::after,
+  .pnl-reports__tabs .pnl-tab-nav::after {
+    display: none !important;
+    content: none !important;
+    flex: none !important;
+    width: 0 !important;
+  }
+
   .pnl-tab-nav--n6,
   .pnl-tab-nav--n7,
   .pnl-tab-nav--n8,
@@ -1380,6 +1400,14 @@
     width: 100% !important;
     overflow-x: auto !important;
     grid-template-columns: none !important;
+    padding: 0.28rem 0 0.28rem 0.28rem !important;
+  }
+
+  .pnl-reports__tabs .pnl-tab-nav::after {
+    display: block !important;
+    content: "" !important;
+    flex: 0 0 0.28rem !important;
+    width: 0.28rem !important;
   }
 
   .pnl-reports__tabs .pnl-tab-nav button {

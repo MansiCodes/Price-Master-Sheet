@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import type { NextFetchEvent, NextRequest } from "next/server";
-import NextAuth from "next-auth";
-import { authConfig, SESSION_COOKIE } from "@/auth.config";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { SESSION_COOKIE } from "@/auth.config";
 import {
   defaultLocale,
   isAppLocale,
@@ -58,45 +58,58 @@ function ensureLocaleCookie(req: NextRequest, res: NextResponse) {
   });
 }
 
-/**
- * Middleware must use a *static* NextAuth config.
- * Lazy `NextAuth((req) => config)` makes `auth(wrapper)` return a Promise,
- * so `withAuth` is not a function at runtime.
- * Remember-me session length is still applied in `auth.ts` at sign-in.
- */
-const { auth } = NextAuth(authConfig);
+function isPublicPath(pathname: string): boolean {
+  return (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/cron")
+  );
+}
 
-const withAuth = auth((req) => {
+/**
+ * Use getToken (read-only) instead of Auth.js `auth()` middleware.
+ * The edge `authConfig` always had a 30-day session maxAge, which re-wrote
+ * cookies and broke "Remember me" off (session should die when the browser closes).
+ * Session length is applied correctly in `auth.ts` at sign-in / session refresh.
+ */
+export default async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   ensureLocaleCookie(req, res);
-  return res;
-});
 
-/**
- * 1) If browser still has old session cookies → expire them and continue
- *    (so Auth.js never tries to decrypt them → no JWTSessionError spam).
- * 2) Otherwise run Auth.js middleware as usual.
- */
-export default async function middleware(
-  req: NextRequest,
-  event: NextFetchEvent,
-) {
   const stale = req.cookies
     .getAll()
     .filter((c) => isStaleSessionCookie(c.name));
 
   if (stale.length > 0) {
-    const res = NextResponse.next();
     for (const cookie of stale) {
       expireCookie(res, cookie.name);
     }
-    ensureLocaleCookie(req, res);
+  }
+
+  const { pathname } = req.nextUrl;
+  if (isPublicPath(pathname)) {
     return res;
   }
 
-  // Auth.js wrapper is typed like an App Route handler (req, ctx).
-  // Must pass both args or Amplify `next build` fails (Deployment 57).
-  return withAuth(req, event as never);
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    cookieName: SESSION_COOKIE,
+    salt: SESSION_COOKIE,
+  });
+
+  if (!token) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const login = new URL("/login", req.url);
+    login.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(login);
+  }
+
+  return res;
 }
 
 export const config = {
