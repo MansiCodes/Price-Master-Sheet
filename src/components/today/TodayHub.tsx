@@ -169,7 +169,16 @@ const SALE_TYPES = [
   { value: "OTHERS", label: "Others" },
 ] as const;
 
-type SaleTypeValue = (typeof SALE_TYPES)[number]["value"];
+/** Conductor plant — sales Type dropdown (enum values reused). */
+const CONDUCTOR_SALE_TYPES = [
+  { value: "COPPER_SCRAP", label: "Copper" },
+  { value: "ALUMINIUM_SCRAP", label: "Aluminum" },
+  { value: "OTHERS", label: "Other" },
+] as const;
+
+type SaleTypeValue =
+  | (typeof SALE_TYPES)[number]["value"]
+  | (typeof CONDUCTOR_SALE_TYPES)[number]["value"];
 
 const PURCHASE_TYPES = [
   { value: "CONSUMABLE", label: "Consumable" },
@@ -268,6 +277,8 @@ export function TodayHub({
   const isPvc = plantCode.toUpperCase() === "PVC";
   const isUpcast = plantCode.toUpperCase() === "UPCAST";
   const isQuad = plantCode.toUpperCase() === "QUAD";
+  const isConductor = plantCode.toUpperCase() === "CONDUCTOR";
+  const saleTypeOptions = isConductor ? CONDUCTOR_SALE_TYPES : SALE_TYPES;
   const isPvcStyleExpense = isPvc || isUpcast;
   /** Closing stock with RM/WIP/FG + rate × value (Excel ERS / PVC style). */
   const usesStockLedger = isPvc || isUpcast;
@@ -310,17 +321,25 @@ export function TodayHub({
     () => {
       const base = customers.filter((x) => x !== "Other" && x !== "Others");
       const custom = customCustomers.filter((x) => x !== "Other" && x !== "Others");
-      return Array.from(new Set([...base, ...custom, "Other"]));
+      const otherLabel = customers.includes("Others") ? "Others" : "Other";
+      return Array.from(new Set([...base, ...custom, otherLabel]));
     },
     [customers, customCustomers],
   );
   const stockParticulars = useMemo(
     () => {
-      const base = stockCatalog.particulars
-        .map((x) => (x === "Others" ? "Other" : x))
-        .filter((x) => x !== "Other" && x !== "Others");
-      const custom = customStockItems.filter((x) => x !== "Other" && x !== "Others");
-      return Array.from(new Set([...base, ...custom, "Other"]));
+      const otherLabel = stockCatalog.particulars.includes("others")
+        ? "others"
+        : stockCatalog.particulars.includes("Others")
+          ? "Others"
+          : "Other";
+      const base = stockCatalog.particulars.filter(
+        (x) => x !== "Other" && x !== "Others" && x !== "others",
+      );
+      const custom = customStockItems.filter(
+        (x) => x !== "Other" && x !== "Others" && x !== "others",
+      );
+      return Array.from(new Set([...base, ...custom, otherLabel]));
     },
     [stockCatalog.particulars, customStockItems],
   );
@@ -406,13 +425,20 @@ export function TodayHub({
   // Sale
   const [customerName, setCustomerName] = useState("");
   const [customerNameOther, setCustomerNameOther] = useState("");
-  const [saleType, setSaleType] = useState<SaleTypeValue>("FINISHED_GOOD");
+  const [saleType, setSaleType] = useState<SaleTypeValue>(
+    plantCode.toUpperCase() === "CONDUCTOR" ? "COPPER_SCRAP" : "FINISHED_GOOD",
+  );
   const [saleTypeOther, setSaleTypeOther] = useState("");
   const [invoiceNo, setInvoiceNo] = useState("");
   const [saleRemarks, setSaleRemarks] = useState("");
   const [invoicePhotos, setInvoicePhotos] = useState<string[]>([]);
   const [saleLines, setSaleLines] = useState<LineItem[]>([
-    newLine(PRODUCTS[0].unit, PRODUCTS[0].name),
+    newLine(
+      PRODUCTS[0].unit,
+      plantCode.toUpperCase() === "CONDUCTOR"
+        ? "1.4mm"
+        : PRODUCTS[0].name,
+    ),
   ]);
 
   // Stock
@@ -422,6 +448,8 @@ export function TodayHub({
     DEFAULT_PURCHASE_GOODS[0],
   );
   const [stockItemOther, setStockItemOther] = useState("");
+  const [stockSize, setStockSize] = useState("8mm");
+  const [stockSizeOther, setStockSizeOther] = useState("");
   const [stockQty, setStockQty] = useState("");
   const [stockUnit, setStockUnit] = useState("KGS");
   const [stockRate, setStockRate] = useState("");
@@ -457,10 +485,17 @@ export function TodayHub({
   }, [stockCatalog]);
 
   const resolvedStockItemName = useMemo(() => {
-    return stockItem === "Others" || stockItem === "Other"
+    return stockItem === "Others" ||
+      stockItem === "Other" ||
+      stockItem === "others"
       ? stockItemOther.trim()
       : stockItem.trim();
   }, [stockItem, stockItemOther]);
+
+  const resolvedStockSize = useMemo(() => {
+    if (!isConductor) return "";
+    return stockSize === "others" ? stockSizeOther.trim() : stockSize.trim();
+  }, [isConductor, stockSize, stockSizeOther]);
 
   useEffect(() => {
     if (kind !== "stock") {
@@ -672,17 +707,22 @@ export function TodayHub({
     setPurchaseLines([newLine(isCat6 ? "NOS" : "KGS", "")]);
     setCustomerName(customers[0] ?? "");
     setCustomerNameOther("");
-    setSaleType("FINISHED_GOOD");
+    setSaleType(isConductor ? "COPPER_SCRAP" : "FINISHED_GOOD");
     setSaleTypeOther("");
     setInvoiceNo("");
     setSaleRemarks("");
     setInvoicePhotos([]);
     setSaleLines([
-      newLine(isCat6 ? "NOS" : PRODUCTS[0].unit, PRODUCTS[0].name),
+      newLine(
+        isCat6 ? "NOS" : PRODUCTS[0].unit,
+        saleProducts[0] ?? PRODUCTS[0].name,
+      ),
     ]);
     setStockCategory("RM");
     setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
     setStockItemOther("");
+    setStockSize(stockCatalog.sizes?.[0] ?? "8mm");
+    setStockSizeOther("");
     setStockQty("");
     setStockUnit(stockCatalog.defaultUnit);
     setStockRate("");
@@ -926,7 +966,7 @@ export function TodayHub({
       });
     } else if (kind === "sale") {
       const resolvedCustomerName =
-        customerName === "Other"
+        customerName === "Other" || customerName === "Others"
           ? customerNameOther.trim()
           : customerName.trim();
 
@@ -1000,13 +1040,26 @@ export function TodayHub({
       const closingValue = issuedQty * closingRate;
       if (!resolvedItem || stockQty === "") {
         fail(
-          (stockItem === "Others" || stockItem === "Other") &&
+          (stockItem === "Others" ||
+            stockItem === "Other" ||
+            stockItem === "others") &&
             !stockItemOther.trim()
             ? "Enter the other item name."
             : "Enter stock category, item, and quantity.",
         );
         return;
       }
+      if (isConductor && !resolvedStockSize) {
+        fail(
+          stockSize === "others" && !stockSizeOther.trim()
+            ? "Enter the other size."
+            : "Select conductor size.",
+        );
+        return;
+      }
+      const stockItemName = resolvedStockSize
+        ? `${resolvedItem} · ${resolvedStockSize}`
+        : resolvedItem;
       if (!Number.isFinite(closingRate) || closingRate < 0) {
         fail(
           "Enter a rate, or select an item that already has purchase history for this plant.",
@@ -1020,10 +1073,10 @@ export function TodayHub({
       result = await postJson(`/api/plants/${plantId}/stock`, {
         date: entryDate,
         shift,
-        itemName: resolvedItem,
+        itemName: stockItemName,
         category:
           stockCategory === "Other" ? "RM" : stockCategory,
-        unit: usesStockLedger
+        unit: usesStockLedger || isConductor
           ? stockUnit || "KGS"
           : isCat6
             ? stockUnit || stockCatalog.defaultUnit || "NOS"
@@ -1723,7 +1776,7 @@ export function TodayHub({
                     required
                     onChange={(next) => {
                       setCustomerName(next);
-                      if (next !== "Other") setCustomerNameOther("");
+                      if (next !== "Other" && next !== "Others") setCustomerNameOther("");
                     }}
                   />
                 </div>
@@ -1737,7 +1790,7 @@ export function TodayHub({
                     required
                     onChange={(next) => {
                       setCustomerName(next);
-                      if (next !== "Other") setCustomerNameOther("");
+                      if (next !== "Other" && next !== "Others") setCustomerNameOther("");
                     }}
                   />
                 </div>
@@ -1748,13 +1801,14 @@ export function TodayHub({
                     <SelectMenu
                       id="s-type"
                       value={
-                        SALE_TYPES.find((t) => t.value === saleType)?.label ??
+                        saleTypeOptions.find((t) => t.value === saleType)?.label ??
+                        saleTypeOptions[0]?.label ??
                         "Finished Good"
                       }
-                      options={SALE_TYPES.map((t) => t.label)}
+                      options={saleTypeOptions.map((t) => t.label)}
                       required
                       onChange={(label) => {
-                        const next = SALE_TYPES.find((t) => t.label === label);
+                        const next = saleTypeOptions.find((t) => t.label === label);
                         if (next) {
                           setSaleType(next.value);
                           if (next.value !== "OTHERS") setSaleTypeOther("");
@@ -1771,13 +1825,13 @@ export function TodayHub({
                       required
                       onChange={(next) => {
                         setCustomerName(next);
-                        if (next !== "Other") setCustomerNameOther("");
+                        if (next !== "Other" && next !== "Others") setCustomerNameOther("");
                       }}
                     />
                   </div>
                 </div>
                 )}
-                {customerName === "Other" ? (
+                {customerName === "Other" || customerName === "Others" ? (
                   <div className="field">
                     <label htmlFor="s-cust-other">Customer Name <span style={{ color: "red" }}>*</span></label>
                     <input
@@ -1813,12 +1867,16 @@ export function TodayHub({
                   lines={saleLines}
                   onChange={setSaleLines}
                   defaultUnit={isCat6 ? "NOS" : isPvc ? "KG" : PRODUCTS[0].unit}
-                  itemLabel="Item Details"
+                  itemLabel={isConductor ? "Conductor size" : "Item Details"}
                   itemOptions={saleProducts}
+                  itemPlaceholder={
+                    isConductor ? "Select conductor size" : undefined
+                  }
                   unitOptions={
                     isCat6 ? CAT6_LINE_UNITS : isPvc ? ["KG", "Other"] : PRODUCT_UNITS
                   }
                   showCat6MeterFields={isCat6}
+                  sizeQtyUnitRow={isConductor}
                   resolveUnitForItem={(name) =>
                     isPvc ? "KG" : PRODUCTS.find((p) => p.name === name)?.unit
                   }
@@ -1867,12 +1925,18 @@ export function TodayHub({
                     required
                     onChange={(next) => {
                       setStockItem(next);
-                      if (next !== "Others" && next !== "Other")
+                      if (
+                        next !== "Others" &&
+                        next !== "Other" &&
+                        next !== "others"
+                      )
                         setStockItemOther("");
                     }}
                   />
                 </div>
-                {stockItem === "Others" || stockItem === "Other" ? (
+                {stockItem === "Others" ||
+                stockItem === "Other" ||
+                stockItem === "others" ? (
                   <div className="field">
                     <label htmlFor="st-item-other">
                       {usesStockLedger ? "Other particulars" : "Other item"} <span style={{ color: "red" }}>*</span>
@@ -1890,7 +1954,36 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
+                {isConductor && stockSize === "others" ? (
+                  <div className="field">
+                    <label htmlFor="st-size-other">
+                      Other size <span style={{ color: "red" }}>*</span>
+                    </label>
+                    <input
+                      id="st-size-other"
+                      required
+                      placeholder="Enter size"
+                      value={stockSizeOther}
+                      onChange={(e) => setStockSizeOther(e.target.value)}
+                    />
+                  </div>
+                ) : null}
                 <div className="prod-fields__row">
+                  {isConductor && stockCatalog.sizes?.length ? (
+                    <div className="field">
+                      <label htmlFor="st-size">Size</label>
+                      <SelectMenu
+                        id="st-size"
+                        value={stockSize || stockCatalog.sizes[0]}
+                        options={[...stockCatalog.sizes]}
+                        required
+                        onChange={(next) => {
+                          setStockSize(next);
+                          if (next !== "others") setStockSizeOther("");
+                        }}
+                      />
+                    </div>
+                  ) : null}
                   <div className="field">
                     <label htmlFor="st-qty">
                       {isUpcast
@@ -1919,9 +2012,11 @@ export function TodayHub({
                       }}
                     />
                   </div>
+                </div>
+                <div className="prod-fields__row">
                   <div className="field">
                     <label htmlFor="st-unit">Unit</label>
-                    {usesStockLedger || isCat6 ? (
+                    {usesStockLedger || isCat6 || isConductor ? (
                       <SelectMenu
                         id="st-unit"
                         value={
@@ -1937,8 +2032,6 @@ export function TodayHub({
                       <input id="st-unit" value="kg" readOnly />
                     )}
                   </div>
-                </div>
-                <div className="prod-fields__row">
                   <div className="field">
                     <label htmlFor="st-rate">Rate</label>
                     <DecimalInput
@@ -2629,6 +2722,7 @@ function LineEditor({
   showGst = false,
   showCat6MeterFields = false,
   showDebitQty = false,
+  sizeQtyUnitRow = false,
 }: {
   lines: LineItem[];
   onChange: (lines: LineItem[]) => void;
@@ -2641,11 +2735,94 @@ function LineEditor({
   showGst?: boolean;
   showCat6MeterFields?: boolean;
   showDebitQty?: boolean;
+  /** Put item/size + Qty + Unit on one row (Rate below). */
+  sizeQtyUnitRow?: boolean;
 }) {
   return (
     <div className="line-stack">
       {lines.map((line, idx) => (
         <div key={line.id} className="line-stack__card">
+          {sizeQtyUnitRow ? (
+            <div className="line-stack__row line-stack__row--meta has-unit cols-3">
+              <div className="field" style={{ margin: 0, minWidth: 0 }}>
+                <label htmlFor={`line-item-${line.id}`}>{itemLabel}</label>
+                {itemOptions ? (
+                  <SelectMenu
+                    id={`line-item-${line.id}`}
+                    value={
+                      itemOptions.includes(line.itemDescription)
+                        ? line.itemDescription
+                        : line.itemDescription === ""
+                          ? ""
+                          : itemOptions.includes("Other")
+                            ? "Other"
+                            : itemOptions.includes("Others")
+                              ? "Others"
+                              : itemOptions.includes("others")
+                                ? "others"
+                                : ""
+                    }
+                    options={itemOptions}
+                    placeholder={
+                      itemPlaceholder ?? `Select ${itemLabel.toLowerCase()}`
+                    }
+                    onChange={(next) => {
+                      const copy = [...lines];
+                      const unit = next ? resolveUnitForItem?.(next) : undefined;
+                      copy[idx] = {
+                        ...line,
+                        itemDescription: next,
+                        ...(unit ? { unit } : {}),
+                      };
+                      onChange(copy);
+                    }}
+                  />
+                ) : (
+                  <input
+                    id={`line-item-${line.id}`}
+                    value={line.itemDescription}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, itemDescription: e.target.value };
+                      onChange(next);
+                    }}
+                    placeholder={itemLabel}
+                  />
+                )}
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-qty-${line.id}`}>Qty</label>
+                <DecimalInput
+                  id={`line-qty-${line.id}`}
+                  value={line.quantity}
+                  onChange={(quantity) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, quantity };
+                    onChange(next);
+                  }}
+                />
+              </div>
+              {unitOptions ? (
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-unit-${line.id}`}>Unit</label>
+                  <SelectMenu
+                    id={`line-unit-${line.id}`}
+                    value={
+                      unitOptions.some((u) => u === line.unit)
+                        ? line.unit
+                        : unitOptions[0] || line.unit
+                    }
+                    options={unitOptions}
+                    onChange={(unit) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, unit };
+                      onChange(next);
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : (
           <div className="line-stack__row line-stack__row--item">
             <div className="field" style={{ margin: 0, flex: 1 }}>
               <label htmlFor={`line-item-${line.id}`}>{itemLabel}</label>
@@ -2661,7 +2838,9 @@ function LineEditor({
                           ? "Other"
                           : itemOptions.includes("Others")
                             ? "Others"
-                            : ""
+                            : itemOptions.includes("others")
+                              ? "others"
+                              : ""
                   }
                   options={itemOptions}
                   placeholder={itemPlaceholder ?? `Select ${itemLabel.toLowerCase()}`}
@@ -2700,10 +2879,12 @@ function LineEditor({
               </button>
             ) : null}
           </div>
+          )}
 
           {itemOptions &&
           (line.itemDescription === "Other" ||
             line.itemDescription === "Others" ||
+            line.itemDescription === "others" ||
             (line.itemDescription !== "" &&
               !itemOptions.includes(line.itemDescription))) ? (
             <div className="line-stack__row" style={{ marginTop: "0.2rem", marginBottom: "0.5rem" }}>
@@ -2715,7 +2896,8 @@ function LineEditor({
                   id={`line-item-custom-${line.id}`}
                   value={
                     line.itemDescription === "Other" ||
-                    line.itemDescription === "Others"
+                    line.itemDescription === "Others" ||
+                    line.itemDescription === "others"
                       ? ""
                       : line.itemDescription
                   }
@@ -2725,7 +2907,11 @@ function LineEditor({
                       ...line,
                       itemDescription:
                         e.target.value ||
-                        (itemOptions.includes("Other") ? "Other" : "Others"),
+                        (itemOptions.includes("Other")
+                          ? "Other"
+                          : itemOptions.includes("Others")
+                            ? "Others"
+                            : "others"),
                     };
                     onChange(next);
                   }}
@@ -2812,10 +2998,10 @@ function LineEditor({
                     }
                   />
                 </div>
+              </div>
+              <div className="line-stack__row line-stack__row--meta has-unit">
                 <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-net-value-${line.id}`}>
-                    Net value (after debit)
-                  </label>
+                  <label htmlFor={`line-net-value-${line.id}`}>Net value</label>
                   <input
                     id={`line-net-value-${line.id}`}
                     readOnly
@@ -2835,9 +3021,7 @@ function LineEditor({
                     }
                   />
                 </div>
-              </div>
-              {showGst ? (
-                <div className="line-stack__row line-stack__row--meta">
+                {showGst ? (
                   <div className="field" style={{ margin: 0 }}>
                     <label htmlFor={`line-gst-${line.id}`}>GST %</label>
                     <DecimalInput
@@ -2850,9 +3034,40 @@ function LineEditor({
                       }}
                     />
                   </div>
+                ) : null}
+              </div>
+            </>
+          ) : sizeQtyUnitRow ? (
+            <div
+              className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}`}
+            >
+              <div className="field" style={{ margin: 0 }}>
+                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <DecimalInput
+                  id={`line-rate-${line.id}`}
+                  value={line.rate}
+                  onChange={(rate) => {
+                    const next = [...lines];
+                    next[idx] = { ...line, rate };
+                    onChange(next);
+                  }}
+                />
+              </div>
+              {showGst ? (
+                <div className="field" style={{ margin: 0 }}>
+                  <label htmlFor={`line-gst-${line.id}`}>GST %</label>
+                  <DecimalInput
+                    id={`line-gst-${line.id}`}
+                    value={line.gstPercent}
+                    onChange={(gstPercent) => {
+                      const next = [...lines];
+                      next[idx] = { ...line, gstPercent };
+                      onChange(next);
+                    }}
+                  />
                 </div>
               ) : null}
-            </>
+            </div>
           ) : (
             <div
               className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}${unitOptions ? " has-unit" : ""}`}
