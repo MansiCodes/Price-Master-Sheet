@@ -759,13 +759,27 @@
   .mis-kpi-grid,
   .mis-kpi-grid--six {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
   }
 }
 
 @media (max-width: 520px) {
   .mis-kpi-grid,
   .mis-kpi-grid--six {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .mis .kpi-card {
+    padding: 0.55rem 0.6rem 0.55rem 0.7rem;
+  }
+
+  .kpi-card__value {
+    font-size: 0.95rem;
+  }
+
+  .kpi-card__hint {
+    font-size: 0.65rem;
   }
 }
 
