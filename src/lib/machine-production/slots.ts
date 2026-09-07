@@ -19,6 +19,16 @@ const TZ = "Asia/Kolkata";
 export const DAY_SLOT_HOURS = [9, 13, 17] as const;
 export const NIGHT_SLOT_HOURS = [21, 1, 5] as const;
 
+/** Production window length. Slot labels stay 4 hours (e.g. 1PM–5PM). */
+const SLOT_DURATION_HOURS = 4;
+
+/** Extra time after the window ends for operators to submit that slot's data. */
+export const SLOT_FILL_BUFFER_HOURS = 1;
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
 export function formatHourLabel(hour: number): string {
   const h12 = hour % 12 === 0 ? 12 : hour % 12;
   const ampm = hour < 12 ? "AM" : "PM";
@@ -26,7 +36,7 @@ export function formatHourLabel(hour: number): string {
 }
 
 export function slotWindowLabel(slotStartHour: number): string {
-  const end = (slotStartHour + 4) % 24;
+  const end = (slotStartHour + SLOT_DURATION_HOURS) % 24;
   return `${formatHourLabel(slotStartHour)}–${formatHourLabel(end)}`;
 }
 
@@ -86,23 +96,41 @@ export function istWallToUtc(
 }
 
 /**
- * Deadline = slot start + 4 hours.
- * Night slot 21 starts on entryDate 21:00 → deadline next day 01:00.
- * Night slots 1 and 5 start on entryDate+1 → deadline same day 05:00 / 09:00.
+ * Instant the 4-hour production window ends (no fill buffer).
+ * Night slot 21 starts on entryDate 21:00 → window ends next day 01:00.
+ * Night slots 1 and 5 start on entryDate+1 → window ends 05:00 / 09:00.
+ */
+export function slotWindowEnd(
+  shift: MachineProductionShift,
+  entryDate: string,
+  slotStartHour: number,
+): Date {
+  if (shift === "DAY") {
+    return istWallToUtc(entryDate, slotStartHour + SLOT_DURATION_HOURS);
+  }
+  if (slotStartHour === 21) {
+    return istWallToUtc(addDaysYmd(entryDate, 1), 1);
+  }
+  // 1 → 5, 5 → 9 on the calendar day after entryDate
+  return istWallToUtc(
+    addDaysYmd(entryDate, 1),
+    slotStartHour + SLOT_DURATION_HOURS,
+  );
+}
+
+/**
+ * Fill deadline = window end + 1 hour buffer.
+ * Example: 1PM–5PM stays fillable until 6PM IST.
  */
 export function slotDeadline(
   shift: MachineProductionShift,
   entryDate: string,
   slotStartHour: number,
 ): Date {
-  if (shift === "DAY") {
-    return istWallToUtc(entryDate, slotStartHour + 4);
-  }
-  if (slotStartHour === 21) {
-    return istWallToUtc(addDaysYmd(entryDate, 1), 1);
-  }
-  // 1 → 5, 5 → 9 on the calendar day after entryDate
-  return istWallToUtc(addDaysYmd(entryDate, 1), slotStartHour + 4);
+  return addHours(
+    slotWindowEnd(shift, entryDate, slotStartHour),
+    SLOT_FILL_BUFFER_HOURS,
+  );
 }
 
 export function buildSlotContext(
@@ -131,7 +159,9 @@ export function buildSlotContext(
 }
 
 export function resolveCurrentSlot(now = new Date()): SlotContext {
-  const p = istParts(now);
+  // Stay on the ending slot during the fill buffer (e.g. 5:00–5:59 PM still 1PM–5PM).
+  const effective = addHours(now, -SLOT_FILL_BUFFER_HOURS);
+  const p = istParts(effective);
   const today = ymd(p.year, p.month, p.day);
   const yesterday = addDaysYmd(today, -1);
 
