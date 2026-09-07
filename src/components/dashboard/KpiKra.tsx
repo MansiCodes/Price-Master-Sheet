@@ -48,7 +48,7 @@ function KpiGlyph({ name }: { name: KpiIcon }) {
 type KpiCardProps = {
   label: string;
   value: string;
-  hint?: string;
+  hint?: React.ReactNode;
   tone?: Tone;
   icon?: KpiIcon;
   spark?: number[];
