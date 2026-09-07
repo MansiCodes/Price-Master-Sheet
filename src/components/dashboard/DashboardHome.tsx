@@ -120,9 +120,17 @@ export async function DashboardHome({
           }
           tone="teal"
           hint={
-            metrics.electricityUnits > 0
-              ? `${electricityHint}${metrics.electricityBill > 0 ? ` · ${formatMoney(metrics.electricityBill)}` : ""}`
-              : electricityHint
+            metrics.electricityUnits > 0 && metrics.electricityBill > 0 ? (
+              <>
+                {electricityHint}
+                {" · "}
+                <span className="kpi-card__hint-value">
+                  {formatMoney(metrics.electricityBill)}
+                </span>
+              </>
+            ) : (
+              electricityHint
+            )
           }
           icon="electricity"
         />
