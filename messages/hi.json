@@ -126,13 +126,17 @@
     "weekCompare": "इस सप्ताह बनाम पिछले सप्ताह",
     "ariaMonthMetrics": "अवधि मेट्रिक्स",
     "periodFilter": "समय अवधि",
+    "periodDaily": "दैनिक",
     "periodWeekly": "साप्ताहिक",
     "periodMonthly": "मासिक",
-    "periodQuarterly": "त्रैमासिक",
     "periodYearly": "वार्षिक",
     "periodHintPlant": "{plant} · {period}",
-    "salesVsPurchasesWeek": "सेल्स बनाम परचेज़ · पिछले 7 दिन",
-    "salesVsPurchasesPeriod": "सेल्स बनाम परचेज़ · {period}"
+    "electricity": "बिजली",
+    "electricityHint": "{units} यूनिट · ₹{perUnit}/यूनिट · औसत {dailyAvg}/दिन",
+    "electricityHintNoUnits": "बिल राशि · {period}",
+    "electricityUnits": "{count} यूनिट",
+    "salesVsPurchasesPeriod": "सेल्स बनाम परचेज़ · {period}",
+    "pieEmpty": "इस अवधि में कोई सेल्स या परचेज़ नहीं"
   },
   "today": {
     "title": "आज की एंट्री",

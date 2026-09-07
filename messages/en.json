@@ -126,13 +126,17 @@
     "weekCompare": "This week vs last week",
     "ariaMonthMetrics": "Period metrics",
     "periodFilter": "Time period",
+    "periodDaily": "Daily",
     "periodWeekly": "Weekly",
     "periodMonthly": "Monthly",
-    "periodQuarterly": "Quarterly",
     "periodYearly": "Yearly",
     "periodHintPlant": "{plant} · {period}",
-    "salesVsPurchasesWeek": "Sales vs purchases · last 7 days",
-    "salesVsPurchasesPeriod": "Sales vs purchases · {period}"
+    "electricity": "Electricity",
+    "electricityHint": "{units} units · ₹{perUnit}/unit · {dailyAvg}/day avg",
+    "electricityHintNoUnits": "Bill amount · {period}",
+    "electricityUnits": "{count} units",
+    "salesVsPurchasesPeriod": "Sales vs purchases · {period}",
+    "pieEmpty": "No sales or purchases in this period"
   },
   "today": {
     "title": "Today's entry",

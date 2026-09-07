@@ -77,6 +77,14 @@ export type DashboardMetrics = {
   mtdStockValue: number;
   mtdProductionQty: number;
   mtdNetProfit: number | null;
+  /** Electricity bill amount for the selected period. */
+  electricityBill: number;
+  /** Consumed meter units for the selected period. */
+  electricityUnits: number;
+  /** ₹ per consumed unit (0 if no units). */
+  electricityPerUnit: number;
+  /** Average units per calendar day in the period. */
+  electricityDailyAvg: number;
   formsCompleteToday: number;
   formsTotalToday: number;
   plantsTracked: number;
@@ -171,6 +179,10 @@ export async function getDashboardMetrics(
     mtdStockValue: 0,
     mtdProductionQty: 0,
     mtdNetProfit: null,
+    electricityBill: 0,
+    electricityUnits: 0,
+    electricityPerUnit: 0,
+    electricityDailyAvg: 0,
     formsCompleteToday: 0,
     formsTotalToday: Math.max(1, plantIds.length) * TODAY_MODULE_COUNT * 2,
     plantsTracked: plantIds.length,
@@ -281,6 +293,7 @@ export async function getDashboardMetrics(
     prevWeekPurchaseAgg,
     statuses,
     todayStatuses,
+    electricityRows,
   ] = await Promise.all([
     prisma.sale.aggregate({
       where: { ...entryFilter, date: todayDate },
@@ -385,6 +398,31 @@ export async function getDashboardMetrics(
         manpowerFilled: true,
         pettyCashFilled: true,
         allComplete: true,
+      },
+    }),
+    // Electricity is stored by calendar month (1st of month).
+    prisma.electricityRent.findMany({
+      where: {
+        plantId: { in: plantIds },
+        month: {
+          gte: new Date(
+            Date.UTC(
+              periodStart.getUTCFullYear(),
+              periodStart.getUTCMonth(),
+              1,
+            ),
+          ),
+          lte: new Date(
+            Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth(), 1),
+          ),
+        },
+      },
+      select: {
+        month: true,
+        consumedUnits: true,
+        billAmount: true,
+        openingReading: true,
+        closingReading: true,
       },
     }),
   ]);
@@ -752,6 +790,38 @@ export async function getDashboardMetrics(
     toNum(mtdPettyAgg._sum.contractorSalary) +
     toNum(mtdPettyAgg._sum.supervisorSalary);
 
+  let electricityBill = 0;
+  let electricityUnits = 0;
+  for (const row of electricityRows) {
+    const unitsRaw = toNum(row.consumedUnits);
+    const opening = toNum(row.openingReading);
+    const closing = toNum(row.closingReading);
+    const units =
+      unitsRaw > 0 ? unitsRaw : closing > opening ? closing - opening : 0;
+    const bill = toNum(row.billAmount);
+
+    electricityBill += bill;
+    electricityUnits += units;
+  }
+
+  // Electricity is stored per calendar month. For day/week, pro-rate by days covered.
+  if (period === "day" || period === "week") {
+    const daysInMonth =
+      new Date(
+        Date.UTC(todayDate.getUTCFullYear(), todayDate.getUTCMonth() + 1, 0),
+      ).getUTCDate();
+    const scale = Math.min(1, bounds.periodDayCount / Math.max(daysInMonth, 1));
+    electricityBill *= scale;
+    electricityUnits *= scale;
+  }
+
+  const electricityPerUnit =
+    electricityUnits > 0 ? electricityBill / electricityUnits : 0;
+  const electricityDailyAvg =
+    bounds.periodDayCount > 0
+      ? electricityUnits / bounds.periodDayCount
+      : 0;
+
   return {
     period,
     periodLabel,
@@ -767,6 +837,10 @@ export async function getDashboardMetrics(
     mtdStockValue: toNum(mtdStockAgg._sum.closingValue),
     mtdProductionQty: toNum(mtdProductionAgg._sum.quantity),
     mtdNetProfit,
+    electricityBill,
+    electricityUnits,
+    electricityPerUnit,
+    electricityDailyAvg,
     formsCompleteToday: formsFilled,
     formsTotalToday: formsTotal,
     plantsTracked: plants.length,

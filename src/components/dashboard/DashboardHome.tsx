@@ -1,6 +1,6 @@
 import { getTranslations, getLocale } from "next-intl/server";
-import { WeekCompareChart } from "@/components/dashboard/Charts";
 import { formatMoney, KpiCard } from "@/components/dashboard/KpiKra";
+import { SalesPurchasePieChart } from "@/components/dashboard/Charts";
 import {
   TodayHub,
   type ShiftModulesMap,
@@ -8,17 +8,14 @@ import {
 import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
 import type { DashboardMetrics } from "@/lib/dashboard/metrics";
 import type { MpHomeMetrics } from "@/lib/machine-production/home-metrics";
-import { localeToBcp47, type AppLocale } from "@/i18n/config";
+import type { AppLocale } from "@/i18n/config";
 import { PendingApprovalsTable } from "@/components/dashboard/PendingApprovalsTable";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import type { DashboardPeriod } from "@/lib/dashboard/period";
 
-function formatDay(dateStr: string, locale: AppLocale): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  return d.toLocaleDateString(localeToBcp47(locale), {
-    day: "2-digit",
-    month: "short",
-    timeZone: "UTC",
+function formatUnits(n: number): string {
+  return n.toLocaleString("en-IN", {
+    maximumFractionDigits: n >= 100 ? 0 : 2,
   });
 }
 
@@ -64,10 +61,14 @@ export async function DashboardHome({
       ? t("periodHintPlant", { plant: plant.name, period: metrics.periodLabel })
       : metrics.periodLabel;
 
-  const chartTitle =
-    period === "week"
-      ? t("salesVsPurchasesWeek")
-      : t("salesVsPurchasesPeriod", { period: metrics.periodLabel });
+  const electricityHint =
+    metrics.electricityUnits > 0
+      ? t("electricityHint", {
+          units: formatUnits(metrics.electricityUnits),
+          perUnit: formatUnits(metrics.electricityPerUnit),
+          dailyAvg: formatUnits(metrics.electricityDailyAvg),
+        })
+      : t("electricityHintNoUnits", { period: metrics.periodLabel });
 
   return (
     <div className="dashboard mis dash-merged">
@@ -108,6 +109,23 @@ export async function DashboardHome({
           hint={kpiHint}
           icon="expenses"
         />
+        <KpiCard
+          label={t("electricity")}
+          value={
+            metrics.electricityUnits > 0
+              ? t("electricityUnits", {
+                  count: formatUnits(metrics.electricityUnits),
+                })
+              : formatMoney(metrics.electricityBill)
+          }
+          tone="teal"
+          hint={
+            metrics.electricityUnits > 0
+              ? `${electricityHint}${metrics.electricityBill > 0 ? ` · ${formatMoney(metrics.electricityBill)}` : ""}`
+              : electricityHint
+          }
+          icon="electricity"
+        />
         {showNet ? (
           <KpiCard
             label={t("netProfit")}
@@ -143,37 +161,17 @@ export async function DashboardHome({
         </div>
 
         <div className="dash-merged__side">
-          <section className="mis-panel">
-            <h2 className="section-label">{t("weekCompare")}</h2>
-            <ul className="mis-day-list">
-              {metrics.dailyReportRows.map((row) => (
-                <li
-                  key={row.date}
-                  className={`mis-day-row${row.allComplete ? " is-done" : ""}`}
-                >
-                  <span className="mis-day-row__date">
-                    {formatDay(row.date, locale)}
-                  </span>
-                  <span className="mis-day-row__score">
-                    <span className="mis-day-row__shift">
-                      D{row.dayShift.completed}/{row.dayShift.total}
-                      <span
-                        className={`mis-day-row__dot${row.dayShift.allComplete ? " is-filled" : ""}`}
-                        aria-hidden
-                      />
-                    </span>
-                    <span className="mis-day-row__sep">·</span>
-                    <span className="mis-day-row__shift">
-                      N{row.nightShift.completed}/{row.nightShift.total}
-                      <span
-                        className={`mis-day-row__dot${row.nightShift.allComplete ? " is-filled" : ""}`}
-                        aria-hidden
-                      />
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+          <section className="mis-panel mis-panel--pie">
+            <h2 className="section-label">
+              {t("salesVsPurchasesPeriod", { period: metrics.periodLabel })}
+            </h2>
+            <SalesPurchasePieChart
+              sales={metrics.mtdSales}
+              purchases={metrics.mtdPurchases}
+              salesLabel={t("sales")}
+              purchasesLabel={t("purchases")}
+              emptyLabel={t("pieEmpty")}
+            />
           </section>
         </div>
       </div>
@@ -185,25 +183,6 @@ export async function DashboardHome({
           locale={locale}
         />
       ) : null}
-
-      <div className="dash-merged__pair">
-        <section className="mis-panel week-panel">
-          <div className="dash-panel__head">
-            <h2 className="section-label">{chartTitle}</h2>
-            <div className="dash-panel__head-meta">
-              <div className="legend">
-                <span className="legend__item legend__item--teal">
-                  {t("sales")}
-                </span>
-                <span className="legend__item legend__item--coral">
-                  {t("purchases")}
-                </span>
-              </div>
-            </div>
-          </div>
-          <WeekCompareChart points={metrics.weekSeries} />
-        </section>
-      </div>
 
       {machineProductionMetrics ? (
         <section

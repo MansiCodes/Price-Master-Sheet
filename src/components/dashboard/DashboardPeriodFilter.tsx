@@ -11,9 +11,9 @@ export function DashboardPeriodFilter({ active }: { active: DashboardPeriod }) {
   const t = useTranslations("dashboard");
 
   const labels: Record<DashboardPeriod, string> = {
+    day: t("periodDaily"),
     week: t("periodWeekly"),
     month: t("periodMonthly"),
-    quarter: t("periodQuarterly"),
     year: t("periodYearly"),
   };
 

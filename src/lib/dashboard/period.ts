@@ -1,23 +1,25 @@
 import { parseDateOnly, todayDateString } from "@/lib/dates";
 
-export type DashboardPeriod = "week" | "month" | "quarter" | "year";
+export type DashboardPeriod = "day" | "week" | "month" | "year";
 
 export const DASHBOARD_PERIODS: DashboardPeriod[] = [
+  "day",
   "week",
   "month",
-  "quarter",
   "year",
 ];
 
 export function parseDashboardPeriod(raw?: string | null): DashboardPeriod {
   if (
+    raw === "day" ||
     raw === "week" ||
     raw === "month" ||
-    raw === "quarter" ||
     raw === "year"
   ) {
     return raw;
   }
+  // Legacy bookmark: quarterly → monthly
+  if (raw === "quarter") return "month";
   return "month";
 }
 
@@ -37,6 +39,8 @@ export type PeriodBounds = {
   previousEnd: Date;
   bucketKeys: string[];
   bucketGranularity: "day" | "week" | "month";
+  /** Calendar days in the selected period (inclusive). */
+  periodDayCount: number;
 };
 
 export function getDashboardPeriodBounds(
@@ -51,7 +55,11 @@ export function getDashboardPeriodBounds(
   let bucketGranularity: PeriodBounds["bucketGranularity"];
   let bucketKeys: string[];
 
-  if (period === "week") {
+  if (period === "day") {
+    periodStart = parseDateOnly(today);
+    bucketGranularity = "day";
+    bucketKeys = [today];
+  } else if (period === "week") {
     const periodStartStr = addDays(today, -6);
     periodStart = parseDateOnly(periodStartStr);
     bucketGranularity = "day";
@@ -63,19 +71,6 @@ export function getDashboardPeriodBounds(
     const days =
       Math.floor((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1;
     bucketKeys = Array.from({ length: days }, (_, i) => addDays(startStr, i));
-  } else if (period === "quarter") {
-    const qMonth = Math.floor(m / 3) * 3;
-    periodStart = new Date(Date.UTC(y, qMonth, 1));
-    bucketGranularity = "week";
-    bucketKeys = [];
-    let cursor = new Date(periodStart);
-    while (cursor <= periodEnd) {
-      bucketKeys.push(cursor.toISOString().slice(0, 10));
-      cursor = new Date(cursor.getTime() + 7 * 86400000);
-    }
-    if (bucketKeys.length === 0) {
-      bucketKeys.push(periodStart.toISOString().slice(0, 10));
-    }
   } else {
     periodStart = new Date(Date.UTC(y, 0, 1));
     bucketGranularity = "month";
@@ -85,10 +80,10 @@ export function getDashboardPeriodBounds(
   }
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodDays =
+  const periodDayCount =
     Math.floor((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1;
   const previousEndStr = addDays(periodStartStr, -1);
-  const previousStartStr = addDays(previousEndStr, -(periodDays - 1));
+  const previousStartStr = addDays(previousEndStr, -(periodDayCount - 1));
 
   return {
     period,
@@ -100,6 +95,7 @@ export function getDashboardPeriodBounds(
     previousEnd: parseDateOnly(previousEndStr),
     bucketKeys,
     bucketGranularity,
+    periodDayCount,
   };
 }
 
@@ -128,6 +124,14 @@ export function formatPeriodLabel(
   bounds: PeriodBounds,
 ): string {
   const end = bounds.periodEnd;
+  if (period === "day") {
+    return end.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
   if (period === "week") return "Last 7 days";
   if (period === "month") {
     return end.toLocaleString("en-IN", {
@@ -135,10 +139,6 @@ export function formatPeriodLabel(
       year: "numeric",
       timeZone: "UTC",
     });
-  }
-  if (period === "quarter") {
-    const q = Math.floor(end.getUTCMonth() / 3) + 1;
-    return `Q${q} ${end.getUTCFullYear()}`;
   }
   return String(end.getUTCFullYear());
 }

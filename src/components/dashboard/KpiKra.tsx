@@ -8,7 +8,8 @@ type KpiIcon =
   | "production"
   | "manpower"
   | "expenses"
-  | "profit";
+  | "profit"
+  | "electricity";
 
 const ICON_PATH: Record<KpiIcon, string> = {
   sales:
@@ -22,6 +23,8 @@ const ICON_PATH: Record<KpiIcon, string> = {
   expenses:
     "M6 3h9l6 6v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm9 0v6h6M8 13h8M8 17h5",
   profit: "M3 17l6-6 4 4 8-8M15 7h6v6",
+  electricity:
+    "M13 2 4 14h7l-1 8 10-14h-7l1-6Z",
 };
 
 function KpiGlyph({ name }: { name: KpiIcon }) {
