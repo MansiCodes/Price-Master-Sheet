@@ -326,7 +326,7 @@ export function StockReport({
         ]}
         rows={rows}
         loading={loading}
-        variant={isPvc || cat6 ? "register" : undefined}
+        variant="register"
         footer={
           totals && rows.length > 0
             ? isPvc

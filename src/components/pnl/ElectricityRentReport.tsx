@@ -243,7 +243,7 @@ export function ElectricityRentReport({
         columns={columns}
         rows={rows}
         loading={loading}
-        variant={section === "combined" ? "default" : "register"}
+        variant="register"
       />
       <Pagination
         page={page}

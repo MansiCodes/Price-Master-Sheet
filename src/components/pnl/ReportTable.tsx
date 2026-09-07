@@ -21,7 +21,7 @@ export function ReportTable<T extends { id: string }>({
   rows,
   loading,
   emptyLabel = "No records in this date range.",
-  variant = "default",
+  variant = "register",
   footer,
   secondaryFooter,
 }: {
@@ -33,7 +33,7 @@ export function ReportTable<T extends { id: string }>({
   footer?: Record<string, ReactNode>;
   secondaryFooter?: Record<string, ReactNode>;
 }) {
-  const isRegister = variant === "register";
+  const isRegister = variant !== "default";
   const tableClass = isRegister
     ? "pnl-report-table pnl-report-table--register"
     : "pnl-report-table";

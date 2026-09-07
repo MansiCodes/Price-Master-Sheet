@@ -530,7 +530,7 @@ export function ExpenseReport({
             rows={sectionHeads.length === 0 ? [] : rows}
             loading={loading}
             emptyLabel={t("noRecords")}
-            variant={pvc || cat6 ? "register" : undefined}
+            variant="register"
             footer={
               totals && rows.length > 0 && sectionHeads.length > 0
                 ? cat6
