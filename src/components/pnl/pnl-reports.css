@@ -391,24 +391,60 @@
   box-shadow: 0 3px 10px rgba(18, 114, 105, 0.25) !important;
 }
 
-/* Expense category counts — equal columns inside segmented track */
-.pnl-expense-cat-pills--n2,
-.pnl-expense-cat-nav--cols-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+/* Expense categories — shared track; desktop/tablet width follows label text */
+.pnl-expense-cat-nav-multi,
+.pnl-expense-cat-nav {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0.28rem !important;
+  border-radius: 1.35rem !important;
+  background: #eef3f1 !important;
+  border: 1px solid var(--border, #d7e0dc) !important;
+  box-sizing: border-box !important;
+  gap: 0.25rem !important;
+  overflow-x: visible !important;
+  margin: 0 !important;
 }
 
-.pnl-expense-cat-pills--n3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+.pnl-expense-cat-nav-multi button,
+.pnl-expense-cat-nav button {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  width: fit-content !important;
+  min-width: 0 !important;
+  height: 2.35rem !important;
+  min-height: 2.35rem !important;
+  padding: 0 1rem !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--fg-muted, #5b6b66) !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
 }
 
-.pnl-expense-cat-pills--n4,
-.pnl-expense-cat-pills--n5,
-.pnl-expense-cat-pills--n6,
-.pnl-expense-cat-pills--n7 {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+.pnl-expense-cat-nav-multi button.is-active,
+.pnl-expense-cat-nav button.is-active {
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%)) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
-.pnl-expense-cat-nav-multi.pnl-expense-cat-pills--n4 .pnl-expense-cat-label--full,
 .pnl-expense-cat-nav-multi .pnl-expense-cat-label--full,
 .pnl-expense-cat-nav .pnl-expense-cat-label--full {
   display: inline !important;
@@ -420,49 +456,6 @@
 .pnl-expense-cat-nav .pnl-expense-cat-label--short,
 .pnl-expense-cat-nav .pnl-expense-cat-label--stacked {
   display: none !important;
-}
-
-/* Multi-category — one shared track; inner options stay pill-curved */
-.pnl-expense-cat-nav-multi {
-  display: grid !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  padding: 0.28rem !important;
-  border-radius: 1.35rem !important;
-  background: #eef3f1 !important;
-  border: 1px solid var(--border, #d7e0dc) !important;
-  box-sizing: border-box !important;
-  gap: 0.22rem !important;
-  overflow-x: visible !important;
-  flex-wrap: unset !important;
-}
-
-.pnl-expense-cat-nav-multi button {
-  appearance: none !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex: none !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  height: auto !important;
-  min-height: 2.35rem !important;
-  padding: 0.3rem 0.25rem !important;
-  font-size: 0.7rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0 !important;
-  text-align: center !important;
-  white-space: nowrap !important;
-  text-overflow: clip !important;
-  overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 999px !important;
-  background: transparent !important;
-  color: var(--fg-muted, #5b6b66) !important;
-  box-shadow: none !important;
-  cursor: pointer !important;
-  box-sizing: border-box !important;
 }
 
 .pnl-expense-cat-label--short {
@@ -895,33 +888,46 @@
   box-shadow: var(--teal-fill-shadow, none);
 }
 
-/* Purchase Vendor / ATCL — always two equal columns; labels wrap to 2 lines */
+/* Purchase Vendor / ATCL — desktop: content-sized active pills in one row */
 .pnl-purchase-source-nav,
 .pnl-expense-subnav.pnl-purchase-source-nav {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  width: fit-content !important;
   max-width: 100% !important;
-  gap: 0.4rem !important;
-  flex-wrap: unset !important;
+  gap: 0.5rem !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
   overflow: visible !important;
 }
 
 .pnl-purchase-source-nav button,
 .pnl-expense-subnav.pnl-purchase-source-nav button {
-  width: 100% !important;
-  flex: none !important;
+  width: fit-content !important;
+  flex: 0 0 auto !important;
   min-width: 0 !important;
-  height: auto !important;
-  min-height: 2.5rem !important;
-  padding: 0.35rem 0.45rem !important;
-  white-space: normal !important;
-  line-height: 1.15 !important;
-  border-radius: 12px !important;
+  height: 2.45rem !important;
+  min-height: 2.45rem !important;
+  padding: 0 1.15rem !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  border-radius: 999px !important;
+  font-size: 0.8rem !important;
+}
+
+.pnl-purchase-source-label--full {
+  display: inline;
+}
+
+.pnl-purchase-source-label--stacked {
+  display: none;
 }
 
 .pnl-purchase-source-nav .pnl-tab-nav__stacked {
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -955,63 +961,9 @@
   color: var(--fg-muted, #5b6b66);
 }
 
-/* Direct / Indirect — same segmented track as main P&L tabs */
+/* Direct / Indirect — separate pills (styles above) */
 .pnl-expense-type-nav {
   margin: 0;
-}
-
-/* Category options — one row; column count matches number of buttons */
-.pnl-expense-cat-nav {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.25rem;
-  margin: 0;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: visible;
-  padding: 0.28rem;
-  border-radius: 1.35rem;
-  background: #eef3f1;
-  border: 1px solid var(--border, #d7e0dc);
-  box-sizing: border-box;
-}
-
-.pnl-expense-cat-nav--cols-1 {
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-}
-
-.pnl-expense-cat-nav--cols-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.pnl-expense-cat-nav--cols-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.pnl-expense-cat-nav--cols-7 {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-}
-
-.pnl-expense-cat-nav button {
-  width: 100%;
-  min-width: 0;
-  height: auto;
-  min-height: 2.35rem;
-  padding: 0.35rem 0.4rem;
-  white-space: nowrap;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--fg-muted, #5b6b66);
-  font-weight: 700;
-}
-
-.pnl-expense-cat-nav button.is-active {
-  background: var(--teal-fill);
-  color: var(--teal-active-text, #fff);
 }
 
 .pnl-report-panel--expense .pnl-report-panel__title {
@@ -1418,10 +1370,18 @@
 
   .pnl-expense-cat-nav {
     display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: visible !important;
     border-radius: 1.35rem !important;
+  }
+
+  .pnl-expense-cat-nav button {
+    width: 100% !important;
+    flex: none !important;
+    padding: 0.3rem 0.35rem !important;
+    font-size: 0.68rem !important;
   }
 
   .pnl-expense-cat-nav-multi {
@@ -1437,6 +1397,15 @@
     background: #eef3f1 !important;
     border: 1px solid var(--border, #d7e0dc) !important;
     border-radius: 1.35rem !important;
+  }
+
+  .pnl-expense-cat-nav-multi.pnl-expense-cat-pills--n3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .pnl-expense-cat-nav-multi button {
+    width: 100% !important;
+    flex: none !important;
   }
 
   .pnl-expense-type-nav button {
@@ -1766,6 +1735,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     width: 100% !important;
     overflow: visible !important;
+    gap: 0.4rem !important;
   }
 
   .pnl-purchase-source-nav button,
@@ -1776,6 +1746,15 @@
     white-space: normal !important;
     font-size: 0.68rem !important;
     padding: 0.3rem 0.35rem !important;
+  }
+
+  .pnl-purchase-source-label--full {
+    display: none !important;
+  }
+
+  .pnl-purchase-source-label--stacked,
+  .pnl-purchase-source-nav .pnl-tab-nav__stacked {
+    display: flex !important;
   }
 
   .pnl-expense-cat-nav-multi {

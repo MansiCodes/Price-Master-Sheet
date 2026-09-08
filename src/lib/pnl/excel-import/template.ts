@@ -11,7 +11,7 @@ import {
   getStockCatalog,
   UPCAST_MISC_NATURES,
 } from "@/lib/plant-catalogs";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 
 export type PnlTemplateOptions = {
   plantCode: string;
@@ -25,6 +25,7 @@ type PlantFamily =
   | "pvc"
   | "cat6"
   | "conductor"
+  | "quadsignal"
   | "default";
 
 function plantFamily(code: string): PlantFamily {
@@ -33,6 +34,7 @@ function plantFamily(code: string): PlantFamily {
   if (c === "PVC") return "pvc";
   if (isCat6Plant(c)) return "cat6";
   if (c === "CONDUCTOR") return "conductor";
+  if (isQuadSignalPlant(c)) return "quadsignal";
   return "default";
 }
 
@@ -97,6 +99,19 @@ function salesHeaders(family: PlantFamily): string[] {
     case "pvc":
       return [
         "Date",
+        "Customer",
+        "Invoice no.",
+        "Bill Date",
+        "Item Details",
+        "Unit",
+        "Quantity",
+        "Rate",
+        "Remarks",
+      ];
+    case "quadsignal":
+      return [
+        "Date",
+        "Type",
         "Customer",
         "Invoice no.",
         "Bill Date",
@@ -180,6 +195,21 @@ function purchaseHeaders(family: PlantFamily): string[] {
         "GST %",
         "Remarks",
       ];
+    case "quadsignal":
+      return [
+        "Date",
+        "Purchase source",
+        "Raw Material",
+        "Vendor's Name",
+        "Invoice no. / Challan no.",
+        "Bill Date",
+        "Unit",
+        "Quantity",
+        "Debit Qty",
+        "Rate",
+        "GST %",
+        "Remarks",
+      ];
     default:
       return [
         "Date",
@@ -232,6 +262,8 @@ function stockHeaders(family: PlantFamily): string[] {
         "Notes",
       ];
     case "cat6":
+      return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
+    case "quadsignal":
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
     default:
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
@@ -458,6 +490,13 @@ export async function buildPnlImportTemplate(
     } else if (family === "pvc") {
       guide.addRow([
         "8. Stock Category: RM / WIP / FG. Fuel & Power sheet is for electricity-style entries.",
+      ]);
+    } else if (family === "quadsignal") {
+      guide.addRow([
+        "8. Quad & Signal Plant — Purchase: fill Raw Material first, then Vendor's Name (vendors depend on material). Debit Qty is optional.",
+      ]);
+      guide.addRow([
+        "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",
       ]);
     }
   }

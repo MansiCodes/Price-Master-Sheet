@@ -185,7 +185,9 @@ export async function persistPnlImport(opts: {
       continue;
     }
 
-    const basicValue = round2(row.quantity * row.rate);
+    const basicValue = round2(
+      (row.quantity - (row.debitQuantity || 0)) * row.rate,
+    );
     const gstAmount = round2(basicValue * (row.gstPercent / 100));
     const invoiceValue = round2(basicValue + gstAmount);
     const approval = approvalFor(role, row.date);
@@ -204,6 +206,7 @@ export async function persistPnlImport(opts: {
         itemDescription: row.itemDescription,
         unit: row.unit,
         quantity: row.quantity,
+        debitQuantity: row.debitQuantity || 0,
         rate: row.rate,
         basicValue,
         gstPercent: row.gstPercent,

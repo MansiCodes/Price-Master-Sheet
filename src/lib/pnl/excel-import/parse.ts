@@ -56,6 +56,7 @@ export type ParsedPurchaseRow = {
   itemDescription: string;
   unit: string;
   quantity: number;
+  debitQuantity: number;
   rate: number;
   gstPercent: number;
   notes: string | null;
@@ -180,9 +181,16 @@ const PURCHASE_ALIASES: Record<string, string[]> = {
     "description",
     "particulars",
     "product",
+    "raw material",
   ],
   unit: ["unit", "uom"],
   quantity: ["quantity", "qty"],
+  debitQuantity: [
+    "debit qty",
+    "debit quantity",
+    "debitquantity",
+    "debit",
+  ],
   rate: ["rate", "price"],
   gstPercent: ["gst percent", "gst %", "gstpct"],
   gstin: ["gstin gst no", "gstin", "gst no"],
@@ -807,6 +815,9 @@ export async function parsePnlWorkbook(
           vendor,
           str(getCell(sheet, r, header.map, "notes")) || null,
         );
+        const debitRaw = num(getCell(sheet, r, header.map, "debitQuantity"));
+        const debitQuantity =
+          debitRaw != null && debitRaw > 0 ? Math.min(debitRaw, qty) : 0;
         result.purchases.push({
           row: r,
           date: ymd(dateRaw),
@@ -819,6 +830,7 @@ export async function parsePnlWorkbook(
           itemDescription: item || vendor || "Purchase item",
           unit: str(getCell(sheet, r, header.map, "unit")) || "kg",
           quantity: qty,
+          debitQuantity,
           rate,
           gstPercent,
           notes: sourced.notes,

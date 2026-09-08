@@ -595,7 +595,10 @@ export function PurchaseReport({
             setPage(1);
           }}
         >
-          <span className="pnl-tab-nav__stacked">
+          <span className="pnl-purchase-source-label--full">
+            Purchase from Vendor
+          </span>
+          <span className="pnl-tab-nav__stacked pnl-purchase-source-label--stacked">
             <span>Purchase from</span>
             <span>Vendor</span>
           </span>
@@ -610,7 +613,10 @@ export function PurchaseReport({
             setPage(1);
           }}
         >
-          <span className="pnl-tab-nav__stacked">
+          <span className="pnl-purchase-source-label--full">
+            Stock Taken from ATCL
+          </span>
+          <span className="pnl-tab-nav__stacked pnl-purchase-source-label--stacked">
             <span>Stock Taken</span>
             <span>from ATCL</span>
           </span>

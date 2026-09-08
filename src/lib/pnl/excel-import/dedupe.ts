@@ -56,6 +56,7 @@ export function purchaseSourceKey(
     billNumber: string | null;
     itemDescription: string;
     quantity: number;
+    debitQuantity?: number;
     rate: number;
     gstPercent: number;
   },
@@ -68,6 +69,7 @@ export function purchaseSourceKey(
     row.billNumber,
     row.itemDescription,
     row.quantity,
+    row.debitQuantity ?? 0,
     row.rate,
     row.gstPercent,
   ]);
