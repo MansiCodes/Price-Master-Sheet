@@ -493,7 +493,7 @@ export async function buildPnlImportTemplate(
       ]);
     } else if (family === "quadsignal") {
       guide.addRow([
-        "8. Quad & Signal Plant — Purchase: fill Raw Material first, then Vendor's Name (vendors depend on material). Debit Qty is optional.",
+        "8. Quad + Signal Plant — Purchase: fill Raw Material first, then Vendor's Name (vendors depend on material). Debit Qty is optional.",
       ]);
       guide.addRow([
         "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getAccessiblePlantIds, isSuperAdmin } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
+import { getPlantDisplayName } from "@/lib/plant-segments";
 import { WelcomeRedirect } from "@/components/welcome/WelcomeRedirect";
 import "./welcome.css";
 
@@ -25,12 +26,16 @@ export default async function WelcomePage() {
 
   const plant = await prisma.plant.findUnique({
     where: { id: selectedPlantId },
-    select: { name: true },
+    select: { name: true, code: true },
   });
 
   if (!plant) {
     redirect("/");
   }
 
-  return <WelcomeRedirect plantName={plant.name} />;
+  return (
+    <WelcomeRedirect
+      plantName={getPlantDisplayName(plant.code, plant.name)}
+    />
+  );
 }

@@ -32,14 +32,14 @@ async function main() {
     );
   }
 
-  // Signal merged into Quad & Signal (code QUAD) — hide legacy Signal plant from pickers.
+  // Signal merged into Quad + Signal (code QUAD) — hide legacy Signal plant from pickers.
   await prisma.plant.updateMany({
     where: { code: "SIGNALLING" },
-    data: { isActive: false, name: "Quad & Signal Plant (legacy Signal)" },
+    data: { isActive: false, name: "Quad + Signal Plant (legacy Signal)" },
   });
   await prisma.plant.updateMany({
     where: { code: "QUAD" },
-    data: { name: "Quad & Signal Plant", isActive: true },
+    data: { name: "Quad + Signal Plant", isActive: true },
   });
 
   const plant = plants.find((p) => p.code === "CAT6") ?? plants[0]!;

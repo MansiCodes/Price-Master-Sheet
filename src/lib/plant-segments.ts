@@ -2,7 +2,7 @@
  * Step-1 business-segment map: plants ↔ raw materials ↔ final product types.
  * DB `code` stays stable for existing data; `name` is the display label.
  *
- * Draft lists for new plants (Upcast / SL SSL / Quad & Signal / Rope light) are
+ * Draft lists for new plants (Upcast / SL SSL / Quad + Signal / Rope light) are
  * industry-typical starters — refine before locking BOMs (Step 2).
  */
 
@@ -144,7 +144,7 @@ export const PLANT_SEGMENTS: PlantSegment[] = [
   },
   {
     code: "QUAD",
-    name: "Quad & Signal Plant",
+    name: "Quad + Signal Plant",
     rmSummary: "Copper · PE / PVC · Signalling & star-quad materials",
     sortOrder: 6,
     rawMaterials: [
@@ -196,7 +196,7 @@ const byCode = new Map(
   PLANT_SEGMENTS.map((s) => [s.code.toUpperCase(), s] as const),
 );
 
-/** Legacy Signal plant code → merged Quad & Signal segment. */
+/** Legacy Signal plant code → merged Quad + Signal segment. */
 byCode.set("SIGNALLING", byCode.get("QUAD")!);
 byCode.set("QUADSIGNAL", byCode.get("QUAD")!);
 
@@ -205,7 +205,7 @@ export function getPlantSegment(code: string | null | undefined): PlantSegment |
   return byCode.get(code.trim().toUpperCase()) ?? null;
 }
 
-/** Prefer catalog display name (e.g. merged Quad & Signal) over stale DB labels. */
+/** Prefer catalog display name (e.g. merged Quad + Signal) over stale DB labels. */
 export function getPlantDisplayName(
   code: string | null | undefined,
   fallbackName?: string | null,

@@ -57,7 +57,7 @@ const CONDUCTOR_PURCHASE_GOODS = [
 
 /** Conductor plant — sales customer dropdown. */
 const CONDUCTOR_CUSTOMERS = [
-  "Quad & Signal",
+  "Quad + Signal",
   "CAT6",
   "PIJF",
   "FS Cable",
