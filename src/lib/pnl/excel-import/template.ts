@@ -264,7 +264,18 @@ function stockHeaders(family: PlantFamily): string[] {
     case "cat6":
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
     case "quadsignal":
-      return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
+      return [
+        "Date",
+        "Stock type",
+        "Raw Material / Cable",
+        "Size",
+        "Process",
+        "Process Qty",
+        "Unit",
+        "Quantity",
+        "Rate",
+        "Notes",
+      ];
     default:
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
   }
@@ -497,6 +508,9 @@ export async function buildPnlImportTemplate(
       ]);
       guide.addRow([
         "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",
+      ]);
+      guide.addRow([
+        "   Stock: choose Stock type Raw Material or Cable. Cable → Size dropdown + Process qty columns (manual). RM → RDSO Black/Grey and other materials.",
       ]);
     }
   }

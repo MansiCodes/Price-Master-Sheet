@@ -37,6 +37,11 @@ import {
   getQuadVendorsForMaterial,
   getSalesCatalog,
   getStockCatalog,
+  getQuadSignalCableSizes,
+  getQuadSignalCableProcesses,
+  encodeQuadSignalStockNotes,
+  QUAD_SIGNAL_STOCK_CABLES,
+  QUAD_SIGNAL_STOCK_RAW_MATERIALS,
   pvcStockEntryNotes,
   type PvcStockEntryType,
 } from "@/lib/plant-catalogs";
@@ -328,12 +333,15 @@ export function TodayHub({
   );
   const stockParticulars = useMemo(
     () => {
-      const otherLabel = stockCatalog.particulars.includes("others")
+      const source = isQuad
+        ? QUAD_SIGNAL_STOCK_RAW_MATERIALS
+        : stockCatalog.particulars;
+      const otherLabel = source.includes("others")
         ? "others"
-        : stockCatalog.particulars.includes("Others")
+        : source.includes("Others")
           ? "Others"
           : "Other";
-      const base = stockCatalog.particulars.filter(
+      const base = source.filter(
         (x) => x !== "Other" && x !== "Others" && x !== "others",
       );
       const custom = customStockItems.filter(
@@ -341,7 +349,7 @@ export function TodayHub({
       );
       return Array.from(new Set([...base, ...custom, otherLabel]));
     },
-    [stockCatalog.particulars, customStockItems],
+    [stockCatalog.particulars, customStockItems, isQuad],
   );
 
   const accountantOnly =
@@ -444,6 +452,18 @@ export function TodayHub({
   // Stock
   const [stockCategory, setStockCategory] =
     useState<(typeof STOCK_CATEGORIES)[number]>("RM");
+  const [stockKind, setStockKind] = useState<"raw" | "cable">("raw");
+  const [stockCable, setStockCable] = useState<string>(
+    QUAD_SIGNAL_STOCK_CABLES[0],
+  );
+  const [stockCableOther, setStockCableOther] = useState("");
+  const [stockCableSize, setStockCableSize] = useState(
+    () => getQuadSignalCableSizes(QUAD_SIGNAL_STOCK_CABLES[0])[0] ?? "Other",
+  );
+  const [stockCableSizeOther, setStockCableSizeOther] = useState("");
+  const [stockProcessQtys, setStockProcessQtys] = useState<
+    Record<string, string>
+  >({});
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
@@ -459,6 +479,31 @@ export function TodayHub({
   const [stockNotes, setStockNotes] = useState("");
   const [stockType, setStockType] = useState<PvcStockEntryType>("closing");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
+
+  const quadCableSizeOptions = useMemo(() => {
+    const sizes = getQuadSignalCableSizes(
+      stockCable === "Other" ? "Other" : stockCable,
+    );
+    return [...sizes];
+  }, [stockCable]);
+
+  const quadCableProcessFields = useMemo(() => {
+    if (!isQuad || stockKind !== "cable") return [] as string[];
+    const cableKey = stockCable === "Other" ? "Other" : stockCable;
+    return [...getQuadSignalCableProcesses(cableKey)];
+  }, [isQuad, stockKind, stockCable]);
+
+  useEffect(() => {
+    if (!isQuad || stockKind !== "cable") return;
+    const sizes = getQuadSignalCableSizes(
+      stockCable === "Other" ? "Other" : stockCable,
+    );
+    if (!sizes.includes(stockCableSize as (typeof sizes)[number])) {
+      setStockCableSize(sizes[0] ?? "Other");
+      setStockCableSizeOther("");
+    }
+    setStockProcessQtys({});
+  }, [isQuad, stockKind, stockCable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isQuad) return;
@@ -480,9 +525,13 @@ export function TodayHub({
   }, [isQuad, quadSelectedMaterial, quadSupplierOptions, vendorName]);
 
   useEffect(() => {
-    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
+    setStockItem(
+      isQuad
+        ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
+        : stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0],
+    );
     setStockUnit(stockCatalog.defaultUnit);
-  }, [stockCatalog]);
+  }, [stockCatalog, isQuad]);
 
   const resolvedStockItemName = useMemo(() => {
     return stockItem === "Others" ||
@@ -718,7 +767,19 @@ export function TodayHub({
       ),
     ]);
     setStockCategory("RM");
-    setStockItem(stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0]);
+    setStockKind("raw");
+    setStockCable(QUAD_SIGNAL_STOCK_CABLES[0]);
+    setStockCableOther("");
+    setStockCableSize(
+      getQuadSignalCableSizes(QUAD_SIGNAL_STOCK_CABLES[0])[0] ?? "Other",
+    );
+    setStockCableSizeOther("");
+    setStockProcessQtys({});
+    setStockItem(
+      isQuad
+        ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
+        : stockCatalog.particulars[0] ?? DEFAULT_PURCHASE_GOODS[0],
+    );
     setStockItemOther("");
     setStockSize(stockCatalog.sizes?.[0] ?? "8mm");
     setStockSizeOther("");
@@ -1026,7 +1087,6 @@ export function TodayHub({
         items,
       });
     } else if (kind === "stock") {
-      const resolvedItem = resolvedStockItemName;
       const issuedQty = Number(stockQty);
       const manualRate = Number(stockRate);
       const closingRate =
@@ -1036,6 +1096,112 @@ export function TodayHub({
             ? stockPurchaseRate
             : NaN;
       const closingValue = issuedQty * closingRate;
+
+      if (isQuad) {
+        if (stockKind === "raw") {
+          const resolvedItem = resolvedStockItemName;
+          if (!resolvedItem || stockQty === "") {
+            fail(
+              (stockItem === "Others" ||
+                stockItem === "Other" ||
+                stockItem === "others") &&
+                !stockItemOther.trim()
+                ? "Enter the other raw material name."
+                : "Select raw material and quantity.",
+            );
+            return;
+          }
+          if (!Number.isFinite(closingRate) || closingRate < 0) {
+            fail("Enter a rate for this stock entry.");
+            return;
+          }
+          if (!(issuedQty >= 0)) {
+            fail("Quantity must be zero or more.");
+            return;
+          }
+          result = await postJson(`/api/plants/${plantId}/stock`, {
+            date: entryDate,
+            shift,
+            itemName: resolvedItem,
+            category: "RM",
+            unit: stockUnit || "KGS",
+            quantity: issuedQty,
+            rate: closingRate,
+            value: closingValue,
+            notes: encodeQuadSignalStockNotes(
+              { v: 1, kind: "raw" },
+              stockNotes.trim() || `Closing stock as on ${entryDate}`,
+            ),
+            photoUrls: stockPhotos,
+          });
+        } else {
+          const resolvedCable =
+            stockCable === "Other"
+              ? stockCableOther.trim()
+              : stockCable.trim();
+          const resolvedSize =
+            stockCableSize === "Other"
+              ? stockCableSizeOther.trim()
+              : stockCableSize.trim();
+          if (!resolvedCable) {
+            fail(
+              stockCable === "Other"
+                ? "Enter the other cable name."
+                : "Select cable type.",
+            );
+            return;
+          }
+          if (!resolvedSize) {
+            fail(
+              stockCableSize === "Other"
+                ? "Enter the other size."
+                : "Select cable size.",
+            );
+            return;
+          }
+          if (stockQty === "" || !(issuedQty >= 0)) {
+            fail("Enter quantity (zero or more).");
+            return;
+          }
+          if (!Number.isFinite(closingRate) || closingRate < 0) {
+            fail("Enter a rate for this stock entry.");
+            return;
+          }
+          const processes: Record<string, number> = {};
+          for (const name of quadCableProcessFields) {
+            const raw = stockProcessQtys[name]?.trim() ?? "";
+            if (raw === "") continue;
+            const n = Number(raw);
+            if (!Number.isFinite(n) || n < 0) {
+              fail(`Process "${name}" must be a number ≥ 0.`);
+              return;
+            }
+            processes[name] = n;
+          }
+          result = await postJson(`/api/plants/${plantId}/stock`, {
+            date: entryDate,
+            shift,
+            itemName: `${resolvedCable} · ${resolvedSize}`,
+            category: "FG",
+            unit: stockUnit || "MTR",
+            quantity: issuedQty,
+            rate: closingRate,
+            value: closingValue,
+            notes: encodeQuadSignalStockNotes(
+              {
+                v: 1,
+                kind: "cable",
+                cable: resolvedCable,
+                size: resolvedSize,
+                processes,
+              },
+              stockNotes.trim() || `Closing stock as on ${entryDate}`,
+            ),
+            photoUrls: stockPhotos,
+          });
+        }
+      } else {
+      const resolvedItem = resolvedStockItemName;
       if (!resolvedItem || stockQty === "") {
         fail(
           (stockItem === "Others" ||
@@ -1090,6 +1256,7 @@ export function TodayHub({
             : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
+      }
     } else if (kind === "expense") {
       if (expenseHead === "Factory Rent") {
         const area =
@@ -1919,6 +2086,175 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
+                {isQuad ? (
+                  <>
+                    <div className="field">
+                      <label htmlFor="st-kind">Stock type</label>
+                      <SelectMenu
+                        id="st-kind"
+                        value={
+                          stockKind === "cable" ? "Cable" : "Raw Material"
+                        }
+                        options={["Raw Material", "Cable"]}
+                        required
+                        onChange={(next) => {
+                          setStockKind(next === "Cable" ? "cable" : "raw");
+                          setStockProcessQtys({});
+                        }}
+                      />
+                    </div>
+                    {stockKind === "raw" ? (
+                      <>
+                        <div className="field">
+                          <label htmlFor="st-item">Raw Material</label>
+                          <SelectMenu
+                            id="st-item"
+                            value={stockItem || stockParticulars[0]}
+                            options={stockParticulars}
+                            required
+                            onChange={(next) => {
+                              setStockItem(next);
+                              if (
+                                next !== "Others" &&
+                                next !== "Other" &&
+                                next !== "others"
+                              )
+                                setStockItemOther("");
+                            }}
+                          />
+                        </div>
+                        {stockItem === "Others" ||
+                        stockItem === "Other" ||
+                        stockItem === "others" ? (
+                          <div className="field">
+                            <label htmlFor="st-item-other">
+                              Other raw material{" "}
+                              <span style={{ color: "red" }}>*</span>
+                            </label>
+                            <input
+                              id="st-item-other"
+                              required
+                              placeholder="Enter raw material"
+                              value={stockItemOther}
+                              onChange={(e) =>
+                                setStockItemOther(e.target.value)
+                              }
+                            />
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <div className="form-grid two">
+                          <div className="field">
+                            <label htmlFor="st-cable">Cable</label>
+                            <SelectMenu
+                              id="st-cable"
+                              value={stockCable}
+                              options={[...QUAD_SIGNAL_STOCK_CABLES]}
+                              required
+                              onChange={(next) => {
+                                setStockCable(next);
+                                if (next !== "Other") setStockCableOther("");
+                              }}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="st-cable-size">Size</label>
+                            <SelectMenu
+                              id="st-cable-size"
+                              value={stockCableSize}
+                              options={quadCableSizeOptions}
+                              required
+                              onChange={(next) => {
+                                setStockCableSize(next);
+                                if (next !== "Other")
+                                  setStockCableSizeOther("");
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {stockCable === "Other" ? (
+                          <div className="field">
+                            <label htmlFor="st-cable-other">
+                              Other cable{" "}
+                              <span style={{ color: "red" }}>*</span>
+                            </label>
+                            <input
+                              id="st-cable-other"
+                              required
+                              placeholder="Enter cable type"
+                              value={stockCableOther}
+                              onChange={(e) =>
+                                setStockCableOther(e.target.value)
+                              }
+                            />
+                          </div>
+                        ) : null}
+                        {stockCableSize === "Other" ? (
+                          <div className="field">
+                            <label htmlFor="st-cable-size-other">
+                              Other size{" "}
+                              <span style={{ color: "red" }}>*</span>
+                            </label>
+                            <input
+                              id="st-cable-size-other"
+                              required
+                              placeholder="Enter size"
+                              value={stockCableSizeOther}
+                              onChange={(e) =>
+                                setStockCableSizeOther(e.target.value)
+                              }
+                            />
+                          </div>
+                        ) : null}
+                        {quadCableProcessFields.length > 0 ? (
+                          <div className="field">
+                            <p
+                              className="field-hint"
+                              style={{ marginBottom: "0.45rem" }}
+                            >
+                              Process quantities (optional — for future
+                              calculation)
+                            </p>
+                            <div className="form-grid two">
+                              {quadCableProcessFields.map((proc) => (
+                                <div className="field" key={proc}>
+                                  <label htmlFor={`st-proc-${proc}`}>
+                                    {proc}
+                                  </label>
+                                  <DecimalInput
+                                    id={`st-proc-${proc}`}
+                                    value={stockProcessQtys[proc] ?? ""}
+                                    onChange={(next) =>
+                                      setStockProcessQtys((prev) => ({
+                                        ...prev,
+                                        [proc]: next,
+                                      }))
+                                    }
+                                    placeholder="0"
+                                  />
+                                </div>
+                              ))}
+                              {quadCableProcessFields.length % 2 === 1 ? (
+                                <div className="field">
+                                  <label htmlFor="st-rate">Rate</label>
+                                  <DecimalInput
+                                    id="st-rate"
+                                    required
+                                    value={stockRate}
+                                    onChange={setStockRate}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
                 <div className="field">
                   <label htmlFor="st-item">
                     {usesStockLedger ? "Particulars" : "Item"}
@@ -1973,22 +2309,32 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
-                <div className="prod-fields__row">
-                  {isConductor && stockCatalog.sizes?.length ? (
-                    <div className="field">
-                      <label htmlFor="st-size">Size</label>
-                      <SelectMenu
-                        id="st-size"
-                        value={stockSize || stockCatalog.sizes[0]}
-                        options={[...stockCatalog.sizes]}
-                        required
-                        onChange={(next) => {
-                          setStockSize(next);
-                          if (next !== "others") setStockSizeOther("");
-                        }}
-                      />
-                    </div>
-                  ) : null}
+                  </>
+                )}
+                {!isQuad && isConductor && stockCatalog.sizes?.length ? (
+                  <div className="field">
+                    <label htmlFor="st-size">Size</label>
+                    <SelectMenu
+                      id="st-size"
+                      value={stockSize || stockCatalog.sizes[0]}
+                      options={[...stockCatalog.sizes]}
+                      required
+                      onChange={(next) => {
+                        setStockSize(next);
+                        if (next !== "others") setStockSizeOther("");
+                      }}
+                    />
+                  </div>
+                ) : null}
+                <div
+                  className={
+                    isQuad &&
+                    stockKind === "cable" &&
+                    quadCableProcessFields.length % 2 === 1
+                      ? "prod-fields__row"
+                      : "form-grid three"
+                  }
+                >
                   <div className="field">
                     <label htmlFor="st-qty">
                       {isUpcast
@@ -2017,11 +2363,9 @@ export function TodayHub({
                       }}
                     />
                   </div>
-                </div>
-                <div className="prod-fields__row">
                   <div className="field">
                     <label htmlFor="st-unit">Unit</label>
-                    {usesStockLedger || isCat6 || isConductor ? (
+                    {usesStockLedger || isCat6 || isConductor || isQuad ? (
                       <SelectMenu
                         id="st-unit"
                         value={
@@ -2037,15 +2381,21 @@ export function TodayHub({
                       <input id="st-unit" value="kg" readOnly />
                     )}
                   </div>
-                  <div className="field">
-                    <label htmlFor="st-rate">Rate</label>
-                    <DecimalInput
-                      id="st-rate"
-                      required
-                      value={stockRate}
-                      onChange={setStockRate}
-                    />
-                  </div>
+                  {!(
+                    isQuad &&
+                    stockKind === "cable" &&
+                    quadCableProcessFields.length % 2 === 1
+                  ) ? (
+                    <div className="field">
+                      <label htmlFor="st-rate">Rate</label>
+                      <DecimalInput
+                        id="st-rate"
+                        required
+                        value={stockRate}
+                        onChange={setStockRate}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 {stockPurchaseRateLoading ? (
                   <p className="field-hint">Loading rate from purchase history…</p>

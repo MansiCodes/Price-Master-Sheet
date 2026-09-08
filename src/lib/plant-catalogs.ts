@@ -199,38 +199,248 @@ export const QUAD_RAW_MATERIAL_VENDORS: Record<string, readonly string[]> = {
   ],
 };
 
-/** Quad & Signal plant — stock item dropdown (union of Quad + Signal). */
-export const QUAD_STOCK_PARTICULARS = [
-  "6 Quad x 0.9m",
-  "Insulation",
-  "Single Quad Blue",
-  "Single Quad Orange",
-  "Single Quad Green",
-  "Single Quad Brown",
-  "Single Quad Yellow",
-  "Single Quad Black",
-  "*Laying:",
-  "*Inner:",
-  "*Screening:",
-  "Inter:-",
-  "DST:-",
-  "Outer:-",
-  "Signalling Cable 1.5 sq mm",
-  "Signalling Cable 2.5 sq mm",
-  "Signalling Cable 4 sq mm",
-  "Signalling Cable 6 sq mm",
+/** Quad + Signal — stock Raw Materials (non-cable leftovers). */
+export const QUAD_SIGNAL_STOCK_RAW_MATERIALS = [
   "RDSO Black",
   "RDSO Grey",
-  "Railway Quad Cable 0.9 mm",
-  "Railway Quad Cable (other sizes)",
-  "Star Quad Jelly-filled Cable",
   "Copper Conductor",
+  "Copper Wire (fine gauge)",
   "PVC Insulation Compound",
+  "PE / Foam PE Insulation",
   "PVC Outer Sheath Compound",
+  "PVC Outer Sheath",
+  "Filler / Binder",
+  "Star-quad Filler / Binder",
+  "Masterbatch (Black / Grey)",
+  "Screening / Armour (if applicable)",
+  "COPPER",
+  "HDPE",
+  "P.E.M.B",
+  "P.P BINDER",
+  "POLYESTER TAPE",
+  "DUMMY",
+  "FILLING JELLY",
+  "POLYAL TAPE",
+  "FLOODING JELLY",
+  "HOT MELT GLUE",
+  "LDPE (I/S)",
+  "ALUMINIUM STRIP",
+  "B.C. TAPE",
+  "PVC GREY (SHEATH)",
+  "GAL. STEEL TAPE ZN",
+  "GAL. STEEL TAPE NZN",
+  "PVC BLACK (O/S)",
+  "DRUM",
   "Other",
 ] as const;
 
-/** Quad & Signal — sales products (union). */
+/** Quad + Signal — Cable type dropdown. */
+export const QUAD_SIGNAL_STOCK_CABLES = [
+  "Signalling Cable",
+  "Power Cable",
+  "Indoor Multi-Core Cable",
+  "Indoor Single-Core Cable",
+  "Fire Survival Cable",
+  "Quad Cable",
+  "PIJF Cable",
+  "Other",
+] as const;
+
+const SIGNALLING_CABLE_SIZES = [
+  "2 Core x 2.5 sqmm",
+  "6 Core x 1.5 sqmm",
+  "12 Core x 1.5 sqmm",
+  "18 Core x 1.5 sqmm",
+  "19 Core x 1.5 sqmm",
+  "24 Core x 1.5 sqmm",
+  "30 Core x 1.5 sqmm",
+  "12 Core x 2.5 sqmm",
+  "Other",
+] as const;
+
+const POWER_CABLE_SIZES = [
+  "2 Core x 10 sqmm",
+  "2 Core x 25 sqmm",
+  "2 Core x 35 sqmm",
+  "2 Core x 70 sqmm",
+  "2Core, 3Core, 4Core Armd (Size 1.5-185 SQMM)",
+  "2Core, 3Core, 4Core Un-Armd (Size 1.5-185 SQMM)",
+  "3.5 CORE (Size 25-185 SQMM)",
+  "3.5 Core x 70 sqmm",
+  "Other",
+] as const;
+
+const INDOOR_MULTI_CORE_SIZES = [
+  "40 Core x 0.6mm",
+  "60 Core x 0.6mm",
+  "40 Core x 1.0mm",
+  "60 Core x 1.0mm",
+  "24 Core x 0.6mm",
+  "24 Core x 1.0mm",
+  "Other",
+] as const;
+
+const INDOOR_SINGLE_CORE_SIZES = [
+  "16/0.2 mm ABC",
+  "16/0.2 mm ATC",
+  "0.75 sqmm (24/0.2mm)",
+  "1.5 sqmm (22/0.3mm)",
+  "28/0.3mm",
+  "2.5 sqmm (36/0.3mm)",
+  "4 Sqmm",
+  "6 Sqmm",
+  "10 Sqmm",
+  "16 Sqmm",
+  "25 Sqmm",
+  "35 Sqmm",
+  "50 Sqmm",
+  "3/0.75 mm",
+  "7/0.75 mm",
+  "1mm ATC",
+  "0.6mm ATC",
+  "16/0.2 mm Twin Twisted",
+  "Other",
+] as const;
+
+const FIRE_SURVIVAL_SIZES = [
+  "2 Core x 1.5 sqmm Armoured",
+  "2 Core x 1.5 sqmm un-Armoured",
+  "Other",
+] as const;
+
+const QUAD_CABLE_SIZES = [
+  "6 Quad x 0.9mm",
+  "4 Quad x 0.9mm",
+  "Other",
+] as const;
+
+const PIJF_CABLE_SIZES = [
+  "10P x 0.5mm Unamoured",
+  "10P x 0.9mm Armoured",
+  "20P x 0.9mm Unamoured",
+  "20P x 0.9mm Armoured",
+  "10P x 0.9mm Un-Armoured",
+  "5P x 0.5mm Unamoured",
+  "2P x 0.5mm Unamoured",
+  "20P x 0.5mm Armoured",
+  "Other",
+] as const;
+
+/** Sizes by cable type (always includes Other). */
+export const QUAD_SIGNAL_CABLE_SIZES: Record<string, readonly string[]> = {
+  "Signalling Cable": SIGNALLING_CABLE_SIZES,
+  "Power Cable": POWER_CABLE_SIZES,
+  "Indoor Multi-Core Cable": INDOOR_MULTI_CORE_SIZES,
+  "Indoor Single-Core Cable": INDOOR_SINGLE_CORE_SIZES,
+  "Fire Survival Cable": FIRE_SURVIVAL_SIZES,
+  "Quad Cable": QUAD_CABLE_SIZES,
+  "PIJF Cable": PIJF_CABLE_SIZES,
+  Other: ["Other"],
+};
+
+const SIGNALLING_PROCESSES = [
+  "Insulation",
+  "Laying",
+  "Inner Sheath",
+  "Outer Sheath",
+  "DST",
+] as const;
+
+const QUAD_PROCESSES = [
+  "Insulation",
+  "Single Quad",
+  "Laying",
+  "Inner",
+  "Outer",
+  "Screening",
+  "Intermediate",
+  "DST",
+] as const;
+
+const POWER_PROCESSES = [
+  "Insulation",
+  "Laying",
+  "Inner Sheath",
+  "Outer Sheath",
+  "Armouring",
+] as const;
+
+const SINGLE_CORE_PROCESSES = [
+  "Insulation",
+  "Laying",
+  "Outer Sheath",
+] as const;
+
+/** Manual process qty columns by cable type. */
+export const QUAD_SIGNAL_CABLE_PROCESSES: Record<string, readonly string[]> = {
+  "Signalling Cable": SIGNALLING_PROCESSES,
+  "Power Cable": POWER_PROCESSES,
+  "Indoor Multi-Core Cable": SIGNALLING_PROCESSES,
+  "Indoor Single-Core Cable": SINGLE_CORE_PROCESSES,
+  "Fire Survival Cable": POWER_PROCESSES,
+  "Quad Cable": QUAD_PROCESSES,
+  "PIJF Cable": QUAD_PROCESSES,
+  Other: SINGLE_CORE_PROCESSES,
+};
+
+export function getQuadSignalCableSizes(cable: string): readonly string[] {
+  return QUAD_SIGNAL_CABLE_SIZES[cable] ?? ["Other"];
+}
+
+export function getQuadSignalCableProcesses(cable: string): readonly string[] {
+  return QUAD_SIGNAL_CABLE_PROCESSES[cable] ?? SINGLE_CORE_PROCESSES;
+}
+
+export type QuadSignalStockMeta = {
+  v: 1;
+  kind: "raw" | "cable";
+  cable?: string;
+  size?: string;
+  processes?: Record<string, number>;
+};
+
+const QS_STOCK_PREFIX = "QSSTOCK:";
+
+export function encodeQuadSignalStockNotes(
+  meta: QuadSignalStockMeta,
+  userNotes?: string | null,
+): string {
+  const payload = `${QS_STOCK_PREFIX}${JSON.stringify(meta)}`;
+  const extra = userNotes?.trim();
+  return extra ? `${payload}\n${extra}` : payload;
+}
+
+export function parseQuadSignalStockNotes(notes: string | null | undefined): {
+  meta: QuadSignalStockMeta | null;
+  userNotes: string;
+} {
+  const raw = notes?.trim() ?? "";
+  if (!raw.startsWith(QS_STOCK_PREFIX)) {
+    return { meta: null, userNotes: raw };
+  }
+  const rest = raw.slice(QS_STOCK_PREFIX.length);
+  const nl = rest.indexOf("\n");
+  const jsonPart = nl >= 0 ? rest.slice(0, nl) : rest;
+  const userNotes = nl >= 0 ? rest.slice(nl + 1).trim() : "";
+  try {
+    const meta = JSON.parse(jsonPart) as QuadSignalStockMeta;
+    if (meta?.v === 1 && (meta.kind === "raw" || meta.kind === "cable")) {
+      return { meta, userNotes };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { meta: null, userNotes: raw };
+}
+
+/** @deprecated Prefer Raw Materials / Cable split UI. Kept for catalog fallbacks. */
+export const QUAD_STOCK_PARTICULARS = [
+  ...QUAD_SIGNAL_STOCK_RAW_MATERIALS.filter((x) => x !== "Other"),
+  ...QUAD_SIGNAL_STOCK_CABLES.filter((x) => x !== "Other"),
+  "Other",
+] as const;
+
+/** Quad + Signal — sales products (union). */
 export const QUAD_SIGNAL_SALE_PRODUCTS = [
   "Signalling Cable 1.5 sq mm",
   "Signalling Cable 2.5 sq mm",
@@ -404,7 +614,7 @@ export function getStockCatalog(plantCode: string): {
 
   if (isQuadSignalPlant(plantCode)) {
     return {
-      particulars: QUAD_STOCK_PARTICULARS,
+      particulars: QUAD_SIGNAL_STOCK_RAW_MATERIALS,
       defaultUnit: "KGS",
       units: ["PCS", "KGS", "NOS", "KM", "MTR", "COIL", "ROLL"],
     };

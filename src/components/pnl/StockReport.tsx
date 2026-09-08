@@ -8,13 +8,16 @@ import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { formatDayMonthYear } from "@/lib/dates";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
 import { collectStockPhotoUrls } from "@/lib/bill-photos";
-import { PVC_STOCK_ENTRY_TYPES } from "@/lib/plant-catalogs";
+import {
+  parseQuadSignalStockNotes,
+  PVC_STOCK_ENTRY_TYPES,
+} from "@/lib/plant-catalogs";
 
 type StockRow = {
   id: string;
@@ -66,6 +69,7 @@ export function StockReport({
   const t = useTranslations("pnl");
   const isPvc = plantCode?.toUpperCase() === "PVC";
   const cat6 = isCat6Plant(plantCode);
+  const isQuadSignal = isQuadSignalPlant(plantCode);
   const [stockView, setStockView] = useState<"closing" | "atcl">("closing");
   const baseUrl =
     `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` +
@@ -307,9 +311,117 @@ export function StockReport({
     },
   ];
 
+  const quadSignalColumns: ReportColumn<StockRow>[] = [
+    {
+      key: "s",
+      label: "S.No",
+      render: (_r, index) =>
+        String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "date",
+      label: "Date",
+      align: "center",
+      compact: true,
+      render: (r) => isoDate(r.date),
+    },
+    {
+      key: "kind",
+      label: "Type",
+      compact: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind === "cable") return "Cable";
+        if (meta?.kind === "raw") return "Raw Material";
+        return r.category === "FG" ? "Cable" : "Raw Material";
+      },
+    },
+    {
+      key: "item",
+      label: "Raw Material / Cable",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind === "cable") return meta.cable || r.itemName;
+        if (meta?.kind === "raw") return r.itemName;
+        const parts = r.itemName.split(" · ");
+        return parts[0] || r.itemName;
+      },
+    },
+    {
+      key: "size",
+      label: "Size",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind === "cable") return meta.size || "—";
+        const parts = r.itemName.split(" · ");
+        return parts.length > 1 ? parts.slice(1).join(" · ") : "—";
+      },
+    },
+    {
+      key: "process",
+      label: "Process",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        const procs = meta?.processes;
+        if (!procs || Object.keys(procs).length === 0) return "—";
+        return Object.entries(procs)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join(", ");
+      },
+    },
+    {
+      key: "qty",
+      label: "Qty",
+      align: "right",
+      compact: true,
+      render: (r) => `${Number(r.quantity)} ${r.unit}`,
+    },
+    {
+      key: "value",
+      label: "Value",
+      align: "right",
+      render: (r) => formatINR(r.closingValue),
+    },
+    {
+      key: "excelUploadedAt",
+      label: "Excel upload",
+      compact: true,
+      render: (r) =>
+        r.excelUploadedAt ? formatDayMonthYear(r.excelUploadedAt) : "—",
+    },
+    {
+      key: "approvedByHead",
+      label: "Approval Status",
+      compact: true,
+      render: (r) => <PnlApprovalBadge row={r} level="head" />,
+    },
+    {
+      key: "photos",
+      label: "Image",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.photoUrls} fallbackUrl={r.photoUrl} />
+      ),
+    },
+  ];
+
   const activeColumns = useMemo(() => {
-    return isPvc ? pvcColumns : cat6 ? cat6Columns : defaultColumns;
-  }, [isPvc, pvcColumns, cat6, cat6Columns, defaultColumns]);
+    if (isPvc) return pvcColumns;
+    if (cat6) return cat6Columns;
+    if (isQuadSignal) return quadSignalColumns;
+    return defaultColumns;
+  }, [
+    isPvc,
+    cat6,
+    isQuadSignal,
+    pvcColumns,
+    cat6Columns,
+    quadSignalColumns,
+    defaultColumns,
+  ]);
 
   return (
     <section className="pnl-report-panel">
