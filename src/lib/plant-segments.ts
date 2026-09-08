@@ -2,7 +2,7 @@
  * Step-1 business-segment map: plants ↔ raw materials ↔ final product types.
  * DB `code` stays stable for existing data; `name` is the display label.
  *
- * Draft lists for new plants (Upcast / SL SSL / Quad / Rope light) are
+ * Draft lists for new plants (Upcast / SL SSL / Quad & Signal / Rope light) are
  * industry-typical starters — refine before locking BOMs (Step 2).
  */
 
@@ -143,16 +143,21 @@ export const PLANT_SEGMENTS: PlantSegment[] = [
     ],
   },
   {
-    code: "SIGNALLING",
-    name: "Signal Plant",
-    rmSummary: "Copper · PVC · RDSO sheath compounds",
+    code: "QUAD",
+    name: "Quad & Signal Plant",
+    rmSummary: "Copper · PE / PVC · Signalling & star-quad materials",
     sortOrder: 6,
     rawMaterials: [
       { name: "Copper Conductor", kind: "RM", unit: "KGS" },
+      { name: "Copper Wire (fine gauge)", kind: "RM", unit: "KGS" },
       { name: "PVC Insulation Compound", kind: "RM", unit: "KGS" },
+      { name: "PE / Foam PE Insulation", kind: "RM", unit: "KGS" },
       { name: "PVC Outer Sheath Compound", kind: "RM", unit: "KGS" },
+      { name: "PVC Outer Sheath", kind: "RM", unit: "KGS" },
       { name: "Filler / Binder", kind: "RM", unit: "KGS" },
+      { name: "Star-quad Filler / Binder", kind: "RM", unit: "KGS" },
       { name: "Masterbatch (Black / Grey)", kind: "RM", unit: "KGS" },
+      { name: "Screening / Armour (if applicable)", kind: "RM", unit: "KGS" },
     ],
     finalProducts: [
       { name: "Signalling Cable 1.5 sq mm", kind: "FG", unit: "MTR" },
@@ -161,21 +166,6 @@ export const PLANT_SEGMENTS: PlantSegment[] = [
       { name: "Signalling Cable 6 sq mm", kind: "FG", unit: "MTR" },
       { name: "RDSO Black", kind: "FG", unit: "MTR" },
       { name: "RDSO Grey", kind: "FG", unit: "MTR" },
-    ],
-  },
-  {
-    code: "QUAD",
-    name: "Quad Plant",
-    rmSummary: "Copper · PE / PVC · Star-quad fillers",
-    sortOrder: 7,
-    rawMaterials: [
-      { name: "Copper Wire (fine gauge)", kind: "RM", unit: "KGS" },
-      { name: "PE / Foam PE Insulation", kind: "RM", unit: "KGS" },
-      { name: "PVC Outer Sheath", kind: "RM", unit: "KGS" },
-      { name: "Star-quad Filler / Binder", kind: "RM", unit: "KGS" },
-      { name: "Screening / Armour (if applicable)", kind: "RM", unit: "KGS" },
-    ],
-    finalProducts: [
       { name: "Railway Quad Cable 0.9 mm", kind: "FG", unit: "MTR" },
       { name: "Railway Quad Cable (other sizes)", kind: "FG", unit: "MTR" },
       { name: "Star Quad Jelly-filled Cable", kind: "FG", unit: "MTR" },
@@ -206,9 +196,26 @@ const byCode = new Map(
   PLANT_SEGMENTS.map((s) => [s.code.toUpperCase(), s] as const),
 );
 
+/** Legacy Signal plant code → merged Quad & Signal segment. */
+byCode.set("SIGNALLING", byCode.get("QUAD")!);
+byCode.set("QUADSIGNAL", byCode.get("QUAD")!);
+
 export function getPlantSegment(code: string | null | undefined): PlantSegment | null {
   if (!code) return null;
   return byCode.get(code.trim().toUpperCase()) ?? null;
+}
+
+/** Prefer catalog display name (e.g. merged Quad & Signal) over stale DB labels. */
+export function getPlantDisplayName(
+  code: string | null | undefined,
+  fallbackName?: string | null,
+): string {
+  return getPlantSegment(code)?.name ?? fallbackName?.trim() ?? code?.trim() ?? "";
+}
+
+/** Hide legacy Signal plant once merged into Quad. */
+export function isLegacyMergedPlantCode(code: string | null | undefined): boolean {
+  return code?.trim().toUpperCase() === "SIGNALLING";
 }
 
 export function getPlantRmSummary(code: string | null | undefined): string {

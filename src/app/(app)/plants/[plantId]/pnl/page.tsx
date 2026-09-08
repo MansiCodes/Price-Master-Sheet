@@ -8,6 +8,7 @@ import {
   getPlantManagerNames,
 } from "@/lib/plant-managers";
 import { PnlReportsShell } from "@/components/pnl/PnlReportsShell";
+import { getPlantDisplayName } from "@/lib/plant-segments";
 
 type PageProps = {
   params: Promise<{ plantId: string }>;
@@ -60,7 +61,7 @@ export default async function PlantPnlPage({ params }: PageProps) {
   return (
     <PnlReportsShell
       plantId={plant.id}
-      plantName={plant.name}
+      plantName={getPlantDisplayName(plant.code, plant.name)}
       plantCode={plant.code}
       plantManagerName={plantManagerName}
       isSuperAdmin={isSuperAdmin}

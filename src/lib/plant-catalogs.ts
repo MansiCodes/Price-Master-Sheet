@@ -10,7 +10,7 @@ import {
   CAT6_STOCK_ITEMS,
   CAT6_SUPPLIERS,
 } from "@/lib/cat6-catalogs";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import { getPlantSegment } from "@/lib/plant-segments";
 import { CAT6_STOCK_UNITS } from "@/lib/units";
 
@@ -57,8 +57,7 @@ const CONDUCTOR_PURCHASE_GOODS = [
 
 /** Conductor plant — sales customer dropdown. */
 const CONDUCTOR_CUSTOMERS = [
-  "Signalling",
-  "Quad",
+  "Quad & Signal",
   "CAT6",
   "PIJF",
   "FS Cable",
@@ -149,7 +148,7 @@ const PVC_PURCHASE_GOODS = [
   "Other",
 ] as const;
 
-/** Quad plant — raw materials (purchase description dropdown). */
+/** Quad & Signal plant — raw materials (purchase description dropdown). */
 export const QUAD_RAW_MATERIALS = [
   "COPPER",
   "HDPE",
@@ -200,7 +199,7 @@ export const QUAD_RAW_MATERIAL_VENDORS: Record<string, readonly string[]> = {
   ],
 };
 
-/** Quad plant — stock item dropdown options. */
+/** Quad & Signal plant — stock item dropdown (union of Quad + Signal). */
 export const QUAD_STOCK_PARTICULARS = [
   "6 Quad x 0.9m",
   "Insulation",
@@ -216,7 +215,68 @@ export const QUAD_STOCK_PARTICULARS = [
   "Inter:-",
   "DST:-",
   "Outer:-",
+  "Signalling Cable 1.5 sq mm",
+  "Signalling Cable 2.5 sq mm",
+  "Signalling Cable 4 sq mm",
+  "Signalling Cable 6 sq mm",
+  "RDSO Black",
+  "RDSO Grey",
+  "Railway Quad Cable 0.9 mm",
+  "Railway Quad Cable (other sizes)",
+  "Star Quad Jelly-filled Cable",
+  "Copper Conductor",
+  "PVC Insulation Compound",
+  "PVC Outer Sheath Compound",
   "Other",
+] as const;
+
+/** Quad & Signal — sales products (union). */
+export const QUAD_SIGNAL_SALE_PRODUCTS = [
+  "Signalling Cable 1.5 sq mm",
+  "Signalling Cable 2.5 sq mm",
+  "Signalling Cable 4 sq mm",
+  "Signalling Cable 6 sq mm",
+  "RDSO Black",
+  "RDSO Grey",
+  "Railway Quad Cable 0.9 mm",
+  "Railway Quad Cable (other sizes)",
+  "Star Quad Jelly-filled Cable",
+  "Other",
+] as const;
+
+/** Quad & Signal — customers (union). */
+export const QUAD_SIGNAL_CUSTOMERS = [
+  "Indian Railways",
+  "RDSO",
+  "ATCL",
+  "Wirelux",
+  "Samriddhi Automation Noida",
+  "Noto Fire",
+  "Samriddhii Automation Haridwar",
+  "Railway PO ATC",
+  "Hamsa India",
+  "Peak Star Networking",
+  "Glow Right",
+  "Ayansh Infocom",
+  "Qlo Networks",
+  "Anu Exterprises",
+  "Digamber Telecom",
+  "Naitik Infotex",
+  "Bharat Cable Industries",
+  "Goa Shipping Yard",
+  "Reliable securities",
+  "Chrome Infra",
+  "Epsillon Cable",
+  "Other",
+] as const;
+
+/** Extra Signal-side RM names (beyond Quad vendor map keys). */
+const SIGNAL_EXTRA_RAW_MATERIALS = [
+  "Copper Conductor",
+  "PVC Insulation Compound",
+  "PVC Outer Sheath Compound",
+  "Filler / Binder",
+  "Masterbatch (Black / Grey)",
 ] as const;
 
 export function getQuadVendorsForMaterial(material: string): readonly string[] {
@@ -231,6 +291,15 @@ export function getQuadVendorsForMaterial(material: string): readonly string[] {
   const mapped = QUAD_RAW_MATERIAL_VENDORS[key];
   if (!mapped) return ["Other"];
   return [...mapped, "Other"];
+}
+
+export function getQuadSignalPurchaseGoods(): readonly string[] {
+  const set = new Set<string>([
+    ...QUAD_RAW_MATERIALS.filter((x) => x !== "Other"),
+    ...SIGNAL_EXTRA_RAW_MATERIALS,
+    "Other",
+  ]);
+  return [...set];
 }
 
 export const PVC_STOCK_PARTICULARS = [
@@ -333,7 +402,7 @@ export function getStockCatalog(plantCode: string): {
     };
   }
 
-  if (plantCode.toUpperCase() === "QUAD") {
+  if (isQuadSignalPlant(plantCode)) {
     return {
       particulars: QUAD_STOCK_PARTICULARS,
       defaultUnit: "KGS",
@@ -407,10 +476,10 @@ export function getPurchaseCatalog(plantCode: string): {
     };
   }
 
-  if (plantCode.toUpperCase() === "QUAD") {
+  if (isQuadSignalPlant(plantCode)) {
     return {
       suppliers: getQuadVendorsForMaterial(""),
-      goods: QUAD_RAW_MATERIALS,
+      goods: getQuadSignalPurchaseGoods(),
     };
   }
 
@@ -440,16 +509,8 @@ export function getSalesCatalog(plantCode: string): readonly string[] {
   if (plantCode?.toUpperCase() === "CONDUCTOR") {
     return CONDUCTOR_SALE_SIZES;
   }
-  if (plantCode?.toUpperCase() === "SIGNALLING") {
-    return [
-      "Signalling Cable 1.5 sq mm",
-      "Signalling Cable 2.5 sq mm",
-      "Signalling Cable 4 sq mm",
-      "Signalling Cable 6 sq mm",
-      "RDSO Black",
-      "RDSO Grey",
-      "Other",
-    ];
+  if (isQuadSignalPlant(plantCode)) {
+    return QUAD_SIGNAL_SALE_PRODUCTS;
   }
   const segment = getPlantSegment(plantCode);
   if (segment) {
@@ -486,15 +547,8 @@ export function getCustomerCatalog(plantCode: string): readonly string[] {
   if (plantCode?.toUpperCase() === "CONDUCTOR") {
     return CONDUCTOR_CUSTOMERS;
   }
-  if (plantCode?.toUpperCase() === "SIGNALLING") {
-    return [
-      "Indian Railways",
-      "RDSO",
-      "ATCL",
-      "Wirelux",
-      "Samriddhi Automation Noida",
-      "Other",
-    ];
+  if (isQuadSignalPlant(plantCode)) {
+    return QUAD_SIGNAL_CUSTOMERS;
   }
   return [
     "Noto Fire",
@@ -671,7 +725,7 @@ export function getExpenseHeadsForSection(
       ? UPCAST_DIRECT_EXPENSE_HEADS
       : UPCAST_INDIRECT_EXPENSE_HEADS;
   }
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
+  if (code === "LEDROPE" || code === "SLSSL" || isQuadSignalPlant(code)) {
     return section === "direct"
       ? LED_DIRECT_EXPENSE_HEADS
       : LED_INDIRECT_EXPENSE_HEADS;
@@ -730,7 +784,7 @@ export function expenseSectionForPlant(
     }
     return "indirect";
   }
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
+  if (code === "LEDROPE" || code === "SLSSL" || isQuadSignalPlant(code)) {
     if (
       (LED_DIRECT_EXPENSE_HEADS as readonly string[]).includes(normalized)
     ) {
@@ -751,7 +805,7 @@ export function getExpenseHeads(plantCode?: string | null): readonly string[] {
   if (code === "PVC") return PVC_EXPENSE_HEADS;
   if (code === "CAT6") return CAT6_EXPENSE_HEADS;
   if (code === "UPCAST") return UPCAST_EXPENSE_HEADS;
-  if (code === "LEDROPE" || code === "SIGNALLING" || code === "SLSSL" || code === "QUAD") {
+  if (code === "LEDROPE" || code === "SLSSL" || isQuadSignalPlant(code)) {
     return LED_EXPENSE_HEADS;
   }
   return DEFAULT_EXPENSE_HEADS;
@@ -819,7 +873,6 @@ export function cat6ExpensePnlLine(head: string): string {
 
 /** Short tab label for dense expense category bars (full name stays in aria-label). */
 export function expenseHeadTabLabel(head: string): string {
-  if (head === "Miscellaneous") return "Misc.";
   return head;
 }
 

@@ -2,6 +2,12 @@ export function isCat6Plant(code: string | null | undefined): boolean {
   return code?.trim().toUpperCase() === "CAT6";
 }
 
+/** Quad + Signal merged plant (canonical code QUAD; legacy SIGNALLING still maps here). */
+export function isQuadSignalPlant(code: string | null | undefined): boolean {
+  const c = code?.trim().toUpperCase();
+  return c === "QUAD" || c === "SIGNALLING" || c === "QUADSIGNAL";
+}
+
 /** P&L formula values stored as stock rows — not real Stock (UP&UK) items. */
 export const CAT6_PNL_ONLY_STOCK_ITEMS = [
   "Opening Stock (CAT6)",

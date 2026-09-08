@@ -422,11 +422,11 @@ export function ExpenseReport({
 
           {sectionHeads.length > 0 ? (
             <div
-              className={`pnl-tab-nav ${
+              className={
                 sectionHeads.length <= 2
-                  ? "pnl-expense-subnav-2"
-                  : "pnl-tab-nav--compact pnl-expense-cat-nav-multi"
-              }`}
+                  ? "pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-2"
+                  : `pnl-tab-nav pnl-expense-cat-nav-multi pnl-expense-cat-pills--n${sectionHeads.length}`
+              }
               role="tablist"
               aria-label={
                 section === "direct"

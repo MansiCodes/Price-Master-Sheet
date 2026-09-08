@@ -214,7 +214,7 @@
   max-width: 100%;
   /* Left/top/bottom pad; trailing ::after mirrors the left inset (overflow-safe) */
   padding: 0.28rem 0 0.28rem 0.28rem;
-  border-radius: 14px;
+  border-radius: 16px;
   background: #eef3f1;
   border: 1px solid var(--border, #d7e0dc);
   box-sizing: border-box;
@@ -240,7 +240,7 @@
   font-weight: 700;
   height: 2.35rem;
   padding: 0 0.55rem;
-  border-radius: 10px;
+  border-radius: 999px;
   cursor: pointer;
   text-align: center;
   white-space: nowrap;
@@ -263,10 +263,9 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: visible;
 }
 
-/* Separate pill buttons with border and teal gradient selection */
 .pnl-tab-nav--fit {
   display: flex !important;
   flex-direction: row !important;
@@ -276,8 +275,7 @@
   max-width: 100%;
 }
 
-/* Direct / Indirect — pill size matches label text (desktop/tablet) */
-.pnl-expense-type-nav,
+/* Separate pill buttons (purchase source etc.) — NOT Direct/Indirect tabs */
 .pnl-expense-subnav-2,
 .pnl-expense-subnav {
   display: flex !important;
@@ -297,12 +295,6 @@
   box-sizing: border-box !important;
 }
 
-.pnl-expense-type-nav.pnl-tab-nav--fit {
-  width: fit-content !important;
-  max-width: 100% !important;
-}
-
-.pnl-expense-type-nav button,
 .pnl-expense-subnav-2 button,
 .pnl-expense-subnav button {
   appearance: none !important;
@@ -327,7 +319,6 @@
   box-sizing: border-box !important;
 }
 
-.pnl-expense-type-nav button:hover:not(.is-active),
 .pnl-expense-subnav-2 button:hover:not(.is-active),
 .pnl-expense-subnav button:hover:not(.is-active) {
   background: #f0f5f3 !important;
@@ -335,7 +326,6 @@
   color: var(--teal-ink, #0e5a54) !important;
 }
 
-.pnl-expense-type-nav button.is-active,
 .pnl-expense-subnav-2 button.is-active,
 .pnl-expense-subnav button.is-active {
   background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%)) !important;
@@ -344,25 +334,28 @@
   box-shadow: 0 3px 10px rgba(18, 114, 105, 0.25) !important;
 }
 
-/* Multi-category expense pills — content-sized on desktop; one row */
-.pnl-expense-cat-nav-multi {
+/* Direct / Indirect — separate capsule pills (like Import Excel curve) */
+.pnl-expense-type-nav,
+.pnl-expense-type-nav.pnl-tab-nav--fit {
   display: flex !important;
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
+  gap: 0.5rem !important;
   width: fit-content !important;
   max-width: 100% !important;
   min-width: 0 !important;
-  padding: 0.3rem 0.4rem !important;
-  border-radius: 14px !important;
-  background: #eef3f1 !important;
-  border: 1px solid var(--border, #d7e0dc) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
   box-sizing: border-box !important;
-  gap: 0.2rem !important;
-  overflow-x: visible !important;
 }
 
-.pnl-expense-cat-nav-multi button {
+.pnl-expense-type-nav button {
   appearance: none !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -370,21 +363,104 @@
   flex: 0 0 auto !important;
   width: fit-content !important;
   min-width: 0 !important;
+  height: 2.45rem !important;
+  padding: 0 1.15rem !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  border: 1.5px solid var(--border-strong, #c5d3cd) !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: var(--fg-muted, #475569) !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  box-sizing: border-box !important;
+}
+
+.pnl-expense-type-nav button:hover:not(.is-active) {
+  background: #f0f5f3 !important;
+  border-color: var(--teal, #127269) !important;
+  color: var(--teal-ink, #0e5a54) !important;
+}
+
+.pnl-expense-type-nav button.is-active {
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%)) !important;
+  color: #ffffff !important;
+  border: 1.5px solid transparent !important;
+  box-shadow: 0 3px 10px rgba(18, 114, 105, 0.25) !important;
+}
+
+/* Expense category counts — equal columns inside segmented track */
+.pnl-expense-cat-pills--n2,
+.pnl-expense-cat-nav--cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.pnl-expense-cat-pills--n3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.pnl-expense-cat-pills--n4,
+.pnl-expense-cat-pills--n5,
+.pnl-expense-cat-pills--n6,
+.pnl-expense-cat-pills--n7 {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.pnl-expense-cat-nav-multi.pnl-expense-cat-pills--n4 .pnl-expense-cat-label--full,
+.pnl-expense-cat-nav-multi .pnl-expense-cat-label--full,
+.pnl-expense-cat-nav .pnl-expense-cat-label--full {
+  display: inline !important;
+  white-space: nowrap;
+}
+
+.pnl-expense-cat-nav-multi .pnl-expense-cat-label--short,
+.pnl-expense-cat-nav-multi .pnl-expense-cat-label--stacked,
+.pnl-expense-cat-nav .pnl-expense-cat-label--short,
+.pnl-expense-cat-nav .pnl-expense-cat-label--stacked {
+  display: none !important;
+}
+
+/* Multi-category — one shared track; inner options stay pill-curved */
+.pnl-expense-cat-nav-multi {
+  display: grid !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  padding: 0.28rem !important;
+  border-radius: 1.35rem !important;
+  background: #eef3f1 !important;
+  border: 1px solid var(--border, #d7e0dc) !important;
+  box-sizing: border-box !important;
+  gap: 0.22rem !important;
+  overflow-x: visible !important;
+  flex-wrap: unset !important;
+}
+
+.pnl-expense-cat-nav-multi button {
+  appearance: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
   height: auto !important;
   min-height: 2.35rem !important;
-  padding: 0.35rem 0.7rem !important;
-  font-size: 0.78rem !important;
+  padding: 0.3rem 0.25rem !important;
+  font-size: 0.7rem !important;
   font-weight: 700 !important;
   letter-spacing: 0 !important;
   text-align: center !important;
   white-space: nowrap !important;
   text-overflow: clip !important;
-  overflow: visible !important;
-  line-height: 1.15 !important;
-  border-radius: 10px !important;
+  overflow: hidden !important;
   border: 0 !important;
+  border-radius: 999px !important;
   background: transparent !important;
   color: var(--fg-muted, #5b6b66) !important;
+  box-shadow: none !important;
   cursor: pointer !important;
   box-sizing: border-box !important;
 }
@@ -819,6 +895,43 @@
   box-shadow: var(--teal-fill-shadow, none);
 }
 
+/* Purchase Vendor / ATCL — always two equal columns; labels wrap to 2 lines */
+.pnl-purchase-source-nav,
+.pnl-expense-subnav.pnl-purchase-source-nav {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  gap: 0.4rem !important;
+  flex-wrap: unset !important;
+  overflow: visible !important;
+}
+
+.pnl-purchase-source-nav button,
+.pnl-expense-subnav.pnl-purchase-source-nav button {
+  width: 100% !important;
+  flex: none !important;
+  min-width: 0 !important;
+  height: auto !important;
+  min-height: 2.5rem !important;
+  padding: 0.35rem 0.45rem !important;
+  white-space: normal !important;
+  line-height: 1.15 !important;
+  border-radius: 12px !important;
+}
+
+.pnl-purchase-source-nav .pnl-tab-nav__stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: 1.15;
+  text-align: center;
+}
+
 /* CAT-6: 5 categories on one row */
 .pnl-expense-subnav--cat6 {
   display: grid;
@@ -844,12 +957,7 @@
 
 /* Direct / Indirect — same segmented track as main P&L tabs */
 .pnl-expense-type-nav {
-  margin: 0 0 0.55rem;
-}
-
-.pnl-expense-type-nav button {
-  padding: 0 1.1rem !important;
-  font-size: 0.8rem !important;
+  margin: 0;
 }
 
 /* Category options — one row; column count matches number of buttons */
@@ -857,14 +965,23 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.25rem;
-  margin: 0 0 0.85rem;
+  margin: 0;
   width: 100%;
   max-width: 100%;
   overflow-x: visible;
+  padding: 0.28rem;
+  border-radius: 1.35rem;
+  background: #eef3f1;
+  border: 1px solid var(--border, #d7e0dc);
+  box-sizing: border-box;
 }
 
 .pnl-expense-cat-nav--cols-1 {
   grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.pnl-expense-cat-nav--cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .pnl-expense-cat-nav--cols-4 {
@@ -881,10 +998,20 @@
   height: auto;
   min-height: 2.35rem;
   padding: 0.35rem 0.4rem;
-  white-space: normal;
+  white-space: nowrap;
   line-height: 1.15;
-  overflow: visible;
-  text-overflow: unset;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-muted, #5b6b66);
+  font-weight: 700;
+}
+
+.pnl-expense-cat-nav button.is-active {
+  background: var(--teal-fill);
+  color: var(--teal-active-text, #fff);
 }
 
 .pnl-report-panel--expense .pnl-report-panel__title {
@@ -1149,7 +1276,7 @@
     flex: none !important;
   }
 
-  /* Phone: equal-width Direct/Indirect; wrap / stack long category labels */
+  /* Phone: equal-width Direct/Indirect; category pills wrap so none are clipped */
   .pnl-expense-type-nav,
   .pnl-expense-type-nav.pnl-tab-nav--fit {
     width: 100% !important;
@@ -1161,24 +1288,48 @@
   }
 
   .pnl-expense-cat-nav-multi {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow-x: visible !important;
     align-items: stretch !important;
+    flex-wrap: unset !important;
   }
 
   .pnl-expense-cat-nav-multi button {
-    flex: 1 1 0 !important;
-    width: auto !important;
+    flex: none !important;
+    width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
-    min-height: 2.6rem !important;
+    min-height: 2.35rem !important;
     padding: 0.3rem 0.2rem !important;
     font-size: 0.62rem !important;
-    white-space: normal !important;
+    white-space: nowrap !important;
     line-height: 1.15 !important;
-    overflow: visible !important;
-    text-overflow: unset !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: transparent !important;
+  }
+
+  .pnl-expense-cat-nav-multi button.is-active,
+  .pnl-expense-cat-nav button.is-active {
+    background: var(--teal-fill) !important;
+    color: #fff !important;
+  }
+
+  .pnl-expense-cat-nav-multi .pnl-expense-cat-label--full,
+  .pnl-expense-cat-nav .pnl-expense-cat-label--full {
+    display: inline !important;
+  }
+
+  .pnl-expense-cat-nav-multi .pnl-expense-cat-label--short,
+  .pnl-expense-cat-nav-multi .pnl-expense-cat-label--stacked,
+  .pnl-expense-cat-nav .pnl-expense-cat-label--short,
+  .pnl-expense-cat-nav .pnl-expense-cat-label--stacked {
+    display: none !important;
   }
 
   .pnl-expense-cat-label--full {
@@ -1211,6 +1362,7 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.22rem;
     padding: 0.22rem;
+    border-radius: 16px !important;
   }
 
   /* Spacer is flex-only; hide it in the phone grid so it doesn’t add a cell */
@@ -1246,6 +1398,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    border-radius: 999px !important;
   }
 
   .pnl-expense-type-nav {
@@ -1253,9 +1406,14 @@
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    width: fit-content !important;
+    width: 100% !important;
     max-width: 100% !important;
-    overflow-x: auto !important;
+    overflow-x: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    gap: 0.45rem !important;
   }
 
   .pnl-expense-cat-nav {
@@ -1263,18 +1421,22 @@
     width: 100% !important;
     max-width: 100% !important;
     overflow-x: visible !important;
+    border-radius: 1.35rem !important;
   }
 
   .pnl-expense-cat-nav-multi {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    flex-direction: unset !important;
+    flex-wrap: unset !important;
     align-items: stretch !important;
     width: 100% !important;
     max-width: 100% !important;
-    grid-template-columns: none !important;
-    overflow-x: hidden !important;
-    padding: 0.3rem 0.35rem !important;
+    overflow-x: visible !important;
+    padding: 0.22rem !important;
+    background: #eef3f1 !important;
+    border: 1px solid var(--border, #d7e0dc) !important;
+    border-radius: 1.35rem !important;
   }
 
   .pnl-expense-type-nav button {
@@ -1282,17 +1444,25 @@
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    width: fit-content !important;
-    flex: 0 0 auto !important;
+    width: auto !important;
+    flex: 1 1 0 !important;
     min-width: 0 !important;
-    height: 2.35rem !important;
-    padding: 0 1rem !important;
-    font-size: 0.78rem !important;
+    height: 2.45rem !important;
+    padding: 0 0.65rem !important;
+    font-size: 0.74rem !important;
     font-weight: 700 !important;
     white-space: nowrap !important;
     text-align: center !important;
+    border: 1.5px solid var(--border-strong, #c5d3cd) !important;
     border-radius: 999px !important;
+    background: #ffffff !important;
     box-sizing: border-box !important;
+  }
+
+  .pnl-expense-type-nav button.is-active {
+    background: var(--teal-fill) !important;
+    color: #fff !important;
+    border-color: transparent !important;
   }
 
   .pnl-expense-cat-nav button {
@@ -1576,16 +1746,50 @@
     padding: 0 0.65rem !important;
   }
 
+  /* Narrow phones: Indirect categories → 2×2 inside segmented track */
+  .pnl-expense-cat-pills--n3,
+  .pnl-expense-cat-pills--n4,
+  .pnl-expense-cat-pills--n5,
+  .pnl-expense-cat-pills--n6,
+  .pnl-expense-cat-pills--n7 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .pnl-expense-cat-nav-multi button {
+    min-height: 2.35rem !important;
+    font-size: 0.62rem !important;
+  }
+
+  .pnl-purchase-source-nav,
+  .pnl-expense-subnav.pnl-purchase-source-nav {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .pnl-purchase-source-nav button,
+  .pnl-expense-subnav.pnl-purchase-source-nav button {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 2.55rem !important;
+    white-space: normal !important;
+    font-size: 0.68rem !important;
+    padding: 0.3rem 0.35rem !important;
+  }
+
   .pnl-expense-cat-nav-multi {
-    display: flex !important;
-    flex-wrap: nowrap !important;
-    grid-template-columns: none !important;
-    overflow-x: hidden !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    flex-wrap: unset !important;
+    overflow-x: visible !important;
     padding: 0.35rem 0.45rem !important;
   }
 
   /* Keep multi-line category labels readable; don't inherit fixed tab height */
   .pnl-expense-cat-nav-multi button {
+    flex: none !important;
+    width: 100% !important;
     height: auto !important;
     min-height: 2.4rem !important;
     white-space: normal !important;

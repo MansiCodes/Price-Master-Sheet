@@ -16,7 +16,7 @@ import {
   isSuperAdmin,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
-import { getPlantRmSummary, getPlantSegment } from "@/lib/plant-segments";
+import { getPlantRmSummary, getPlantSegment, getPlantDisplayName, isLegacyMergedPlantCode } from "@/lib/plant-segments";
 
 export const dynamic = "force-dynamic";
 
@@ -83,20 +83,28 @@ export default async function AppLayout({
       : [];
 
   const switchablePlants = switchablePlantsRaw
+    .filter((p) => !isLegacyMergedPlantCode(p.code))
     .map((p) => ({
       ...p,
+      name: getPlantDisplayName(p.code, p.name),
       rmSummary: getPlantRmSummary(p.code),
       sortOrder: getPlantSegment(p.code)?.sortOrder ?? 99,
     }))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
 
-  const selectedPlant =
+  const selectedPlantRaw =
     selectedPlantId && user
       ? await prisma.plant.findUnique({
           where: { id: selectedPlantId },
           select: { id: true, name: true, code: true },
         })
       : null;
+  const selectedPlant = selectedPlantRaw
+    ? {
+        ...selectedPlantRaw,
+        name: getPlantDisplayName(selectedPlantRaw.code, selectedPlantRaw.name),
+      }
+    : null;
 
   const showPnl = role ? canViewPnl(role) : false;
   const pnlSalesPurchaseOnly = role ? isAccountantPnlLimited(role) : false;

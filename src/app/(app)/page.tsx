@@ -13,6 +13,7 @@ import {
   seesOwnEntriesOnly,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
+import { getPlantDisplayName } from "@/lib/plant-segments";
 import { DashboardHome } from "@/components/dashboard/DashboardHome";
 import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
 import { getMachineProductionHomeMetrics } from "@/lib/machine-production/home-metrics";
@@ -135,7 +136,14 @@ export default async function DashboardPage({
       dateStr={dateStr}
       canEnter={canEnterData(user.globalRole)}
       showNet={showNet}
-      plant={primary}
+      plant={
+        primary
+          ? {
+              ...primary,
+              name: getPlantDisplayName(primary.code, primary.name),
+            }
+          : null
+      }
       shiftModules={shiftModules}
       scope={primary ? "plant" : "org"}
       machineProductionMetrics={machineProductionMetrics}

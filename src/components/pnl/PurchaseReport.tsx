@@ -580,7 +580,11 @@ export function PurchaseReport({
           ? "Stock Taken from ATCL"
           : t("purchaseTitle")}
       </h3>
-      <div className="pnl-expense-subnav" role="tablist" aria-label="Purchase type">
+      <div
+        className="pnl-expense-subnav pnl-purchase-source-nav"
+        role="tablist"
+        aria-label="Purchase type"
+      >
         <button
           type="button"
           role="tab"
@@ -591,7 +595,10 @@ export function PurchaseReport({
             setPage(1);
           }}
         >
-          Purchase from Vendor
+          <span className="pnl-tab-nav__stacked">
+            <span>Purchase from</span>
+            <span>Vendor</span>
+          </span>
         </button>
         <button
           type="button"
@@ -603,7 +610,10 @@ export function PurchaseReport({
             setPage(1);
           }}
         >
-          Stock Taken from ATCL
+          <span className="pnl-tab-nav__stacked">
+            <span>Stock Taken</span>
+            <span>from ATCL</span>
+          </span>
         </button>
       </div>
       {error ? <div className="alert alert--error">{error}</div> : null}

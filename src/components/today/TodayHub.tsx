@@ -40,7 +40,7 @@ import {
   pvcStockEntryNotes,
   type PvcStockEntryType,
 } from "@/lib/plant-catalogs";
-import { isCat6Plant, mapCat6PettyNature } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import "./today-hub.css";
 
 export type TodayModuleKey =
@@ -276,7 +276,7 @@ export function TodayHub({
   );
   const isPvc = plantCode.toUpperCase() === "PVC";
   const isUpcast = plantCode.toUpperCase() === "UPCAST";
-  const isQuad = plantCode.toUpperCase() === "QUAD";
+  const isQuad = isQuadSignalPlant(plantCode);
   const isConductor = plantCode.toUpperCase() === "CONDUCTOR";
   const saleTypeOptions = isConductor ? CONDUCTOR_SALE_TYPES : SALE_TYPES;
   const isPvcStyleExpense = isPvc || isUpcast;
@@ -569,9 +569,8 @@ export function TodayHub({
       ? "Miscellaneous"
       : plantCode.toUpperCase() === "UPCAST" ||
           plantCode.toUpperCase() === "LEDROPE" ||
-          plantCode.toUpperCase() === "SIGNALLING" ||
           plantCode.toUpperCase() === "SLSSL" ||
-          plantCode.toUpperCase() === "QUAD"
+          isQuadSignalPlant(plantCode)
         ? "Electricity"
         : "Fuel & Power",
   );
@@ -743,9 +742,8 @@ export function TodayHub({
         ? "Miscellaneous"
         : isUpcast ||
             plantCode.toUpperCase() === "LEDROPE" ||
-            plantCode.toUpperCase() === "SIGNALLING" ||
             plantCode.toUpperCase() === "SLSSL" ||
-            plantCode.toUpperCase() === "QUAD"
+            isQuad
           ? "Electricity"
           : "Fuel & Power",
     );
@@ -1677,7 +1675,14 @@ export function TodayHub({
                 ) : null}
                 {purchaseSource === "atcl" ? null : (
                 <div className="form-grid two">
-                  <div className="field">
+                  <div
+                    className="field"
+                    title={
+                      isQuad && !quadSelectedMaterial
+                        ? "First choose raw material"
+                        : undefined
+                    }
+                  >
                     <label htmlFor="p-vendor">
                       {isCat6 || isQuad ? "Vendor's Name" : "Supplier name"}
                     </label>
