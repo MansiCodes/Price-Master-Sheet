@@ -263,10 +263,6 @@ const POWER_CABLE_SIZES = [
   "2 Core x 25 sqmm",
   "2 Core x 35 sqmm",
   "2 Core x 70 sqmm",
-  "2Core, 3Core, 4Core Armd (Size 1.5-185 SQMM)",
-  "2Core, 3Core, 4Core Un-Armd (Size 1.5-185 SQMM)",
-  "3.5 CORE (Size 25-185 SQMM)",
-  "3.5 Core x 70 sqmm",
   "Other",
 ] as const;
 
