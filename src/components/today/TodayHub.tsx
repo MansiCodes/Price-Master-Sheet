@@ -2500,13 +2500,7 @@ export function TodayHub({
                                     </li>
                                   ))}
                                 </ul>
-                              ) : (
-                                <p className="field-hint">
-                                  No matching sales for this size today. Enter
-                                  the invoice on the Sales tab (description
-                                  should include core × size, e.g. 12C × 1.5).
-                                </p>
-                              )}
+                              ) : null}
                             </div>
                             {stockWipCalc?.warnings?.length ? (
                               <div className="alert alert--error">
