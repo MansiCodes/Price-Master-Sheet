@@ -46,6 +46,12 @@ import {
   type PvcStockEntryType,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
+import {
+  calculateQuadSignalWip,
+  displayKm,
+  resolveQuadSignalVariant,
+  type WipCalcResult,
+} from "@/lib/quad-signal-wip";
 import "./today-hub.css";
 
 export type TodayModuleKey =
@@ -464,6 +470,27 @@ export function TodayHub({
   const [stockProcessQtys, setStockProcessQtys] = useState<
     Record<string, string>
   >({});
+  const [stockWipOpening, setStockWipOpening] = useState<
+    Record<string, number>
+  >({});
+  const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
+  const [stockWipSalesLines, setStockWipSalesLines] = useState<
+    Array<{
+      id: string;
+      billNumber: string | null;
+      customerName: string;
+      itemDescription: string;
+      quantity: number;
+      unit: string;
+    }>
+  >([]);
+  const [stockWipOpeningFrom, setStockWipOpeningFrom] = useState<string | null>(
+    null,
+  );
+  const [stockWipLoading, setStockWipLoading] = useState(false);
+  const [stockWipFactorNote, setStockWipFactorNote] = useState<string | null>(
+    null,
+  );
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
@@ -494,6 +521,13 @@ export function TodayHub({
   }, [isQuad, stockKind, stockCable]);
 
   useEffect(() => {
+    if (!isQuad) return;
+    if (stockKind === "cable") {
+      setStockUnit((u) => (u === "KGS" || !u ? "KM" : u));
+    }
+  }, [isQuad, stockKind]);
+
+  useEffect(() => {
     if (!isQuad || stockKind !== "cable") return;
     const sizes = getQuadSignalCableSizes(
       stockCable === "Other" ? "Other" : stockCable,
@@ -504,6 +538,128 @@ export function TodayHub({
     }
     setStockProcessQtys({});
   }, [isQuad, stockKind, stockCable]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const resolvedQuadCableName =
+    stockCable === "Other" ? stockCableOther.trim() : stockCable.trim();
+  const resolvedQuadSizeName =
+    stockCableSize === "Other"
+      ? stockCableSizeOther.trim()
+      : stockCableSize.trim();
+
+  useEffect(() => {
+    if (!isQuad || stockKind !== "cable") {
+      setStockWipOpening({});
+      setStockWipSalesKm(0);
+      setStockWipSalesLines([]);
+      setStockWipOpeningFrom(null);
+      setStockWipFactorNote(null);
+      return;
+    }
+    if (!resolvedQuadCableName || !resolvedQuadSizeName) return;
+
+    const ac = new AbortController();
+    setStockWipLoading(true);
+    const q = new URLSearchParams({
+      date: entryDate,
+      cable: resolvedQuadCableName,
+      size: resolvedQuadSizeName,
+    });
+    fetch(`/api/plants/${plantId}/stock/quad-wip-context?${q}`, {
+      signal: ac.signal,
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load WIP context");
+        return res.json() as Promise<{
+          opening: Record<string, number>;
+          openingFromDate: string | null;
+          salesKm: number;
+          sales: typeof stockWipSalesLines;
+          variant: {
+            coreCount: number;
+            lengthFactor: number;
+            factorConfirmed: boolean;
+          } | null;
+        }>;
+      })
+      .then((data) => {
+        setStockWipOpening(data.opening ?? {});
+        setStockWipOpeningFrom(data.openingFromDate);
+        setStockWipSalesKm(Number(data.salesKm) || 0);
+        setStockWipSalesLines(data.sales ?? []);
+        if (data.variant) {
+          setStockWipFactorNote(
+            data.variant.factorConfirmed
+              ? `Cores ${data.variant.coreCount} · length factor ${data.variant.lengthFactor}`
+              : `Cores ${data.variant.coreCount} · length factor ${data.variant.lengthFactor} (provisional — confirm with TJ)`,
+          );
+        } else {
+          setStockWipFactorNote(
+            "Core count / length factor not resolved for this size.",
+          );
+        }
+      })
+      .catch((err) => {
+        if (ac.signal.aborted) return;
+        console.error(err);
+        setStockWipOpening({});
+        setStockWipSalesKm(0);
+        setStockWipSalesLines([]);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setStockWipLoading(false);
+      });
+
+    return () => ac.abort();
+  }, [
+    isQuad,
+    stockKind,
+    plantId,
+    entryDate,
+    resolvedQuadCableName,
+    resolvedQuadSizeName,
+  ]);
+
+  const stockWipCalc: WipCalcResult | null = useMemo(() => {
+    if (!isQuad || stockKind !== "cable" || quadCableProcessFields.length === 0)
+      return null;
+    const variant = resolveQuadSignalVariant(resolvedQuadSizeName);
+    if (!variant) return null;
+    const production: Record<string, number> = {};
+    for (const name of quadCableProcessFields) {
+      const raw = stockProcessQtys[name]?.trim() ?? "";
+      if (raw === "") {
+        production[name] = 0;
+        continue;
+      }
+      const n = Number(raw);
+      production[name] = Number.isFinite(n) && n >= 0 ? n : 0;
+    }
+    return calculateQuadSignalWip({
+      processes: quadCableProcessFields,
+      opening: stockWipOpening,
+      production,
+      salesKm: stockWipSalesKm,
+      coreCount: variant.coreCount,
+      lengthFactor: variant.lengthFactor,
+    });
+  }, [
+    isQuad,
+    stockKind,
+    quadCableProcessFields,
+    stockProcessQtys,
+    stockWipOpening,
+    stockWipSalesKm,
+    resolvedQuadSizeName,
+  ]);
+
+  useEffect(() => {
+    if (!stockWipCalc?.finishedProcess) return;
+    const fin = stockWipCalc.byProcess[stockWipCalc.finishedProcess];
+    if (fin == null || !Number.isFinite(fin)) return;
+    // Keep valuation qty aligned with finished closing (km as entered)
+    setStockQty(String(fin));
+  }, [stockWipCalc]);
 
   useEffect(() => {
     if (!isQuad) return;
@@ -1159,10 +1315,6 @@ export function TodayHub({
             );
             return;
           }
-          if (stockQty === "" || !(issuedQty >= 0)) {
-            fail("Enter quantity (zero or more).");
-            return;
-          }
           if (!Number.isFinite(closingRate) || closingRate < 0) {
             fail("Enter a rate for this stock entry.");
             return;
@@ -1170,30 +1322,61 @@ export function TodayHub({
           const processes: Record<string, number> = {};
           for (const name of quadCableProcessFields) {
             const raw = stockProcessQtys[name]?.trim() ?? "";
-            if (raw === "") continue;
+            if (raw === "") {
+              processes[name] = 0;
+              continue;
+            }
             const n = Number(raw);
             if (!Number.isFinite(n) || n < 0) {
-              fail(`Process "${name}" must be a number ≥ 0.`);
+              fail(`Production "${name}" must be a number ≥ 0.`);
               return;
             }
             processes[name] = n;
           }
+          const variant = resolveQuadSignalVariant(resolvedSize);
+          if (!variant) {
+            fail(
+              "Could not resolve core count / length factor for this size.",
+            );
+            return;
+          }
+          const wip = calculateQuadSignalWip({
+            processes: quadCableProcessFields,
+            opening: stockWipOpening,
+            production: processes,
+            salesKm: stockWipSalesKm,
+            coreCount: variant.coreCount,
+            lengthFactor: variant.lengthFactor,
+          });
+          if (wip.warnings.length > 0) {
+            fail(wip.warnings[0] ?? "WIP validation failed.");
+            return;
+          }
+          const finishedQty =
+            wip.finishedProcess != null
+              ? (wip.byProcess[wip.finishedProcess] ?? issuedQty)
+              : issuedQty;
           result = await postJson(`/api/plants/${plantId}/stock`, {
             date: entryDate,
             shift,
             itemName: `${resolvedCable} · ${resolvedSize}`,
             category: "FG",
-            unit: stockUnit || "MTR",
-            quantity: issuedQty,
+            unit: stockUnit || "KM",
+            quantity: finishedQty,
             rate: closingRate,
-            value: closingValue,
+            value: finishedQty * closingRate,
             notes: encodeQuadSignalStockNotes(
               {
-                v: 1,
+                v: 2,
                 kind: "cable",
                 cable: resolvedCable,
                 size: resolvedSize,
-                processes,
+                production: processes,
+                opening: stockWipOpening,
+                closing: wip.byProcess,
+                processes: wip.byProcess,
+                salesKm: stockWipSalesKm,
+                calcSnapshot: wip.calcSnapshot,
               },
               stockNotes.trim() || `Closing stock as on ${entryDate}`,
             ),
@@ -2209,44 +2392,147 @@ export function TodayHub({
                           </div>
                         ) : null}
                         {quadCableProcessFields.length > 0 ? (
-                          <div className="field">
+                          <div className="field qs-wip">
                             <p
                               className="field-hint"
                               style={{ marginBottom: "0.45rem" }}
                             >
-                              Process quantities (optional — for future
-                              calculation)
+                              Enter <strong>today&apos;s production</strong>{" "}
+                              (km). Opening comes from the prior day closing;
+                              Sales comes from the Sales tab (read-only).
+                              {stockWipLoading
+                                ? " Loading opening / sales…"
+                                : null}
                             </p>
+                            {stockWipFactorNote ? (
+                              <p className="field-hint qs-wip__factor">
+                                {stockWipFactorNote}
+                                {stockWipOpeningFrom
+                                  ? ` · Opening from ${stockWipOpeningFrom}`
+                                  : " · No prior closing (opening = 0)"}
+                              </p>
+                            ) : null}
+                            <div className="qs-wip__table-wrap">
+                              <table className="qs-wip__table">
+                                <thead>
+                                  <tr>
+                                    <th>Process</th>
+                                    <th>Opening</th>
+                                    <th>Production</th>
+                                    <th>Out / Sales</th>
+                                    <th>Closing</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {quadCableProcessFields.map((proc) => {
+                                    const stage = stockWipCalc?.stages.find(
+                                      (s) => s.process === proc,
+                                    );
+                                    const outLabel =
+                                      stage?.outboundKind === "sales"
+                                        ? `Sales ${stage.outbound}`
+                                        : stage?.outboundKind ===
+                                            "insulation_to_laying"
+                                          ? `→ Lay ${stage.outbound}`
+                                          : stage?.outboundKind ===
+                                              "next_process"
+                                            ? String(stage.outbound)
+                                            : "—";
+                                    return (
+                                      <tr key={proc}>
+                                        <td>{proc}</td>
+                                        <td className="qs-wip__num">
+                                          {stage?.opening ??
+                                            stockWipOpening[proc] ??
+                                            0}
+                                        </td>
+                                        <td>
+                                          <DecimalInput
+                                            id={`st-proc-${proc}`}
+                                            value={
+                                              stockProcessQtys[proc] ?? ""
+                                            }
+                                            onChange={(next) =>
+                                              setStockProcessQtys((prev) => ({
+                                                ...prev,
+                                                [proc]: next,
+                                              }))
+                                            }
+                                            placeholder="0"
+                                          />
+                                        </td>
+                                        <td className="qs-wip__num">
+                                          {outLabel}
+                                        </td>
+                                        <td className="qs-wip__num">
+                                          {stage != null
+                                            ? `${stage.closing}${
+                                                proc
+                                                  .toLowerCase()
+                                                  .includes("insulation")
+                                                  ? ` (~${displayKm(stage.closing)})`
+                                                  : ""
+                                              }`
+                                            : "—"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                            <div className="qs-wip__sales">
+                              <div className="field">
+                                <label>Sales (from Sales tab)</label>
+                                <input
+                                  readOnly
+                                  value={`${stockWipSalesKm} km`}
+                                  aria-label="Sales quantity from Sales ledger"
+                                />
+                              </div>
+                              {stockWipSalesLines.length > 0 ? (
+                                <ul className="qs-wip__sales-list">
+                                  {stockWipSalesLines.map((s) => (
+                                    <li key={s.id}>
+                                      {s.billNumber || "—"} · {s.customerName} ·{" "}
+                                      {s.itemDescription} · {s.quantity}{" "}
+                                      {s.unit}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p className="field-hint">
+                                  No matching sales for this size today. Enter
+                                  the invoice on the Sales tab (description
+                                  should include core × size, e.g. 12C × 1.5).
+                                </p>
+                              )}
+                            </div>
+                            {stockWipCalc?.warnings?.length ? (
+                              <div className="alert alert--error">
+                                {stockWipCalc.warnings.join(" ")}
+                              </div>
+                            ) : null}
                             <div className="form-grid two">
-                              {quadCableProcessFields.map((proc) => (
-                                <div className="field" key={proc}>
-                                  <label htmlFor={`st-proc-${proc}`}>
-                                    {proc}
-                                  </label>
-                                  <DecimalInput
-                                    id={`st-proc-${proc}`}
-                                    value={stockProcessQtys[proc] ?? ""}
-                                    onChange={(next) =>
-                                      setStockProcessQtys((prev) => ({
-                                        ...prev,
-                                        [proc]: next,
-                                      }))
-                                    }
-                                    placeholder="0"
-                                  />
-                                </div>
-                              ))}
-                              {quadCableProcessFields.length % 2 === 1 ? (
-                                <div className="field">
-                                  <label htmlFor="st-rate">Rate</label>
-                                  <DecimalInput
-                                    id="st-rate"
-                                    required
-                                    value={stockRate}
-                                    onChange={setStockRate}
-                                  />
-                                </div>
-                              ) : null}
+                              <div className="field">
+                                <label htmlFor="st-rate">Rate</label>
+                                <DecimalInput
+                                  id="st-rate"
+                                  required
+                                  value={stockRate}
+                                  onChange={setStockRate}
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor="st-qty-fin">
+                                  Finished qty (auto)
+                                </label>
+                                <DecimalInput
+                                  id="st-qty-fin"
+                                  value={stockQty}
+                                  onChange={setStockQty}
+                                />
+                              </div>
                             </div>
                           </div>
                         ) : null}
@@ -2326,6 +2612,22 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
+                {isQuad && stockKind === "cable" && quadCableProcessFields.length > 0 ? (
+                  <div className="field">
+                    <label htmlFor="st-unit">Unit</label>
+                    <SelectMenu
+                      id="st-unit"
+                      value={
+                        stockCatalog.units.includes(stockUnit)
+                          ? stockUnit
+                          : stockCatalog.defaultUnit
+                      }
+                      options={stockCatalog.units}
+                      required
+                      onChange={setStockUnit}
+                    />
+                  </div>
+                ) : (
                 <div
                   className={
                     isQuad &&
@@ -2397,6 +2699,7 @@ export function TodayHub({
                     </div>
                   ) : null}
                 </div>
+                )}
                 {stockPurchaseRateLoading ? (
                   <p className="field-hint">Loading rate from purchase history…</p>
                 ) : null}

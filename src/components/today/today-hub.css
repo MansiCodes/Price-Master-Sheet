@@ -787,3 +787,48 @@
 .today-entries__table tr:last-child td {
   border-bottom: 0;
 }
+
+/* Quad + Signal WIP stock table */
+.qs-wip__table-wrap {
+  overflow-x: auto;
+  margin: 0.5rem 0 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 8px;
+}
+.qs-wip__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.qs-wip__table th,
+.qs-wip__table td {
+  padding: 0.4rem 0.45rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+  vertical-align: middle;
+}
+.qs-wip__table th {
+  text-align: left;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+.qs-wip__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qs-wip__table input {
+  width: 100%;
+  min-width: 4.5rem;
+}
+.qs-wip__factor {
+  margin: 0 0 0.35rem;
+}
+.qs-wip__sales {
+  margin-bottom: 0.75rem;
+}
+.qs-wip__sales-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}

@@ -15,6 +15,7 @@ import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
 import { collectStockPhotoUrls } from "@/lib/bill-photos";
 import {
+  getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
   PVC_STOCK_ENTRY_TYPES,
 } from "@/lib/plant-catalogs";
@@ -363,20 +364,51 @@ export function StockReport({
     },
     {
       key: "process",
-      label: "Process",
+      label: "Process WIP",
       wrap: true,
       render: (r) => {
         const { meta } = parseQuadSignalStockNotes(r.notes);
-        const procs = meta?.processes;
-        if (!procs || Object.keys(procs).length === 0) return "—";
-        return Object.entries(procs)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(", ");
+        if (!meta || meta.kind !== "cable") return "—";
+        const procs = getQuadSignalCableProcesses(meta.cable ?? "");
+        const production = meta.production ?? {};
+        const opening = meta.opening ?? {};
+        const closing = meta.closing ?? meta.processes ?? {};
+        if (
+          Object.keys(closing).length === 0 &&
+          Object.keys(production).length === 0
+        ) {
+          return "—";
+        }
+        const lines = (procs.length ? procs : Object.keys(closing)).map(
+          (name) => {
+            const o = opening[name];
+            const p = production[name];
+            const c = closing[name];
+            const bits: string[] = [name];
+            if (o != null) bits.push(`O:${o}`);
+            if (p != null) bits.push(`P:${p}`);
+            if (c != null) bits.push(`C:${c}`);
+            return bits.join(" ");
+          },
+        );
+        return lines.join(" · ");
+      },
+    },
+    {
+      key: "salesKm",
+      label: "Sales",
+      align: "right",
+      compact: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        if (meta.salesKm == null) return "—";
+        return `${meta.salesKm}`;
       },
     },
     {
       key: "qty",
-      label: "Qty",
+      label: "Finished qty",
       align: "right",
       compact: true,
       render: (r) => `${Number(r.quantity)} ${r.unit}`,

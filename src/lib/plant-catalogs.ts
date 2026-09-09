@@ -334,23 +334,25 @@ export const QUAD_SIGNAL_CABLE_SIZES: Record<string, readonly string[]> = {
   Other: ["Other"],
 };
 
+/** Signalling: Insulation → Laying → Inner Sheath → DST → Outer Sheath (TJ Sir). */
 const SIGNALLING_PROCESSES = [
   "Insulation",
   "Laying",
   "Inner Sheath",
-  "Outer Sheath",
   "DST",
+  "Outer Sheath",
 ] as const;
 
+/** Quad: Insulation → Single Quad → Laying → Inner → Screening → Intermediate → DST → Outer (TJ Sir). */
 const QUAD_PROCESSES = [
   "Insulation",
   "Single Quad",
   "Laying",
   "Inner",
-  "Outer",
   "Screening",
   "Intermediate",
   "DST",
+  "Outer",
 ] as const;
 
 const POWER_PROCESSES = [
@@ -388,11 +390,26 @@ export function getQuadSignalCableProcesses(cable: string): readonly string[] {
 }
 
 export type QuadSignalStockMeta = {
-  v: 1;
+  /** v1 = legacy process snapshot; v2 = production + WIP closing snapshot. */
+  v: 1 | 2;
   kind: "raw" | "cable";
   cable?: string;
   size?: string;
+  /** Legacy (v1) or alias: treated as closing when opening/closing absent. */
   processes?: Record<string, number>;
+  /** Today's production by process (v2). */
+  production?: Record<string, number>;
+  opening?: Record<string, number>;
+  closing?: Record<string, number>;
+  /** Finished-stock sales km summed from Sales ledger (v2). */
+  salesKm?: number;
+  calcSnapshot?: {
+    coreCount: number;
+    lengthFactor: number;
+    layingProduced: number;
+    insulationConsumed: number;
+    salesKm: number;
+  };
 };
 
 const QS_STOCK_PREFIX = "QSSTOCK:";
@@ -420,13 +437,27 @@ export function parseQuadSignalStockNotes(notes: string | null | undefined): {
   const userNotes = nl >= 0 ? rest.slice(nl + 1).trim() : "";
   try {
     const meta = JSON.parse(jsonPart) as QuadSignalStockMeta;
-    if (meta?.v === 1 && (meta.kind === "raw" || meta.kind === "cable")) {
+    if (
+      (meta?.v === 1 || meta?.v === 2) &&
+      (meta.kind === "raw" || meta.kind === "cable")
+    ) {
       return { meta, userNotes };
     }
   } catch {
     /* ignore */
   }
   return { meta: null, userNotes: raw };
+}
+
+/** Closing balances from a stock notes meta (v2 closing, else v1 processes). */
+export function quadSignalClosingFromMeta(
+  meta: QuadSignalStockMeta | null | undefined,
+): Record<string, number> {
+  if (!meta || meta.kind !== "cable") return {};
+  if (meta.closing && Object.keys(meta.closing).length > 0) return meta.closing;
+  if (meta.processes && Object.keys(meta.processes).length > 0)
+    return meta.processes;
+  return {};
 }
 
 /** @deprecated Prefer Raw Materials / Cable split UI. Kept for catalog fallbacks. */
