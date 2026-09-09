@@ -7,6 +7,11 @@ import { prisma } from "@/lib/db";
 import { canAccessPlant, canEnterExpenseData } from "@/lib/rbac";
 import { toIsoDateString, parseDateOnly, dateOnlyRegex } from "@/lib/dates";
 import { safeSyncDailyExpenseMarker } from "@/lib/daily-expense-marker";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 type Ctx = { params: Promise<{ plantId: string }> };
 
@@ -47,12 +52,15 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
     select: { code: true },
   });
   const rows = await prisma.electricityRent.findMany({
-    where: { plantId },
+    where: { ...pScope },
     orderBy: { month: "asc" },
   });
 
@@ -81,6 +89,8 @@ export async function POST(request: Request, context: Ctx) {
       return NextResponse.json({ ok: false, message: "Forbidden", error: "Forbidden" }, { status: 403 });
     }
 
+    const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
     let json: unknown;
     try {
       json = await request.json();
@@ -105,7 +115,7 @@ export async function POST(request: Request, context: Ctx) {
     }
 
     const existing = await prisma.electricityRent.findUnique({
-      where: { plantId_month: { plantId, month } },
+      where: { plantId_month: { plantId: writePlantId, month } },
     });
 
     const toNum = (value: unknown): number | null => {
@@ -152,8 +162,8 @@ export async function POST(request: Request, context: Ctx) {
     };
 
     const row = await prisma.electricityRent.upsert({
-      where: { plantId_month: { plantId, month } },
-      create: { plantId, month, ...data },
+      where: { plantId_month: { plantId: writePlantId, month } },
+      create: { plantId: writePlantId, month, ...data },
       update: data,
     });
 
@@ -174,7 +184,7 @@ export async function POST(request: Request, context: Ctx) {
         parsed.data.expenseHead?.trim() ||
         (computedRent > 0 ? "Factory Rent" : "Electricity");
       await safeSyncDailyExpenseMarker({
-        plantId,
+        plantId: writePlantId,
         date: parseDateOnly(parsed.data.dailyDate),
         shift: parsed.data.shift,
         expenseHead: markerHead,

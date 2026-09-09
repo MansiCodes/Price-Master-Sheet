@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePlantAccess, requireSession } from "@/lib/api";
 import { dateOnlyRegex, parseDateOnly, toIsoDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { paginate } from "@/lib/ui/paginate";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -17,6 +18,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const { plantId } = await context.params;
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
+
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
 
   const sp = request.nextUrl.searchParams;
   const page = Number(sp.get("page")) || 1;
@@ -51,9 +55,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const toMonth = startOfUtcMonth(toDate);
   const entries = await prisma.electricityRent.findMany({
     where: register
-      ? { plantId }
+      ? { ...pScope }
       : {
-          plantId,
+          ...pScope,
           month: { gte: fromMonth, lte: toMonth },
         },
     orderBy: { month: "asc" },

@@ -4,7 +4,7 @@ import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { isSuperAdmin } from "@/lib/rbac";
+import { canViewUsersDirectory, isSuperAdmin } from "@/lib/rbac";
 
 const createSchema = z.object({
   name: z.string().min(1).max(120),
@@ -25,7 +25,8 @@ export async function GET() {
 
     if (
       session.user.globalRole !== GlobalRole.SUPER_ADMIN &&
-      session.user.globalRole !== GlobalRole.BUSINESS_HEAD
+      session.user.globalRole !== GlobalRole.BUSINESS_HEAD &&
+      !canViewUsersDirectory(session.user.globalRole)
     ) {
       return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
     }

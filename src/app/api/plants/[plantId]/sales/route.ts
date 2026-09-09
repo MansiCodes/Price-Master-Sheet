@@ -20,6 +20,11 @@ import { isCat6Plant } from "@/lib/plant-layout";
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const saleHeaderFields = {
   date: z.string().regex(dateOnlyRegex),
@@ -73,6 +78,9 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
@@ -92,7 +100,7 @@ export async function GET(
 
   const sales = await prisma.sale.findMany({
     where: {
-      plantId,
+      ...pScope,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
       ...(register && isPvc ? {} : filter),
       ...(cat6
@@ -151,6 +159,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -187,7 +197,7 @@ export async function POST(
         const salesValue = round2(item.quantity * item.rate);
         return prisma.sale.create({
           data: {
-            plantId,
+            plantId: writePlantId,
             date: day,
             shift: data.shift,
             type: data.type,
@@ -255,7 +265,7 @@ export async function POST(
 
   const sale = await prisma.sale.create({
     data: {
-      plantId,
+      plantId: writePlantId,
       date: parseDateOnly(data.date),
       shift: data.shift,
       type: data.type,

@@ -7,7 +7,7 @@ import { uploadPriceSheetPdf } from "@/lib/cloudinary";
 import { prisma } from "@/lib/db";
 import { toIndiaPhoneE164 } from "@/lib/phone";
 import { buildPriceSheetPdf } from "@/lib/price-sheet-pdf";
-import { canViewPriceSheet } from "@/lib/rbac";
+import { canViewPriceSheet, isViewer } from "@/lib/rbac";
 import type { CableRate } from "@/lib/sheets/types";
 
 const rateSchema = z.object({
@@ -39,6 +39,7 @@ const shareSchema = z.object({
 });
 
 function canShare(user: { globalRole: GlobalRole; canViewPriceSheet: boolean }) {
+  if (isViewer(user.globalRole)) return false;
   return user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user);
 }
 

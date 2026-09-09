@@ -1,6 +1,5 @@
-import { GlobalRole } from "@prisma/client";
+import { canViewPriceSheet, hasGlobalPlantAccess } from "@/lib/rbac";
 import { auth } from "@/auth";
-import { canViewPriceSheet } from "@/lib/rbac";
 import "./price-sheet.css";
 
 export default async function PriceSheetLayout({
@@ -11,7 +10,7 @@ export default async function PriceSheetLayout({
   const session = await auth();
   const allowed =
     !!session?.user &&
-    (session.user.globalRole === GlobalRole.SUPER_ADMIN ||
+    (hasGlobalPlantAccess(session.user.globalRole) ||
       canViewPriceSheet(session.user));
 
   if (!allowed) {

@@ -1062,11 +1062,14 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: nowrap;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.85rem;
   margin-top: 1rem;
   font-size: 0.85rem;
   color: var(--stone);
+  min-width: 0;
+  width: 100%;
+  overflow: visible;
 }
 
 .pagination__summary,
@@ -1074,76 +1077,68 @@ textarea {
 .pagination__controls {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.65rem;
   min-width: 0;
 }
 
 .pagination__summary {
   flex: 1 1 auto;
+  gap: 0.85rem;
+  min-width: 0;
 }
 
 .pagination__controls {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 640px) {
-  .pagination {
-    flex-wrap: nowrap;
-    gap: 0.4rem;
-    justify-content: space-between;
-  }
-
-  .pagination__info {
-    display: none;
-  }
-
-  .pagination__page-size span {
-    display: none;
-  }
-
-  .pagination__page-size-select {
-    min-width: 3.4rem;
-  }
-
-  .pagination__controls {
-    gap: 0.35rem;
-  }
-
-  .pagination button {
-    min-width: 2rem;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.78rem;
-  }
+  flex: 0 1 auto;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
 .pagination__page-size {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--fg-muted);
+  gap: 0.55rem;
 }
 
 .pagination__page-size-select {
   width: auto;
-  min-width: 4.6rem;
+  flex: 0 0 auto;
+  min-width: 4.75rem;
+}
+
+.pagination__page-size-select.select-menu,
+.pagination__page-size-select .select-menu {
+  width: auto;
+  min-width: 4.75rem;
 }
 
 .pagination__page-size-select .select-menu__trigger {
+  width: 100%;
+  min-width: 4.75rem;
   height: 2.1rem;
-  min-height: 0;
-  padding: 0 0.6rem;
+  min-height: 2.1rem;
+  padding: 0 0.65rem;
   border-radius: 8px;
   background: #fff;
-  color: var(--stone);
+  color: var(--stone, #1c1917);
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.pagination__page-size-select .select-menu__value {
+  flex: 1 1 auto;
+  min-width: 1.25rem;
+  color: inherit;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .pagination__page-size-select .select-menu__trigger:hover:not(:disabled) {
   border-color: var(--teal);
 }
 
-.pagination button {
+.pagination__controls button {
   border: 1px solid var(--border-strong);
   background: #fff;
   color: var(--stone);
@@ -1156,20 +1151,109 @@ textarea {
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 
-.pagination button:hover:not(:disabled) {
+.pagination__controls button:hover:not(:disabled) {
   border-color: var(--teal);
   color: var(--teal-ink);
 }
 
-.pagination button[aria-current="true"] {
+.pagination__controls button[aria-current="true"] {
   background: var(--teal-fill);
   border-color: var(--teal);
   color: #fff;
 }
 
-.pagination button:disabled {
+.pagination__controls button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Mobile: one row — [10] Prev  Page x/y  Next */
+@media (max-width: 640px) {
+  .pagination {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+  }
+
+  .pagination__info {
+    display: none;
+  }
+
+  .pagination__summary {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    gap: 0;
+  }
+
+  .pagination__page-size {
+    flex: 0 0 auto;
+    gap: 0;
+  }
+
+  .pagination__page-size > span {
+    display: none;
+  }
+
+  .pagination__page-size-select,
+  .pagination__page-size-select.select-menu,
+  .pagination__page-size-select .select-menu {
+    flex: 0 0 auto;
+    width: 3.4rem;
+    min-width: 3.4rem;
+    max-width: 3.4rem;
+  }
+
+  .pagination__page-size-select .select-menu__trigger {
+    width: 3.4rem;
+    min-width: 3.4rem;
+    max-width: 3.4rem;
+    height: 2rem;
+    min-height: 2rem;
+    padding: 0 0.3rem;
+    gap: 0.1rem;
+  }
+
+  .pagination__page-size-select .select-menu__value {
+    min-width: 0;
+    flex: 1 1 auto;
+    text-align: center;
+    font-size: 0.78rem;
+  }
+
+  .pagination__page-size-select .select-menu__chevron {
+    font-size: 0.6rem;
+    flex: 0 0 auto;
+  }
+
+  .pagination__controls {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin-left: 0;
+  }
+
+  .pagination__controls > span {
+    flex: 0 1 auto;
+    min-width: 0;
+    text-align: center;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pagination__controls button {
+    flex: 0 0 auto;
+    min-width: 0;
+    padding: 0.32rem 0.45rem;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
 }
 
 .core-skeleton {

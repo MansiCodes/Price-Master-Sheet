@@ -14,6 +14,7 @@ type UsersTableProps = {
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
+  readOnly?: boolean;
 };
 
 export function UsersTable({
@@ -26,6 +27,7 @@ export function UsersTable({
   pageSize,
   total,
   onPageChange,
+  readOnly = false,
 }: UsersTableProps) {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
@@ -44,13 +46,13 @@ export function UsersTable({
               <th>{t("plantsCol")}</th>
               <th>{t("priceSheet")}</th>
               <th>{t("status")}</th>
-              <th>{t("actions")}</th>
+              {!readOnly ? <th>{t("actions")}</th> : null}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="empty">
+                <td colSpan={readOnly ? 8 : 9} className="empty">
                   {emptyMessage ?? t("noUsers")}
                 </td>
               </tr>
@@ -76,7 +78,8 @@ export function UsersTable({
                     </span>
                   </td>
                   <td>
-                    {u.globalRole === "SUPER_ADMIN" ? (
+                    {u.globalRole === "SUPER_ADMIN" ||
+                    u.globalRole === "VIEWER" ? (
                       <span className="users-pill">{t("allPlants")}</span>
                     ) : (
                       <span className="users-plants-cell">
@@ -98,36 +101,48 @@ export function UsersTable({
                     </span>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className={`users-switch${u.isActive ? " is-on" : ""}`}
-                      role="switch"
-                      aria-checked={u.isActive}
-                      disabled={
-                        u.globalRole === "SUPER_ADMIN" || togglingId === u.id
-                      }
-                      onClick={() => onToggleActive(u)}
-                    >
-                      <span className="users-switch__knob" aria-hidden />
-                      <span className="users-switch__label">
+                    {readOnly ? (
+                      <span
+                        className={`users-pill ${
+                          u.isActive ? "users-pill--yes" : "users-pill--no"
+                        }`}
+                      >
                         {u.isActive ? t("active") : t("inactive")}
                       </span>
-                    </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className={`users-switch${u.isActive ? " is-on" : ""}`}
+                        role="switch"
+                        aria-checked={u.isActive}
+                        disabled={
+                          u.globalRole === "SUPER_ADMIN" || togglingId === u.id
+                        }
+                        onClick={() => onToggleActive(u)}
+                      >
+                        <span className="users-switch__knob" aria-hidden />
+                        <span className="users-switch__label">
+                          {u.isActive ? t("active") : t("inactive")}
+                        </span>
+                      </button>
+                    )}
                   </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{
-                        padding: "0.35rem 0.7rem",
-                        fontSize: "0.8rem",
-                        flex: "none",
-                      }}
-                      onClick={() => onEdit(u)}
-                    >
-                      {t("edit")}
-                    </button>
-                  </td>
+                  {!readOnly ? (
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{
+                          padding: "0.35rem 0.7rem",
+                          fontSize: "0.8rem",
+                          flex: "none",
+                        }}
+                        onClick={() => onEdit(u)}
+                      >
+                        {t("edit")}
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             )}

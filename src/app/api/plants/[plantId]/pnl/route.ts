@@ -10,7 +10,7 @@ import {
   todayDateString,
 } from "@/lib/dates";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
-import { canViewFullPnl, isSuperAdmin, seesOwnEntriesOnly } from "@/lib/rbac";
+import { canViewFullPnl, seesOwnEntriesOnly, usesSuperAdminPnlScope } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -47,7 +47,7 @@ export async function GET(
         {
           ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
           // Super Admin P&L uses approved entries only; plant managers see all plant data.
-          approvedOnly: isSuperAdmin(session.user.globalRole),
+          approvedOnly: usesSuperAdminPnlScope(session.user.globalRole),
         },
       ),
       prisma.plant.findUnique({

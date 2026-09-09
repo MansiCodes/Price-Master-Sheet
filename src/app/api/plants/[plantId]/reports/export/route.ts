@@ -12,9 +12,10 @@ import {
   formatMonthLabel,
 } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { canViewFullPnl, canViewPnl, isAccountantPnlLimited, isSuperAdmin, seesOwnEntriesOnly } from "@/lib/rbac";
+import { canViewFullPnl, canViewPnl, isAccountantPnlLimited, seesOwnEntriesOnly, usesSuperAdminPnlScope } from "@/lib/rbac";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -67,13 +68,18 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const kind = (request.nextUrl.searchParams.get("kind") ??
     "pnl") as ExportKind;
-  const fromStr =
-    request.nextUrl.searchParams.get("from") ?? todayDateString();
-  const toStr = request.nextUrl.searchParams.get("to") ?? fromStr;
+  const fromRaw = (request.nextUrl.searchParams.get("from") ?? "").trim();
+  const toRaw = (request.nextUrl.searchParams.get("to") ?? "").trim();
 
-  if (!dateOnlyRegex.test(fromStr) || !dateOnlyRegex.test(toStr)) {
+  if (
+    (fromRaw && !dateOnlyRegex.test(fromRaw)) ||
+    (toRaw && !dateOnlyRegex.test(toRaw))
+  ) {
     return NextResponse.json({ error: "Invalid from/to date" }, { status: 400 });
   }
 
@@ -91,8 +97,25 @@ export async function GET(
     );
   }
 
-  const from = parseDateOnly(fromStr);
-  const to = parseDateOnly(toStr);
+  const from = fromRaw ? parseDateOnly(fromRaw) : null;
+  const to = toRaw ? parseDateOnly(toRaw) : null;
+
+  /** Match list APIs: empty range = all rows; one-sided = open bound. */
+  const dateFilter: { date?: { gte?: Date; lte?: Date } } = (() => {
+    if (!from && !to) return {};
+    if (from && !to) return { date: { gte: from } };
+    if (!from && to) return { date: { lte: to } };
+    if (from!.getTime() > to!.getTime()) {
+      return { date: { gte: to!, lte: from! } };
+    }
+    return { date: { gte: from!, lte: to! } };
+  })();
+
+  const pnlFrom = from ?? parseDateOnly("2025-01-01");
+  const pnlTo = to ?? parseDateOnly(todayDateString());
+  const fromStr = fromRaw || "all";
+  const toStr = toRaw || "all";
+
   const plant = await prisma.plant.findUnique({
     where: { id: plantId },
     select: { id: true, name: true, code: true },
@@ -121,11 +144,11 @@ export async function GET(
     const ownEntriesOnly = seesOwnEntriesOnly(session.user.globalRole);
     const pnl = await calculatePlantPnlStatement(
       plantId,
-      from,
-      to,
+      pnlFrom,
+      pnlTo,
       {
         ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
-        approvedOnly: isSuperAdmin(session.user.globalRole),
+        approvedOnly: usesSuperAdminPnlScope(session.user.globalRole),
       },
     );
     sheet.columns = [
@@ -166,9 +189,9 @@ export async function GET(
   } else if (kind === "sales") {
     const rows = await prisma.sale.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...byUser,
-        date: { gte: from, lte: to },
+        ...dateFilter,
         ...(cat6
           ? { NOT: { sourceKey: { endsWith: "sales-online:excel" } } }
           : {}),
@@ -224,7 +247,7 @@ export async function GET(
     });
   } else if (kind === "purchase") {
     const rows = await prisma.purchase.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { ...pScope, ...byUser, ...dateFilter },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
     sheet.columns = cat6
@@ -290,7 +313,7 @@ export async function GET(
     });
   } else if (kind === "production") {
     const rows = await prisma.productionEntry.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: { ...pScope, ...byUser, ...dateFilter },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     });
     sheet.columns = [
@@ -316,9 +339,9 @@ export async function GET(
     const isPvc = plant.code.toUpperCase() === "PVC";
     const rows = await prisma.stockEntry.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...byUser,
-        date: { gte: from, lte: to },
+        ...dateFilter,
         ...(isPvc ? { notes: { startsWith: "Closing stock" } } : {}),
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
@@ -367,14 +390,19 @@ export async function GET(
       });
     }
   } else if (kind === "electricityRent" || kind === "factoryRent") {
-    const fromMonth = startOfUtcMonth(from);
-    const toMonth = startOfUtcMonth(to);
     const rentOnly = kind === "factoryRent";
     const isPvc = plant.code.toUpperCase() === "PVC";
+    const monthFilter =
+      rentOnly || (!from && !to)
+        ? {}
+        : {
+            month: {
+              ...(from ? { gte: startOfUtcMonth(from) } : {}),
+              ...(to ? { lte: startOfUtcMonth(to) } : {}),
+            },
+          };
     const rows = await prisma.electricityRent.findMany({
-      where: rentOnly
-        ? { plantId }
-        : { plantId, month: { gte: fromMonth, lte: toMonth } },
+      where: { ...pScope, ...monthFilter },
       orderBy: { month: "asc" },
     });
     sheet.columns =
@@ -433,17 +461,21 @@ export async function GET(
   } else if (kind === "fixedAssets") {
     const periodDays = (() => {
       const start = Date.UTC(
-        from.getUTCFullYear(),
-        from.getUTCMonth(),
-        from.getUTCDate(),
+        pnlFrom.getUTCFullYear(),
+        pnlFrom.getUTCMonth(),
+        pnlFrom.getUTCDate(),
       );
-      const end = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+      const end = Date.UTC(
+        pnlTo.getUTCFullYear(),
+        pnlTo.getUTCMonth(),
+        pnlTo.getUTCDate(),
+      );
       const ms = end - start;
       return Math.max(1, Math.floor(ms / 86_400_000) + 1);
     })();
 
     const rows = await prisma.fixedAsset.findMany({
-      where: { plantId },
+      where: { ...pScope },
       orderBy: { createdAt: "desc" },
     });
 
@@ -476,9 +508,9 @@ export async function GET(
   } else if (kind === "pettyCash") {
     const rows = await prisma.pettyCashEntry.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...byUser,
-        date: { gte: from, lte: to },
+        ...dateFilter,
         entryType: PettyCashKind.PETTY_CASH,
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
@@ -530,9 +562,9 @@ export async function GET(
   } else {
     const rows = await prisma.pettyCashEntry.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...byUser,
-        date: { gte: from, lte: to },
+        ...dateFilter,
         entryType: PettyCashKind.EXPENSE,
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],

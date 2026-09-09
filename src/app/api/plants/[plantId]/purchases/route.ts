@@ -21,6 +21,11 @@ import { isCat6Plant } from "@/lib/plant-layout";
 import { isAtclPurchase } from "@/lib/plant-catalogs";
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const purchaseHeaderFields = {
   date: z.string().regex(dateOnlyRegex),
@@ -153,6 +158,9 @@ export async function GET(
     const denied = await requirePlantAccess(session.user.id, plantId);
     if (denied) return denied;
 
+    const plantIds = await resolveReportPlantIds(plantId);
+    const pScope = plantIdFilter(plantIds);
+
     const sp = request.nextUrl.searchParams;
     const { filter, error } = dateRangeFromSearchParams(sp);
     if (error) {
@@ -174,7 +182,7 @@ export async function GET(
 
     let purchases = await prisma.purchase.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...(ownOnly ? { enteredById: session.user.id } : {}),
         ...filter,
         ...(cat6 && excludeAtc
@@ -241,6 +249,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -284,7 +294,7 @@ export async function POST(
           created.push(
             await tx.purchase.create({
               data: purchaseCreateData(
-                plantId,
+                writePlantId,
                 session.user.id,
                 data,
                 item,
@@ -341,7 +351,7 @@ export async function POST(
 
     const purchase = await prisma.purchase.create({
       data: purchaseCreateData(
-        plantId,
+        writePlantId,
         session.user.id,
         data,
         {

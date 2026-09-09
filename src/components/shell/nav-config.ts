@@ -47,6 +47,8 @@ export type NavFlags = {
   /** Machine Supervisor: home is machine production, not plant P&L dashboard. */
   isMachineSupervisor?: boolean;
   showAdmin: boolean;
+  /** Admin → Users list (Super Admin manage, Viewer read-only). */
+  showUsers?: boolean;
   showApprovals: boolean;
   showSuper: boolean;
   isManager: boolean;
@@ -63,6 +65,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
     showMachineProduction,
     isMachineSupervisor = false,
     showAdmin,
+    showUsers = false,
     showApprovals,
     showSuper,
     primaryPlantId,
@@ -144,8 +147,10 @@ export function getNavSections(flags: NavFlags): NavSection[] {
   }
 
   const adminItems: NavItem[] = [];
-  if (showSuper) {
+  if (showUsers || showSuper) {
     adminItems.push({ key: "users", label: "Users", href: "/admin/users", icon: "users" });
+  }
+  if (showSuper) {
     adminItems.push({
       key: "integrations",
       label: "Integrations",

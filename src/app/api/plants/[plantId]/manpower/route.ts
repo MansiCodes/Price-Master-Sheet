@@ -14,6 +14,11 @@ import { refreshDailyStatus } from "@/lib/daily-status";
 import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { paginate } from "@/lib/ui/paginate";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const manpowerSchema = z.object({
   date: z.string().regex(dateOnlyRegex),
@@ -36,6 +41,9 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const dateStr = sp.get("date");
   if (dateStr && !dateOnlyRegex.test(dateStr)) {
@@ -45,7 +53,10 @@ export async function GET(
   const pageSize = Number(sp.get("pageSize")) || 10;
 
   const entries = await prisma.manpowerEntry.findMany({
-    where: { plantId, ...(dateStr ? { date: parseDateOnly(dateStr) } : {}) },
+    where: {
+      ...pScope,
+      ...(dateStr ? { date: parseDateOnly(dateStr) } : {}),
+    },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
@@ -68,6 +79,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -84,7 +97,7 @@ export async function POST(
   if (ratePerDay == null) {
     const setting = await prisma.manpowerRateSetting.findUnique({
       where: {
-        plantId_role: { plantId, role: data.role },
+        plantId_role: { plantId: writePlantId, role: data.role },
       },
     });
     if (!setting) {
@@ -101,7 +114,7 @@ export async function POST(
 
   const entry = await prisma.manpowerEntry.create({
     data: {
-      plantId,
+      plantId: writePlantId,
       date: parseDateOnly(data.date),
       shift: data.shift,
       role: data.role,

@@ -42,10 +42,12 @@ export function PvcExpenseRegisterReport({
   plantId,
   from,
   to,
+  canMutate = true,
 }: {
   plantId: string;
   from: string;
   to: string;
+  canMutate?: boolean;
 }) {
   const t = useTranslations("pnl");
   const [section, setSection] = useState<PvcExpenseSection>("direct");
@@ -207,35 +209,39 @@ export function PvcExpenseRegisterReport({
 
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={[
-          ...columns,
-          {
-            key: "actions",
-            label: "Actions",
-            compact: true,
-            render: (r) => {
-              const entryId = pettyCashIdFromRegister(r);
-              if (!entryId) return "—";
-              return (
-                <ReportRowActions
-                  onEdit={() =>
-                    crud.openEdit(
-                      { ...r, id: entryId },
-                      {
-                        date: toYmd(r.sortDate),
-                        expenseHead: r.expenseLabel,
-                        description: r.description ?? "",
-                        amount: String(r.amount ?? ""),
-                      },
-                      collectBillPhotoUrls(r),
-                    )
-                  }
-                  onDelete={() => void crud.remove(entryId)}
-                />
-              );
-            },
-          },
-        ]}
+        columns={
+          canMutate
+            ? [
+                ...columns,
+                {
+                  key: "actions",
+                  label: "Actions",
+                  compact: true,
+                  render: (r) => {
+                    const entryId = pettyCashIdFromRegister(r);
+                    if (!entryId) return "—";
+                    return (
+                      <ReportRowActions
+                        onEdit={() =>
+                          crud.openEdit(
+                            { ...r, id: entryId },
+                            {
+                              date: toYmd(r.sortDate),
+                              expenseHead: r.expenseLabel,
+                              description: r.description ?? "",
+                              amount: String(r.amount ?? ""),
+                            },
+                            collectBillPhotoUrls(r),
+                          )
+                        }
+                        onDelete={() => void crud.remove(entryId)}
+                      />
+                    );
+                  },
+                },
+              ]
+            : columns
+        }
         rows={rows}
         loading={loading}
         emptyLabel={t("noRecords")}

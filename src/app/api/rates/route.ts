@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
-import { canViewPriceSheet } from "@/lib/rbac";
+import { canViewPriceSheet, hasGlobalPlantAccess } from "@/lib/rbac";
 import { getAllRates, SheetsError } from "@/lib/sheets";
 
 function mayAccessRates(user: {
   globalRole: GlobalRole;
   canViewPriceSheet: boolean;
 }): boolean {
-  return (
-    user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user)
-  );
+  return hasGlobalPlantAccess(user.globalRole) || canViewPriceSheet(user);
 }
 
 export async function GET() {

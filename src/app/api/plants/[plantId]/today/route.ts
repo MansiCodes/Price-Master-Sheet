@@ -16,6 +16,7 @@ import {
   computeDayShiftCompletions,
   type ShiftKey,
 } from "@/lib/shift-completion";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -55,6 +56,9 @@ export async function GET(
   const { plantId } = await context.params;
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
+
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
 
   const dateStr =
     request.nextUrl.searchParams.get("date") ?? todayDateString();
@@ -108,7 +112,7 @@ export async function GET(
   );
 
   const entryWhere = {
-    plantId,
+    ...pScope,
     date: day,
     ...(scopedUserId ? { enteredById: scopedUserId } : {}),
   };
@@ -229,22 +233,22 @@ export async function GET(
 
   const [purchases, sales, stocks, assets] = await Promise.all([
     prisma.purchase.findMany({
-      where: { plantId },
+      where: { ...pScope },
       select: { vendorName: true },
       distinct: ["vendorName"],
     }),
     prisma.sale.findMany({
-      where: { plantId },
+      where: { ...pScope },
       select: { customerName: true },
       distinct: ["customerName"],
     }),
     prisma.stockEntry.findMany({
-      where: { plantId },
+      where: { ...pScope },
       select: { itemName: true },
       distinct: ["itemName"],
     }),
     prisma.fixedAsset.findMany({
-      where: { plantId, vendor: { not: null } },
+      where: { ...pScope, vendor: { not: null } },
       select: { vendor: true },
       distinct: ["vendor"],
     }),

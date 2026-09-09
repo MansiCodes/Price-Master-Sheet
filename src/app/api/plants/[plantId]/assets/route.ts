@@ -4,6 +4,11 @@ import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { canAccessPlant, canEnterExpenseData } from "@/lib/rbac";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 type Ctx = { params: Promise<{ plantId: string }> };
 
@@ -35,8 +40,11 @@ export async function GET(_request: Request, context: Ctx) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const assets = await prisma.fixedAsset.findMany({
-    where: { plantId },
+    where: { ...pScope },
     orderBy: { createdAt: "desc" },
   });
 
@@ -56,6 +64,8 @@ export async function POST(request: Request, context: Ctx) {
   if (!canEnterExpenseData(session.user.globalRole)) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
+
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
 
   let json: unknown;
   try {
@@ -82,7 +92,7 @@ export async function POST(request: Request, context: Ctx) {
 
   const asset = await prisma.fixedAsset.create({
     data: {
-      plantId,
+      plantId: writePlantId,
       assetDescription: parsed.data.assetDescription.trim(),
       vendor: parsed.data.vendor?.trim() || null,
       billNumber: parsed.data.billNumber?.trim() || null,

@@ -7,6 +7,11 @@ import {
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
 import { writeAuditLog } from "@/lib/audit";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -28,11 +33,14 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const page = Math.max(1, Number(request.nextUrl.searchParams.get("page")) || 1);
   const pageSize = Math.min(100, Math.max(1, Number(request.nextUrl.searchParams.get("pageSize")) || 10));
   const skip = (page - 1) * pageSize;
 
-  const where = { plantId };
+  const where = { ...pScope };
   const [contacts, total] = await Promise.all([
     prisma.plantContact.findMany({
       where,
@@ -57,6 +65,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -69,7 +79,7 @@ export async function POST(
 
   const contact = await prisma.plantContact.create({
     data: {
-      plantId,
+      plantId: writePlantId,
       name: parsed.data.name,
       phone: parsed.data.phone ?? null,
       category: parsed.data.category ?? null,

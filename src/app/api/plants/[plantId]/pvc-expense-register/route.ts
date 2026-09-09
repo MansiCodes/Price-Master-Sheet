@@ -5,6 +5,7 @@ import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { parseDateOnly, toIsoDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { normalizePvcExpenseHead } from "@/lib/plant-catalogs";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { paginate } from "@/lib/ui/paginate";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
@@ -63,6 +64,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
@@ -91,7 +95,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const [electricityRows, pettyRows, assetRows] = await Promise.all([
     prisma.electricityRent.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...(fromMonth && toMonth
           ? { month: { gte: fromMonth, lte: toMonth } }
           : {}),
@@ -100,13 +104,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }),
     prisma.pettyCashEntry.findMany({
       where: {
-        plantId,
+        ...pScope,
         ...filter,
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     }),
     prisma.fixedAsset.findMany({
-      where: { plantId },
+      where: { ...pScope },
       orderBy: [{ billDate: "desc" }, { createdAt: "desc" }],
     }),
   ]);

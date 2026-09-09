@@ -123,10 +123,24 @@ export function PnlReportsShell({
           />
         ) : null}
         {tab === "sales" ? (
-          <SalesReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
+          <SalesReport
+            plantId={plantId}
+            plantCode={plantCode}
+            from={from}
+            to={to}
+            userRole={userRole}
+            canMutate={allowImport}
+          />
         ) : null}
         {tab === "purchase" ? (
-          <PurchaseReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
+          <PurchaseReport
+            plantId={plantId}
+            plantCode={plantCode}
+            from={from}
+            to={to}
+            userRole={userRole}
+            canMutate={allowImport}
+          />
         ) : null}
         {tab === "stock" ? (
           <StockReport
@@ -135,13 +149,26 @@ export function PnlReportsShell({
             from={from}
             to={to}
             userRole={userRole}
+            canMutate={allowImport}
           />
         ) : null}
         {tab === "expense" ? (
           pvc ? (
-            <PvcExpenseRegisterReport plantId={plantId} from={from} to={to} />
+            <PvcExpenseRegisterReport
+              plantId={plantId}
+              from={from}
+              to={to}
+              canMutate={allowImport}
+            />
           ) : (
-            <ExpenseReport plantId={plantId} plantCode={plantCode} from={from} to={to} userRole={userRole} />
+            <ExpenseReport
+              plantId={plantId}
+              plantCode={plantCode}
+              from={from}
+              to={to}
+              userRole={userRole}
+              canMutate={allowImport}
+            />
           )
         ) : null}
         {tab === "electricityRent" ? (
@@ -157,7 +184,7 @@ export function PnlReportsShell({
           <FixedAssetsReport plantId={plantId} from={from} to={to} />
         ) : null}
         {tab === "contactList" ? (
-          <ContactListReport plantId={plantId} />
+          <ContactListReport plantId={plantId} canMutate={allowImport} />
         ) : null}
       </div>
     </div>

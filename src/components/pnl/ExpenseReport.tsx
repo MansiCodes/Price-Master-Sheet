@@ -82,12 +82,14 @@ export function ExpenseReport({
   from,
   to,
   userRole,
+  canMutate = true,
 }: {
   plantId: string;
   plantCode?: string;
   from: string;
   to: string;
   userRole?: string;
+  canMutate?: boolean;
 }) {
   const t = useTranslations("pnl");
   const tCommon = useTranslations("common");
@@ -488,45 +490,53 @@ export function ExpenseReport({
       ) : (
         <>
           <ReportTable
-            columns={[
-              ...activeColumns,
-              {
-                key: "actions",
-                label: "Actions",
-                compact: true,
-                render: (r) => (
-                  <ReportRowActions
-                    onEdit={() =>
-                      crud.openEdit(
-                        r,
-                        {
-                          date: toYmd(r.date),
-                          expenseHead: r.expenseHead ?? "",
-                          description: r.description ?? "",
-                          amount: String(r.amount ?? ""),
-                          contractorSalary: String(r.contractorSalary ?? "0"),
-                          supervisorSalary: String(r.supervisorSalary ?? "0"),
-                          payMode: r.payMode ?? "",
-                          nature: r.nature ?? "",
-                          location: r.location ?? "",
-                          billNumber: r.billNumber ?? "",
-                          openingReading:
-                            r.openingReading == null
-                              ? ""
-                              : String(r.openingReading),
-                          closingReading:
-                            r.closingReading == null
-                              ? ""
-                              : String(r.closingReading),
-                        },
-                        collectBillPhotoUrls(r),
-                      )
-                    }
-                    onDelete={() => void crud.remove(r.id)}
-                  />
-                ),
-              },
-            ]}
+            columns={
+              canMutate
+                ? [
+                    ...activeColumns,
+                    {
+                      key: "actions",
+                      label: "Actions",
+                      compact: true,
+                      render: (r) => (
+                        <ReportRowActions
+                          onEdit={() =>
+                            crud.openEdit(
+                              r,
+                              {
+                                date: toYmd(r.date),
+                                expenseHead: r.expenseHead ?? "",
+                                description: r.description ?? "",
+                                amount: String(r.amount ?? ""),
+                                contractorSalary: String(
+                                  r.contractorSalary ?? "0",
+                                ),
+                                supervisorSalary: String(
+                                  r.supervisorSalary ?? "0",
+                                ),
+                                payMode: r.payMode ?? "",
+                                nature: r.nature ?? "",
+                                location: r.location ?? "",
+                                billNumber: r.billNumber ?? "",
+                                openingReading:
+                                  r.openingReading == null
+                                    ? ""
+                                    : String(r.openingReading),
+                                closingReading:
+                                  r.closingReading == null
+                                    ? ""
+                                    : String(r.closingReading),
+                              },
+                              collectBillPhotoUrls(r),
+                            )
+                          }
+                          onDelete={() => void crud.remove(r.id)}
+                        />
+                      ),
+                    },
+                  ]
+                : activeColumns
+            }
             rows={sectionHeads.length === 0 ? [] : rows}
             loading={loading}
             emptyLabel={t("noRecords")}

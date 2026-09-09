@@ -26,6 +26,11 @@ import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
 import { weightedAveragePurchaseRate } from "@/lib/stock/purchase-average-rate";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const stockLineSchema = z.object({
   itemName: z.string().min(1),
@@ -142,6 +147,9 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
@@ -161,7 +169,7 @@ export async function GET(
 
   const entries = await prisma.stockEntry.findMany({
     where: {
-      plantId,
+      ...pScope,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
       ...filter,
       ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
@@ -204,6 +212,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -240,7 +250,7 @@ export async function POST(
         data.entries.map(async (line) => ({
           line,
           amounts: await resolveStockLineAmounts(
-            plantId,
+            writePlantId,
             day,
             line.quantity,
             line.rate,
@@ -256,7 +266,7 @@ export async function POST(
           entries.push(
             await tx.stockEntry.create({
               data: stockEntryCreateData(
-                plantId,
+                writePlantId,
                 session.user.id,
                 data,
                 line,
@@ -303,7 +313,7 @@ export async function POST(
     const day = parseDateOnly(data.date);
     const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
     const amounts = await resolveStockLineAmounts(
-      plantId,
+      writePlantId,
       day,
       data.quantity,
       data.rate,
@@ -318,7 +328,7 @@ export async function POST(
 
     const entry = await prisma.stockEntry.create({
       data: stockEntryCreateData(
-        plantId,
+        writePlantId,
         session.user.id,
         data,
         data,

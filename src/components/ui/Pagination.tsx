@@ -41,6 +41,7 @@ export function Pagination({
               className="pagination__page-size-select"
               value={String(pageSize)}
               options={PAGE_SIZE_LABELS}
+              placeholder={String(pageSize)}
               onChange={(next) => onPageSizeChange(Number(next))}
             />
           </div>
@@ -51,8 +52,9 @@ export function Pagination({
           type="button"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
+          aria-label={t("previous")}
         >
-          {t("previous")}
+          Prev
         </button>
         <span>
           {t("pageOf", { page, totalPages })}
@@ -61,8 +63,9 @@ export function Pagination({
           type="button"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
+          aria-label={t("next")}
         >
-          {t("next")}
+          Next
         </button>
       </div>
     </div>

@@ -112,8 +112,12 @@ function drawSide(
 }
 
 async function exportPnlAsPdf(plantId: string, from: string, to: string) {
+  const params = new URLSearchParams();
+  if (from.trim()) params.set("from", from.trim());
+  if (to.trim()) params.set("to", to.trim());
+  const qs = params.toString();
   const res = await fetch(
-    `/api/plants/${plantId}/pnl?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    `/api/plants/${plantId}/pnl${qs ? `?${qs}` : ""}`,
   );
   if (!res.ok) throw new Error("Failed to fetch P&L data");
   const json = await res.json();
@@ -128,9 +132,13 @@ async function exportPnlAsPdf(plantId: string, from: string, to: string) {
   const halfW = (pageW - mx * 2 - gap) / 2;
   const showRatio = true;
 
+  const rangeLabel =
+    from.trim() || to.trim()
+      ? `(${from.trim() || "…"} to ${to.trim() || "…"})`
+      : "(all dates)";
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text(`Profit & Loss Statement  (${from} to ${to})`, mx, 12);
+  doc.text(`Profit & Loss Statement  ${rangeLabel}`, mx, 12);
 
   const sections = [
     { block: pnl.trading },
@@ -149,7 +157,9 @@ async function exportPnlAsPdf(plantId: string, from: string, to: string) {
     y = Math.max(leftY, rightY) + 4;
   }
 
-  doc.save(`PnL-${from}-to-${to}.pdf`);
+  doc.save(
+    `PnL-${from.trim() || "all"}-to-${to.trim() || "all"}.pdf`,
+  );
 }
 
 function downloadBlob(blob: Blob, disposition: string, fallback: string) {
@@ -187,7 +197,10 @@ export function PnlExportButton({
         await exportPnlAsPdf(plantId, from, to);
         toast.success("P&L exported as PDF");
       } else {
-        const url = `/api/plants/${plantId}/reports/export?kind=${encodeURIComponent(kind)}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+        const params = new URLSearchParams({ kind });
+        if (from.trim()) params.set("from", from.trim());
+        if (to.trim()) params.set("to", to.trim());
+        const url = `/api/plants/${plantId}/reports/export?${params.toString()}`;
         const res = await fetch(url);
         if (!res.ok) {
           const json = (await res.json().catch(() => null)) as {

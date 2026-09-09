@@ -18,6 +18,11 @@ import { prisma } from "@/lib/db";
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { paginate } from "@/lib/ui/paginate";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const pettyCashSchema = z.object({
   date: z.string().regex(dateOnlyRegex),
@@ -53,6 +58,9 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
@@ -74,7 +82,7 @@ export async function GET(
     .map((h) => h.trim())
     .filter(Boolean);
   const where = {
-    plantId,
+    ...pScope,
     ...(ownOnly ? { enteredById: session.user.id } : {}),
     ...filter,
     ...(entryType ? { entryType } : {}),
@@ -140,6 +148,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -162,7 +172,7 @@ export async function POST(
   try {
     const entry = await prisma.pettyCashEntry.create({
     data: {
-      plantId,
+      plantId: writePlantId,
       date: parseDateOnly(data.date),
       shift: data.shift,
       entryType: data.entryType,

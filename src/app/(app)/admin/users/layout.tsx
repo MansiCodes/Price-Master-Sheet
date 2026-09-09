@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
+import { canViewUsersDirectory } from "@/lib/rbac";
 
 export default async function AdminUsersLayout({
   children,
@@ -9,11 +9,11 @@ export default async function AdminUsersLayout({
 }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (session.user.globalRole !== GlobalRole.SUPER_ADMIN) {
+  if (!canViewUsersDirectory(session.user.globalRole)) {
     return (
       <div>
         <h1 className="page-title">Access denied</h1>
-        <p className="page-sub">Only Super Admin can manage users.</p>
+        <p className="page-sub">You do not have access to the users directory.</p>
       </div>
     );
   }

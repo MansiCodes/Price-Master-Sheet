@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePlantAccess, requireSession } from "@/lib/api";
 import { prisma } from "@/lib/db";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -12,16 +13,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const page = Number(sp.get("page")) || 1;
   const pageSize = Number(sp.get("pageSize")) || 10;
 
-  const total = await prisma.fixedAsset.count({ where: { plantId } });
+  const total = await prisma.fixedAsset.count({ where: { ...pScope } });
   const skip = (Math.max(1, page) - 1) * Math.max(1, pageSize);
   const take = Math.max(1, pageSize);
 
   const rows = await prisma.fixedAsset.findMany({
-    where: { plantId },
+    where: { ...pScope },
     orderBy: { createdAt: "desc" },
     skip,
     take,

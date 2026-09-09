@@ -29,12 +29,13 @@ const PVC_INCOME_TAX_BASE = 2_525_000;
 const PVC_UNLOADING_RATE_PER_MT = 70;
 
 import { buildApprovedEntryWhere } from "@/lib/entry-approval";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 
-async function getApprovedFilter(plantId: string, approvedOnly?: boolean, from?: Date, to?: Date) {
+async function getApprovedFilter(plantIds: string[], approvedOnly?: boolean, from?: Date, to?: Date) {
   if (!approvedOnly) return {};
 
   return {
-    plantId,
+    ...plantIdFilter(plantIds),
     ...buildApprovedEntryWhere(from, to),
   };
 }
@@ -65,14 +66,14 @@ function round4(n: number) {
  * This means: Closing Stock (previous period) = Opening Stock (this period).
  */
 async function openingStockFromLastSnapshot(
-  plantId: string,
+  plantIds: string[],
   before: Date,
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
   const latest = await prisma.stockEntry.findFirst({
     where: {
-      plantId,
+      ...plantIdFilter(plantIds),
       date: { lte: before },
       notes: { startsWith: "Closing stock" },
       ...approvedFilter,
@@ -83,7 +84,7 @@ async function openingStockFromLastSnapshot(
   if (!latest) return 0;
   const agg = await prisma.stockEntry.aggregate({
     where: {
-      plantId,
+      ...plantIdFilter(plantIds),
       date: latest.date,
       notes: { startsWith: "Closing stock" },
       ...approvedFilter,
@@ -95,14 +96,14 @@ async function openingStockFromLastSnapshot(
 
 /** Sum explicit closing-stock snapshot rows (matches Excel Stock & Rent SUM(I5:I21)). */
 async function pvcClosingStockSnapshot(
-  plantId: string,
+  plantIds: string[],
   asOf: Date,
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
   const latest = await prisma.stockEntry.findFirst({
     where: {
-      plantId,
+      ...plantIdFilter(plantIds),
       date: { lte: asOf },
       notes: { startsWith: "Closing stock" },
       ...approvedFilter,
@@ -110,11 +111,11 @@ async function pvcClosingStockSnapshot(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     select: { date: true },
   });
-  if (!latest) return stockValueAsOf(plantId, asOf, approvedOnly, approvedFilter);
+  if (!latest) return stockValueAsOf(plantIds, asOf, approvedOnly, approvedFilter);
 
   const agg = await prisma.stockEntry.aggregate({
     where: {
-      plantId,
+      ...plantIdFilter(plantIds),
       date: latest.date,
       notes: { startsWith: "Closing stock" },
       ...approvedFilter,
@@ -125,7 +126,7 @@ async function pvcClosingStockSnapshot(
 }
 
 async function buildPvcDynamic(
-  plantId: string,
+  plantIds: string[],
   from: Date,
   to: Date,
   scoped: boolean,
@@ -141,8 +142,8 @@ async function buildPvcDynamic(
     ).length,
   );
 
-  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
-  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
+  const approvedFilter = await getApprovedFilter(plantIds, approvedOnly, from, to);
+  const globalApprovedFilter = await getApprovedFilter(plantIds, approvedOnly);
 
   const [
     salesAgg,
@@ -156,12 +157,12 @@ async function buildPvcDynamic(
   ] = await Promise.all([
     // Excel P&L: Sales!J223 — entire outward register, not date-filtered.
     prisma.sale.aggregate({
-      where: { plantId, ...byUser, ...globalApprovedFilter },
+      where: { ...plantIdFilter(plantIds), ...byUser, ...globalApprovedFilter },
       _sum: { salesValue: true },
     }),
     prisma.purchase.findMany({
       where: {
-        plantId,
+        ...plantIdFilter(plantIds),
         ...byUser,
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
@@ -173,7 +174,7 @@ async function buildPvcDynamic(
       ? Promise.resolve({ _sum: { closingValue: null } })
       : prisma.stockEntry.aggregate({
           where: {
-            plantId,
+            ...plantIdFilter(plantIds),
             date: { gte: from, lte: to },
             ...atclStockEntryFilter(),
             ...approvedFilter,
@@ -181,7 +182,12 @@ async function buildPvcDynamic(
           _sum: { closingValue: true },
         }),
     prisma.pettyCashEntry.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
       select: {
         entryType: true,
         amount: true,
@@ -195,13 +201,13 @@ async function buildPvcDynamic(
     scoped
       ? Promise.resolve([])
       : prisma.electricityRent.findMany({
-          where: { plantId, month: { in: months } },
+          where: { ...plantIdFilter(plantIds), month: { in: months } },
           select: { billAmount: true, rentAmount: true },
         }),
     scoped
       ? Promise.resolve([])
       : prisma.fixedAsset.findMany({
-          where: { plantId },
+          where: { ...plantIdFilter(plantIds) },
           select: {
             cost: true,
             gst: true,
@@ -209,8 +215,12 @@ async function buildPvcDynamic(
             depreciationPercent: true,
           },
         }),
-    scoped ? Promise.resolve(0) : pvcClosingStockSnapshot(plantId, to, approvedOnly, globalApprovedFilter),
-    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
+    scoped
+      ? Promise.resolve(0)
+      : pvcClosingStockSnapshot(plantIds, to, approvedOnly, globalApprovedFilter),
+    scoped
+      ? Promise.resolve(0)
+      : openingStockFromLastSnapshot(plantIds, from, approvedOnly, globalApprovedFilter),
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));
@@ -479,14 +489,14 @@ function line(
 
 /** Latest closing stock value per item as of a given date (inclusive). */
 async function stockValueAsOf(
-  plantId: string,
+  plantIds: string[],
   asOf: Date,
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
   const entries = await prisma.stockEntry.findMany({
     where: {
-      plantId,
+      ...plantIdFilter(plantIds),
       date: { lte: asOf },
       ...approvedFilter,
     },
@@ -556,16 +566,17 @@ export async function calculatePlantPnlStatement(
     where: { id: plantId },
     select: { code: true },
   });
+  const plantIds = await resolveReportPlantIds(plantId);
 
   if (isCat6Plant(plant?.code)) {
-    return buildCat6Dynamic(plantId, from, to, scoped, enteredById, approvedOnly);
+    return buildCat6Dynamic(plantIds, from, to, scoped, enteredById, approvedOnly);
   }
 
   if (plant?.code?.toUpperCase() === "PVC") {
-    return buildPvcDynamic(plantId, from, to, scoped, enteredById, approvedOnly);
+    return buildPvcDynamic(plantIds, from, to, scoped, enteredById, approvedOnly);
   }
 
-  return buildDynamic(plantId, from, to, scoped, enteredById, plant?.code, approvedOnly);
+  return buildDynamic(plantIds, from, to, scoped, enteredById, plant?.code, approvedOnly);
 }
 
 /** Build P&L statement from pre-computed override values. */
@@ -724,7 +735,7 @@ function buildFromOverride(
 }
 
 async function buildCat6Dynamic(
-  plantId: string,
+  plantIds: string[],
   from: Date,
   to: Date,
   scoped: boolean,
@@ -739,10 +750,15 @@ async function buildCat6Dynamic(
   const salesTo = isExcelCat6Period ? CAT6_EXCEL_SALES_TO : to;
   const purchasesTo = isExcelCat6Period ? CAT6_EXCEL_PURCHASES_TO : to;
 
-  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
-  const salesApprovedFilter = await getApprovedFilter(plantId, approvedOnly, from, salesTo);
-  const purchasesApprovedFilter = await getApprovedFilter(plantId, approvedOnly, from, purchasesTo);
-  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
+  const approvedFilter = await getApprovedFilter(plantIds, approvedOnly, from, to);
+  const salesApprovedFilter = await getApprovedFilter(plantIds, approvedOnly, from, salesTo);
+  const purchasesApprovedFilter = await getApprovedFilter(
+    plantIds,
+    approvedOnly,
+    from,
+    purchasesTo,
+  );
+  const globalApprovedFilter = await getApprovedFilter(plantIds, approvedOnly);
 
   const [
     salesAgg,
@@ -753,12 +769,17 @@ async function buildCat6Dynamic(
     fixedAssets,
   ] = await Promise.all([
       prisma.sale.aggregate({
-        where: { plantId, ...byUser, date: { gte: from, lte: salesTo }, ...salesApprovedFilter },
+        where: {
+          ...plantIdFilter(plantIds),
+          ...byUser,
+          date: { gte: from, lte: salesTo },
+          ...salesApprovedFilter,
+        },
         _sum: { salesValue: true },
       }),
       prisma.purchase.aggregate({
         where: {
-          plantId,
+          ...plantIdFilter(plantIds),
           ...byUser,
           date: { gte: from, lte: purchasesTo },
           type: { in: COGS_PURCHASE_TYPES },
@@ -767,7 +788,12 @@ async function buildCat6Dynamic(
         _sum: { basicValue: true },
       }),
       prisma.pettyCashEntry.findMany({
-        where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+        where: {
+          ...plantIdFilter(plantIds),
+          ...byUser,
+          date: { gte: from, lte: to },
+          ...approvedFilter,
+        },
         select: {
           entryType: true,
           amount: true,
@@ -779,7 +805,7 @@ async function buildCat6Dynamic(
         ? Promise.resolve(null)
         : prisma.stockEntry.findFirst({
             where: {
-              plantId,
+              ...plantIdFilter(plantIds),
               itemName: CAT6_PNL_ONLY_STOCK_ITEMS[0],
               date: { lte: to },
               ...globalApprovedFilter,
@@ -787,11 +813,13 @@ async function buildCat6Dynamic(
             orderBy: [{ date: "desc" }, { createdAt: "desc" }],
             select: { closingValue: true },
           }),
-      scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
+      scoped
+        ? Promise.resolve(0)
+        : openingStockFromLastSnapshot(plantIds, from, approvedOnly, globalApprovedFilter),
       scoped
         ? Promise.resolve([])
         : prisma.fixedAsset.findMany({
-            where: { plantId },
+            where: { ...plantIdFilter(plantIds) },
             select: {
               cost: true,
               gst: true,
@@ -811,7 +839,7 @@ async function buildCat6Dynamic(
     ? null
     : await prisma.stockEntry.findFirst({
         where: {
-          plantId,
+          ...plantIdFilter(plantIds),
           date: { lte: to },
           itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
           ...globalApprovedFilter,
@@ -824,7 +852,7 @@ async function buildCat6Dynamic(
       ? { _sum: { closingValue: 0 } }
       : await prisma.stockEntry.aggregate({
           where: {
-            plantId,
+            ...plantIdFilter(plantIds),
             date: latestClosingDateRow.date,
             itemName: { not: CAT6_PNL_ONLY_STOCK_ITEMS[0] },
             ...globalApprovedFilter,
@@ -938,7 +966,7 @@ async function buildCat6Dynamic(
 
 /** Dynamic calculation from raw entries (original logic). */
 async function buildDynamic(
-  plantId: string,
+  plantIds: string[],
   from: Date,
   to: Date,
   scoped: boolean,
@@ -961,8 +989,8 @@ async function buildDynamic(
       )
     : Math.max(1, months.length);
 
-  const approvedFilter = await getApprovedFilter(plantId, approvedOnly, from, to);
-  const globalApprovedFilter = await getApprovedFilter(plantId, approvedOnly);
+  const approvedFilter = await getApprovedFilter(plantIds, approvedOnly, from, to);
+  const globalApprovedFilter = await getApprovedFilter(plantIds, approvedOnly);
 
   const [
     salesAgg,
@@ -978,12 +1006,17 @@ async function buildDynamic(
     openingStockManualRaw,
   ] = await Promise.all([
     prisma.sale.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
       _sum: { salesValue: true },
     }),
     prisma.purchase.findMany({
       where: {
-        plantId,
+        ...plantIdFilter(plantIds),
         ...byUser,
         date: { gte: from, lte: to },
         type: { in: COGS_PURCHASE_TYPES },
@@ -992,14 +1025,19 @@ async function buildDynamic(
       select: { basicValue: true, vendorName: true, notes: true },
     }),
     prisma.purchase.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
       _sum: { quantity: true },
     }),
     scoped
       ? Promise.resolve({ _sum: { closingValue: null } })
       : prisma.stockEntry.aggregate({
           where: {
-            plantId,
+            ...plantIdFilter(plantIds),
             date: { gte: from, lte: to },
             ...atclStockEntryFilter(),
             ...approvedFilter,
@@ -1007,11 +1045,20 @@ async function buildDynamic(
           _sum: { closingValue: true },
         }),
     prisma.manpowerEntry.aggregate({
-      where: { plantId, ...byUser, date: { gte: from, lte: to } },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+      },
       _sum: { totalCost: true },
     }),
     prisma.pettyCashEntry.findMany({
-      where: { plantId, ...byUser, date: { gte: from, lte: to }, ...approvedFilter },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
       select: {
         entryType: true,
         amount: true,
@@ -1027,7 +1074,7 @@ async function buildDynamic(
       ? Promise.resolve([])
       : prisma.electricityRent.findMany({
           where: {
-            plantId,
+            ...plantIdFilter(plantIds),
             month: { in: months },
           },
           select: {
@@ -1038,7 +1085,7 @@ async function buildDynamic(
     scoped
       ? Promise.resolve([])
       : prisma.fixedAsset.findMany({
-          where: { plantId },
+          where: { ...plantIdFilter(plantIds) },
           select: {
             cost: true,
             gst: true,
@@ -1046,9 +1093,15 @@ async function buildDynamic(
             depreciationPercent: true,
           },
         }),
-    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, dayBeforeFrom, approvedOnly, globalApprovedFilter),
-    scoped ? Promise.resolve(0) : stockValueAsOf(plantId, to, approvedOnly, globalApprovedFilter),
-    scoped ? Promise.resolve(0) : openingStockFromLastSnapshot(plantId, from, approvedOnly, globalApprovedFilter),
+    scoped
+      ? Promise.resolve(0)
+      : stockValueAsOf(plantIds, dayBeforeFrom, approvedOnly, globalApprovedFilter),
+    scoped
+      ? Promise.resolve(0)
+      : stockValueAsOf(plantIds, to, approvedOnly, globalApprovedFilter),
+    scoped
+      ? Promise.resolve(0)
+      : openingStockFromLastSnapshot(plantIds, from, approvedOnly, globalApprovedFilter),
   ]);
 
   const salesRevenue = round2(toNumber(salesAgg._sum.salesValue));

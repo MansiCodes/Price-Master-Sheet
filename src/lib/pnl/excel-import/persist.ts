@@ -27,6 +27,12 @@ import {
 } from "@/lib/pnl/excel-import/dedupe";
 import type { ParsedPnlWorkbook } from "@/lib/pnl/excel-import/parse";
 import { PVC_FAR_DEP_PERCENT } from "@/lib/plant-catalogs";
+import {
+  importFamilyKey,
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 export type ImportSummary = {
   batchId: string;
@@ -62,6 +68,15 @@ export async function persistPnlImport(opts: {
   const { prisma, plantId, enteredById, role, parsed, batchId, uploadedAt } =
     opts;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+  const scopeIds = await resolveReportPlantIds(plantId);
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  const familyKey = importFamilyKey(plant?.code);
+  const pScope = plantIdFilter(scopeIds);
+
   const summary: ImportSummary = {
     batchId,
     uploadedAt: uploadedAt.toISOString(),
@@ -88,7 +103,7 @@ export async function persistPnlImport(opts: {
 
   // ── Sales ──────────────────────────────────────────────────────────
   for (const row of parsed.sales) {
-    const sourceKey = saleSourceKey(plantId, row);
+    const sourceKey = saleSourceKey(familyKey, row);
     if (seenKeys.has(sourceKey)) {
       markDuplicate("Sales", row.row, "Duplicate row in this file");
       continue;
@@ -98,7 +113,7 @@ export async function persistPnlImport(opts: {
     const day = parseDateOnly(row.date);
     const existing = await prisma.sale.findFirst({
       where: {
-        plantId,
+        ...pScope,
         OR: [
           { sourceKey },
           { id: sourceKey },
@@ -125,7 +140,7 @@ export async function persistPnlImport(opts: {
       data: {
         id: sourceKey,
         sourceKey,
-        plantId,
+        plantId: writePlantId,
         date: day,
         shift: row.shift,
         type: row.type,
@@ -154,7 +169,7 @@ export async function persistPnlImport(opts: {
 
   // ── Purchases ──────────────────────────────────────────────────────
   for (const row of parsed.purchases) {
-    const sourceKey = purchaseSourceKey(plantId, row);
+    const sourceKey = purchaseSourceKey(familyKey, row);
     if (seenKeys.has(sourceKey)) {
       markDuplicate("Purchase", row.row, "Duplicate row in this file");
       continue;
@@ -164,7 +179,7 @@ export async function persistPnlImport(opts: {
     const day = parseDateOnly(row.date);
     const existing = await prisma.purchase.findFirst({
       where: {
-        plantId,
+        ...pScope,
         OR: [
           { sourceKey },
           { id: sourceKey },
@@ -195,7 +210,7 @@ export async function persistPnlImport(opts: {
       data: {
         id: sourceKey,
         sourceKey,
-        plantId,
+        plantId: writePlantId,
         date: day,
         shift: row.shift,
         type: row.type,
@@ -225,7 +240,7 @@ export async function persistPnlImport(opts: {
 
   // ── Stock ──────────────────────────────────────────────────────────
   for (const row of parsed.stock) {
-    const sourceKey = stockSourceKey(plantId, row);
+    const sourceKey = stockSourceKey(familyKey, row);
     if (seenKeys.has(sourceKey)) {
       markDuplicate("Stock", row.row, "Duplicate row in this file");
       continue;
@@ -235,7 +250,7 @@ export async function persistPnlImport(opts: {
     const day = parseDateOnly(row.date);
     const existing = await prisma.stockEntry.findFirst({
       where: {
-        plantId,
+        ...pScope,
         OR: [
           { sourceKey },
           {
@@ -258,7 +273,7 @@ export async function persistPnlImport(opts: {
     await prisma.stockEntry.create({
       data: {
         sourceKey,
-        plantId,
+        plantId: writePlantId,
         date: day,
         shift: row.shift,
         itemName: row.itemName,
@@ -293,7 +308,7 @@ export async function persistPnlImport(opts: {
       const billAmount = round2(row.amount);
 
       const existing = await prisma.electricityRent.findUnique({
-        where: { plantId_month: { plantId, month } },
+        where: { plantId_month: { plantId: writePlantId, month } },
         select: { billAmount: true },
       });
       if (
@@ -306,9 +321,9 @@ export async function persistPnlImport(opts: {
       }
 
       await prisma.electricityRent.upsert({
-        where: { plantId_month: { plantId, month } },
+        where: { plantId_month: { plantId: writePlantId, month } },
         create: {
-          plantId,
+          plantId: writePlantId,
           month,
           openingReading: opening,
           closingReading: closing,
@@ -330,7 +345,7 @@ export async function persistPnlImport(opts: {
       summary.electricity += 1;
       try {
         await syncDailyExpenseMarker({
-          plantId,
+          plantId: writePlantId,
           date: day,
           shift: row.shift,
           expenseHead: row.expenseHead,
@@ -356,7 +371,7 @@ export async function persistPnlImport(opts: {
             : round2(row.amount);
 
       const existing = await prisma.electricityRent.findUnique({
-        where: { plantId_month: { plantId, month } },
+        where: { plantId_month: { plantId: writePlantId, month } },
         select: { rentAmount: true },
       });
       if (
@@ -369,9 +384,9 @@ export async function persistPnlImport(opts: {
       }
 
       await prisma.electricityRent.upsert({
-        where: { plantId_month: { plantId, month } },
+        where: { plantId_month: { plantId: writePlantId, month } },
         create: {
-          plantId,
+          plantId: writePlantId,
           month,
           billAmount: 0,
           rentAmount,
@@ -391,7 +406,7 @@ export async function persistPnlImport(opts: {
       summary.rent += 1;
       try {
         await syncDailyExpenseMarker({
-          plantId,
+          plantId: writePlantId,
           date: day,
           shift: row.shift,
           expenseHead: row.expenseHead,
@@ -412,7 +427,7 @@ export async function persistPnlImport(opts: {
         row.gst != null ? round2(row.gst) : round2(cost * 0.18);
       const invoiceValue = round2(cost + gst);
       const dep = row.depreciationPercent ?? PVC_FAR_DEP_PERCENT;
-      const sourceKey = farSourceKey(plantId, {
+      const sourceKey = farSourceKey(familyKey, {
         date: row.date,
         description: row.description || row.expenseHead,
         vendor: row.vendor,
@@ -427,7 +442,7 @@ export async function persistPnlImport(opts: {
 
       const existing = await prisma.fixedAsset.findFirst({
         where: {
-          plantId,
+          ...pScope,
           OR: [
             {
               billNumber: row.billNumber ?? undefined,
@@ -449,7 +464,7 @@ export async function persistPnlImport(opts: {
 
       await prisma.fixedAsset.create({
         data: {
-          plantId,
+          plantId: writePlantId,
           assetDescription: row.description || row.expenseHead,
           vendor: row.vendor,
           billNumber: row.billNumber,
@@ -466,7 +481,7 @@ export async function persistPnlImport(opts: {
     }
 
     // Petty / generic expense
-    const sourceKey = expenseSourceKey(plantId, row);
+    const sourceKey = expenseSourceKey(familyKey, row);
     if (seenKeys.has(sourceKey)) {
       markDuplicate("Expense", row.row, "Duplicate row in this file");
       continue;
@@ -487,7 +502,7 @@ export async function persistPnlImport(opts: {
 
     const existing = await prisma.pettyCashEntry.findFirst({
       where: {
-        plantId,
+        ...pScope,
         OR: [
           { sourceKey },
           { id: sourceKey },
@@ -516,7 +531,7 @@ export async function persistPnlImport(opts: {
       data: {
         id: sourceKey,
         sourceKey,
-        plantId,
+        plantId: writePlantId,
         date: day,
         shift: row.shift,
         entryType: isPetty ? PettyCashKind.PETTY_CASH : PettyCashKind.EXPENSE,
@@ -543,7 +558,7 @@ export async function persistPnlImport(opts: {
   for (const [key, shift] of daysToRefresh) {
     const dateYmd = key.split("|")[0]!;
     await safeRefreshDailyStatus(
-      plantId,
+      writePlantId,
       parseDateOnly(dateYmd),
       shift,
       enteredById,

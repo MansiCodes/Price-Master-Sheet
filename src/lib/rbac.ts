@@ -112,6 +112,29 @@ export function isSuperAdmin(role: GlobalRole | Role): boolean {
   return role === GlobalRole.SUPER_ADMIN;
 }
 
+export function isViewer(role: GlobalRole | Role): boolean {
+  return role === GlobalRole.VIEWER;
+}
+
+/** Super Admin + Viewer: every active plant without per-plant assignment. */
+export function hasGlobalPlantAccess(role: GlobalRole | Role): boolean {
+  return isSuperAdmin(role) || isViewer(role);
+}
+
+/** List users in Admin → Users (view). Mutations stay Super Admin only. */
+export function canViewUsersDirectory(role: GlobalRole | Role): boolean {
+  return isSuperAdmin(role) || isViewer(role);
+}
+
+export function canManageUsers(role: GlobalRole | Role): boolean {
+  return isSuperAdmin(role);
+}
+
+/** Same P&L filters / visibility as Super Admin (read path). */
+export function usesSuperAdminPnlScope(role: GlobalRole | Role): boolean {
+  return isSuperAdmin(role) || isViewer(role);
+}
+
 export function isPlantManager(role: GlobalRole | Role): boolean {
   return role === GlobalRole.PLANT_MANAGER;
 }
@@ -183,7 +206,7 @@ export async function canAccessPlant(
   });
 
   if (!user || !user.isActive) return false;
-  if (user.globalRole === GlobalRole.SUPER_ADMIN) return true;
+  if (hasGlobalPlantAccess(user.globalRole)) return true;
   return user.plantRoles.length > 0;
 }
 
@@ -199,7 +222,7 @@ export async function getAccessiblePlantIds(userId: string): Promise<string[]> {
 
   if (!user || !user.isActive) return [];
 
-  if (user.globalRole === GlobalRole.SUPER_ADMIN) {
+  if (hasGlobalPlantAccess(user.globalRole)) {
     const plants = await prisma.plant.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },

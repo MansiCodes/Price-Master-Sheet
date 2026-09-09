@@ -11,6 +11,7 @@ type UsersToolbarProps = {
   onRoleFilterChange: (value: string) => void;
   onAddUser: () => void;
   onExport: () => void;
+  readOnly?: boolean;
 };
 
 function PlusIcon() {
@@ -46,6 +47,7 @@ export function UsersToolbar({
   onRoleFilterChange,
   onAddUser,
   onExport,
+  readOnly = false,
 }: UsersToolbarProps) {
   const t = useTranslations("admin");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -83,15 +85,17 @@ export function UsersToolbar({
       <div className="users-toolbar__spacer" aria-hidden />
 
       <div className="users-toolbar__actions">
-        <button
-          type="button"
-          className="users-icon-btn users-icon-btn--primary"
-          onClick={onAddUser}
-          title={t("addUser")}
-          aria-label={t("addUser")}
-        >
-          <PlusIcon />
-        </button>
+        {!readOnly ? (
+          <button
+            type="button"
+            className="users-icon-btn users-icon-btn--primary"
+            onClick={onAddUser}
+            title={t("addUser")}
+            aria-label={t("addUser")}
+          >
+            <PlusIcon />
+          </button>
+        ) : null}
 
         <div className="users-filter" ref={filterRef}>
           <button

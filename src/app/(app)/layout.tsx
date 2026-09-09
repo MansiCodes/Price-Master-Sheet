@@ -9,6 +9,8 @@ import {
   canEnterData,
   canViewPnl,
   canViewPriceSheet,
+  canViewUsersDirectory,
+  hasGlobalPlantAccess,
   isAccountantPnlLimited,
   isAdminOrHead,
   isMachineSupervisorOnly,
@@ -32,6 +34,7 @@ export default async function AppLayout({
   const user = session.user;
   const role = user.globalRole;
   const superAdmin = role ? isSuperAdmin(role) : false;
+  const globalPlantAccess = role ? hasGlobalPlantAccess(role) : false;
 
   // Dedicated Machine Supervisors skip plant-scoped shell chrome.
   // Plant Manager / Accountant hybrids keep the plant shell + Machine Production.
@@ -44,6 +47,7 @@ export default async function AppLayout({
           showMachineProduction: true,
           isMachineSupervisor: true,
           showAdmin: false,
+          showUsers: false,
           showApprovals: false,
           showSuper: false,
           isManager: false,
@@ -68,15 +72,19 @@ export default async function AppLayout({
 
   const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
   const selectedPlantId = user
-    ? await resolveSelectedPlantId(user.id, { isSuperAdmin: superAdmin })
+    ? await resolveSelectedPlantId(user.id, {
+        hasGlobalPlantAccess: globalPlantAccess,
+      })
     : null;
   const primaryPlantId = selectedPlantId ?? plantIds[0] ?? null;
 
   const switchablePlantsRaw =
-    user && (plantIds.length >= 1 || superAdmin)
+    user && (plantIds.length >= 1 || globalPlantAccess)
       ? await prisma.plant.findMany({
           where: {
-            ...(superAdmin ? { isActive: true } : { id: { in: plantIds }, isActive: true }),
+            ...(globalPlantAccess
+              ? { isActive: true }
+              : { id: { in: plantIds }, isActive: true }),
           },
           select: { id: true, name: true, code: true },
         })
@@ -110,13 +118,14 @@ export default async function AppLayout({
   const pnlSalesPurchaseOnly = role ? isAccountantPnlLimited(role) : false;
   const showPriceSheet =
     !!user &&
-    (user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user));
+    (hasGlobalPlantAccess(user.globalRole) || canViewPriceSheet(user));
   const showMachineProduction = role
     ? canAccessMachineProduction(role, {
         canMachineSupervise: Boolean(user.canMachineSupervise),
       })
     : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
+  const showUsers = role ? canViewUsersDirectory(role) : false;
   const showApprovals = role === GlobalRole.BUSINESS_HEAD;
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
@@ -131,6 +140,7 @@ export default async function AppLayout({
         showPriceSheet,
         showMachineProduction,
         showAdmin,
+        showUsers,
         showApprovals,
         showSuper,
         isManager,

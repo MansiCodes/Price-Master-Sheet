@@ -4,12 +4,13 @@ import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { toIndiaPhoneE164 } from "@/lib/phone";
-import { canViewPriceSheet } from "@/lib/rbac";
+import { canViewPriceSheet, isViewer } from "@/lib/rbac";
 
 function canManageRecipients(user: {
   globalRole: GlobalRole;
   canViewPriceSheet: boolean;
 }) {
+  if (isViewer(user.globalRole)) return false;
   return user.globalRole === GlobalRole.SUPER_ADMIN || canViewPriceSheet(user);
 }
 

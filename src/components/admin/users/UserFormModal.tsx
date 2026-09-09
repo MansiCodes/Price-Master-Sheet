@@ -63,7 +63,9 @@ export function UserFormModal({
     [plants],
   );
   const requiresPlants =
-    globalRole !== "SUPER_ADMIN" && globalRole !== "MACHINE_SUPERVISOR";
+    globalRole !== "SUPER_ADMIN" &&
+    globalRole !== "VIEWER" &&
+    globalRole !== "MACHINE_SUPERVISOR";
   const canAddMachineSupervise =
     globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT";
 
@@ -117,7 +119,11 @@ export function UserFormModal({
 
   useEffect(() => {
     if (!open) return;
-    if (globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR") {
+    if (
+      globalRole === "SUPER_ADMIN" ||
+      globalRole === "VIEWER" ||
+      globalRole === "MACHINE_SUPERVISOR"
+    ) {
       setSelectedPlantIds([]);
       setPlantError(null);
       setCanMachineSupervise(false);
@@ -180,9 +186,12 @@ export function UserFormModal({
           ? canMachineSupervise
           : false,
       isActive: editing?.isActive ?? true,
-      plantIds: globalRole === "SUPER_ADMIN" || globalRole === "MACHINE_SUPERVISOR"
-        ? []
-        : selectedPlantIds,
+      plantIds:
+        globalRole === "SUPER_ADMIN" ||
+        globalRole === "VIEWER" ||
+        globalRole === "MACHINE_SUPERVISOR"
+          ? []
+          : selectedPlantIds,
     });
   }
 
@@ -363,8 +372,16 @@ export function UserFormModal({
             <label className="users-check">
               <input
                 type="checkbox"
-                checked={canViewPriceSheet || globalRole === "SUPER_ADMIN"}
-                disabled={globalRole === "SUPER_ADMIN" || saving}
+                checked={
+                  canViewPriceSheet ||
+                  globalRole === "SUPER_ADMIN" ||
+                  globalRole === "VIEWER"
+                }
+                disabled={
+                  globalRole === "SUPER_ADMIN" ||
+                  globalRole === "VIEWER" ||
+                  saving
+                }
                 onChange={(e) => setCanViewPriceSheet(e.target.checked)}
               />
               <span>Can view Price Sheet</span>

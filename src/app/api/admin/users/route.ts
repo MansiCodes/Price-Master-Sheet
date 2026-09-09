@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { isSuperAdmin } from "@/lib/rbac";
+import { canManageUsers, canViewUsersDirectory } from "@/lib/rbac";
 
 const indiaPhoneSchema = z
   .string()
@@ -27,13 +27,33 @@ const createSchema = z.object({
   plantIds: z.array(z.string().min(1)).optional().default([]),
 });
 
-function requireSuperAdmin(
+function requireUsersViewer(
   session: { user?: { globalRole?: unknown; id?: string } } | null | undefined,
 ): NextResponse | null {
   if (!session?.user) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
-  if (!isSuperAdmin(session.user.globalRole as Parameters<typeof isSuperAdmin>[0])) {
+  if (
+    !canViewUsersDirectory(
+      session.user.globalRole as Parameters<typeof canViewUsersDirectory>[0],
+    )
+  ) {
+    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
+function requireUsersManager(
+  session: { user?: { globalRole?: unknown; id?: string } } | null | undefined,
+): NextResponse | null {
+  if (!session?.user) {
+    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  }
+  if (
+    !canManageUsers(
+      session.user.globalRole as Parameters<typeof canManageUsers>[0],
+    )
+  ) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
   return null;
@@ -42,7 +62,7 @@ function requireSuperAdmin(
 export async function GET() {
   try {
     const session = await auth();
-    const denied = requireSuperAdmin(session);
+    const denied = requireUsersViewer(session);
     if (denied) return denied;
 
     const users = await prisma.user.findMany({
@@ -69,7 +89,13 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ ok: true, users });
+    return NextResponse.json({
+      ok: true,
+      users,
+      canManage: canManageUsers(
+        session!.user!.globalRole as Parameters<typeof canManageUsers>[0],
+      ),
+    });
   } catch (err) {
     console.error("GET /api/admin/users failed", err);
     return NextResponse.json(
@@ -86,7 +112,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const denied = requireSuperAdmin(session);
+    const denied = requireUsersManager(session);
     if (denied) return denied;
 
     let json: unknown;
@@ -142,6 +168,7 @@ export async function POST(request: Request) {
   const role = parsed.data.globalRole;
   const needsPlants =
     role !== GlobalRole.SUPER_ADMIN &&
+    role !== GlobalRole.VIEWER &&
     role !== GlobalRole.MACHINE_SUPERVISOR;
   if (needsPlants && plantIds.length === 0) {
     return NextResponse.json(
@@ -152,7 +179,7 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
     const canViewPriceSheet =
-      role === GlobalRole.SUPER_ADMIN
+      role === GlobalRole.SUPER_ADMIN || role === GlobalRole.VIEWER
         ? true
         : Boolean(parsed.data.canViewPriceSheet);
     const canMachineSupervise =

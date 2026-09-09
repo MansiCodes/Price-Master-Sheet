@@ -63,12 +63,14 @@ export function PurchaseReport({
   from,
   to,
   userRole,
+  canMutate = true,
 }: {
   plantId: string;
   plantCode?: string;
   from: string;
   to: string;
   userRole?: string;
+  canMutate?: boolean;
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
@@ -624,7 +626,7 @@ export function PurchaseReport({
       </div>
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
-        columns={[...activeColumns, actionCol]}
+        columns={canMutate ? [...activeColumns, actionCol] : activeColumns}
         rows={rows}
         loading={loading}
         variant="register"

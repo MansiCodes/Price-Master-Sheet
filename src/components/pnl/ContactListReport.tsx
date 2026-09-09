@@ -18,8 +18,10 @@ type ContactRow = {
 
 export function ContactListReport({
   plantId,
+  canMutate = true,
 }: {
   plantId: string;
+  canMutate?: boolean;
 }) {
   const t = useTranslations("pnl");
   const baseUrl = `/api/plants/${plantId}/contacts`;
@@ -59,25 +61,29 @@ export function ContactListReport({
       label: "Designation",
       render: (r) => r.designation || "—",
     },
-    {
-      key: "actions",
-      label: "Actions",
-      compact: true,
-      width: "8.75rem",
-      render: (r) => (
-        <ReportRowActions
-          onEdit={() =>
-            crud.openEdit(r, {
-              name: r.name ?? "",
-              phone: r.phone ?? "",
-              category: r.category ?? "",
-              designation: r.designation ?? "",
-            })
-          }
-          onDelete={() => void crud.remove(r.id)}
-        />
-      ),
-    },
+    ...(canMutate
+      ? ([
+          {
+            key: "actions",
+            label: "Actions",
+            compact: true,
+            width: "8.75rem",
+            render: (r: ContactRow) => (
+              <ReportRowActions
+                onEdit={() =>
+                  crud.openEdit(r, {
+                    name: r.name ?? "",
+                    phone: r.phone ?? "",
+                    category: r.category ?? "",
+                    designation: r.designation ?? "",
+                  })
+                }
+                onDelete={() => void crud.remove(r.id)}
+              />
+            ),
+          },
+        ] as ReportColumn<ContactRow>[])
+      : []),
   ];
 
   return (

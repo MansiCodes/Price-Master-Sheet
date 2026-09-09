@@ -25,7 +25,7 @@ export function fileContentHash(buffer: Buffer): string {
 }
 
 export function saleSourceKey(
-  plantId: string,
+  familyKey: string,
   row: {
     date: string;
     customerName: string;
@@ -37,7 +37,7 @@ export function saleSourceKey(
 ): string {
   const fp = contentFingerprint([
     "sale",
-    plantId,
+    familyKey,
     row.date,
     row.customerName,
     row.billNumber,
@@ -49,7 +49,7 @@ export function saleSourceKey(
 }
 
 export function purchaseSourceKey(
-  plantId: string,
+  familyKey: string,
   row: {
     date: string;
     vendorName: string;
@@ -63,7 +63,7 @@ export function purchaseSourceKey(
 ): string {
   const fp = contentFingerprint([
     "purchase",
-    plantId,
+    familyKey,
     row.date,
     row.vendorName,
     row.billNumber,
@@ -77,7 +77,7 @@ export function purchaseSourceKey(
 }
 
 export function stockSourceKey(
-  plantId: string,
+  familyKey: string,
   row: {
     date: string;
     itemName: string;
@@ -88,7 +88,7 @@ export function stockSourceKey(
 ): string {
   const fp = contentFingerprint([
     "stock",
-    plantId,
+    familyKey,
     row.date,
     row.itemName,
     row.unit,
@@ -99,7 +99,7 @@ export function stockSourceKey(
 }
 
 export function expenseSourceKey(
-  plantId: string,
+  familyKey: string,
   row: {
     date: string;
     expenseHead: string;
@@ -112,7 +112,7 @@ export function expenseSourceKey(
 ): string {
   const fp = contentFingerprint([
     "expense",
-    plantId,
+    familyKey,
     row.date,
     row.expenseHead,
     row.description,
@@ -125,7 +125,7 @@ export function expenseSourceKey(
 }
 
 export function farSourceKey(
-  plantId: string,
+  familyKey: string,
   row: {
     date: string;
     description: string | null;
@@ -136,7 +136,7 @@ export function farSourceKey(
 ): string {
   const fp = contentFingerprint([
     "far",
-    plantId,
+    familyKey,
     row.date,
     row.description,
     row.vendor,

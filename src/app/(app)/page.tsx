@@ -8,8 +8,8 @@ import {
   canEnterData,
   canViewFullPnl,
   getAccessiblePlantIds,
+  hasGlobalPlantAccess,
   isMachineSupervisorOnly,
-  isSuperAdmin,
   seesOwnEntriesOnly,
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
@@ -74,11 +74,11 @@ export default async function DashboardPage({
     return <MachineProductionHome metrics={metrics} />;
   }
 
-  const superAdmin = isSuperAdmin(user.globalRole);
+  const globalPlantAccess = hasGlobalPlantAccess(user.globalRole);
   const plantIds = await getAccessiblePlantIds(user.id);
 
   const selectedPlantId = await resolveSelectedPlantId(user.id, {
-    isSuperAdmin: superAdmin,
+    hasGlobalPlantAccess: globalPlantAccess,
   });
 
   const scopedPlantIds = selectedPlantId ? [selectedPlantId] : plantIds;

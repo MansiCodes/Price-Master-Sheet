@@ -51,7 +51,7 @@ async function defaultPlantId(accessible: string[]): Promise<string | null> {
  */
 export async function resolveSelectedPlantId(
   userId: string,
-  options?: { isSuperAdmin?: boolean },
+  options?: { hasGlobalPlantAccess?: boolean },
 ): Promise<string | null> {
   const accessible = await getAccessiblePlantIds(userId);
   if (accessible.length === 0) return null;
@@ -60,7 +60,7 @@ export async function resolveSelectedPlantId(
   const raw = cookieStore.get(SELECTED_PLANT_COOKIE)?.value;
 
   if (raw === ALL_PLANTS_COOKIE_VALUE) {
-    return options?.isSuperAdmin ? null : await defaultPlantId(accessible);
+    return options?.hasGlobalPlantAccess ? null : await defaultPlantId(accessible);
   }
 
   if (raw && accessible.includes(raw)) {

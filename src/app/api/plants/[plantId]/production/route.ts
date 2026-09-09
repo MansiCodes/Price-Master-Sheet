@@ -16,6 +16,11 @@ import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { paginate } from "@/lib/ui/paginate";
+import {
+  plantIdFilter,
+  resolveCanonicalWritePlantId,
+  resolveReportPlantIds,
+} from "@/lib/plant-merge";
 
 const DEFAULT_RATES: Record<ManpowerRole, number> = {
   MANAGER: 4000,
@@ -53,6 +58,9 @@ export async function GET(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const pScope = plantIdFilter(plantIds);
+
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
@@ -62,7 +70,7 @@ export async function GET(
   const pageSize = Number(sp.get("pageSize")) || 10;
 
   const entries = await prisma.productionEntry.findMany({
-    where: { plantId, ...filter },
+    where: { ...pScope, ...filter },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
   });
 
@@ -92,6 +100,8 @@ export async function POST(
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -107,7 +117,7 @@ export async function POST(
   const day = parseDateOnly(data.date);
 
   const rateSettings = await prisma.manpowerRateSetting.findMany({
-    where: { plantId },
+    where: { plantId: writePlantId },
   });
   const rateByRole = new Map(
     rateSettings.map((s) => [s.role, Number(s.ratePerDay)]),
@@ -123,7 +133,7 @@ export async function POST(
     async (tx) => {
       const production = await tx.productionEntry.create({
         data: {
-          plantId,
+          plantId: writePlantId,
           date: day,
           shift: data.shift,
           productName: data.productName,
@@ -141,7 +151,7 @@ export async function POST(
           const totalCost = round2(headcount * ratePerDay);
           return tx.manpowerEntry.create({
             data: {
-              plantId,
+              plantId: writePlantId,
               date: day,
               shift: data.shift,
               role,
