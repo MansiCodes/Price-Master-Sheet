@@ -13,7 +13,6 @@ type ApproveRejectGroupProps = {
 
 export function ApproveRejectGroup({
   statusId,
-  role,
   approveAction,
   rejectAction,
 }: ApproveRejectGroupProps) {
@@ -22,11 +21,8 @@ export function ApproveRejectGroup({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [reason, setReason] = useState("");
 
-  const isHead = role === "BUSINESS_HEAD";
-  const actionApprove =
-    approveAction ?? (isHead ? "approve_head" : "approve_admin");
-  const actionReject =
-    rejectAction ?? (isHead ? "reject_head" : "reject_admin");
+  const actionApprove = approveAction ?? "approve_head";
+  const actionReject = rejectAction ?? "reject_head";
 
   const handleAction = (action: string, rejectReason?: string) => {
     startTransition(async () => {
@@ -42,10 +38,11 @@ export function ApproveRejectGroup({
         }
         
         let msg = "";
-        if (action === "approve_head") msg = "Shift approved by Business Head!";
-        else if (action === "approve_admin") msg = "Shift approved by Super Admin!";
-        else if (action === "reject_head") msg = "Shift rejected by Business Head!";
-        else if (action === "reject_admin") msg = "Shift rejected by Super Admin!";
+        if (action === "approve_head" || action === "approve_admin") {
+          msg = "Shift approved by Super Admin!";
+        } else if (action === "reject_head" || action === "reject_admin") {
+          msg = "Shift rejected by Super Admin!";
+        }
 
         toast.success(msg);
         setShowRejectModal(false);

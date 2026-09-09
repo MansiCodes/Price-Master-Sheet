@@ -112,6 +112,11 @@ export function isSuperAdmin(role: GlobalRole | Role): boolean {
   return role === GlobalRole.SUPER_ADMIN;
 }
 
+/** Entry and shift approval is Super Admin only (Business Head is not involved). */
+export function canApproveEntries(role: GlobalRole | Role): boolean {
+  return isSuperAdmin(role);
+}
+
 export function isViewer(role: GlobalRole | Role): boolean {
   return role === GlobalRole.VIEWER;
 }

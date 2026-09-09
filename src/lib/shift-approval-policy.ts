@@ -1,13 +1,9 @@
-import { dateOnlyRegex, parseDateOnly, startOfUtcDay, todayDateString } from "@/lib/dates";
+import { parseDateOnly, startOfUtcDay } from "@/lib/dates";
+import { getEntryApprovalStartDate } from "@/lib/entry-approval";
 
-/** Kept for metrics/export helpers; approval workflow is disabled. */
+/** Kept for metrics/export helpers; shares the entry-approval start date. */
 export function getShiftApprovalStartDate(): Date {
-  const raw = process.env.SHIFT_APPROVAL_START_DATE?.trim();
-  if (raw && dateOnlyRegex.test(raw)) {
-    return parseDateOnly(raw);
-  }
-  // Default: approval applies from today (IST) when env is not set.
-  return parseDateOnly(todayDateString());
+  return getEntryApprovalStartDate();
 }
 
 export type ShiftApprovalFlags = {

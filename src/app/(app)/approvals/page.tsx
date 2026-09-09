@@ -2,9 +2,13 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { dateOnlyRegex, parseDateOnly } from "@/lib/dates";
-import { getAccessiblePlantIds } from "@/lib/rbac";
+import {
+  canApproveEntries,
+  getAccessiblePlantIds,
+  hasGlobalPlantAccess,
+} from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
-import { GlobalRole } from "@prisma/client";
+import { getPlantDisplayName } from "@/lib/plant-segments";
 import { getLocale } from "next-intl/server";
 import type { AppLocale } from "@/i18n/config";
 import { ApprovalsDateFilter } from "@/components/dashboard/ApprovalsDateFilter";
@@ -22,6 +26,8 @@ const VALID_TABS = new Set<EntryApprovalKind>([
   "expense",
 ]);
 
+const TAB_ORDER: EntryApprovalKind[] = ["purchase", "sale", "stock", "expense"];
+
 export default async function ApprovalsPage({
   searchParams,
 }: {
@@ -30,34 +36,30 @@ export default async function ApprovalsPage({
   const session = await auth();
   if (!session?.user) redirect("/login");
 
-  if (session.user.globalRole !== GlobalRole.BUSINESS_HEAD) {
+  if (!canApproveEntries(session.user.globalRole)) {
     redirect("/");
   }
 
   const { from: fromStr, to: toStr, tab: tabParam } = await searchParams;
   const plantIds = await getAccessiblePlantIds(session.user.id);
-  const selectedPlantId = await resolveSelectedPlantId(session.user.id);
+  const selectedPlantId = await resolveSelectedPlantId(session.user.id, {
+    hasGlobalPlantAccess: hasGlobalPlantAccess(session.user.globalRole),
+  });
   const locale = (await getLocale()) as AppLocale;
-  const initialTab = VALID_TABS.has(tabParam as EntryApprovalKind)
-    ? (tabParam as EntryApprovalKind)
-    : "purchase";
 
-  if (!selectedPlantId || !plantIds.includes(selectedPlantId)) {
+  if (plantIds.length === 0) {
     return (
       <div style={{ padding: "2rem" }} className="approvals-page">
         <h1 className="page-title">Entry Approvals</h1>
-        <p className="page-sub">
-          Select a plant from the sidebar to review and approve entries for that
-          plant.
-        </p>
+        <p className="page-sub">No plants are available to review.</p>
       </div>
     );
   }
 
-  const selectedPlant = await prisma.plant.findUnique({
-    where: { id: selectedPlantId },
-    select: { name: true },
-  });
+  const scopedPlantIds =
+    selectedPlantId && plantIds.includes(selectedPlantId)
+      ? [selectedPlantId]
+      : plantIds;
 
   let fromDate: Date | undefined;
   let toDate: Date | undefined;
@@ -65,7 +67,7 @@ export default async function ApprovalsPage({
   if (toStr && dateOnlyRegex.test(toStr)) toDate = parseDateOnly(toStr);
 
   const pendingWhere = {
-    plantId: selectedPlantId,
+    plantId: { in: scopedPlantIds },
     ...pendingEntryWhere(fromDate, toDate),
   };
 
@@ -73,7 +75,7 @@ export default async function ApprovalsPage({
     prisma.purchase.findMany({
       where: pendingWhere,
       include: {
-        plant: { select: { name: true } },
+        plant: { select: { name: true, code: true } },
         enteredBy: { select: { name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -82,7 +84,7 @@ export default async function ApprovalsPage({
     prisma.sale.findMany({
       where: pendingWhere,
       include: {
-        plant: { select: { name: true } },
+        plant: { select: { name: true, code: true } },
         enteredBy: { select: { name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -91,7 +93,7 @@ export default async function ApprovalsPage({
     prisma.stockEntry.findMany({
       where: pendingWhere,
       include: {
-        plant: { select: { name: true } },
+        plant: { select: { name: true, code: true } },
         enteredBy: { select: { name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -103,13 +105,23 @@ export default async function ApprovalsPage({
         entryType: { in: ["EXPENSE", "PETTY_CASH"] },
       },
       include: {
-        plant: { select: { name: true } },
+        plant: { select: { name: true, code: true } },
         enteredBy: { select: { name: true } },
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 200,
     }),
   ]);
+
+  const tabCounts: Record<EntryApprovalKind, number> = {
+    purchase: purchases.length,
+    sale: sales.length,
+    stock: stocks.length,
+    expense: expenses.length,
+  };
+  const initialTab = VALID_TABS.has(tabParam as EntryApprovalKind)
+    ? (tabParam as EntryApprovalKind)
+    : (TAB_ORDER.find((tab) => tabCounts[tab] > 0) ?? "purchase");
 
   const entries: PendingEntryRow[] = [
     ...purchases.map((p) => ({
@@ -118,7 +130,7 @@ export default async function ApprovalsPage({
       plantId: p.plantId,
       date: p.date.toISOString(),
       shift: p.shift,
-      plantName: p.plant.name,
+      plantName: getPlantDisplayName(p.plant.code, p.plant.name),
       enteredByName: p.enteredBy.name,
       label: p.itemDescription,
       detail: p.vendorName,
@@ -130,7 +142,7 @@ export default async function ApprovalsPage({
       plantId: s.plantId,
       date: s.date.toISOString(),
       shift: s.shift,
-      plantName: s.plant.name,
+      plantName: getPlantDisplayName(s.plant.code, s.plant.name),
       enteredByName: s.enteredBy.name,
       label: s.itemDescription,
       detail: s.customerName,
@@ -142,7 +154,7 @@ export default async function ApprovalsPage({
       plantId: s.plantId,
       date: s.date.toISOString(),
       shift: s.shift,
-      plantName: s.plant.name,
+      plantName: getPlantDisplayName(s.plant.code, s.plant.name),
       enteredByName: s.enteredBy.name,
       label: s.itemName,
       detail: s.notes ?? "",
@@ -154,7 +166,7 @@ export default async function ApprovalsPage({
       plantId: e.plantId,
       date: e.date.toISOString(),
       shift: e.shift,
-      plantName: e.plant.name,
+      plantName: getPlantDisplayName(e.plant.code, e.plant.name),
       enteredByName: e.enteredBy.name,
       label: e.expenseHead,
       detail: e.description ?? e.nature ?? "",
@@ -168,12 +180,6 @@ export default async function ApprovalsPage({
   return (
     <div style={{ padding: "2rem" }} className="approvals-page">
       <h1 className="page-title">Entry Approvals</h1>
-      <p className="page-sub">
-        Pending entries for{" "}
-        <strong>{selectedPlant?.name ?? "selected plant"}</strong>. Switch plant
-        in the sidebar to approve entries for another plant. Your own entries
-        are approved automatically and never appear here.
-      </p>
 
       <ApprovalsDateFilter from={fromStr ?? ""} to={toStr ?? ""} />
 

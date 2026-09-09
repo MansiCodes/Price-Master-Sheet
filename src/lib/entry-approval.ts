@@ -1,11 +1,6 @@
 import { GlobalRole } from "@prisma/client";
-import {
-  dateOnlyRegex,
-  parseDateOnly,
-  startOfUtcDay,
-  todayDateString,
-} from "@/lib/dates";
-import { isBusinessHead, isSuperAdmin } from "@/lib/rbac";
+import { dateOnlyRegex, parseDateOnly, startOfUtcDay } from "@/lib/dates";
+import { isSuperAdmin } from "@/lib/rbac";
 import type {
   EntryApprovalFlags,
   EntryApprovalKind,
@@ -22,13 +17,19 @@ export const LEGACY_ENTRY_APPROVAL: EntryApprovalFlags = {
   approvalRequired: false,
 };
 
-/** Entries on/after this date require Business Head approval (per entry). */
+/**
+ * Entries on/after this date require Super Admin approval (per entry).
+ * Must be a fixed calendar day — defaulting to "today" hid yesterday's
+ * pending queue overnight and made those rows look like legacy-approved.
+ */
+export const DEFAULT_ENTRY_APPROVAL_START = "2026-08-01";
+
 export function getEntryApprovalStartDate(): Date {
   const raw = process.env.SHIFT_APPROVAL_START_DATE?.trim();
   if (raw && dateOnlyRegex.test(raw)) {
     return parseDateOnly(raw);
   }
-  return parseDateOnly(todayDateString());
+  return parseDateOnly(DEFAULT_ENTRY_APPROVAL_START);
 }
 
 export function isEntryApprovalRequired(entryDate: Date | string): boolean {
@@ -39,9 +40,9 @@ export function isEntryApprovalRequired(entryDate: Date | string): boolean {
   return day >= getEntryApprovalStartDate();
 }
 
-/** Business Head / Super Admin own entries skip the approval queue. */
+/** Super Admin own entries skip the approval queue. */
 export function shouldAutoApproveEntry(role: GlobalRole): boolean {
-  return isBusinessHead(role) || isSuperAdmin(role);
+  return isSuperAdmin(role);
 }
 
 export function isAutoApprovedEnterer(role: GlobalRole): boolean {
@@ -153,9 +154,7 @@ export function buildApprovedEntryWhere(
     },
     rejectedByHead: false,
     enteredBy: {
-      globalRole: {
-        in: [GlobalRole.BUSINESS_HEAD, GlobalRole.SUPER_ADMIN],
-      },
+      globalRole: GlobalRole.SUPER_ADMIN,
     },
   });
 
@@ -173,7 +172,7 @@ export function pendingEntryWhere(from?: Date, to?: Date) {
     rejectedByHead: false,
     enteredBy: {
       globalRole: {
-        notIn: [GlobalRole.BUSINESS_HEAD, GlobalRole.SUPER_ADMIN],
+        not: GlobalRole.SUPER_ADMIN,
       },
     },
   };

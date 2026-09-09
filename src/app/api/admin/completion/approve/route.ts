@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/api";
-import { GlobalRole } from "@prisma/client";
+import { canApproveEntries } from "@/lib/rbac";
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const role = session.user.globalRole;
-  if (role !== GlobalRole.SUPER_ADMIN && role !== GlobalRole.BUSINESS_HEAD) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!canApproveEntries(session.user.globalRole)) {
+    return NextResponse.json(
+      { error: "Only Super Admin can approve shifts" },
+      { status: 403 },
+    );
   }
 
-  let body: { id: string; action: "approve_head" | "approve_admin" | "reject_head" | "reject_admin"; reason?: string };
+  let body: {
+    id: string;
+    action: "approve_head" | "approve_admin" | "reject_head" | "reject_admin";
+    reason?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -31,73 +37,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Shift status not found" }, { status: 404 });
   }
 
-  if (action === "approve_head") {
-    if (role !== GlobalRole.BUSINESS_HEAD) {
-      return NextResponse.json(
-        { error: "Only Business Head can approve shifts" },
-        { status: 403 },
-      );
-    }
+  if (action === "approve_head" || action === "approve_admin") {
     const updated = await prisma.dailyEntryStatus.update({
       where: { id },
       data: {
         approvedByHead: true,
         approvedByHeadId: session.user.id,
         approvedByAdmin: true,
+        approvedByAdminId: session.user.id,
         rejectedByHead: false,
         rejectedByAdmin: false,
+        rejectionReason: null,
       },
     });
     return NextResponse.json({ success: true, status: updated });
   }
 
-  if (action === "reject_head") {
-    if (role !== GlobalRole.BUSINESS_HEAD) {
-      return NextResponse.json(
-        { error: "Only Business Head can reject shifts" },
-        { status: 403 },
-      );
-    }
+  if (action === "reject_head" || action === "reject_admin") {
     const updated = await prisma.dailyEntryStatus.update({
       where: { id },
       data: {
         rejectedByHead: true,
-        approvedByHead: false,
-        allComplete: false,
-        rejectionReason: reason || null,
-      },
-    });
-    return NextResponse.json({ success: true, status: updated });
-  }
-
-  if (action === "approve_admin") {
-    if (role !== GlobalRole.SUPER_ADMIN) {
-      return NextResponse.json({ error: "Only Super Admin can approve at this level" }, { status: 403 });
-    }
-    if (!existing.approvedByHead) {
-      return NextResponse.json({ error: "Must be approved by Plant Head first" }, { status: 400 });
-    }
-    const updated = await prisma.dailyEntryStatus.update({
-      where: { id },
-      data: {
-        approvedByAdmin: true,
-        approvedByAdminId: session.user.id,
-        rejectedByAdmin: false,
-      },
-    });
-    return NextResponse.json({ success: true, status: updated });
-  }
-
-  if (action === "reject_admin") {
-    if (role !== GlobalRole.SUPER_ADMIN) {
-      return NextResponse.json({ error: "Only Super Admin can reject at this level" }, { status: 403 });
-    }
-    const updated = await prisma.dailyEntryStatus.update({
-      where: { id },
-      data: {
         rejectedByAdmin: true,
-        approvedByAdmin: false,
         approvedByHead: false,
+        approvedByAdmin: false,
         allComplete: false,
         rejectionReason: reason || null,
       },

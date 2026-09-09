@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GlobalRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/api";
-import { canAccessPlant } from "@/lib/rbac";
+import { canAccessPlant, canApproveEntries } from "@/lib/rbac";
 import type { EntryApprovalKind } from "@/lib/entry-approval";
 import { shouldAutoApproveEntry } from "@/lib/entry-approval";
 
@@ -50,9 +49,9 @@ export async function POST(request: NextRequest) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  if (session.user.globalRole !== GlobalRole.BUSINESS_HEAD) {
+  if (!canApproveEntries(session.user.globalRole)) {
     return NextResponse.json(
-      { error: "Only Business Head can approve entries" },
+      { error: "Only Super Admin can approve entries" },
       { status: 403 },
     );
   }
@@ -76,7 +75,7 @@ export async function POST(request: NextRequest) {
 
   if (shouldAutoApproveEntry(existing.enteredBy.globalRole)) {
     return NextResponse.json(
-      { error: "Business Head and Super Admin entries do not require approval" },
+      { error: "Super Admin entries do not require approval" },
       { status: 400 },
     );
   }

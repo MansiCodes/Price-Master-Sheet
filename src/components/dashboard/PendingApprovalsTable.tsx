@@ -74,7 +74,7 @@ export function PendingApprovalsTable({
                           color: "#d97706",
                         }}
                       >
-                        Pending Business Head
+                        Pending Super Admin
                       </span>
                     </td>
                     <td style={{ padding: "0.75rem 0.5rem", textAlign: "right" }}>
@@ -97,7 +97,7 @@ export function PendingApprovalsTable({
                         </button>
                         <ApproveRejectGroup
                           statusId={app.id}
-                          role="BUSINESS_HEAD"
+                          role="SUPER_ADMIN"
                           approveAction="approve_head"
                           rejectAction="reject_head"
                         />

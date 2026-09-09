@@ -26,7 +26,7 @@ export function ApproveButton({ statusId, action, label }: ApproveButtonProps) {
         if (!res.ok) {
           throw new Error(data.error || "Failed to approve shift");
         }
-        toast.success(action === "approve_head" ? "Approved by Plant Head!" : "Approved by Super Admin!");
+        toast.success("Approved by Super Admin!");
         router.refresh();
       } catch (err: any) {
         toast.error(err.message || "An error occurred");

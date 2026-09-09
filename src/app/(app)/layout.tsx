@@ -1,4 +1,3 @@
-import { GlobalRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppShell } from "@/components/shell/AppShell";
@@ -6,6 +5,7 @@ import { prisma } from "@/lib/db";
 import {
   getAccessiblePlantIds,
   canAccessMachineProduction,
+  canApproveEntries,
   canEnterData,
   canViewPnl,
   canViewPriceSheet,
@@ -126,7 +126,7 @@ export default async function AppLayout({
     : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
   const showUsers = role ? canViewUsersDirectory(role) : false;
-  const showApprovals = role === GlobalRole.BUSINESS_HEAD;
+  const showApprovals = role ? canApproveEntries(role) : false;
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
   const canEnter = role ? canEnterData(role) : false;

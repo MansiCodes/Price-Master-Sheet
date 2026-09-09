@@ -60,7 +60,7 @@ export function formatShiftApprovalStatus(
     };
   }
   if (!status.approvedByHead) {
-    return { label: "Pending Business Head", tone: "warning" };
+    return { label: "Pending Super Admin", tone: "warning" };
   }
   return { label: "Approved", tone: "success" };
 }
