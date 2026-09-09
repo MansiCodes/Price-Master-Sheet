@@ -135,70 +135,74 @@ export function PvcExpenseRegisterReport({
     <section className="pnl-report-panel pnl-report-panel--expense">
       <h3 className="pnl-report-panel__title">{t("expenseTitle")}</h3>
 
-      <div
-        className="pnl-tab-nav pnl-tab-nav--fit pnl-expense-type-nav"
-        role="tablist"
-        aria-label="Expense section"
-      >
-        {PVC_EXPENSE_SECTIONS.map((entry) => (
-          <button
-            key={entry.value}
-            type="button"
-            role="tab"
-            aria-selected={section === entry.value}
-            className={section === entry.value ? "is-active" : undefined}
-            onClick={() => onSectionChange(entry.value)}
-          >
-            {entry.label}
-          </button>
-        ))}
-      </div>
-
-      <div
-        className={`pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-${sectionHeads.length}`}
-        role="tablist"
-        aria-label={
-          section === "direct" ? "Direct expense types" : "Indirect expense types"
-        }
-      >
-        {sectionHeads.map((head) => {
-          const lines = expenseHeadLabelLines(head);
-          const shortLabel = expenseHeadTabLabel(head);
-          return (
+      <div className="pnl-expense-navigation-group">
+        <div
+          className="pnl-tab-nav pnl-tab-nav--fit pnl-expense-type-nav"
+          role="tablist"
+          aria-label="Expense section"
+        >
+          {PVC_EXPENSE_SECTIONS.map((entry) => (
             <button
-              key={head}
+              key={entry.value}
               type="button"
               role="tab"
-              aria-label={head}
-              title={head}
-              aria-selected={category === head}
-              className={category === head ? "is-active" : undefined}
-              onClick={() => {
-                setCategory(head);
-                setPage(1);
-              }}
+              aria-selected={section === entry.value}
+              className={section === entry.value ? "is-active" : undefined}
+              onClick={() => onSectionChange(entry.value)}
             >
-              {lines ? (
-                <>
-                  <span className="pnl-expense-cat-label--full">{head}</span>
-                  <span className="pnl-expense-cat-label--stacked pnl-tab-nav__stacked">
-                    <span>{lines[0]}</span>
-                    <span>{lines[1]}</span>
-                  </span>
-                </>
-              ) : shortLabel !== head ? (
-                <>
-                  <span className="pnl-expense-cat-label--full">{head}</span>
-                  <span className="pnl-expense-cat-label--short">
-                    {shortLabel}
-                  </span>
-                </>
-              ) : (
-                head
-              )}
+              {entry.label}
             </button>
-          );
-        })}
+          ))}
+        </div>
+
+        <div
+          className={`pnl-tab-nav pnl-expense-cat-nav pnl-expense-cat-nav--cols-${sectionHeads.length}`}
+          role="tablist"
+          aria-label={
+            section === "direct"
+              ? "Direct expense types"
+              : "Indirect expense types"
+          }
+        >
+          {sectionHeads.map((head) => {
+            const lines = expenseHeadLabelLines(head);
+            const shortLabel = expenseHeadTabLabel(head);
+            return (
+              <button
+                key={head}
+                type="button"
+                role="tab"
+                aria-label={head}
+                title={head}
+                aria-selected={category === head}
+                className={category === head ? "is-active" : undefined}
+                onClick={() => {
+                  setCategory(head);
+                  setPage(1);
+                }}
+              >
+                {lines ? (
+                  <>
+                    <span className="pnl-expense-cat-label--full">{head}</span>
+                    <span className="pnl-expense-cat-label--stacked pnl-tab-nav__stacked">
+                      <span>{lines[0]}</span>
+                      <span>{lines[1]}</span>
+                    </span>
+                  </>
+                ) : shortLabel !== head ? (
+                  <>
+                    <span className="pnl-expense-cat-label--full">{head}</span>
+                    <span className="pnl-expense-cat-label--short">
+                      {shortLabel}
+                    </span>
+                  </>
+                ) : (
+                  head
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {error ? <div className="alert alert--error">{error}</div> : null}
