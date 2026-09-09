@@ -16,6 +16,22 @@ import { canViewFullPnl, canViewPnl, isAccountantPnlLimited, seesOwnEntriesOnly,
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
+import { getPlantDisplayName } from "@/lib/plant-segments";
+
+/** Safe filename stem from plant display name (e.g. Quad + Signal → Quad-+-Signal). */
+function plantFilenameStem(code: string, name?: string | null): string {
+  const label = (getPlantDisplayName(code, name) || code).replace(
+    /\s+Plant$/i,
+    "",
+  );
+  const stem = label
+    .replace(/\s*\+\s*/g, "-+-")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9+._-]+/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  return stem || code;
+}
 
 type RouteContext = { params: Promise<{ plantId: string }> };
 
@@ -608,7 +624,7 @@ export async function GET(
   }
 
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-  const filename = `${plant.code}-${kind}-${fromStr}-to-${toStr}.xlsx`;
+  const filename = `${plantFilenameStem(plant.code, plant.name)}-${kind}-${fromStr}-to-${toStr}.xlsx`;
 
   return new NextResponse(buffer, {
     status: 200,
