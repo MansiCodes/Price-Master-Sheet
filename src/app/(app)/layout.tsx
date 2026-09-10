@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import {
   getAccessiblePlantIds,
   canAccessMachineProduction,
+  canAdminMachineProduction,
   canApproveEntries,
   canEnterData,
   canViewPnl,
@@ -38,6 +39,11 @@ export default async function AppLayout({
 
   // Dedicated Machine Supervisors skip plant-scoped shell chrome.
   // Plant Manager / Accountant hybrids keep the plant shell + Machine Production.
+  const mpOpts = {
+    canMachineSupervise: Boolean(user.canMachineSupervise),
+    canAdminMachineProduction: Boolean(user.canAdminMachineProduction),
+  };
+  const mpAdmin = role ? canAdminMachineProduction(role, mpOpts) : false;
   if (role && isMachineSupervisorOnly(role)) {
     return (
       <AppShell
@@ -50,6 +56,7 @@ export default async function AppLayout({
           showUsers: false,
           showApprovals: false,
           showSuper: false,
+          showMpAdmin: mpAdmin,
           isManager: false,
           primaryPlantId: null,
           showSwitchPlant: false,
@@ -120,9 +127,7 @@ export default async function AppLayout({
     !!user &&
     (hasGlobalPlantAccess(user.globalRole) || canViewPriceSheet(user));
   const showMachineProduction = role
-    ? canAccessMachineProduction(role, {
-        canMachineSupervise: Boolean(user.canMachineSupervise),
-      })
+    ? canAccessMachineProduction(role, mpOpts)
     : false;
   const showAdmin = role ? isAdminOrHead(role) : false;
   const showUsers = role ? canViewUsersDirectory(role) : false;
@@ -143,6 +148,7 @@ export default async function AppLayout({
         showUsers,
         showApprovals,
         showSuper,
+        showMpAdmin: mpAdmin,
         isManager,
         primaryPlantId,
         showSwitchPlant,

@@ -25,6 +25,7 @@ const patchSchema = z.object({
   globalRole: z.enum(GlobalRole).optional(),
   canViewPriceSheet: z.boolean().optional(),
   canMachineSupervise: z.boolean().optional(),
+  canAdminMachineProduction: z.boolean().optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(128).optional(),
   plantIds: z.array(z.string().min(1)).optional(),
@@ -145,6 +146,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         ? existing.canMachineSupervise
         : false;
 
+  const nextCanAdminMachineProduction =
+    nextRole === GlobalRole.SUPER_ADMIN
+      ? true
+      : data.canAdminMachineProduction !== undefined
+        ? data.canAdminMachineProduction
+        : existing.canAdminMachineProduction;
+
   const updated = await prisma.$transaction(async (tx) => {
     const user = await tx.user.update({
       where: { id: userId },
@@ -166,6 +174,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             ? { canViewPriceSheet: true }
             : {}),
         canMachineSupervise: nextCanMachineSupervise,
+        canAdminMachineProduction: nextCanAdminMachineProduction,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         // For now it is prefilled only for SUPER_ADMIN.
         creditScore: nextCreditScore,
@@ -180,6 +189,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         creditScore: true,
         canViewPriceSheet: true,
         canMachineSupervise: true,
+        canAdminMachineProduction: true,
         isActive: true,
       },
     });
@@ -208,6 +218,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     oldValue: {
       globalRole: existing.globalRole,
       canViewPriceSheet: existing.canViewPriceSheet,
+      canMachineSupervise: existing.canMachineSupervise,
+      canAdminMachineProduction: existing.canAdminMachineProduction,
       isActive: existing.isActive,
       plantIds: existing.plantRoles.map((p) => p.plantId),
     },

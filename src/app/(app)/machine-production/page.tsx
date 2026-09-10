@@ -8,7 +8,10 @@ import { canAccessMachineProduction } from "@/lib/rbac";
 export default async function MachineProductionPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (!canAccessMachineProduction(session.user.globalRole, { canMachineSupervise: session.user.canMachineSupervise })) {
+  if (!canAccessMachineProduction(session.user.globalRole, {
+    canMachineSupervise: session.user.canMachineSupervise,
+    canAdminMachineProduction: session.user.canAdminMachineProduction,
+  })) {
     redirect("/");
   }
 

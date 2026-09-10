@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  const denied = requireMachineProductionAdmin(session.user);
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);
@@ -165,7 +165,7 @@ export async function PATCH(request: Request) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  const denied = requireMachineProductionAdmin(session.user);
   if (denied) return denied;
 
   const body = await request.json().catch(() => null);

@@ -59,6 +59,9 @@ export const authConfig = {
         token.globalRole = user.globalRole;
         token.canViewPriceSheet = user.canViewPriceSheet;
         token.canMachineSupervise = Boolean(user.canMachineSupervise);
+        token.canAdminMachineProduction = Boolean(
+          user.canAdminMachineProduction,
+        );
       }
       return token;
     },
@@ -70,6 +73,9 @@ export const authConfig = {
         session.user.globalRole = token.globalRole as typeof session.user.globalRole;
         session.user.canViewPriceSheet = Boolean(token.canViewPriceSheet);
         session.user.canMachineSupervise = Boolean(token.canMachineSupervise);
+        session.user.canAdminMachineProduction = Boolean(
+          token.canAdminMachineProduction,
+        );
       }
       return session;
     },

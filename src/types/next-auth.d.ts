@@ -8,6 +8,7 @@ declare module "next-auth" {
     globalRole: GlobalRole;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    canAdminMachineProduction: boolean;
     rememberMe?: boolean;
   }
 
@@ -18,6 +19,7 @@ declare module "next-auth" {
       globalRole: GlobalRole;
       canViewPriceSheet: boolean;
       canMachineSupervise: boolean;
+      canAdminMachineProduction: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     globalRole: GlobalRole;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    canAdminMachineProduction: boolean;
     rememberMe?: boolean;
   }
 }

@@ -21,7 +21,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  const denied = requireMachineProductionAdmin(session.user);
   if (denied) return denied;
 
   const { processId } = await ctx.params;
@@ -114,7 +114,7 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
-  const denied = requireMachineProductionAdmin(session.user.globalRole);
+  const denied = requireMachineProductionAdmin(session.user);
   if (denied) return denied;
 
   const { processId } = await ctx.params;

@@ -51,6 +51,7 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
     globalRole: user.globalRole,
     canViewPriceSheet: user.canViewPriceSheet,
     canMachineSupervise: user.canMachineSupervise,
+    canAdminMachineProduction: user.canAdminMachineProduction,
   };
 }
 
@@ -174,6 +175,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
               globalRole: user.globalRole,
               canViewPriceSheet: user.canViewPriceSheet,
               canMachineSupervise: user.canMachineSupervise,
+              canAdminMachineProduction: user.canAdminMachineProduction,
               rememberMe: rememberFlag,
             };
           } catch (err) {
@@ -192,6 +194,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
           token.globalRole = user.globalRole;
           token.canViewPriceSheet = user.canViewPriceSheet;
           token.canMachineSupervise = Boolean(user.canMachineSupervise);
+          token.canAdminMachineProduction = Boolean(
+            user.canAdminMachineProduction,
+          );
           token.rememberMe = Boolean(
             (user as { rememberMe?: boolean }).rememberMe,
           );
