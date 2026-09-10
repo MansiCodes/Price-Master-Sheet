@@ -73,6 +73,13 @@ export type ParsedStockRow = {
   quantity: number;
   rate: number;
   notes: string | null;
+  /** Quad + Signal cable/raw meta for QSSTOCK notes (optional). */
+  qsKind?: "raw" | "cable";
+  qsCable?: string;
+  qsSize?: string;
+  qsProduction?: Record<string, number>;
+  qsSalesKm?: number;
+  qsDrumLabel?: string | null;
 };
 
 export type ExpenseTarget = "petty" | "electricity" | "rent" | "far";
@@ -235,6 +242,7 @@ const STOCK_ALIASES: Record<string, string[]> = {
   date: ["date", "entry date", "stock date", "as on"],
   shift: ["shift"],
   item: [
+    "raw material / cable",
     "list of items",
     "particulars",
     "item name",
@@ -245,17 +253,34 @@ const STOCK_ALIASES: Record<string, string[]> = {
   size: ["size", "conductor size"],
   unit: ["unit", "uom"],
   quantity: [
+    "finished qty",
     "issued quantity",
     "closing stock",
     "closing qty",
     "quantity",
-    "qty",
   ],
   rate: ["rate", "price", "avg rate"],
   value: ["closing value", "value", "amount"],
-  category: ["stock category", "category", "stock"],
+  category: ["stock category", "category"],
+  stockType: ["stock type"],
+  salesKm: ["sales km", "sales"],
+  drumLength: ["drum length", "coil length", "drum / coil length"],
   notes: ["notes", "remarks", "remark"],
 };
+
+/** Process production columns used on Quad + Signal stock import template. */
+const QS_STOCK_PROCESS_HEADERS = [
+  "Insulation",
+  "Single Quad",
+  "Laying",
+  "Inner Sheath",
+  "Inner",
+  "Screening",
+  "Intermediate",
+  "DST",
+  "Outer Sheath",
+  "Outer",
+] as const;
 
 const EXPENSE_ALIASES: Record<string, string[]> = {
   date: ["payment date", "date", "entry date", "expense date"],
@@ -859,14 +884,31 @@ export async function parsePnlWorkbook(
           reason: "No recognizable Stock header row",
         });
       } else {
+        // Map process production columns by exact header text (Quad template).
+        const processColByName: Record<string, number> = {};
+        sheet.getRow(header.row).eachCell({ includeEmpty: false }, (cell, col) => {
+          const h = str(cellVal(cell));
+          if (!h) return;
+          const match = QS_STOCK_PROCESS_HEADERS.find(
+            (p) => p.toLowerCase() === h.toLowerCase(),
+          );
+          if (match) processColByName[match] = col;
+        });
+        const isQuadPlant =
+          opts?.plantCode?.toUpperCase() === "QUAD" ||
+          opts?.plantCode?.toUpperCase() === "SIGNALLING" ||
+          opts?.plantCode?.toUpperCase() === "QUADSIGNAL";
+
         for (let r = header.row + 1; r <= sheet.rowCount; r++) {
           const item = str(getCell(sheet, r, header.map, "item"));
           const qty = num(getCell(sheet, r, header.map, "quantity"));
           let rate = num(getCell(sheet, r, header.map, "rate"));
           const value = num(getCell(sheet, r, header.map, "value"));
+          const stockTypeRaw = str(getCell(sheet, r, header.map, "stockType"));
           const rowText = [
             item,
             str(getCell(sheet, r, header.map, "category")),
+            stockTypeRaw,
           ].join(" ");
           if (sectionBreak(rowText) && !qty) break;
           if (!item) {
@@ -891,8 +933,20 @@ export async function parsePnlWorkbook(
             null,
             sheetDate,
           );
-          if (!dateRaw || !(qty != null && qty > 0)) {
-            if (!(qty != null && qty > 0)) continue;
+
+          const production: Record<string, number> = {};
+          let hasProduction = false;
+          for (const [proc, col] of Object.entries(processColByName)) {
+            const cell = sheet.getRow(r).getCell(col);
+            const n = num(cellVal(cell));
+            if (n != null && n >= 0) {
+              production[proc] = n;
+              if (n > 0) hasProduction = true;
+            }
+          }
+
+          if (!dateRaw || (!(qty != null && qty > 0) && !hasProduction)) {
+            if (!(qty != null && qty > 0) && !hasProduction) continue;
             result.skipped.push({
               sheet: sheet.name,
               row: r,
@@ -900,24 +954,59 @@ export async function parsePnlWorkbook(
             });
             continue;
           }
-          if ((rate == null || rate === 0) && value != null && qty > 0) {
-            rate = value / qty;
+          if ((rate == null || rate === 0) && value != null && (qty ?? 0) > 0) {
+            rate = value / (qty as number);
           }
           rate = rate ?? 0;
           const size = str(getCell(sheet, r, header.map, "size"));
           const itemName = size ? `${item} · ${size}` : item;
+
+          const typeLower = stockTypeRaw.toLowerCase();
+          const looksCable =
+            /cable/.test(typeLower) ||
+            (isQuadPlant && size.length > 0) ||
+            hasProduction;
+          const looksRaw =
+            /raw/.test(typeLower) ||
+            typeLower === "rm" ||
+            (!looksCable && isQuadPlant && !size && !hasProduction);
+
+          let qsKind: "raw" | "cable" | undefined;
+          if (isQuadPlant) {
+            qsKind = looksRaw && !looksCable ? "raw" : looksCable ? "cable" : "raw";
+          }
+
+          const salesKm = num(getCell(sheet, r, header.map, "salesKm"));
+          const drumLength =
+            str(getCell(sheet, r, header.map, "drumLength")) || null;
+
           result.stock.push({
             row: r,
             date: ymd(dateRaw),
             shift: parseShift(getCell(sheet, r, header.map, "shift")),
             itemName,
             category: parseStockCategory(
-              getCell(sheet, r, header.map, "category"),
+              getCell(sheet, r, header.map, "category") ??
+                (qsKind === "cable" ? "FG" : "RM"),
             ),
             unit: str(getCell(sheet, r, header.map, "unit")) || "kg",
-            quantity: qty,
+            quantity: qty != null && qty > 0 ? qty : 0,
             rate,
             notes: str(getCell(sheet, r, header.map, "notes")) || null,
+            ...(qsKind
+              ? {
+                  qsKind,
+                  qsCable: qsKind === "cable" ? item : undefined,
+                  qsSize: qsKind === "cable" ? size || undefined : undefined,
+                  qsProduction:
+                    qsKind === "cable" && Object.keys(production).length
+                      ? production
+                      : undefined,
+                  qsSalesKm:
+                    qsKind === "cable" && salesKm != null ? salesKm : undefined,
+                  qsDrumLabel: qsKind === "cable" ? drumLength : undefined,
+                }
+              : {}),
           });
         }
       }

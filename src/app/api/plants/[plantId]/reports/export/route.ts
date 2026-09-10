@@ -14,9 +14,13 @@ import {
 import { prisma } from "@/lib/db";
 import { canViewFullPnl, canViewPnl, isAccountantPnlLimited, seesOwnEntriesOnly, usesSuperAdminPnlScope } from "@/lib/rbac";
 import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
-import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { getPlantDisplayName } from "@/lib/plant-segments";
+import {
+  getQuadSignalCableProcesses,
+  parseQuadSignalStockNotes,
+} from "@/lib/plant-catalogs";
 
 /** Safe filename stem from plant display name (e.g. Quad + Signal → Quad-+-Signal). */
 function plantFilenameStem(code: string, name?: string | null): string {
@@ -353,6 +357,7 @@ export async function GET(
     });
   } else if (kind === "stock") {
     const isPvc = plant.code.toUpperCase() === "PVC";
+    const isQuad = isQuadSignalPlant(plant.code);
     const rows = await prisma.stockEntry.findMany({
       where: {
         ...pScope,
@@ -365,6 +370,7 @@ export async function GET(
     if (isPvc) {
       sheet.columns = [
         { header: "S.No.", key: "sno", width: 8 },
+        { header: "Date", key: "date", width: 12 },
         { header: "Stock", key: "stock", width: 10 },
         { header: "Particulars", key: "particulars", width: 28 },
         { header: "Closing Stock", key: "qty", width: 16 },
@@ -376,6 +382,7 @@ export async function GET(
       rows.forEach((r, i) => {
         sheet.addRow({
           sno: i + 1,
+          date: iso(r.date),
           stock: r.category,
           particulars: r.itemName,
           qty: toNum(r.quantity),
@@ -384,13 +391,77 @@ export async function GET(
           value: toNum(r.closingValue),
         });
       });
+    } else if (isQuad) {
+      sheet.columns = [
+        { header: "S.No.", key: "sno", width: 8 },
+        { header: "Date", key: "date", width: 12 },
+        { header: "Type", key: "type", width: 14 },
+        { header: "Raw Material / Cable", key: "item", width: 24 },
+        { header: "Size", key: "size", width: 18 },
+        { header: "Process WIP", key: "process", width: 40 },
+        { header: "Sales km", key: "salesKm", width: 12 },
+        { header: "Finished Qty", key: "qty", width: 14 },
+        { header: "Unit", key: "unit", width: 10 },
+        { header: "Rate", key: "rate", width: 12 },
+        { header: "Value", key: "value", width: 14 },
+      ];
+      styleHeader(sheet.getRow(1));
+      rows.forEach((r, i) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        let type = r.category === "FG" ? "Cable" : "Raw Material";
+        let item = r.itemName;
+        let size = "";
+        let process = "";
+        let salesKm = "";
+        if (meta?.kind === "cable") {
+          type = "Cable";
+          item = meta.cable || r.itemName;
+          size = meta.size || "";
+          const procs = getQuadSignalCableProcesses(meta.cable ?? "");
+          const production = meta.production ?? {};
+          const opening = meta.opening ?? {};
+          const closing = meta.closing ?? meta.processes ?? {};
+          process = (procs.length ? procs : Object.keys(closing))
+            .map((name) => {
+              const bits = [name];
+              if (opening[name] != null) bits.push(`O:${opening[name]}`);
+              if (production[name] != null) bits.push(`P:${production[name]}`);
+              if (closing[name] != null) bits.push(`C:${closing[name]}`);
+              return bits.join(" ");
+            })
+            .join(" · ");
+          if (meta.salesKm != null) salesKm = String(meta.salesKm);
+        } else if (meta?.kind === "raw") {
+          type = "Raw Material";
+          item = r.itemName;
+        } else {
+          const parts = r.itemName.split(" · ");
+          item = parts[0] || r.itemName;
+          size = parts.slice(1).join(" · ");
+        }
+        sheet.addRow({
+          sno: i + 1,
+          date: iso(r.date),
+          type,
+          item,
+          size,
+          process,
+          salesKm,
+          qty: toNum(r.quantity),
+          unit: r.unit,
+          rate: toNum(r.rate),
+          value: toNum(r.closingValue),
+        });
+      });
     } else {
       sheet.columns = [
-        { header: "sNo.", key: "sno", width: 8 },
+        { header: "S.No.", key: "sno", width: 8 },
         { header: "Date", key: "date", width: 12 },
+        { header: "Category", key: "category", width: 12 },
         { header: "Item", key: "item", width: 22 },
         { header: "Unit", key: "unit", width: 10 },
         { header: "Qty", key: "qty", width: 12 },
+        { header: "Rate", key: "rate", width: 12 },
         { header: "Value", key: "value", width: 14 },
       ];
       styleHeader(sheet.getRow(1));
@@ -398,9 +469,11 @@ export async function GET(
         sheet.addRow({
           sno: i + 1,
           date: iso(r.date),
+          category: r.category,
           item: r.itemName,
           unit: r.unit,
           qty: toNum(r.quantity),
+          rate: toNum(r.rate),
           value: toNum(r.closingValue),
         });
       });

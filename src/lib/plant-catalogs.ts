@@ -409,6 +409,7 @@ export type QuadSignalStockMeta = {
     layingProduced: number;
     insulationConsumed: number;
     salesKm: number;
+    drumLabel?: string;
   };
 };
 

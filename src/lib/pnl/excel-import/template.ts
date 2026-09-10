@@ -269,11 +269,21 @@ function stockHeaders(family: PlantFamily): string[] {
         "Stock type",
         "Raw Material / Cable",
         "Size",
-        "Process",
-        "Process Qty",
         "Unit",
-        "Quantity",
+        "Finished Qty",
         "Rate",
+        "Sales km",
+        "Drum length",
+        "Insulation",
+        "Single Quad",
+        "Laying",
+        "Inner Sheath",
+        "Inner",
+        "Screening",
+        "Intermediate",
+        "DST",
+        "Outer Sheath",
+        "Outer",
         "Notes",
       ];
     default:
@@ -510,7 +520,7 @@ export async function buildPnlImportTemplate(
         "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",
       ]);
       guide.addRow([
-        "   Stock: choose Stock type Raw Material or Cable. Cable → Size dropdown + Process qty columns (manual). RM → RDSO Black/Grey and other materials.",
+        "   Stock: Stock type = Raw Material or Cable. For Cable fill Size + today's Production under process columns (Insulation, Laying, …). Sales km and Drum length optional (Sales also matches Sales sheet). Opening/closing are calculated in the app.",
       ]);
     }
   }

@@ -1,56 +1,202 @@
 /**
  * Quad & Signalling plant WIP / finished-stock calculation.
  * Sales qty is read from the Sales ledger (never duplicated here).
+ *
+ * Length factors sourced from:
+ * "Size of Cable, RM & Process List" → Size of Cable (col drum length)
+ * + TJ Sir confirmed 12C × 1.5 uses factor 1.010 for 1KM drums.
  */
 
 export type ProcessQtyMap = Record<string, number>;
+
+export type LengthOption = {
+  /** UI label, e.g. "100 mtr", "1 KM", "500 Mtr" */
+  label: string;
+  /** Factor in km used in insulation consumption */
+  lengthFactor: number;
+};
 
 export type QuadSignalVariantConfig = {
   /** Number of insulated wires/cores consumed into one laying km. */
   coreCount: number;
   /**
-   * Length factor (drum length in km), e.g. 1.010 for 1010 m.
-   * Confirmed vs provisional — do not invent new sizes without TJ / Excel.
+   * Default length factor in km (first / preferred option).
+   * 1KM drums use 1.01 (TJ); 500 m → 0.5; 100 m coils → 0.1.
    */
   lengthFactor: number;
+  /** Raw drum label from Size of Cable sheet. */
+  drumLabel: string;
+  /** Selectable drum/coil lengths when Excel lists more than one. */
+  lengthOptions: LengthOption[];
   factorConfirmed: boolean;
-};
-
-/** Confirmed: 12C × 1.5 uses 1.010 (TJ Sir real example). */
-const CONFIRMED_VARIANTS: Record<string, QuadSignalVariantConfig> = {
-  "12 Core x 1.5 sqmm": {
-    coreCount: 12,
-    lengthFactor: 1.01,
-    factorConfirmed: true,
-  },
+  /** True when Excel lists multiple lengths (e.g. 1KM/500Mtr). */
+  factorAmbiguous?: boolean;
 };
 
 /**
- * Provisional factors from verbal TJ guidance only (6/12c ~1 km, 18–30c ~500 m).
- * Marked unconfirmed — replace from Excel / TJ when available.
+ * Expand Excel drum/coil text into selectable length options.
+ * 1KM → 1.01 (plant practice confirmed by TJ for signalling 1KM drums).
  */
-const PROVISIONAL_SIGNALLING: Record<string, Omit<QuadSignalVariantConfig, "factorConfirmed">> = {
-  "2 Core x 1.5 sqmm": { coreCount: 2, lengthFactor: 1.01 },
-  "2 Core x 2.5 sqmm": { coreCount: 2, lengthFactor: 1.01 },
-  "6 Core x 1.5 sqmm": { coreCount: 6, lengthFactor: 1.01 },
-  "18 Core x 1.5 sqmm": { coreCount: 18, lengthFactor: 0.505 },
-  "19 Core x 1.5 sqmm": { coreCount: 19, lengthFactor: 0.505 },
-  "24 Core x 1.5 sqmm": { coreCount: 24, lengthFactor: 0.505 },
-  "30 Core x 1.5 sqmm": { coreCount: 30, lengthFactor: 0.505 },
-  "12 Core x 2.5 sqmm": { coreCount: 12, lengthFactor: 1.01 },
+export function parseDrumLengthOptions(drumLabel: string): LengthOption[] {
+  const raw = drumLabel.trim();
+  if (!raw) return [{ label: "1 KM", lengthFactor: 1 }];
+
+  const d = raw.toLowerCase().replace(/\s+/g, "");
+  const options: LengthOption[] = [];
+  const push = (label: string, lengthFactor: number) => {
+    if (!options.some((o) => o.lengthFactor === lengthFactor)) {
+      options.push({ label, lengthFactor });
+    }
+  };
+
+  // Explicit multi patterns first
+  if (/100\/200\/300/.test(d) || (d.includes("100") && d.includes("200") && d.includes("300"))) {
+    push("100 mtr", 0.1);
+    push("200 mtr", 0.2);
+    push("300 mtr", 0.3);
+    return options;
+  }
+
+  const has1km = /1km/.test(d);
+  const has500 = /500mtr|500m\b|500/.test(d) && !/1500|2500|3500/.test(d);
+
+  if (has1km) push("1 KM", 1.01);
+  if (has500) push("500 Mtr", 0.5);
+
+  if (options.length > 0) return options;
+
+  if (/300mtr|300\s*m/.test(raw.toLowerCase())) push("300 mtr", 0.3);
+  if (/200mtr|200\s*m/.test(raw.toLowerCase())) push("200 mtr", 0.2);
+  if (/100mtr|100\s*m/.test(raw.toLowerCase())) push("100 mtr", 0.1);
+
+  if (options.length > 0) return options;
+
+  // Fallback: single option from the raw label
+  return [{ label: raw || "Default", lengthFactor: 1 }];
+}
+
+/**
+ * Parse Excel drum/coil text → default length factor (km).
+ * Prefer first option from parseDrumLengthOptions.
+ */
+export function drumLabelToLengthFactor(drumLabel: string): {
+  lengthFactor: number;
+  ambiguous: boolean;
+} {
+  const options = parseDrumLengthOptions(drumLabel);
+  return {
+    lengthFactor: options[0]?.lengthFactor ?? 1,
+    ambiguous: options.length > 1,
+  };
+}
+
+type MasterRow = {
+  size: string;
+  drumLabel: string;
+  coreCount: number;
 };
+
+/**
+ * From Size of Cable sheet (yellow Power range rows excluded).
+ * Process for App confirms Signalling / Quad stage order already in plant-catalogs.
+ */
+const SIZE_OF_CABLE_MASTER: MasterRow[] = [
+  // Signalling
+  { size: "2 Core x 2.5 sqmm", drumLabel: "1KM", coreCount: 2 },
+  { size: "6 Core x 1.5 sqmm", drumLabel: "1KM", coreCount: 6 },
+  { size: "12 Core x 1.5 sqmm", drumLabel: "1KM", coreCount: 12 },
+  { size: "18 Core x 1.5 sqmm", drumLabel: "500 Mtr", coreCount: 18 },
+  { size: "19 Core x 1.5 sqmm", drumLabel: "500 Mtr", coreCount: 19 },
+  { size: "24 Core x 1.5 sqmm", drumLabel: "500 Mtr", coreCount: 24 },
+  { size: "30 Core x 1.5 sqmm", drumLabel: "500 Mtr", coreCount: 30 },
+  { size: "12 Core x 2.5 sqmm", drumLabel: "1KM/500Mtr", coreCount: 12 },
+  // Power (non-yellow only)
+  { size: "2 Core x 10 sqmm", drumLabel: "1KM", coreCount: 2 },
+  { size: "2 Core x 25 sqmm", drumLabel: "1KM", coreCount: 2 },
+  { size: "2 Core x 35 sqmm", drumLabel: "1KM", coreCount: 2 },
+  { size: "2 Core x 70 sqmm", drumLabel: "500Mtr", coreCount: 2 },
+  // Indoor Multi-Core
+  { size: "40 Core x 0.6mm", drumLabel: "500mtr", coreCount: 40 },
+  { size: "60 Core x 0.6mm", drumLabel: "500mtr", coreCount: 60 },
+  { size: "40 Core x 1.0mm", drumLabel: "500mtr", coreCount: 40 },
+  { size: "60 Core x 1.0mm", drumLabel: "500mtr", coreCount: 60 },
+  { size: "24 Core x 0.6mm", drumLabel: "500mtr", coreCount: 24 },
+  { size: "24 Core x 1.0mm", drumLabel: "500mtr", coreCount: 24 },
+  // Indoor Single-Core (1 conductor)
+  { size: "16/0.2 mm ABC", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "16/0.2 mm ATC", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "0.75 sqmm (24/0.2mm)", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "1.5 sqmm (22/0.3mm)", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "28/0.3mm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "2.5 sqmm (36/0.3mm)", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "4 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "6 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "10 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "16 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "25 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "35 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "50 Sqmm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "3/0.75 mm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "7/0.75 mm", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "1mm ATC", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "0.6mm ATC", drumLabel: "100mtr Coils", coreCount: 1 },
+  { size: "16/0.2 mm Twin Twisted", drumLabel: "100mtr Coils", coreCount: 1 },
+  // Fire Survival
+  {
+    size: "2 Core x 1.5 sqmm Armoured",
+    drumLabel: "100/200/300 mtr coil",
+    coreCount: 2,
+  },
+  {
+    size: "2 Core x 1.5 sqmm un-Armoured",
+    drumLabel: "100/200/300 mtr coil",
+    coreCount: 2,
+  },
+  // Quad
+  { size: "6 Quad x 0.9mm", drumLabel: "1KM", coreCount: 24 }, // 6×4 wires
+  { size: "4 Quad x 0.9mm", drumLabel: "1KM", coreCount: 16 },
+  // PIJF
+  { size: "10P x 0.5mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 20 },
+  { size: "10P x 0.9mm Armoured", drumLabel: "1KM/500mtr", coreCount: 20 },
+  { size: "20P x 0.9mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 40 },
+  { size: "20P x 0.9mm Armoured", drumLabel: "1KM/500mtr", coreCount: 40 },
+  { size: "10P x 0.9mm Un-Armoured", drumLabel: "1KM/500mtr", coreCount: 20 },
+  { size: "5P x 0.5mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 10 },
+  { size: "2P x 0.5mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 4 },
+  { size: "20P x 0.5mm Armoured", drumLabel: "1KM/500mtr", coreCount: 40 },
+];
+
+function buildVariantMap(): Record<string, QuadSignalVariantConfig> {
+  const map: Record<string, QuadSignalVariantConfig> = {};
+  for (const row of SIZE_OF_CABLE_MASTER) {
+    const lengthOptions = parseDrumLengthOptions(row.drumLabel);
+    const lengthFactor = lengthOptions[0]?.lengthFactor ?? 1;
+    const ambiguous = lengthOptions.length > 1;
+    map[normalizeSizeKey(row.size)] = {
+      coreCount: row.coreCount,
+      lengthFactor,
+      drumLabel: row.drumLabel,
+      lengthOptions,
+      factorConfirmed: !ambiguous,
+      factorAmbiguous: ambiguous || undefined,
+    };
+  }
+  return map;
+}
+
+const VARIANT_BY_SIZE = buildVariantMap();
 
 function normalizeSizeKey(size: string): string {
   return size.trim().replace(/\s+/g, " ");
 }
 
-/** Parse "12 Core x 1.5 sqmm" / "6 Quad x 0.9mm" → core/quad count. */
+/** Parse "12 Core x 1.5 sqmm" / "6 Quad x 0.9mm" → core/wire count. */
 export function parseCoreOrQuadCount(size: string): number | null {
   const s = size.trim();
   const core = s.match(/(\d+)\s*Core\b/i);
   if (core) return Number(core[1]);
   const quad = s.match(/(\d+)\s*Quad\b/i);
-  if (quad) return Number(quad[1]) * 4; // 1 quad = 4 wires (NEEDS BUSINESS CONFIRMATION for insulation)
+  if (quad) return Number(quad[1]) * 4;
   const pair = s.match(/(\d+)\s*P\b/i);
   if (pair) return Number(pair[1]) * 2;
   return null;
@@ -60,16 +206,19 @@ export function resolveQuadSignalVariant(
   size: string,
 ): QuadSignalVariantConfig | null {
   const key = normalizeSizeKey(size);
-  const confirmed = CONFIRMED_VARIANTS[key];
-  if (confirmed) return confirmed;
-  const provisional = PROVISIONAL_SIGNALLING[key];
-  if (provisional) {
-    return { ...provisional, factorConfirmed: false };
-  }
+  const fromMaster = VARIANT_BY_SIZE[key];
+  if (fromMaster) return fromMaster;
+
   const cores = parseCoreOrQuadCount(key);
   if (cores == null || cores <= 0) return null;
-  // Unknown size: cores from label, factor unknown → use 1.0 and flag unconfirmed
-  return { coreCount: cores, lengthFactor: 1, factorConfirmed: false };
+  return {
+    coreCount: cores,
+    lengthFactor: 1,
+    drumLabel: "unknown",
+    lengthOptions: [{ label: "Default (1 KM)", lengthFactor: 1 }],
+    factorConfirmed: false,
+    factorAmbiguous: true,
+  };
 }
 
 export type WipStageResult = {

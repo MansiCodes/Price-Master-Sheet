@@ -205,12 +205,26 @@ export function StockReport({
 
   const defaultColumns: ReportColumn<StockRow>[] = [
     { key: "date", label: "Date", render: (r) => isoDate(r.date) },
+    {
+      key: "category",
+      label: "Category",
+      compact: true,
+      render: (r) => r.category || "—",
+    },
     { key: "item", label: "Item", render: (r) => r.itemName },
     {
       key: "qty",
       label: "Qty",
       align: "right",
       render: (r) => `${Number(r.quantity)} ${r.unit}`,
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      render: (r) =>
+        r.rate != null && r.rate !== "" ? formatINR(Number(r.rate)) : "—",
     },
     {
       key: "value",
@@ -412,6 +426,14 @@ export function StockReport({
       align: "right",
       compact: true,
       render: (r) => `${Number(r.quantity)} ${r.unit}`,
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      render: (r) =>
+        r.rate != null && r.rate !== "" ? formatINR(Number(r.rate)) : "—",
     },
     {
       key: "value",

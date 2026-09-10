@@ -48,7 +48,6 @@ import {
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import {
   calculateQuadSignalWip,
-  displayKm,
   resolveQuadSignalVariant,
   type WipCalcResult,
 } from "@/lib/quad-signal-wip";
@@ -484,11 +483,10 @@ export function TodayHub({
       unit: string;
     }>
   >([]);
-  const [stockWipOpeningFrom, setStockWipOpeningFrom] = useState<string | null>(
-    null,
-  );
-  const [stockWipLoading, setStockWipLoading] = useState(false);
-  const [stockWipFactorNote, setStockWipFactorNote] = useState<string | null>(
+  const [stockLengthOptions, setStockLengthOptions] = useState<
+    Array<{ label: string; lengthFactor: number }>
+  >([]);
+  const [stockLengthFactor, setStockLengthFactor] = useState<number | null>(
     null,
   );
   const [stockItem, setStockItem] = useState<string>(
@@ -551,14 +549,13 @@ export function TodayHub({
       setStockWipOpening({});
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
-      setStockWipOpeningFrom(null);
-      setStockWipFactorNote(null);
+      setStockLengthOptions([]);
+      setStockLengthFactor(null);
       return;
     }
     if (!resolvedQuadCableName || !resolvedQuadSizeName) return;
 
     const ac = new AbortController();
-    setStockWipLoading(true);
     const q = new URLSearchParams({
       date: entryDate,
       cable: resolvedQuadCableName,
@@ -579,24 +576,36 @@ export function TodayHub({
             coreCount: number;
             lengthFactor: number;
             factorConfirmed: boolean;
+            drumLabel?: string;
+            factorAmbiguous?: boolean;
+            lengthOptions?: Array<{ label: string; lengthFactor: number }>;
           } | null;
         }>;
       })
       .then((data) => {
         setStockWipOpening(data.opening ?? {});
-        setStockWipOpeningFrom(data.openingFromDate);
         setStockWipSalesKm(Number(data.salesKm) || 0);
         setStockWipSalesLines(data.sales ?? []);
         if (data.variant) {
-          setStockWipFactorNote(
-            data.variant.factorConfirmed
-              ? `Cores ${data.variant.coreCount} · length factor ${data.variant.lengthFactor}`
-              : `Cores ${data.variant.coreCount} · length factor ${data.variant.lengthFactor} (provisional — confirm with TJ)`,
-          );
+          const opts =
+            data.variant.lengthOptions && data.variant.lengthOptions.length > 0
+              ? data.variant.lengthOptions
+              : [
+                  {
+                    label: data.variant.drumLabel || "Default",
+                    lengthFactor: data.variant.lengthFactor,
+                  },
+                ];
+          setStockLengthOptions(opts);
+          setStockLengthFactor((prev) => {
+            if (prev != null && opts.some((o) => o.lengthFactor === prev)) {
+              return prev;
+            }
+            return opts[0]?.lengthFactor ?? data.variant!.lengthFactor;
+          });
         } else {
-          setStockWipFactorNote(
-            "Core count / length factor not resolved for this size.",
-          );
+          setStockLengthOptions([]);
+          setStockLengthFactor(null);
         }
       })
       .catch((err) => {
@@ -605,9 +614,6 @@ export function TodayHub({
         setStockWipOpening({});
         setStockWipSalesKm(0);
         setStockWipSalesLines([]);
-      })
-      .finally(() => {
-        if (!ac.signal.aborted) setStockWipLoading(false);
       });
 
     return () => ac.abort();
@@ -635,13 +641,17 @@ export function TodayHub({
       const n = Number(raw);
       production[name] = Number.isFinite(n) && n >= 0 ? n : 0;
     }
+    const lengthFactor =
+      stockLengthFactor != null && Number.isFinite(stockLengthFactor)
+        ? stockLengthFactor
+        : variant.lengthFactor;
     return calculateQuadSignalWip({
       processes: quadCableProcessFields,
       opening: stockWipOpening,
       production,
       salesKm: stockWipSalesKm,
       coreCount: variant.coreCount,
-      lengthFactor: variant.lengthFactor,
+      lengthFactor,
     });
   }, [
     isQuad,
@@ -651,6 +661,7 @@ export function TodayHub({
     stockWipOpening,
     stockWipSalesKm,
     resolvedQuadSizeName,
+    stockLengthFactor,
   ]);
 
   useEffect(() => {
@@ -1340,13 +1351,20 @@ export function TodayHub({
             );
             return;
           }
+          const lengthFactor =
+            stockLengthFactor != null && Number.isFinite(stockLengthFactor)
+              ? stockLengthFactor
+              : variant.lengthFactor;
+          const selectedLengthLabel =
+            stockLengthOptions.find((o) => o.lengthFactor === lengthFactor)
+              ?.label ?? variant.drumLabel;
           const wip = calculateQuadSignalWip({
             processes: quadCableProcessFields,
             opening: stockWipOpening,
             production: processes,
             salesKm: stockWipSalesKm,
             coreCount: variant.coreCount,
-            lengthFactor: variant.lengthFactor,
+            lengthFactor,
           });
           if (wip.warnings.length > 0) {
             fail(wip.warnings[0] ?? "WIP validation failed.");
@@ -1376,7 +1394,10 @@ export function TodayHub({
                 closing: wip.byProcess,
                 processes: wip.byProcess,
                 salesKm: stockWipSalesKm,
-                calcSnapshot: wip.calcSnapshot,
+                calcSnapshot: {
+                  ...wip.calcSnapshot,
+                  drumLabel: selectedLengthLabel,
+                },
               },
               stockNotes.trim() || `Closing stock as on ${entryDate}`,
             ),
@@ -2393,24 +2414,34 @@ export function TodayHub({
                         ) : null}
                         {quadCableProcessFields.length > 0 ? (
                           <div className="field qs-wip">
-                            <p
-                              className="field-hint"
-                              style={{ marginBottom: "0.45rem" }}
-                            >
-                              Enter <strong>today&apos;s production</strong>{" "}
-                              (km). Opening comes from the prior day closing;
-                              Sales comes from the Sales tab (read-only).
-                              {stockWipLoading
-                                ? " Loading opening / sales…"
-                                : null}
-                            </p>
-                            {stockWipFactorNote ? (
-                              <p className="field-hint qs-wip__factor">
-                                {stockWipFactorNote}
-                                {stockWipOpeningFrom
-                                  ? ` · Opening from ${stockWipOpeningFrom}`
-                                  : " · No prior closing (opening = 0)"}
-                              </p>
+                            {stockLengthOptions.length > 1 ? (
+                              <div className="field">
+                                <label htmlFor="st-drum-len">
+                                  Drum / coil length
+                                </label>
+                                <SelectMenu
+                                  id="st-drum-len"
+                                  value={
+                                    stockLengthOptions.find(
+                                      (o) =>
+                                        o.lengthFactor === stockLengthFactor,
+                                    )?.label ??
+                                    stockLengthOptions[0]?.label ??
+                                    ""
+                                  }
+                                  options={stockLengthOptions.map(
+                                    (o) => o.label,
+                                  )}
+                                  required
+                                  onChange={(next) => {
+                                    const opt = stockLengthOptions.find(
+                                      (o) => o.label === next,
+                                    );
+                                    if (opt)
+                                      setStockLengthFactor(opt.lengthFactor);
+                                  }}
+                                />
+                              </div>
                             ) : null}
                             <div className="qs-wip__table-wrap">
                               <table className="qs-wip__table">
@@ -2437,7 +2468,9 @@ export function TodayHub({
                                           : stage?.outboundKind ===
                                               "next_process"
                                             ? String(stage.outbound)
-                                            : "—";
+                                            : stage != null
+                                              ? String(stage.outbound)
+                                              : "—";
                                     return (
                                       <tr key={proc}>
                                         <td>{proc}</td>
@@ -2466,13 +2499,7 @@ export function TodayHub({
                                         </td>
                                         <td className="qs-wip__num">
                                           {stage != null
-                                            ? `${stage.closing}${
-                                                proc
-                                                  .toLowerCase()
-                                                  .includes("insulation")
-                                                  ? ` (~${displayKm(stage.closing)})`
-                                                  : ""
-                                              }`
+                                            ? String(stage.closing)
                                             : "—"}
                                         </td>
                                       </tr>
@@ -2483,7 +2510,7 @@ export function TodayHub({
                             </div>
                             <div className="qs-wip__sales">
                               <div className="field">
-                                <label>Sales (from Sales tab)</label>
+                                <label>Sales</label>
                                 <input
                                   readOnly
                                   value={`${stockWipSalesKm} km`}
@@ -2518,9 +2545,7 @@ export function TodayHub({
                                 />
                               </div>
                               <div className="field">
-                                <label htmlFor="st-qty-fin">
-                                  Finished qty (auto)
-                                </label>
+                                <label htmlFor="st-qty-fin">Finished qty</label>
                                 <DecimalInput
                                   id="st-qty-fin"
                                   value={stockQty}
