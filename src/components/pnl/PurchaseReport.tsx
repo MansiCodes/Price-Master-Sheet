@@ -697,7 +697,7 @@ export function PurchaseReport({
                   type: "number",
                 },
                 { name: "unit", label: "Unit", required: true },
-                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "rate", label: "Rate", type: "number", required: false },
                 { name: "notes", label: "Notes", type: "textarea" },
               ]
             : [
@@ -712,7 +712,7 @@ export function PurchaseReport({
                   type: "number",
                 },
                 { name: "unit", label: "Unit", required: true },
-                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "rate", label: "Rate", type: "number", required: false },
                 { name: "gstPercent", label: "GST %", type: "number" },
                 { name: "notes", label: "Remarks", type: "textarea" },
               ]

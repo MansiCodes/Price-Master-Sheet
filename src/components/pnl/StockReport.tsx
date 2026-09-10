@@ -523,7 +523,7 @@ export function StockReport({
           { name: "itemName", label: isPvc ? "Particulars" : "Item Name", required: true },
           { name: "quantity", label: isPvc ? "Closing Stock" : "QTY", type: "number", required: true },
           { name: "unit", label: "Unit", required: true },
-          { name: "rate", label: "Rate", type: "number", required: true },
+          { name: "rate", label: "Rate", type: "number", required: false },
           { name: "notes", label: "Notes", type: "textarea" },
         ]}
         values={crud.values}

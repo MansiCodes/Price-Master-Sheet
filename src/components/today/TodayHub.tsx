@@ -1145,7 +1145,8 @@ export function TodayHub({
         const l = purchaseLines[i];
         const desc = l.itemDescription.trim();
         const qty = Number(l.quantity);
-        const rate = Number(l.rate);
+        const rateRaw = l.rate.trim();
+        const rate = rateRaw === "" ? 0 : Number(rateRaw);
 
         if (purchaseLines.length === 1 || desc || l.quantity || l.rate) {
           if (!desc) {
@@ -1156,7 +1157,7 @@ export function TodayHub({
             fail(`Enter a valid quantity greater than 0 for item ${i + 1}.`);
             return;
           }
-          if (!(rate >= 0) || isNaN(rate)) {
+          if (rateRaw !== "" && (!Number.isFinite(rate) || rate < 0)) {
             fail(`Enter a valid rate for item ${i + 1}.`);
             return;
           }
@@ -1171,7 +1172,7 @@ export function TodayHub({
           debitQuantity: l.debitQuantity ? Number(l.debitQuantity) : 0,
           openingReading: l.openingReading ? Number(l.openingReading) : null,
           closingReading: l.closingReading ? Number(l.closingReading) : null,
-          rate: Number(l.rate),
+          rate: l.rate.trim() === "" ? 0 : Number(l.rate),
           gstPercent: isCat6 ? 0 : Number(l.gstPercent) || 0,
         }))
         .filter((l) => l.itemDescription && l.quantity > 0);
@@ -1222,7 +1223,8 @@ export function TodayHub({
         const l = saleLines[i];
         const desc = l.itemDescription.trim();
         const qty = Number(l.quantity);
-        const rate = Number(l.rate);
+        const rateRaw = l.rate.trim();
+        const rate = rateRaw === "" ? 0 : Number(rateRaw);
 
         if (saleLines.length === 1 || desc || l.quantity || l.rate) {
           if (!desc) {
@@ -1233,7 +1235,7 @@ export function TodayHub({
             fail(`Enter a valid quantity greater than 0 for item ${i + 1}.`);
             return;
           }
-          if (!(rate >= 0) || isNaN(rate)) {
+          if (rateRaw !== "" && (!Number.isFinite(rate) || rate < 0)) {
             fail(`Enter a valid rate for item ${i + 1}.`);
             return;
           }
@@ -1245,7 +1247,7 @@ export function TodayHub({
           itemDescription: l.itemDescription.trim(),
           unit: l.unit.trim() || "PCS",
           quantity: Number(l.quantity),
-          rate: Number(l.rate),
+          rate: l.rate.trim() === "" ? 0 : Number(l.rate),
           ...(isCat6
             ? {
                 inMeter: l.inMeter?.trim() ? Number(l.inMeter) : null,
@@ -1277,14 +1279,18 @@ export function TodayHub({
       });
     } else if (kind === "stock") {
       const issuedQty = Number(stockQty);
-      const manualRate = Number(stockRate);
+      const manualRateRaw = stockRate.trim();
+      const manualRate =
+        manualRateRaw === "" ? NaN : Number(manualRateRaw);
       const closingRate =
         Number.isFinite(manualRate) && manualRate >= 0
           ? manualRate
           : stockPurchaseRate != null && Number.isFinite(stockPurchaseRate)
             ? stockPurchaseRate
-            : NaN;
-      const closingValue = issuedQty * closingRate;
+            : 0;
+      const closingValue = Number.isFinite(issuedQty)
+        ? issuedQty * closingRate
+        : 0;
 
       if (isQuad) {
         if (stockKind === "raw") {
@@ -1298,10 +1304,6 @@ export function TodayHub({
                 ? "Enter the other raw material name."
                 : "Select raw material and quantity.",
             );
-            return;
-          }
-          if (!Number.isFinite(closingRate) || closingRate < 0) {
-            fail("Enter a rate for this stock entry.");
             return;
           }
           if (!(issuedQty >= 0)) {
@@ -1346,10 +1348,6 @@ export function TodayHub({
                 ? "Enter the other size."
                 : "Select cable size.",
             );
-            return;
-          }
-          if (!Number.isFinite(closingRate) || closingRate < 0) {
-            fail("Enter a rate for this stock entry.");
             return;
           }
           const processes: Record<string, number> = {};
@@ -1464,12 +1462,6 @@ export function TodayHub({
       const stockItemName = resolvedStockSize
         ? `${resolvedItem} · ${resolvedStockSize}`
         : resolvedItem;
-      if (!Number.isFinite(closingRate) || closingRate < 0) {
-        fail(
-          "Enter a rate, or select an item that already has purchase history for this plant.",
-        );
-        return;
-      }
       if (!(issuedQty >= 0)) {
         fail("Quantity must be zero or more.");
         return;
@@ -1544,9 +1536,9 @@ export function TodayHub({
         const billAmount =
           consumed != null && rate > 0
             ? Math.round(consumed * rate * 100) / 100
-            : Number(expenseAmount);
-        if (!(billAmount > 0)) {
-          fail("Enter rate and readings so the electricity bill amount is calculated.");
+            : Number(expenseAmount) || 0;
+        if (!(billAmount >= 0) || !Number.isFinite(billAmount)) {
+          fail("Enter a valid electricity bill amount.");
           return;
         }
         result = await postJson(`/api/plants/${plantId}/electricity`, {
@@ -2617,12 +2609,12 @@ export function TodayHub({
                             ) : null}
                             <div className="form-grid two">
                               <div className="field">
-                                <label htmlFor="st-rate">Rate</label>
+                                <label htmlFor="st-rate">Rate (optional)</label>
                                 <DecimalInput
                                   id="st-rate"
-                                  required
                                   value={stockRate}
                                   onChange={setStockRate}
+                                  placeholder="0"
                                 />
                               </div>
                               <div className="field">
@@ -2789,12 +2781,12 @@ export function TodayHub({
                     quadCableProcessFields.length % 2 === 1
                   ) ? (
                     <div className="field">
-                      <label htmlFor="st-rate">Rate</label>
+                      <label htmlFor="st-rate">Rate (optional)</label>
                       <DecimalInput
                         id="st-rate"
-                        required
                         value={stockRate}
                         onChange={setStockRate}
+                        placeholder="0"
                       />
                     </div>
                   ) : null}
@@ -2811,8 +2803,8 @@ export function TodayHub({
                   </p>
                 ) : resolvedStockItemName ? (
                   <p className="field-hint">
-                    No purchase history matched this item — enter rate manually (purchase
-                    today is not required).
+                    No purchase history matched this item — rate is optional
+                    (leave blank to save as 0).
                   </p>
                 ) : null}
                 <div className="field expense-desc">
@@ -2919,7 +2911,7 @@ export function TodayHub({
                         />
                       </div>
                       <div className="field">
-                        <label htmlFor="e-rent-rate">Rate (₹/sqft)</label>
+                        <label htmlFor="e-rent-rate">Rate (₹/sqft, optional)</label>
                         <DecimalInput
                           id="e-rent-rate"
                           value={rentRatePerSqft}
@@ -2994,12 +2986,12 @@ export function TodayHub({
                     ) : null}
                     <div className="prod-fields__row">
                       <div className="field">
-                        <label htmlFor="e-rate">Rate (₹/unit)</label>
+                        <label htmlFor="e-rate">Rate (₹/unit, optional)</label>
                         <DecimalInput
                           id="e-rate"
-                          required
                           value={expenseRate}
                           onChange={setExpenseRate}
+                          placeholder="0"
                         />
                       </div>
                       <div className="field">
@@ -3132,7 +3124,7 @@ export function TodayHub({
                         />
                       </div>
                       <div className="field">
-                        <label htmlFor="e-unload-rate">Rate (₹/MT)</label>
+                        <label htmlFor="e-unload-rate">Rate (₹/MT, optional)</label>
                         <DecimalInput
                           id="e-unload-rate"
                           value={unloadRatePerMt}
@@ -3714,7 +3706,7 @@ function LineEditor({
                   />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                  <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
                   <DecimalInput
                     id={`line-rate-${line.id}`}
                     value={line.rate}
@@ -3723,6 +3715,7 @@ function LineEditor({
                       next[idx] = { ...line, rate };
                       onChange(next);
                     }}
+                    placeholder="0"
                   />
                 </div>
               </div>
@@ -3800,7 +3793,7 @@ function LineEditor({
               className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}`}
             >
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}
@@ -3809,6 +3802,7 @@ function LineEditor({
                     next[idx] = { ...line, rate };
                     onChange(next);
                   }}
+                  placeholder="0"
                 />
               </div>
               {showGst ? (
@@ -3862,7 +3856,7 @@ function LineEditor({
                 />
               </div>
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}
@@ -3871,6 +3865,7 @@ function LineEditor({
                     next[idx] = { ...line, rate };
                     onChange(next);
                   }}
+                  placeholder="0"
                 />
               </div>
               {showGst ? (

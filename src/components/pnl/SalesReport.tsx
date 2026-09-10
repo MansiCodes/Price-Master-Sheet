@@ -360,7 +360,7 @@ export function SalesReport({
                 { name: "itemDescription", label: "Item Details", required: true },
                 { name: "quantity", label: "Quantity", type: "number", required: true },
                 { name: "unit", label: "Unit", required: true },
-                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "rate", label: "Rate", type: "number", required: false },
                 { name: "inMeter", label: "In Meter", type: "number" },
                 { name: "qtyMtr", label: "QTY-MTR", type: "number" },
                 { name: "meterUnit", label: "Unit (MTR)" },
@@ -373,7 +373,7 @@ export function SalesReport({
                 { name: "itemDescription", label: "Item Details", required: true },
                 { name: "quantity", label: "Qty", type: "number", required: true },
                 { name: "unit", label: "Unit", required: true },
-                { name: "rate", label: "Rate", type: "number", required: true },
+                { name: "rate", label: "Rate", type: "number", required: false },
                 { name: "notes", label: "Remarks", type: "textarea" },
               ]
         }
