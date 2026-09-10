@@ -470,7 +470,7 @@ export function TodayHub({
     Record<string, string>
   >({});
   const [stockWipOpening, setStockWipOpening] = useState<
-    Record<string, number>
+    Record<string, string>
   >({});
   const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
@@ -586,7 +586,12 @@ export function TodayHub({
         }>;
       })
       .then((data) => {
-        setStockWipOpening(data.opening ?? {});
+        const openingStrings: Record<string, string> = {};
+        for (const [key, raw] of Object.entries(data.opening ?? {})) {
+          const n = Number(raw);
+          if (Number.isFinite(n)) openingStrings[key] = String(n);
+        }
+        setStockWipOpening(openingStrings);
         setStockOpeningEditable(Boolean(data.openingEditable));
         setStockWipSalesKm(Number(data.salesKm) || 0);
         setStockWipSalesLines(data.sales ?? []);
@@ -646,13 +651,23 @@ export function TodayHub({
       const n = Number(raw);
       production[name] = Number.isFinite(n) && n >= 0 ? n : 0;
     }
+    const opening: Record<string, number> = {};
+    for (const name of quadCableProcessFields) {
+      const raw = stockWipOpening[name]?.trim() ?? "";
+      if (raw === "" || raw === ".") {
+        opening[name] = 0;
+        continue;
+      }
+      const n = Number(raw);
+      opening[name] = Number.isFinite(n) && n >= 0 ? n : 0;
+    }
     const lengthFactor =
       stockLengthFactor != null && Number.isFinite(stockLengthFactor)
         ? stockLengthFactor
         : variant.lengthFactor;
     return calculateQuadSignalWip({
       processes: quadCableProcessFields,
-      opening: stockWipOpening,
+      opening,
       production,
       salesKm: stockWipSalesKm,
       coreCount: variant.coreCount,
@@ -1351,6 +1366,20 @@ export function TodayHub({
             }
             processes[name] = n;
           }
+          const openingQty: Record<string, number> = {};
+          for (const name of quadCableProcessFields) {
+            const raw = stockWipOpening[name]?.trim() ?? "";
+            if (raw === "" || raw === ".") {
+              openingQty[name] = 0;
+              continue;
+            }
+            const n = Number(raw);
+            if (!Number.isFinite(n) || n < 0) {
+              fail(`Opening "${name}" must be a number ≥ 0.`);
+              return;
+            }
+            openingQty[name] = n;
+          }
           const variant = resolveQuadSignalVariant(resolvedSize);
           if (!variant) {
             fail(
@@ -1367,7 +1396,7 @@ export function TodayHub({
               ?.label ?? variant.drumLabel;
           const wip = calculateQuadSignalWip({
             processes: quadCableProcessFields,
-            opening: stockWipOpening,
+            opening: openingQty,
             production: processes,
             salesKm: stockWipSalesKm,
             coreCount: variant.coreCount,
@@ -1397,7 +1426,7 @@ export function TodayHub({
                 cable: resolvedCable,
                 size: resolvedSize,
                 production: processes,
-                opening: stockWipOpening,
+                opening: openingQty,
                 closing: wip.byProcess,
                 processes: wip.byProcess,
                 salesKm: stockWipSalesKm,
@@ -2506,8 +2535,9 @@ export function TodayHub({
                                               : "—";
                                     const openingVal =
                                       stage?.opening ??
-                                      stockWipOpening[proc] ??
-                                      0;
+                                      (stockWipOpening[proc]?.trim()
+                                        ? Number(stockWipOpening[proc])
+                                        : 0);
                                     return (
                                       <tr key={proc}>
                                         <td>{proc}</td>
@@ -2516,23 +2546,14 @@ export function TodayHub({
                                             <DecimalInput
                                               id={`st-open-${proc}`}
                                               value={
-                                                stockWipOpening[proc] != null
-                                                  ? String(stockWipOpening[proc])
-                                                  : ""
+                                                stockWipOpening[proc] ?? ""
                                               }
-                                              onChange={(next) => {
-                                                const n =
-                                                  next.trim() === ""
-                                                    ? 0
-                                                    : Number(next);
+                                              onChange={(next) =>
                                                 setStockWipOpening((prev) => ({
                                                   ...prev,
-                                                  [proc]:
-                                                    Number.isFinite(n) && n >= 0
-                                                      ? n
-                                                      : 0,
-                                                }));
-                                              }}
+                                                  [proc]: next,
+                                                }))
+                                              }
                                               placeholder="0"
                                             />
                                           ) : (

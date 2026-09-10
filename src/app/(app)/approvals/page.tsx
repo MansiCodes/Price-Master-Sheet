@@ -18,6 +18,7 @@ import {
 } from "@/components/dashboard/EntryApprovalsPanel";
 import { pendingEntryWhere } from "@/lib/entry-approval";
 import type { EntryApprovalKind } from "@/lib/entry-approval";
+import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
 
 const VALID_TABS = new Set<EntryApprovalKind>([
   "purchase",
@@ -27,6 +28,14 @@ const VALID_TABS = new Set<EntryApprovalKind>([
 ]);
 
 const TAB_ORDER: EntryApprovalKind[] = ["purchase", "sale", "stock", "expense"];
+
+function stockUserRemark(notes: string | null | undefined): string {
+  const raw = notes?.trim() ?? "";
+  if (!raw) return "";
+  const { meta, userNotes } = parseQuadSignalStockNotes(raw);
+  if (meta) return userNotes.trim();
+  return raw;
+}
 
 export default async function ApprovalsPage({
   searchParams,
@@ -134,6 +143,7 @@ export default async function ApprovalsPage({
       enteredByName: p.enteredBy.name,
       label: p.itemDescription,
       detail: p.vendorName,
+      remark: p.notes?.trim() || null,
       amount: Number(p.invoiceValue),
     })),
     ...sales.map((s) => ({
@@ -146,6 +156,7 @@ export default async function ApprovalsPage({
       enteredByName: s.enteredBy.name,
       label: s.itemDescription,
       detail: s.customerName,
+      remark: s.notes?.trim() || null,
       amount: Number(s.salesValue),
     })),
     ...stocks.map((s) => ({
@@ -157,7 +168,8 @@ export default async function ApprovalsPage({
       plantName: getPlantDisplayName(s.plant.code, s.plant.name),
       enteredByName: s.enteredBy.name,
       label: s.itemName,
-      detail: s.notes ?? "",
+      detail: "",
+      remark: stockUserRemark(s.notes) || null,
       amount: Number(s.closingValue),
     })),
     ...expenses.map((e) => ({
@@ -169,7 +181,8 @@ export default async function ApprovalsPage({
       plantName: getPlantDisplayName(e.plant.code, e.plant.name),
       enteredByName: e.enteredBy.name,
       label: e.expenseHead,
-      detail: e.description ?? e.nature ?? "",
+      detail: e.nature ?? "",
+      remark: e.description?.trim() || null,
       amount:
         Number(e.amount) +
         Number(e.contractorSalary) +

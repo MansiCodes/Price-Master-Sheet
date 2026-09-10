@@ -15,6 +15,8 @@ export type PendingEntryRow = {
   enteredByName: string | null;
   label: string;
   detail: string;
+  /** Form remark / note entered with the row (visible to approvers). */
+  remark?: string | null;
   amount: number;
 };
 
@@ -128,6 +130,19 @@ export function EntryApprovalsPanel({
                     {row.detail ? (
                       <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>
                         {row.detail}
+                      </div>
+                    ) : null}
+                    {row.remark?.trim() ? (
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: "#0f766e",
+                          marginTop: "0.2rem",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        Note: {row.remark.trim()}
                       </div>
                     ) : null}
                   </td>
