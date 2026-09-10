@@ -473,6 +473,8 @@ export function TodayHub({
     Record<string, string>
   >({});
   const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
+  const [stockOpeningAlwaysEditable, setStockOpeningAlwaysEditable] =
+    useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
   const [stockWipSalesLines, setStockWipSalesLines] = useState<
     Array<{
@@ -549,6 +551,7 @@ export function TodayHub({
     if (!isQuad || stockKind !== "cable") {
       setStockWipOpening({});
       setStockOpeningEditable(false);
+      setStockOpeningAlwaysEditable(false);
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
       setStockLengthOptions([]);
@@ -573,6 +576,7 @@ export function TodayHub({
           opening: Record<string, number>;
           openingFromDate: string | null;
           openingEditable?: boolean;
+          openingAlwaysEditable?: boolean;
           salesKm: number;
           sales: typeof stockWipSalesLines;
           variant: {
@@ -593,6 +597,7 @@ export function TodayHub({
         }
         setStockWipOpening(openingStrings);
         setStockOpeningEditable(Boolean(data.openingEditable));
+        setStockOpeningAlwaysEditable(Boolean(data.openingAlwaysEditable));
         setStockWipSalesKm(Number(data.salesKm) || 0);
         setStockWipSalesLines(data.sales ?? []);
         if (data.variant) {
@@ -622,6 +627,7 @@ export function TodayHub({
         console.error(err);
         setStockWipOpening({});
         setStockOpeningEditable(false);
+        setStockOpeningAlwaysEditable(false);
         setStockWipSalesKm(0);
         setStockWipSalesLines([]);
       });
@@ -964,6 +970,7 @@ export function TodayHub({
     setStockProcessQtys({});
     setStockWipOpening({});
     setStockOpeningEditable(false);
+    setStockOpeningAlwaysEditable(false);
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -2487,9 +2494,9 @@ export function TodayHub({
                                   })}
                                 </strong>
                                 <span>
-                                  One-time only for this cable/size. After save,
-                                  Opening locks and future days use
-                                  yesterday&apos;s Closing.
+                                  {stockOpeningAlwaysEditable
+                                    ? "You can edit Opening anytime. After save, the next day’s Opening uses this entry’s Closing."
+                                    : "One-time only for this cable/size. After save, Opening locks and future days use yesterday’s Closing."}
                                 </span>
                               </div>
                             ) : null}

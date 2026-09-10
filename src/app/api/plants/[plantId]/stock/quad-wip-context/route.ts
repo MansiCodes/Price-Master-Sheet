@@ -9,6 +9,7 @@ import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
+import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
 import {
   resolveQuadSignalVariant,
   saleMatchesCableSize,
@@ -19,8 +20,7 @@ type RouteContext = { params: Promise<{ plantId: string }> };
 
 /**
  * Opening WIP + Sales-ledger qty for Quad/Signal stock form.
- * Sales form is unchanged — this only reads Sale rows.
- * Opening is editable only for the first entry of each cable+size.
+ * Opening is editable on first entry per cable+size, or anytime for Tarun.
  */
 export async function GET(
   request: NextRequest,
@@ -64,6 +64,7 @@ export async function GET(
   const itemName = `${cable} · ${size}`;
   const processes = [...getQuadSignalCableProcesses(cable)];
   const variant = resolveQuadSignalVariant(size);
+  const alwaysEditable = canAlwaysEditQuadOpeningStock(session.user.email);
 
   const {
     opening,
@@ -74,6 +75,7 @@ export async function GET(
     day,
     cable,
     size,
+    alwaysEditable,
   });
 
   const sales = await prisma.sale.findMany({
@@ -112,6 +114,7 @@ export async function GET(
     opening,
     openingFromDate,
     openingEditable,
+    openingAlwaysEditable: alwaysEditable,
     salesKm,
     sales: matchedSales.map((s) => ({
       id: s.id,

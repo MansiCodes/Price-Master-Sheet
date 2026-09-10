@@ -35,6 +35,7 @@ import {
   applyQuadSignalOpeningLockToNotes,
 } from "@/lib/quad-signal-opening";
 import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
+import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
 
 const stockLineSchema = z.object({
   itemName: z.string().min(1),
@@ -251,12 +252,16 @@ export async function POST(
       };
 
       const plantIds = await resolveReportPlantIds(plantId);
+      const allowOpeningOverride = canAlwaysEditQuadOpeningStock(
+        session.user.email,
+      );
       const resolved = await Promise.all(
         data.entries.map(async (line) => {
           const lockedNotes = await applyQuadSignalOpeningLockToNotes({
             plantIds,
             day,
             notes: line.notes,
+            allowOpeningOverride,
           });
           return {
             line: { ...line, notes: lockedNotes ?? line.notes },
@@ -328,6 +333,7 @@ export async function POST(
       plantIds,
       day,
       notes: data.notes,
+      allowOpeningOverride: canAlwaysEditQuadOpeningStock(session.user.email),
     });
     const dataWithNotes = { ...data, notes: lockedNotes ?? data.notes };
     const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
@@ -436,6 +442,9 @@ export async function PATCH(
       : null;
 
   const plantIds = await resolveReportPlantIds(plantId);
+  const allowOpeningOverride = canAlwaysEditQuadOpeningStock(
+    session.user.email,
+  );
   const existingOpening =
     parseQuadSignalStockNotes(existing.notes).meta?.opening ?? {};
   const lockedNotes =
@@ -444,7 +453,8 @@ export async function PATCH(
           plantIds,
           day: parseDateOnly(dateStr),
           notes: data.notes,
-          lockOpeningTo: existingOpening,
+          allowOpeningOverride,
+          lockOpeningTo: allowOpeningOverride ? undefined : existingOpening,
         })
       : undefined;
 

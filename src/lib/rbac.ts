@@ -140,6 +140,28 @@ export function isPrimarySuperAdmin(
   return email.trim().toLowerCase() === primary;
 }
 
+/**
+ * Super Admin allowed to edit Quad/Signal Opening stock any time
+ * (defaults to Tarun Jain). Others only get a one-time seed.
+ */
+export function getOpeningStockEditorEmail(): string | null {
+  const email = (
+    process.env.OPENING_STOCK_EDITOR_EMAIL ||
+    "tarun@gmail.com"
+  )
+    .trim()
+    .toLowerCase();
+  return email || null;
+}
+
+export function canAlwaysEditQuadOpeningStock(
+  email: string | null | undefined,
+): boolean {
+  const editor = getOpeningStockEditorEmail();
+  if (!editor || !email) return false;
+  return email.trim().toLowerCase() === editor;
+}
+
 /** Entry and shift approval is Super Admin only (Business Head is not involved). */
 export function canApproveEntries(role: GlobalRole | Role): boolean {
   return isSuperAdmin(role);
