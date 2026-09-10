@@ -9,7 +9,11 @@ export default async function MachineProductionLayout({
 }) {
   const session = await auth();
   const allowed =
-    !!session?.user && canAccessMachineProduction(session.user.globalRole, { canMachineSupervise: session.user.canMachineSupervise });
+    !!session?.user &&
+    canAccessMachineProduction(session.user.globalRole, {
+      canMachineSupervise: session.user.canMachineSupervise,
+      canAdminMachineProduction: session.user.canAdminMachineProduction,
+    });
 
   if (!allowed) {
     return (

@@ -81,6 +81,10 @@ export function UsersTable({
                       {ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ??
                         u.globalRole}
                       {u.canMachineSupervise ? " + MS" : ""}
+                      {u.canAdminMachineProduction &&
+                      u.globalRole !== "SUPER_ADMIN"
+                        ? " + MP Admin"
+                        : ""}
                     </span>
                   </td>
                   <td>

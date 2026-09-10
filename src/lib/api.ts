@@ -17,23 +17,30 @@ export type SessionUser = {
   globalRole: GlobalRole;
   canViewPriceSheet: boolean;
   canMachineSupervise: boolean;
+  canAdminMachineProduction: boolean;
   name?: string | null;
 };
 
 type MachineUserLike =
   | GlobalRole
-  | Pick<SessionUser, "globalRole" | "canMachineSupervise">;
+  | Pick<
+      SessionUser,
+      "globalRole" | "canMachineSupervise" | "canAdminMachineProduction"
+    >;
 
 function asMachineOpts(userOrRole: MachineUserLike): {
   role: GlobalRole;
-  opts: { canMachineSupervise?: boolean };
+  opts: { canMachineSupervise?: boolean; canAdminMachineProduction?: boolean };
 } {
   if (typeof userOrRole === "string") {
     return { role: userOrRole, opts: {} };
   }
   return {
     role: userOrRole.globalRole,
-    opts: { canMachineSupervise: userOrRole.canMachineSupervise },
+    opts: {
+      canMachineSupervise: userOrRole.canMachineSupervise,
+      canAdminMachineProduction: userOrRole.canAdminMachineProduction,
+    },
   };
 }
 
@@ -53,6 +60,9 @@ export async function requireSession(): Promise<
       globalRole: session.user.globalRole,
       canViewPriceSheet: session.user.canViewPriceSheet,
       canMachineSupervise: Boolean(session.user.canMachineSupervise),
+      canAdminMachineProduction: Boolean(
+        session.user.canAdminMachineProduction,
+      ),
       name: session.user.name,
     },
   };
@@ -136,9 +146,10 @@ export function requireMachineProductionEnter(
 }
 
 export function requireMachineProductionAdmin(
-  role: GlobalRole,
+  userOrRole: MachineUserLike,
 ): NextResponse | null {
-  if (!canAdminMachineProduction(role)) {
+  const { role, opts } = asMachineOpts(userOrRole);
+  if (!canAdminMachineProduction(role, opts)) {
     return NextResponse.json(
       { error: "Forbidden — Admin access required" },
       { status: 403 },

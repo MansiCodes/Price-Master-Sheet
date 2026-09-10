@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { ROLE_LABEL, ROLES, fromStoredIndiaPhone, indianMobileDigits, type PlantOption, type RoleValue, type UserRow } from "./types";
+import { ExtraAccessSelect, type ExtraAccessKey, type ExtraAccessOption } from "./ExtraAccessSelect";
 import { PlantMultiSelect } from "./PlantMultiSelect";
 
 type UserFormModalProps = {
@@ -23,6 +24,7 @@ type UserFormModalProps = {
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    canAdminMachineProduction: boolean;
     isActive: boolean;
     plantIds: string[];
   }) => Promise<void>;
@@ -54,6 +56,8 @@ export function UserFormModal({
   const [globalRole, setGlobalRole] = useState<RoleValue>("ACCOUNTANT");
   const [canViewPriceSheet, setCanViewPriceSheet] = useState(false);
   const [canMachineSupervise, setCanMachineSupervise] = useState(false);
+  const [canAdminMachineProduction, setCanAdminMachineProduction] =
+    useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
   const [plantError, setPlantError] = useState<string | null>(null);
@@ -68,6 +72,48 @@ export function UserFormModal({
     globalRole !== "MACHINE_SUPERVISOR";
   const canAddMachineSupervise =
     globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT";
+  const priceSheetLocked =
+    globalRole === "SUPER_ADMIN" || globalRole === "VIEWER";
+  const mpAdminLocked = globalRole === "SUPER_ADMIN";
+
+  const extraAccessOptions = useMemo<ExtraAccessOption[]>(() => {
+    const opts: ExtraAccessOption[] = [
+      {
+        id: "PRICE_SHEET",
+        label: "Can view Price Sheet",
+        locked: priceSheetLocked,
+      },
+    ];
+    if (canAddMachineSupervise) {
+      opts.push({
+        id: "MACHINE_SUPERVISOR",
+        label: "Also Machine Supervisor",
+      });
+    }
+    opts.push({
+      id: "MP_ADMIN",
+      label: "MP Admin",
+      locked: mpAdminLocked,
+    });
+    return opts;
+  }, [canAddMachineSupervise, priceSheetLocked, mpAdminLocked]);
+
+  const extraAccessValue = useMemo<ExtraAccessKey[]>(() => {
+    const selected: ExtraAccessKey[] = [];
+    if (canViewPriceSheet || priceSheetLocked) selected.push("PRICE_SHEET");
+    if (canAddMachineSupervise && canMachineSupervise) {
+      selected.push("MACHINE_SUPERVISOR");
+    }
+    if (canAdminMachineProduction || mpAdminLocked) selected.push("MP_ADMIN");
+    return selected;
+  }, [
+    canViewPriceSheet,
+    canMachineSupervise,
+    canAdminMachineProduction,
+    canAddMachineSupervise,
+    priceSheetLocked,
+    mpAdminLocked,
+  ]);
 
   useEffect(() => {
     if (open) {
@@ -92,6 +138,7 @@ export function UserFormModal({
       setGlobalRole(editing.globalRole as RoleValue);
       setCanViewPriceSheet(editing.canViewPriceSheet);
       setCanMachineSupervise(Boolean(editing.canMachineSupervise));
+      setCanAdminMachineProduction(Boolean(editing.canAdminMachineProduction));
       setSelectedPlantIds(
         editing.plantRoles?.map((role) => role.plantId) ?? [],
       );
@@ -103,6 +150,7 @@ export function UserFormModal({
       setGlobalRole("ACCOUNTANT");
       setCanViewPriceSheet(false);
       setCanMachineSupervise(false);
+      setCanAdminMachineProduction(false);
       setSelectedPlantIds(
         activePlants[0] ? [activePlants[0].id] : [],
       );
@@ -127,6 +175,12 @@ export function UserFormModal({
       setSelectedPlantIds([]);
       setPlantError(null);
       setCanMachineSupervise(false);
+      if (globalRole === "SUPER_ADMIN") {
+        setCanViewPriceSheet(true);
+        setCanAdminMachineProduction(true);
+      } else if (globalRole === "VIEWER") {
+        setCanViewPriceSheet(true);
+      }
       return;
     }
     if (
@@ -180,11 +234,12 @@ export function UserFormModal({
       phone: digits,
       password,
       globalRole,
-      canViewPriceSheet,
+      canViewPriceSheet: priceSheetLocked || canViewPriceSheet,
       canMachineSupervise:
         globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT"
           ? canMachineSupervise
           : false,
+      canAdminMachineProduction: mpAdminLocked || canAdminMachineProduction,
       isActive: editing?.isActive ?? true,
       plantIds:
         globalRole === "SUPER_ADMIN" ||
@@ -199,6 +254,28 @@ export function UserFormModal({
     setPlantError(null);
     setSelectedPlantIds(next);
   }
+
+  function onExtraAccessChange(next: ExtraAccessKey[]) {
+    setCanViewPriceSheet(priceSheetLocked || next.includes("PRICE_SHEET"));
+    setCanMachineSupervise(
+      canAddMachineSupervise && next.includes("MACHINE_SUPERVISOR"),
+    );
+    setCanAdminMachineProduction(mpAdminLocked || next.includes("MP_ADMIN"));
+  }
+
+  const extraAccessField = (
+    <div className={`field${requiresPlants ? " users-modal__span-2" : ""}`}>
+      <label htmlFor="user-extra-access">Extra access</label>
+      <ExtraAccessSelect
+        id="user-extra-access"
+        options={extraAccessOptions}
+        value={extraAccessValue}
+        disabled={saving}
+        placeholder="Select extra access"
+        onChange={onExtraAccessChange}
+      />
+    </div>
+  );
 
   return (
     <div
@@ -365,38 +442,10 @@ export function UserFormModal({
                   </p>
                 ) : null}
               </div>
-            ) : null}
-          </div>
-
-          <div className="users-modal__checks">
-            <label className="users-check">
-              <input
-                type="checkbox"
-                checked={
-                  canViewPriceSheet ||
-                  globalRole === "SUPER_ADMIN" ||
-                  globalRole === "VIEWER"
-                }
-                disabled={
-                  globalRole === "SUPER_ADMIN" ||
-                  globalRole === "VIEWER" ||
-                  saving
-                }
-                onChange={(e) => setCanViewPriceSheet(e.target.checked)}
-              />
-              <span>Can view Price Sheet</span>
-            </label>
-            {canAddMachineSupervise ? (
-              <label className="users-check">
-                <input
-                  type="checkbox"
-                  checked={canMachineSupervise}
-                  disabled={saving}
-                  onChange={(e) => setCanMachineSupervise(e.target.checked)}
-                />
-                <span>Also Machine Supervisor</span>
-              </label>
-            ) : null}
+            ) : (
+              extraAccessField
+            )}
+            {requiresPlants ? extraAccessField : null}
           </div>
         </form>
 

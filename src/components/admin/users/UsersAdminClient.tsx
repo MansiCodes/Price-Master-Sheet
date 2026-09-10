@@ -161,6 +161,7 @@ export function UsersAdminClient() {
     globalRole: RoleValue;
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
+    canAdminMachineProduction: boolean;
     isActive: boolean;
     plantIds: string[];
   }) {
@@ -176,6 +177,7 @@ export function UsersAdminClient() {
           globalRole: payload.globalRole,
           canViewPriceSheet: payload.canViewPriceSheet,
           canMachineSupervise: payload.canMachineSupervise,
+          canAdminMachineProduction: payload.canAdminMachineProduction,
           isActive: payload.isActive,
           plantIds: payload.plantIds,
         };
@@ -202,6 +204,7 @@ export function UsersAdminClient() {
             globalRole: payload.globalRole,
             canViewPriceSheet: payload.canViewPriceSheet,
             canMachineSupervise: payload.canMachineSupervise,
+            canAdminMachineProduction: payload.canAdminMachineProduction,
             plantIds: payload.plantIds,
           }),
         });
@@ -275,6 +278,8 @@ export function UsersAdminClient() {
         "Role",
         "Plants",
         "Price Sheet",
+        "Machine Supervisor",
+        "MP Admin",
         "Status",
       ],
       ...filtered.map((u) => [
@@ -286,6 +291,10 @@ export function UsersAdminClient() {
           ? "All plants"
           : (u.plantRoles ?? []).map((role) => role.plant.name).join(", "),
         u.canViewPriceSheet ? "Yes" : "No",
+        u.canMachineSupervise ? "Yes" : "No",
+        u.canAdminMachineProduction || u.globalRole === "SUPER_ADMIN"
+          ? "Yes"
+          : "No",
         u.isActive ? "Active" : "Inactive",
       ]),
     ];

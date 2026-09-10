@@ -6,7 +6,9 @@ import { canAdminMachineProduction } from "@/lib/rbac";
 export default async function MachineProductionAdminPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");
-  if (!canAdminMachineProduction(session.user.globalRole)) {
+  if (!canAdminMachineProduction(session.user.globalRole, {
+    canAdminMachineProduction: session.user.canAdminMachineProduction,
+  })) {
     redirect("/machine-production");
   }
 

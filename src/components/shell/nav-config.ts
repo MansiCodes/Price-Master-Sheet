@@ -50,7 +50,10 @@ export type NavFlags = {
   /** Admin → Users list (Super Admin manage, Viewer read-only). */
   showUsers?: boolean;
   showApprovals: boolean;
+  /** Super Admin integrations + plants. */
   showSuper: boolean;
+  /** Machine Production admin (machines/processes). Super Admin always has this. */
+  showMpAdmin?: boolean;
   isManager: boolean;
   primaryPlantId: string | null;
   showSwitchPlant: boolean;
@@ -68,6 +71,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
     showUsers = false,
     showApprovals,
     showSuper,
+    showMpAdmin = false,
     primaryPlantId,
   } = flags;
   const sections: NavSection[] = [];
@@ -157,6 +161,8 @@ export function getNavSections(flags: NavFlags): NavSection[] {
       href: "/admin/integrations",
       icon: "export",
     });
+  }
+  if (showSuper || showMpAdmin) {
     adminItems.push({
       key: "machine-production-admin",
       label: "MP Admin",

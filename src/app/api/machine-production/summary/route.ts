@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
   const denied = requireMachineProductionAccess(session.user);
   if (denied) return denied;
 
-  if (!canAdminMachineProduction(session.user.globalRole)) {
+  if (!canAdminMachineProduction(session.user.globalRole, {
+    canAdminMachineProduction: session.user.canAdminMachineProduction,
+  })) {
     return NextResponse.json({ error: "Forbidden — Admin only" }, { status: 403 });
   }
 

@@ -134,7 +134,9 @@ export async function GET(request: NextRequest) {
   const denied = requireMachineProductionAccess(session.user);
   if (denied) return denied;
 
-  const isAdmin = canAdminMachineProduction(session.user.globalRole);
+  const isAdmin = canAdminMachineProduction(session.user.globalRole, {
+    canAdminMachineProduction: session.user.canAdminMachineProduction,
+  });
   const sp = request.nextUrl.searchParams;
 
   const dateFrom = sp.get("dateFrom");

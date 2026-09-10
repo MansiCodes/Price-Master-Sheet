@@ -12,6 +12,8 @@ export type PriceSheetUser = {
 export type MachineAccessOpts = {
   /** Plant Manager / Accountant also acting as Machine Supervisor */
   canMachineSupervise?: boolean;
+  /** Extra Machine Production admin (MP Admin) for non Super Admin users */
+  canAdminMachineProduction?: boolean;
 };
 
 const PNL_VIEW_ROLES: ReadonlySet<GlobalRole> = new Set([
@@ -74,6 +76,7 @@ export function canAccessMachineProduction(
   opts?: MachineAccessOpts,
 ): boolean {
   if (MACHINE_PRODUCTION_ROLES.has(role)) return true;
+  if (opts?.canAdminMachineProduction) return true;
   return Boolean(opts?.canMachineSupervise);
 }
 
@@ -87,11 +90,16 @@ export function canEnterMachineProduction(
   ) {
     return true;
   }
+  if (opts?.canAdminMachineProduction) return true;
   return Boolean(opts?.canMachineSupervise);
 }
 
-export function canAdminMachineProduction(role: GlobalRole | Role): boolean {
-  return role === GlobalRole.SUPER_ADMIN;
+export function canAdminMachineProduction(
+  role: GlobalRole | Role,
+  opts?: MachineAccessOpts,
+): boolean {
+  if (role === GlobalRole.SUPER_ADMIN) return true;
+  return Boolean(opts?.canAdminMachineProduction);
 }
 
 /** True only for dedicated Machine Supervisor accounts (no plant shell). */

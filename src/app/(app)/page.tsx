@@ -127,9 +127,10 @@ export default async function DashboardPage({
     };
   }
 
-  const machineProductionMetrics = user.canMachineSupervise
-    ? await getMachineProductionHomeMetrics()
-    : null;
+  const machineProductionMetrics =
+    user.canMachineSupervise || user.canAdminMachineProduction
+      ? await getMachineProductionHomeMetrics()
+      : null;
 
   const pendingApprovals =
     canApproveEntries(user.globalRole) && scopedPlantIds.length > 0
