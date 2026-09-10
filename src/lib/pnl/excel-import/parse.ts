@@ -59,6 +59,7 @@ export type ParsedPurchaseRow = {
   debitQuantity: number;
   rate: number;
   gstPercent: number;
+  gstin: string | null;
   notes: string | null;
 };
 
@@ -833,6 +834,7 @@ export async function parsePnlWorkbook(
           debitQuantity,
           rate,
           gstPercent,
+          gstin: str(getCell(sheet, r, header.map, "gstin")) || null,
           notes: sourced.notes,
         });
       }

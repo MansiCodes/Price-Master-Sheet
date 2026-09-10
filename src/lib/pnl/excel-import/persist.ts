@@ -44,13 +44,19 @@ export type ImportSummary = {
   electricity: number;
   rent: number;
   far: number;
-  /** Rows skipped because the same data already exists. */
+  /** Rows skipped because the same data already exists (nothing to fill). */
   duplicates: number;
-  /** True when every row in the file was already present. */
+  /** Existing rows that received previously empty fields from this file. */
+  updated: number;
+  /** True when every row in the file was already present and nothing was filled. */
   alreadyUploaded: boolean;
   skipped: { sheet: string; row: number; reason: string }[];
   sheetsFound: string[];
 };
+
+function isBlankText(v: string | null | undefined): boolean {
+  return v == null || String(v).trim() === "";
+}
 
 function approvalFor(role: GlobalRole, dateYmd: string) {
   return entryApprovalCreateData(role, dateYmd);
@@ -88,6 +94,7 @@ export async function persistPnlImport(opts: {
     rent: 0,
     far: 0,
     duplicates: 0,
+    updated: 0,
     alreadyUploaded: false,
     skipped: [...parsed.skipped],
     sheetsFound: parsed.sheetsFound,
@@ -193,10 +200,83 @@ export async function persistPnlImport(opts: {
           },
         ],
       },
-      select: { id: true },
+      select: {
+        id: true,
+        billNumber: true,
+        billDate: true,
+        notes: true,
+        gstin: true,
+        unit: true,
+        typeOther: true,
+        debitQuantity: true,
+        sourceKey: true,
+      },
     });
     if (existing) {
-      markDuplicate("Purchase", row.row, "Already uploaded");
+      const patch: {
+        billNumber?: string | null;
+        billDate?: Date | null;
+        notes?: string | null;
+        gstin?: string | null;
+        unit?: string;
+        typeOther?: string | null;
+        debitQuantity?: number;
+        sourceKey?: string;
+        excelUploadedAt?: Date;
+      } = {};
+
+      if (isBlankText(existing.billNumber) && !isBlankText(row.billNumber)) {
+        patch.billNumber = row.billNumber;
+      }
+      if (existing.billDate == null && row.billDate) {
+        patch.billDate = parseDateOnly(row.billDate);
+      }
+      if (isBlankText(existing.notes) && !isBlankText(row.notes)) {
+        patch.notes = row.notes;
+      }
+      if (isBlankText(existing.gstin) && !isBlankText(row.gstin)) {
+        patch.gstin = row.gstin;
+      }
+      if (isBlankText(existing.typeOther) && !isBlankText(row.typeOther)) {
+        patch.typeOther = row.typeOther;
+      }
+      const existingUnit = (existing.unit ?? "").trim();
+      const incomingUnit = (row.unit ?? "").trim();
+      if (
+        incomingUnit &&
+        (isBlankText(existingUnit) ||
+          (existingUnit.toLowerCase() === "kg" &&
+            incomingUnit.toLowerCase() !== "kg"))
+      ) {
+        patch.unit = incomingUnit;
+      }
+      const existingDebit = Number(existing.debitQuantity ?? 0);
+      if (
+        (!(existingDebit > 0) || !Number.isFinite(existingDebit)) &&
+        row.debitQuantity > 0
+      ) {
+        patch.debitQuantity = row.debitQuantity;
+      }
+      if (isBlankText(existing.sourceKey) && sourceKey) {
+        patch.sourceKey = sourceKey;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        patch.excelUploadedAt = uploadedAt;
+        await prisma.purchase.update({
+          where: { id: existing.id },
+          data: patch,
+        });
+        summary.updated += 1;
+        summary.skipped.push({
+          sheet: "Purchase",
+          row: row.row,
+          reason: "Duplicate — filled missing fields",
+        });
+        daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
+      } else {
+        markDuplicate("Purchase", row.row, "Already uploaded");
+      }
       continue;
     }
 
@@ -227,6 +307,7 @@ export async function persistPnlImport(opts: {
         gstPercent: row.gstPercent,
         gstAmount,
         invoiceValue,
+        gstin: row.gstin,
         notes: row.notes,
         enteredById,
         isBackdated: isBackdated(row.date),
@@ -573,7 +654,8 @@ export async function persistPnlImport(opts: {
     summary.electricity +
     summary.rent +
     summary.far;
-  summary.alreadyUploaded = imported === 0 && summary.duplicates > 0;
+  summary.alreadyUploaded =
+    imported === 0 && summary.duplicates > 0 && summary.updated === 0;
 
   return summary;
 }

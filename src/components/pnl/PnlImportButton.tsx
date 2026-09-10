@@ -14,6 +14,7 @@ type ImportSummary = {
   rent: number;
   far: number;
   duplicates?: number;
+  updated?: number;
   alreadyUploaded?: boolean;
   skipped: { sheet: string; row: number; reason: string }[];
 };
@@ -123,16 +124,21 @@ export function PnlImportButton({
         ].filter(Boolean);
         const dup =
           s.duplicates && s.duplicates > 0
-            ? ` · ${s.duplicates} duplicate${s.duplicates === 1 ? "" : "s"} skipped`
+            ? ` · ${s.duplicates} duplicate${s.duplicates === 1 ? "" : "s"} unchanged`
+            : "";
+        const filled =
+          s.updated && s.updated > 0
+            ? ` · ${s.updated} existing row${s.updated === 1 ? "" : "s"} filled missing fields`
             : "";
         toast.success(
-          `Imported ${parts.join(", ") || "0 new rows"}${dup} · ${formatUploadTime(s.uploadedAt)}`,
+          `Imported ${parts.join(", ") || "0 new rows"}${filled}${dup} · ${formatUploadTime(s.uploadedAt)}`,
         );
         const realSkips = (s.skipped ?? []).filter(
           (x) =>
             x.reason &&
             !/already uploaded/i.test(x.reason) &&
-            !/duplicate row in this file/i.test(x.reason),
+            !/duplicate row in this file/i.test(x.reason) &&
+            !/filled missing fields/i.test(x.reason),
         );
         if (realSkips.length > 0) {
           const tip = realSkips

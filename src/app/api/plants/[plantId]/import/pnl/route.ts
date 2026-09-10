@@ -104,26 +104,9 @@ export async function POST(
   const buffer = Buffer.from(await file.arrayBuffer());
   const fileHash = fileContentHash(buffer);
 
-  // Exact same file already imported for this plant
-  const priorFile = await prisma.auditLog.findFirst({
-    where: {
-      plantId,
-      field: "excel-import",
-      newValue: { contains: `"fileHash":"${fileHash}"` },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { createdAt: true, newValue: true },
-  });
-  if (priorFile) {
-    return NextResponse.json(
-      {
-        error: "This file was already uploaded for this plant.",
-        alreadyUploaded: true,
-        uploadedAt: priorFile.createdAt.toISOString(),
-      },
-      { status: 409 },
-    );
-  }
+  // Same-file hash is recorded in the audit log after import, but we no longer
+  // hard-block re-uploads: purchase persist can fill previously empty columns
+  // on duplicate rows (e.g. CAT-6 GSTIN / bill fields).
 
   let parsed = await parsePnlWorkbook(buffer, { plantCode: plant.code });
 
@@ -225,6 +208,7 @@ export async function POST(
         rent: summary.rent,
         far: summary.far,
         duplicates: summary.duplicates,
+        updated: summary.updated,
       },
     },
     actorId: session.user.id,
