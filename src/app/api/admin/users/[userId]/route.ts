@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { isSuperAdmin } from "@/lib/rbac";
+import { isPrimarySuperAdmin, isSuperAdmin } from "@/lib/rbac";
 
 type RouteContext = { params: Promise<{ userId: string }> };
 
@@ -64,11 +64,32 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ ok: false, message: "User not found" }, { status: 404 });
   }
 
-  if (existing.globalRole === GlobalRole.SUPER_ADMIN && parsed.data.isActive === false) {
-    return NextResponse.json(
-      { ok: false, message: "A Super Admin cannot be deactivated" },
-      { status: 400 },
-    );
+  if (
+    existing.globalRole === GlobalRole.SUPER_ADMIN &&
+    parsed.data.isActive !== undefined
+  ) {
+    if (!isPrimarySuperAdmin(session.user.email)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            "Only the primary Super Admin can activate or deactivate Super Admins",
+        },
+        { status: 403 },
+      );
+    }
+    if (
+      isPrimarySuperAdmin(existing.email) &&
+      parsed.data.isActive === false
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: "The primary Super Admin account cannot be deactivated",
+        },
+        { status: 400 },
+      );
+    }
   }
   if (
     existing.id === session.user.id &&

@@ -7,7 +7,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
-import { isCloudinaryBillUrl } from "@/lib/cloudinary";
+import { isAllowedMediaUrl } from "@/lib/cloudinary";
 import { prisma } from "@/lib/db";
 import { canAdminMachineProduction } from "@/lib/rbac";
 import {
@@ -381,7 +381,7 @@ export async function POST(request: Request) {
   }
 
   const photos = (parsed.data.photoUrls ?? []).filter((u) =>
-    isCloudinaryBillUrl(u),
+    isAllowedMediaUrl(u),
   );
 
   // Others free-text becomes a permanent dropdown option for this process+machine.

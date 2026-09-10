@@ -15,6 +15,9 @@ type UsersTableProps = {
   total: number;
   onPageChange: (page: number) => void;
   readOnly?: boolean;
+  /** Primary Super Admin may toggle other Super Admins active/inactive. */
+  canManageSuperAdmins?: boolean;
+  primarySuperAdminEmail?: string | null;
 };
 
 export function UsersTable({
@@ -28,9 +31,12 @@ export function UsersTable({
   total,
   onPageChange,
   readOnly = false,
+  canManageSuperAdmins = false,
+  primarySuperAdminEmail = null,
 }: UsersTableProps) {
   const t = useTranslations("admin");
   const tCommon = useTranslations("common");
+  const primaryEmail = primarySuperAdminEmail?.trim().toLowerCase() || null;
 
   return (
     <section className="users-table-card">
@@ -116,7 +122,12 @@ export function UsersTable({
                         role="switch"
                         aria-checked={u.isActive}
                         disabled={
-                          u.globalRole === "SUPER_ADMIN" || togglingId === u.id
+                          (u.globalRole === "SUPER_ADMIN" &&
+                            (!canManageSuperAdmins ||
+                              (primaryEmail != null &&
+                                u.email.trim().toLowerCase() ===
+                                  primaryEmail))) ||
+                          togglingId === u.id
                         }
                         onClick={() => onToggleActive(u)}
                       >

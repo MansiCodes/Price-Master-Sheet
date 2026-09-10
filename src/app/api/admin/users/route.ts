@@ -5,7 +5,12 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { canManageUsers, canViewUsersDirectory } from "@/lib/rbac";
+import {
+  canManageUsers,
+  canViewUsersDirectory,
+  getPrimarySuperAdminEmail,
+  isPrimarySuperAdmin,
+} from "@/lib/rbac";
 
 const indiaPhoneSchema = z
   .string()
@@ -95,6 +100,8 @@ export async function GET() {
       canManage: canManageUsers(
         session!.user!.globalRole as Parameters<typeof canManageUsers>[0],
       ),
+      canManageSuperAdmins: isPrimarySuperAdmin(session!.user!.email),
+      primarySuperAdminEmail: getPrimarySuperAdminEmail(),
     });
   } catch (err) {
     console.error("GET /api/admin/users failed", err);

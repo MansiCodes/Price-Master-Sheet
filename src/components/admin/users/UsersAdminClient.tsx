@@ -33,6 +33,10 @@ export function UsersAdminClient() {
   const [confirmUser, setConfirmUser] = useState<UserRow | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [canManageSuperAdmins, setCanManageSuperAdmins] = useState(false);
+  const [primarySuperAdminEmail, setPrimarySuperAdminEmail] = useState<
+    string | null
+  >(null);
   const pageSize = 10;
 
   const allowSuperAdmin = canManage;
@@ -52,6 +56,8 @@ export function UsersAdminClient() {
         message?: string;
         users?: UserRow[];
         canManage?: boolean;
+        canManageSuperAdmins?: boolean;
+        primarySuperAdminEmail?: string | null;
       };
       let plantsJson: {
         ok?: boolean;
@@ -83,6 +89,10 @@ export function UsersAdminClient() {
       setUsers(usersJson.users ?? []);
       setPlants(plantsJson.plants ?? []);
       setCanManage(Boolean(usersJson.canManage));
+      setCanManageSuperAdmins(Boolean(usersJson.canManageSuperAdmins));
+      setPrimarySuperAdminEmail(
+        usersJson.primarySuperAdminEmail?.trim().toLowerCase() || null,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -212,9 +222,20 @@ export function UsersAdminClient() {
 
   async function confirmToggleActive() {
     if (!confirmUser) return;
-    if (confirmUser.globalRole === "SUPER_ADMIN") {
+    if (confirmUser.globalRole === "SUPER_ADMIN" && !canManageSuperAdmins) {
       setConfirmUser(null);
-      setError("A Super Admin cannot be deactivated.");
+      setError(
+        "Only the primary Super Admin can activate or deactivate Super Admins.",
+      );
+      return;
+    }
+    if (
+      primarySuperAdminEmail &&
+      confirmUser.email.trim().toLowerCase() === primarySuperAdminEmail &&
+      confirmUser.isActive
+    ) {
+      setConfirmUser(null);
+      setError("The primary Super Admin account cannot be deactivated.");
       return;
     }
     const nextActive = !confirmUser.isActive;
@@ -319,6 +340,8 @@ export function UsersAdminClient() {
           total={filtered.length}
           onPageChange={setPage}
           readOnly={!canManage}
+          canManageSuperAdmins={canManageSuperAdmins}
+          primarySuperAdminEmail={primarySuperAdminEmail}
         />
       )}
 

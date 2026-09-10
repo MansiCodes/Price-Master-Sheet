@@ -1,3 +1,10 @@
+/**
+ * Cloudinary helpers — ACTIVE for new uploads.
+ *
+ * Amazon S3 upload code lives in src/lib/storage/ (commented) until the
+ * AWS bucket + keys are ready. Then switch getMediaStorageProvider() to "s3"
+ * and uncomment the S3 blocks.
+ */
 import { createHash } from "node:crypto";
 
 const MAX_BILL_PHOTOS = 3;
@@ -112,6 +119,32 @@ export function isCloudinaryBillUrl(url: string, cloudName?: string): boolean {
   }
 }
 
+function isAmazonS3Url(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return false;
+    const base = process.env.AWS_S3_PUBLIC_BASE_URL?.trim();
+    if (base) {
+      try {
+        if (parsed.hostname === new URL(base).hostname) return true;
+      } catch {
+        /* ignore */
+      }
+    }
+    return (
+      /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(parsed.hostname) ||
+      /^s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(parsed.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Accept Cloudinary or Amazon S3 bill/document URLs. */
+export function isAllowedMediaUrl(url: string, cloudName?: string): boolean {
+  return isCloudinaryBillUrl(url, cloudName) || isAmazonS3Url(url);
+}
+
 export function normalizeBillPhotoUrls(
   urls: string[] | undefined,
   legacyUrl?: string | null,
@@ -123,7 +156,7 @@ export function normalizeBillPhotoUrls(
     ...new Set(
       merged
         .map((u) => u.trim())
-        .filter((u) => u && isCloudinaryBillUrl(u, cloudName)),
+        .filter((u) => u && isAllowedMediaUrl(u, cloudName)),
     ),
   ].slice(0, MAX_BILL_PHOTOS);
   return {

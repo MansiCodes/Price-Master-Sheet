@@ -5,13 +5,10 @@ import {
 } from "@/lib/api";
 import { dateOnlyRegex, parseDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import {
-  getQuadSignalCableProcesses,
-  parseQuadSignalStockNotes,
-  quadSignalClosingFromMeta,
-} from "@/lib/plant-catalogs";
+import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
+import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
 import {
   resolveQuadSignalVariant,
   saleMatchesCableSize,
@@ -23,6 +20,7 @@ type RouteContext = { params: Promise<{ plantId: string }> };
 /**
  * Opening WIP + Sales-ledger qty for Quad/Signal stock form.
  * Sales form is unchanged — this only reads Sale rows.
+ * Opening is editable only for the first entry of each cable+size.
  */
 export async function GET(
   request: NextRequest,
@@ -67,36 +65,16 @@ export async function GET(
   const processes = [...getQuadSignalCableProcesses(cable)];
   const variant = resolveQuadSignalVariant(size);
 
-  // Prior cable stock entry (same item or matching meta) → opening = its closing
-  const priorRows = await prisma.stockEntry.findMany({
-    where: {
-      ...pScope,
-      date: { lt: day },
-      category: "FG",
-      OR: [
-        { itemName },
-        { notes: { startsWith: "QSSTOCK:" } },
-      ],
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    take: 40,
-    select: { id: true, date: true, itemName: true, notes: true },
+  const {
+    opening,
+    openingFromDate,
+    openingEditable,
+  } = await resolveQuadSignalStockOpening({
+    plantIds,
+    day,
+    cable,
+    size,
   });
-
-  let opening: Record<string, number> = {};
-  let openingFromDate: string | null = null;
-  for (const row of priorRows) {
-    const { meta } = parseQuadSignalStockNotes(row.notes);
-    const sameItem =
-      row.itemName === itemName ||
-      (meta?.kind === "cable" &&
-        meta.cable === cable &&
-        meta.size === size);
-    if (!sameItem) continue;
-    opening = quadSignalClosingFromMeta(meta);
-    openingFromDate = row.date.toISOString().slice(0, 10);
-    break;
-  }
 
   const sales = await prisma.sale.findMany({
     where: {
@@ -129,9 +107,11 @@ export async function GET(
     date: dateRaw,
     cable,
     size,
+    itemName,
     processes,
     opening,
     openingFromDate,
+    openingEditable,
     salesKm,
     sales: matchedSales.map((s) => ({
       id: s.id,

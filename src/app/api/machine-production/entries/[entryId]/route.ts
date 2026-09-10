@@ -6,7 +6,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
-import { isCloudinaryBillUrl } from "@/lib/cloudinary";
+import { isAllowedMediaUrl } from "@/lib/cloudinary";
 import { prisma } from "@/lib/db";
 import { efficiencyPct } from "@/lib/machine-production/slots";
 
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 
   const photos =
     parsed.data.photoUrls !== undefined
-      ? parsed.data.photoUrls.filter((u) => isCloudinaryBillUrl(u))
+      ? parsed.data.photoUrls.filter((u) => isAllowedMediaUrl(u))
       : undefined;
 
   const entry = await prisma.machineProductionEntry.update({

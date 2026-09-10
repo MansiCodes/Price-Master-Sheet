@@ -112,6 +112,26 @@ export function isSuperAdmin(role: GlobalRole | Role): boolean {
   return role === GlobalRole.SUPER_ADMIN;
 }
 
+/** Email of the single Super Admin who may activate/deactivate other Super Admins. */
+export function getPrimarySuperAdminEmail(): string | null {
+  const email = (
+    process.env.PRIMARY_SUPER_ADMIN_EMAIL ||
+    process.env.SUPER_ADMIN_EMAIL ||
+    ""
+  )
+    .trim()
+    .toLowerCase();
+  return email || null;
+}
+
+export function isPrimarySuperAdmin(
+  email: string | null | undefined,
+): boolean {
+  const primary = getPrimarySuperAdminEmail();
+  if (!primary || !email) return false;
+  return email.trim().toLowerCase() === primary;
+}
+
 /** Entry and shift approval is Super Admin only (Business Head is not involved). */
 export function canApproveEntries(role: GlobalRole | Role): boolean {
   return isSuperAdmin(role);

@@ -1,9 +1,16 @@
+/**
+ * Server-side upload endpoint.
+ * ACTIVE = Cloudinary.
+ * S3 path is commented until the AWS bucket is ready.
+ */
 import { NextResponse } from "next/server";
 import {
   requireCanEnterOrMachineProduction,
   requireSession,
 } from "@/lib/api";
 import { createBillUploadSignature } from "@/lib/cloudinary";
+// --- S3 (UPLOAD turned off until bucket is ready) ---
+// import { createS3PresignedPut, getS3Config } from "@/lib/storage/s3";
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
@@ -21,6 +28,7 @@ export async function POST(request: Request) {
   const enterDenied = requireCanEnterOrMachineProduction(session.user);
   if (enterDenied) return enterDenied;
 
+  // ========== ACTIVE: Cloudinary ==========
   const signed = createBillUploadSignature();
   if (!signed) {
     return NextResponse.json(
@@ -31,6 +39,17 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
+
+  // ========== FUTURE: S3 config check (commented) ==========
+  // if (!getS3Config()) {
+  //   return NextResponse.json(
+  //     {
+  //       error:
+  //         "Bill upload is not configured. Set AWS_REGION, AWS_S3_BUCKET (and AWS credentials or IAM role).",
+  //     },
+  //     { status: 503 },
+  //   );
+  // }
 
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.includes("multipart/form-data")) {
@@ -58,6 +77,7 @@ export async function POST(request: Request) {
     );
   }
 
+  // ========== ACTIVE: Cloudinary ==========
   const cloudForm = new FormData();
   cloudForm.append("file", file);
   cloudForm.append("api_key", signed.apiKey);
@@ -81,4 +101,25 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, url: json.secure_url });
+
+  // ========== FUTURE: Amazon S3 (commented) ==========
+  // const s3Signed = await createS3PresignedPut({
+  //   fileName: file.name || `upload-${Date.now()}.jpg`,
+  //   contentType: file.type || "application/octet-stream",
+  // });
+  // if (!s3Signed) {
+  //   return NextResponse.json({ error: "Could not sign S3 upload" }, { status: 503 });
+  // }
+  // const put = await fetch(s3Signed.uploadUrl, {
+  //   method: "PUT",
+  //   headers: s3Signed.headers,
+  //   body: file,
+  // });
+  // if (!put.ok) {
+  //   return NextResponse.json(
+  //     { error: `S3 upload failed (${put.status})` },
+  //     { status: 502 },
+  //   );
+  // }
+  // return NextResponse.json({ ok: true, url: s3Signed.publicUrl });
 }

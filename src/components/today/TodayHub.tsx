@@ -472,6 +472,7 @@ export function TodayHub({
   const [stockWipOpening, setStockWipOpening] = useState<
     Record<string, number>
   >({});
+  const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
   const [stockWipSalesLines, setStockWipSalesLines] = useState<
     Array<{
@@ -547,6 +548,7 @@ export function TodayHub({
   useEffect(() => {
     if (!isQuad || stockKind !== "cable") {
       setStockWipOpening({});
+      setStockOpeningEditable(false);
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
       setStockLengthOptions([]);
@@ -570,6 +572,7 @@ export function TodayHub({
         return res.json() as Promise<{
           opening: Record<string, number>;
           openingFromDate: string | null;
+          openingEditable?: boolean;
           salesKm: number;
           sales: typeof stockWipSalesLines;
           variant: {
@@ -584,6 +587,7 @@ export function TodayHub({
       })
       .then((data) => {
         setStockWipOpening(data.opening ?? {});
+        setStockOpeningEditable(Boolean(data.openingEditable));
         setStockWipSalesKm(Number(data.salesKm) || 0);
         setStockWipSalesLines(data.sales ?? []);
         if (data.variant) {
@@ -612,6 +616,7 @@ export function TodayHub({
         if (ac.signal.aborted) return;
         console.error(err);
         setStockWipOpening({});
+        setStockOpeningEditable(false);
         setStockWipSalesKm(0);
         setStockWipSalesLines([]);
       });
@@ -942,6 +947,8 @@ export function TodayHub({
     );
     setStockCableSizeOther("");
     setStockProcessQtys({});
+    setStockWipOpening({});
+    setStockOpeningEditable(false);
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -2414,7 +2421,7 @@ export function TodayHub({
                         ) : null}
                         {quadCableProcessFields.length > 0 ? (
                           <div className="field qs-wip">
-                            {stockLengthOptions.length > 1 ? (
+                            {stockLengthOptions.length > 0 ? (
                               <div className="field">
                                 <label htmlFor="st-drum-len">
                                   Drum / coil length
@@ -2443,12 +2450,38 @@ export function TodayHub({
                                 />
                               </div>
                             ) : null}
+                            {stockOpeningEditable ? (
+                              <div
+                                className="qs-wip__seed-banner"
+                                role="status"
+                              >
+                                <strong>
+                                  Opening stock is open for{" "}
+                                  {new Date(
+                                    `${entryDate}T12:00:00`,
+                                  ).toLocaleDateString("en-IN", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
+                                </strong>
+                                <span>
+                                  One-time only for this cable/size. After save,
+                                  Opening locks and future days use
+                                  yesterday&apos;s Closing.
+                                </span>
+                              </div>
+                            ) : null}
                             <div className="qs-wip__table-wrap">
                               <table className="qs-wip__table">
                                 <thead>
                                   <tr>
                                     <th>Process</th>
-                                    <th>Opening</th>
+                                    <th>
+                                      {stockOpeningEditable
+                                        ? "Opening (open)"
+                                        : "Opening"}
+                                    </th>
                                     <th>Production</th>
                                     <th>Out / Sales</th>
                                     <th>Closing</th>
@@ -2471,13 +2504,40 @@ export function TodayHub({
                                             : stage != null
                                               ? String(stage.outbound)
                                               : "—";
+                                    const openingVal =
+                                      stage?.opening ??
+                                      stockWipOpening[proc] ??
+                                      0;
                                     return (
                                       <tr key={proc}>
                                         <td>{proc}</td>
                                         <td className="qs-wip__num">
-                                          {stage?.opening ??
-                                            stockWipOpening[proc] ??
-                                            0}
+                                          {stockOpeningEditable ? (
+                                            <DecimalInput
+                                              id={`st-open-${proc}`}
+                                              value={
+                                                stockWipOpening[proc] != null
+                                                  ? String(stockWipOpening[proc])
+                                                  : ""
+                                              }
+                                              onChange={(next) => {
+                                                const n =
+                                                  next.trim() === ""
+                                                    ? 0
+                                                    : Number(next);
+                                                setStockWipOpening((prev) => ({
+                                                  ...prev,
+                                                  [proc]:
+                                                    Number.isFinite(n) && n >= 0
+                                                      ? n
+                                                      : 0,
+                                                }));
+                                              }}
+                                              placeholder="0"
+                                            />
+                                          ) : (
+                                            openingVal
+                                          )}
                                         </td>
                                         <td>
                                           <DecimalInput

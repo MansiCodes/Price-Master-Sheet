@@ -31,6 +31,10 @@ import {
   resolveCanonicalWritePlantId,
   resolveReportPlantIds,
 } from "@/lib/plant-merge";
+import {
+  applyQuadSignalOpeningLockToNotes,
+} from "@/lib/quad-signal-opening";
+import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
 
 const stockLineSchema = z.object({
   itemName: z.string().min(1),
@@ -246,18 +250,26 @@ export async function POST(
           : {}),
       };
 
+      const plantIds = await resolveReportPlantIds(plantId);
       const resolved = await Promise.all(
-        data.entries.map(async (line) => ({
-          line,
-          amounts: await resolveStockLineAmounts(
-            writePlantId,
+        data.entries.map(async (line) => {
+          const lockedNotes = await applyQuadSignalOpeningLockToNotes({
+            plantIds,
             day,
-            line.quantity,
-            line.rate,
-            line.value,
-            line.itemName,
-          ),
-        })),
+            notes: line.notes,
+          });
+          return {
+            line: { ...line, notes: lockedNotes ?? line.notes },
+            amounts: await resolveStockLineAmounts(
+              writePlantId,
+              day,
+              line.quantity,
+              line.rate,
+              line.value,
+              line.itemName,
+            ),
+          };
+        }),
       );
 
       const created = await prisma.$transaction(async (tx) => {
@@ -311,6 +323,13 @@ export async function POST(
     const data = parsed.data;
     const backdated = isBackdated(data.date);
     const day = parseDateOnly(data.date);
+    const plantIds = await resolveReportPlantIds(plantId);
+    const lockedNotes = await applyQuadSignalOpeningLockToNotes({
+      plantIds,
+      day,
+      notes: data.notes,
+    });
+    const dataWithNotes = { ...data, notes: lockedNotes ?? data.notes };
     const photos = normalizeBillPhotoUrls(data.photoUrls, data.photoUrl);
     const amounts = await resolveStockLineAmounts(
       writePlantId,
@@ -330,8 +349,8 @@ export async function POST(
       data: stockEntryCreateData(
         writePlantId,
         session.user.id,
-        data,
-        data,
+        dataWithNotes,
+        dataWithNotes,
         amounts,
         photos,
         approvalFields,
@@ -416,6 +435,19 @@ export async function PATCH(
       ? normalizeBillPhotoUrls(data.photoUrls, data.photoUrl)
       : null;
 
+  const plantIds = await resolveReportPlantIds(plantId);
+  const existingOpening =
+    parseQuadSignalStockNotes(existing.notes).meta?.opening ?? {};
+  const lockedNotes =
+    data.notes !== undefined
+      ? await applyQuadSignalOpeningLockToNotes({
+          plantIds,
+          day: parseDateOnly(dateStr),
+          notes: data.notes,
+          lockOpeningTo: existingOpening,
+        })
+      : undefined;
+
   const entry = await prisma.stockEntry.update({
     where: { id: existing.id },
     data: {
@@ -426,7 +458,7 @@ export async function PATCH(
       quantity: amounts.quantity,
       rate: amounts.rate,
       closingValue: amounts.closingValue,
-      notes: data.notes,
+      notes: lockedNotes !== undefined ? lockedNotes : data.notes,
       ...(photos
         ? {
             photoUrl: photos.billPhotoUrl,

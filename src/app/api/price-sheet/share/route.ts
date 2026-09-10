@@ -3,7 +3,7 @@ import { z } from "zod";
 import { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { sendPriceSheetWhatsApp } from "@/lib/aisensy";
-import { uploadPriceSheetPdf } from "@/lib/cloudinary";
+import { uploadPriceSheetPdf } from "@/lib/storage";
 import { prisma } from "@/lib/db";
 import { toIndiaPhoneE164 } from "@/lib/phone";
 import { buildPriceSheetPdf } from "@/lib/price-sheet-pdf";
