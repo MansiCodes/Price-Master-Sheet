@@ -473,8 +473,6 @@ export function TodayHub({
     Record<string, string>
   >({});
   const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
-  const [stockOpeningAlwaysEditable, setStockOpeningAlwaysEditable] =
-    useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
   const [stockWipSalesLines, setStockWipSalesLines] = useState<
     Array<{
@@ -551,7 +549,6 @@ export function TodayHub({
     if (!isQuad || stockKind !== "cable") {
       setStockWipOpening({});
       setStockOpeningEditable(false);
-      setStockOpeningAlwaysEditable(false);
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
       setStockLengthOptions([]);
@@ -576,7 +573,6 @@ export function TodayHub({
           opening: Record<string, number>;
           openingFromDate: string | null;
           openingEditable?: boolean;
-          openingAlwaysEditable?: boolean;
           salesKm: number;
           sales: typeof stockWipSalesLines;
           variant: {
@@ -597,7 +593,6 @@ export function TodayHub({
         }
         setStockWipOpening(openingStrings);
         setStockOpeningEditable(Boolean(data.openingEditable));
-        setStockOpeningAlwaysEditable(Boolean(data.openingAlwaysEditable));
         setStockWipSalesKm(Number(data.salesKm) || 0);
         setStockWipSalesLines(data.sales ?? []);
         if (data.variant) {
@@ -627,7 +622,6 @@ export function TodayHub({
         console.error(err);
         setStockWipOpening({});
         setStockOpeningEditable(false);
-        setStockOpeningAlwaysEditable(false);
         setStockWipSalesKm(0);
         setStockWipSalesLines([]);
       });
@@ -970,7 +964,6 @@ export function TodayHub({
     setStockProcessQtys({});
     setStockWipOpening({});
     setStockOpeningEditable(false);
-    setStockOpeningAlwaysEditable(false);
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -2478,38 +2471,12 @@ export function TodayHub({
                                 />
                               </div>
                             ) : null}
-                            {stockOpeningEditable ? (
-                              <div
-                                className="qs-wip__seed-banner"
-                                role="status"
-                              >
-                                <strong>
-                                  Opening stock is open for{" "}
-                                  {new Date(
-                                    `${entryDate}T12:00:00`,
-                                  ).toLocaleDateString("en-IN", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  })}
-                                </strong>
-                                <span>
-                                  {stockOpeningAlwaysEditable
-                                    ? "You can edit Opening anytime. After save, the next day’s Opening uses this entry’s Closing."
-                                    : "One-time only for this cable/size. After save, Opening locks and future days use yesterday’s Closing."}
-                                </span>
-                              </div>
-                            ) : null}
                             <div className="qs-wip__table-wrap">
                               <table className="qs-wip__table">
                                 <thead>
                                   <tr>
                                     <th>Process</th>
-                                    <th>
-                                      {stockOpeningEditable
-                                        ? "Opening (open)"
-                                        : "Opening"}
-                                    </th>
+                                    <th>Opening</th>
                                     <th>Production</th>
                                     <th>Out / Sales</th>
                                     <th>Closing</th>
@@ -2616,7 +2583,7 @@ export function TodayHub({
                             ) : null}
                             <div className="form-grid two">
                               <div className="field">
-                                <label htmlFor="st-rate">Rate (optional)</label>
+                                <label htmlFor="st-rate">Rate</label>
                                 <DecimalInput
                                   id="st-rate"
                                   value={stockRate}
@@ -2788,7 +2755,7 @@ export function TodayHub({
                     quadCableProcessFields.length % 2 === 1
                   ) ? (
                     <div className="field">
-                      <label htmlFor="st-rate">Rate (optional)</label>
+                      <label htmlFor="st-rate">Rate</label>
                       <DecimalInput
                         id="st-rate"
                         value={stockRate}
@@ -2801,17 +2768,11 @@ export function TodayHub({
                 )}
                 {stockPurchaseRateLoading ? (
                   <p className="field-hint">Loading rate from purchase history…</p>
-                ) : null}
-                {stockPurchaseRate != null ? (
+                ) : stockPurchaseRate != null ? (
                   <p className="field-hint">
                     Suggested from purchase history: ₹{stockPurchaseRate.toFixed(2)}/
                     {stockUnit || "KGS"} (weighted average — edit if needed)
                     {stockValue ? ` · Value: ${formatINR(Number(stockValue))}` : ""}
-                  </p>
-                ) : resolvedStockItemName ? (
-                  <p className="field-hint">
-                    No purchase history matched this item — rate is optional
-                    (leave blank to save as 0).
                   </p>
                 ) : null}
                 <div className="field expense-desc">
@@ -2918,7 +2879,7 @@ export function TodayHub({
                         />
                       </div>
                       <div className="field">
-                        <label htmlFor="e-rent-rate">Rate (₹/sqft, optional)</label>
+                        <label htmlFor="e-rent-rate">Rate (₹/sqft)</label>
                         <DecimalInput
                           id="e-rent-rate"
                           value={rentRatePerSqft}
@@ -2993,7 +2954,7 @@ export function TodayHub({
                     ) : null}
                     <div className="prod-fields__row">
                       <div className="field">
-                        <label htmlFor="e-rate">Rate (₹/unit, optional)</label>
+                        <label htmlFor="e-rate">Rate (₹/unit)</label>
                         <DecimalInput
                           id="e-rate"
                           value={expenseRate}
@@ -3131,7 +3092,7 @@ export function TodayHub({
                         />
                       </div>
                       <div className="field">
-                        <label htmlFor="e-unload-rate">Rate (₹/MT, optional)</label>
+                        <label htmlFor="e-unload-rate">Rate (₹/MT)</label>
                         <DecimalInput
                           id="e-unload-rate"
                           value={unloadRatePerMt}
@@ -3713,7 +3674,7 @@ function LineEditor({
                   />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
+                  <label htmlFor={`line-rate-${line.id}`}>Rate</label>
                   <DecimalInput
                     id={`line-rate-${line.id}`}
                     value={line.rate}
@@ -3800,7 +3761,7 @@ function LineEditor({
               className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}`}
             >
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
+                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}
@@ -3863,7 +3824,7 @@ function LineEditor({
                 />
               </div>
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate (optional)</label>
+                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}
