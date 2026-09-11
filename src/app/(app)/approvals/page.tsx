@@ -58,8 +58,7 @@ export default async function ApprovalsPage({
 
   if (plantIds.length === 0) {
     return (
-      <div style={{ padding: "2rem" }} className="approvals-page">
-        <h1 className="page-title">Entry Approvals</h1>
+      <div style={{ padding: "1rem 1.5rem 2rem" }} className="approvals-page">
         <p className="page-sub">No plants are available to review.</p>
       </div>
     );
@@ -191,9 +190,7 @@ export default async function ApprovalsPage({
   ];
 
   return (
-    <div style={{ padding: "2rem" }} className="approvals-page">
-      <h1 className="page-title">Entry Approvals</h1>
-
+    <div style={{ padding: "1rem 1.5rem 2rem" }} className="approvals-page">
       <ApprovalsDateFilter from={fromStr ?? ""} to={toStr ?? ""} />
 
       <EntryApprovalsPanel

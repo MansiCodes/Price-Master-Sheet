@@ -61,7 +61,7 @@ export function EntryApprovalsPanel({
   }));
 
   return (
-    <section className="mis-panel" style={{ marginTop: "1.5rem", padding: "1.25rem" }}>
+    <section className="mis-panel" style={{ marginTop: "0.85rem", padding: "1.25rem" }}>
       <div
         style={{
           display: "flex",

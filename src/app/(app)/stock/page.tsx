@@ -10,6 +10,10 @@ import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { buildCableStockStatus } from "@/lib/stock-production-status";
+import type {
+  CableStockStatusBlock,
+  SharedInsulationStatus,
+} from "@/lib/stock-production-status";
 import { StockStatusClient } from "@/components/stock/StockStatusClient";
 
 export default async function StockPage({
@@ -51,7 +55,8 @@ export default async function StockPage({
 
   const tab = tabParam === "raw" ? "raw" : "cable";
 
-  let cableBlocks: ReturnType<typeof buildCableStockStatus> = [];
+  let cableBlocks: CableStockStatusBlock[] = [];
+  let sharedInsulation: SharedInsulationStatus | null = null;
 
   if (plant && isQuadSignalPlant(plant.code)) {
     const reportIds = await resolveReportPlantIds(selectedPlantId);
@@ -72,7 +77,9 @@ export default async function StockPage({
         notes: true,
       },
     });
-    cableBlocks = buildCableStockStatus(rows);
+    const built = buildCableStockStatus(rows);
+    cableBlocks = built.blocks;
+    sharedInsulation = built.sharedInsulation;
   }
 
   return (
@@ -80,6 +87,7 @@ export default async function StockPage({
       date={date}
       tab={tab}
       cableBlocks={cableBlocks}
+      sharedInsulation={sharedInsulation}
     />
   );
 }

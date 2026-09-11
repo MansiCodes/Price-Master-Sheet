@@ -102,9 +102,9 @@
   align-self: center;
 }
 
-/* Approvals page: spacing below intro text */
+/* Approvals page: keep date filter flush with top content */
 .approvals-page .pnl-date-filter {
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 @media (max-width: 560px) {

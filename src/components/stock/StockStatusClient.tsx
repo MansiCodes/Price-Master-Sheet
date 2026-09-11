@@ -8,9 +8,12 @@ import {
   getQuadSignalCableSizes,
   QUAD_SIGNAL_STOCK_CABLES,
 } from "@/lib/plant-catalogs";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
   formatProcessStatusLine,
+  formatSharedInsulationLine,
   type CableStockStatusBlock,
+  type SharedInsulationStatus,
 } from "@/lib/stock-production-status";
 import "@/components/ui/date-filter.css";
 import "./stock-status.css";
@@ -21,9 +24,30 @@ function formatDisplayDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+function CalendarIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+const ALL_CABLES = "All cables";
 const ALL_SIZES = "All sizes";
 
 const CABLE_TYPES = QUAD_SIGNAL_STOCK_CABLES.filter((c) => c !== "Other");
+const CABLE_TYPE_OPTIONS = [ALL_CABLES, ...CABLE_TYPES];
 
 type DisplayCard = {
   key: string;
@@ -36,10 +60,12 @@ export function StockStatusClient({
   date,
   tab,
   cableBlocks,
+  sharedInsulation,
 }: {
   date: string;
   tab: "cable" | "raw";
   cableBlocks: CableStockStatusBlock[];
+  sharedInsulation: SharedInsulationStatus | null;
 }) {
   const router = useRouter();
   const today = todayDateString();
@@ -49,49 +75,87 @@ export function StockStatusClient({
     ? "No data for today"
     : `No data for ${formatDisplayDate(date)}`;
 
-  const [cableType, setCableType] = useState<string>(
-    () => CABLE_TYPES[0] ?? "Signalling Cable",
-  );
+  const [cableType, setCableType] = useState(ALL_CABLES);
   const [cableSize, setCableSize] = useState(ALL_SIZES);
 
-  const activeCable = CABLE_TYPES.includes(
-    cableType as (typeof CABLE_TYPES)[number],
-  )
+  const activeCable = CABLE_TYPE_OPTIONS.includes(cableType)
     ? cableType
-    : (CABLE_TYPES[0] ?? "Signalling Cable");
+    : ALL_CABLES;
+  const showAllCables = activeCable === ALL_CABLES;
+
+  const cablesInView = useMemo(
+    () => (showAllCables ? [...CABLE_TYPES] : [activeCable]),
+    [showAllCables, activeCable],
+  );
 
   const catalogSizes = useMemo(() => {
+    if (showAllCables) {
+      const set = new Set<string>();
+      for (const cable of CABLE_TYPES) {
+        for (const s of getQuadSignalCableSizes(cable)) {
+          if (s !== "Other") set.add(s);
+        }
+      }
+      return Array.from(set);
+    }
     return getQuadSignalCableSizes(activeCable).filter((s) => s !== "Other");
-  }, [activeCable]);
+  }, [showAllCables, activeCable]);
 
   const sizeOptions = useMemo(
     () => [ALL_SIZES, ...catalogSizes],
     [catalogSizes],
   );
 
-  const blocksBySize = useMemo(() => {
+  const blocksByKey = useMemo(() => {
     const map = new Map<string, CableStockStatusBlock>();
     for (const b of cableBlocks) {
-      if (b.cable !== activeCable) continue;
-      if (!map.has(b.size)) map.set(b.size, b);
+      map.set(`${b.cable} · ${b.size}`, b);
     }
     return map;
-  }, [cableBlocks, activeCable]);
+  }, [cableBlocks]);
 
   const displayCards = useMemo((): DisplayCard[] => {
-    const sizes =
-      cableSize === ALL_SIZES
-        ? catalogSizes
-        : catalogSizes.includes(cableSize)
-          ? [cableSize]
-          : [];
-    return sizes.map((size) => ({
-      key: `${activeCable} · ${size}`,
-      cable: activeCable,
-      size,
-      block: blocksBySize.get(size) ?? null,
-    }));
-  }, [activeCable, catalogSizes, cableSize, blocksBySize]);
+    const cards: DisplayCard[] = [];
+    for (const cable of cablesInView) {
+      const sizes = getQuadSignalCableSizes(cable).filter((s) => s !== "Other");
+      for (const size of sizes) {
+        if (cableSize !== ALL_SIZES && size !== cableSize) continue;
+        const key = `${cable} · ${size}`;
+        cards.push({
+          key,
+          cable,
+          size,
+          block: blocksByKey.get(key) ?? null,
+        });
+      }
+    }
+
+    // Filled data first, then empty. Within each group: Signalling → next cables,
+    // then catalog size order.
+    cards.sort((a, b) => {
+      const aHas = a.block ? 0 : 1;
+      const bHas = b.block ? 0 : 1;
+      if (aHas !== bHas) return aHas - bHas;
+
+      const aCable = CABLE_TYPES.indexOf(
+        a.cable as (typeof CABLE_TYPES)[number],
+      );
+      const bCable = CABLE_TYPES.indexOf(
+        b.cable as (typeof CABLE_TYPES)[number],
+      );
+      const aCableOrd = aCable === -1 ? 999 : aCable;
+      const bCableOrd = bCable === -1 ? 999 : bCable;
+      if (aCableOrd !== bCableOrd) return aCableOrd - bCableOrd;
+
+      const sizes = getQuadSignalCableSizes(a.cable);
+      return sizes.indexOf(a.size) - sizes.indexOf(b.size);
+    });
+
+    return cards;
+  }, [cablesInView, cableSize, blocksByKey]);
+
+  const showInsulationCard =
+    showAllCables || isSignallingCableName(activeCable);
 
   function setDate(next: string) {
     if (!next || next > today) return;
@@ -121,10 +185,6 @@ export function StockStatusClient({
 
   return (
     <div className="stock-status-page">
-      <header className="stock-status-page__head">
-        <h1 className="page-title">Stock</h1>
-      </header>
-
       <div className="stock-status-toolbar">
         <div className="stock-status-tabs" role="tablist">
           <button
@@ -153,7 +213,15 @@ export function StockStatusClient({
           >
             {isToday ? "Today" : formatDisplayDate(date)}
           </span>
-          <div className="pnl-date-filter">
+          <button
+            type="button"
+            className="stock-status-cal-btn"
+            aria-label="Choose stock date"
+            onClick={openCalendar}
+          >
+            <CalendarIcon />
+          </button>
+          <div className="pnl-date-filter stock-status-date-full">
             <div className="pnl-date-filter__field">
               <label htmlFor="stock-date" className="sr-only">
                 Calendar
@@ -188,7 +256,7 @@ export function StockStatusClient({
               <SelectMenu
                 id="stock-cable-type"
                 value={activeCable}
-                options={CABLE_TYPES}
+                options={CABLE_TYPE_OPTIONS}
                 required
                 onChange={(next) => {
                   setCableType(next);
@@ -211,6 +279,41 @@ export function StockStatusClient({
           </div>
 
           <ol className="stock-status-grid">
+            {showInsulationCard ? (
+              <li
+                className={`stock-status-card stock-status-card--insulation${
+                  sharedInsulation ? "" : " is-empty"
+                }`}
+              >
+                <h3 className="stock-status-card__size">
+                  Insulation
+                  <span className="stock-status-card__cable">
+                    {" "}
+                    · Signalling Cable
+                  </span>
+                </h3>
+                {sharedInsulation ? (
+                  <>
+                    <ul className="stock-status-card__procs">
+                      <li>
+                        {formatSharedInsulationLine(sharedInsulation)}
+                      </li>
+                    </ul>
+                    {sharedInsulation.consumed > 0 ? (
+                      <p className="stock-status-card__meta">
+                        Consumed — {sharedInsulation.consumed}km
+                      </p>
+                    ) : null}
+                    <p className="stock-status-card__total">
+                      Closing — {sharedInsulation.closing}km
+                    </p>
+                  </>
+                ) : (
+                  <p className="stock-status-card__empty">{emptyLabel}</p>
+                )}
+              </li>
+            ) : null}
+
             {displayCards.map((card, idx) => {
               const block = card.block;
               return (
@@ -220,19 +323,16 @@ export function StockStatusClient({
                 >
                   <h3 className="stock-status-card__size">
                     {idx + 1}- {card.size}
-                    <span className="stock-status-card__cable">
-                      {" "}
-                      · {card.cable}
-                    </span>
+                    {showAllCables ? (
+                      <span className="stock-status-card__cable">
+                        {" "}
+                        · {card.cable}
+                      </span>
+                    ) : null}
                   </h3>
 
                   {block ? (
                     <>
-                      {block.insulationNote ? (
-                        <p className="stock-status-card__note">
-                          {block.insulationNote}
-                        </p>
-                      ) : null}
                       <ul className="stock-status-card__procs">
                         {block.processes.map((p) => (
                           <li key={p.name}>{formatProcessStatusLine(p)}</li>
@@ -251,12 +351,6 @@ export function StockStatusClient({
                           {block.userNotes}
                         </p>
                       ) : null}
-                      <p className="stock-status-card__meta">
-                        Closing stock as on {block.entryDate}
-                        {block.entryDate !== date
-                          ? ` · view date ${formatDisplayDate(date)}`
-                          : ""}
-                      </p>
                     </>
                   ) : (
                     <p className="stock-status-card__empty">{emptyLabel}</p>
