@@ -831,6 +831,16 @@
 .qs-wip__factor {
   margin: 0 0 0.35rem;
 }
+.qs-wip__size-for-chain {
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 10px;
+  background: #fff;
+}
+.qs-wip__size-for-chain .form-grid.two {
+  margin: 0;
+}
 .qs-wip__drum {
   margin-bottom: 0;
 }

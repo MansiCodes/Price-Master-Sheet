@@ -796,14 +796,15 @@ export function TodayHub({
         layingProduced: number;
         coreCount: number;
         lengthFactor: number;
-      }> = [
-        {
+      }> = [];
+      if (stockOpeningEditable || stockInsulationExtras.length > 0) {
+        sizeRows.push({
           size: resolvedQuadSizeName,
           layingProduced: production.Laying ?? 0,
           coreCount: variant.coreCount,
           lengthFactor,
-        },
-      ];
+        });
+      }
       for (const extra of stockInsulationExtras) {
         const sizeName =
           extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
@@ -852,6 +853,7 @@ export function TodayHub({
     resolvedQuadSizeName,
     stockLengthFactor,
     stockInsulationExtras,
+    stockOpeningEditable,
   ]);
 
   useEffect(() => {
@@ -1591,14 +1593,15 @@ export function TodayHub({
               layingProduced: number;
               coreCount: number;
               lengthFactor: number;
-            }> = [
-              {
+            }> = [];
+            if (stockOpeningEditable || stockInsulationExtras.length > 0) {
+              sizeRows.push({
                 size: resolvedSize,
                 layingProduced: processes.Laying ?? 0,
                 coreCount: variant.coreCount,
                 lengthFactor,
-              },
-            ];
+              });
+            }
             for (const extra of stockInsulationExtras) {
               const sizeName =
                 extra.size === "Other"
@@ -2733,51 +2736,6 @@ export function TodayHub({
                             />
                           </div>
                         </div>
-                        <div className="form-grid two">
-                          <div className="field">
-                            <label htmlFor="st-cable-size">Size</label>
-                            <SelectMenu
-                              id="st-cable-size"
-                              value={stockCableSize}
-                              options={quadCableSizeOptions}
-                              required
-                              onChange={(next) => {
-                                setStockCableSize(next);
-                                if (next !== "Other")
-                                  setStockCableSizeOther("");
-                              }}
-                            />
-                          </div>
-                          {stockLengthOptions.length > 0 ? (
-                            <div className="field qs-wip__drum">
-                              <label htmlFor="st-drum-len">
-                                Drum / coil length
-                              </label>
-                              <SelectMenu
-                                id="st-drum-len"
-                                value={
-                                  stockLengthOptions.find(
-                                    (o) =>
-                                      o.lengthFactor === stockLengthFactor,
-                                  )?.label ??
-                                  stockLengthOptions[0]?.label ??
-                                  ""
-                                }
-                                options={stockLengthOptions.map((o) => o.label)}
-                                required
-                                onChange={(next) => {
-                                  const opt = stockLengthOptions.find(
-                                    (o) => o.label === next,
-                                  );
-                                  if (opt)
-                                    setStockLengthFactor(opt.lengthFactor);
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <div className="field" aria-hidden />
-                          )}
-                        </div>
                         {stockCable === "Other" ? (
                           <div className="field">
                             <label htmlFor="st-cable-other">
@@ -2795,22 +2753,73 @@ export function TodayHub({
                             />
                           </div>
                         ) : null}
-                        {stockCableSize === "Other" ? (
-                          <div className="field">
-                            <label htmlFor="st-cable-size-other">
-                              Other size{" "}
-                              <span style={{ color: "red" }}>*</span>
-                            </label>
-                            <input
-                              id="st-cable-size-other"
-                              required
-                              placeholder="Enter size"
-                              value={stockCableSizeOther}
-                              onChange={(e) =>
-                                setStockCableSizeOther(e.target.value)
-                              }
-                            />
-                          </div>
+                        {!isSignallingStock ? (
+                          <>
+                            <div className="form-grid two">
+                              <div className="field">
+                                <label htmlFor="st-cable-size">Size</label>
+                                <SelectMenu
+                                  id="st-cable-size"
+                                  value={stockCableSize}
+                                  options={quadCableSizeOptions}
+                                  required
+                                  onChange={(next) => {
+                                    setStockCableSize(next);
+                                    if (next !== "Other")
+                                      setStockCableSizeOther("");
+                                  }}
+                                />
+                              </div>
+                              {stockLengthOptions.length > 0 ? (
+                                <div className="field qs-wip__drum">
+                                  <label htmlFor="st-drum-len">
+                                    Drum / coil length
+                                  </label>
+                                  <SelectMenu
+                                    id="st-drum-len"
+                                    value={
+                                      stockLengthOptions.find(
+                                        (o) =>
+                                          o.lengthFactor === stockLengthFactor,
+                                      )?.label ??
+                                      stockLengthOptions[0]?.label ??
+                                      ""
+                                    }
+                                    options={stockLengthOptions.map(
+                                      (o) => o.label,
+                                    )}
+                                    required
+                                    onChange={(next) => {
+                                      const opt = stockLengthOptions.find(
+                                        (o) => o.label === next,
+                                      );
+                                      if (opt)
+                                        setStockLengthFactor(opt.lengthFactor);
+                                    }}
+                                  />
+                                </div>
+                              ) : (
+                                <div className="field" aria-hidden />
+                              )}
+                            </div>
+                            {stockCableSize === "Other" ? (
+                              <div className="field">
+                                <label htmlFor="st-cable-size-other">
+                                  Other size{" "}
+                                  <span style={{ color: "red" }}>*</span>
+                                </label>
+                                <input
+                                  id="st-cable-size-other"
+                                  required
+                                  placeholder="Enter size"
+                                  value={stockCableSizeOther}
+                                  onChange={(e) =>
+                                    setStockCableSizeOther(e.target.value)
+                                  }
+                                />
+                              </div>
+                            ) : null}
+                          </>
                         ) : null}
                         {quadCableProcessFields.length > 0 ? (
                           <div className="field qs-wip">
@@ -2947,9 +2956,8 @@ export function TodayHub({
                                         </button>
                                       </div>
                                       <p className="qs-wip__box-note">
-                                        Common across all Signalling sizes.
-                                        Enter Insulation first, then + to add
-                                        other sizes (unit, laying).
+                                        Shared for all Signalling sizes. Use +
+                                        to add another size.
                                       </p>
                                       <div className="qs-wip__table-wrap">
                                         <table className="qs-wip__table">
@@ -3258,6 +3266,83 @@ export function TodayHub({
                                               ) : null}
                                             </div>
                                           ) : null}
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="qs-wip__size-for-chain">
+                                      <div className="form-grid two">
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size">
+                                            Size
+                                          </label>
+                                          <SelectMenu
+                                            id="st-cable-size"
+                                            value={stockCableSize}
+                                            options={quadCableSizeOptions}
+                                            required
+                                            onChange={(next) => {
+                                              setStockCableSize(next);
+                                              if (next !== "Other")
+                                                setStockCableSizeOther("");
+                                            }}
+                                          />
+                                        </div>
+                                        {stockLengthOptions.length > 0 ? (
+                                          <div className="field qs-wip__drum">
+                                            <label htmlFor="st-drum-len">
+                                              Drum / coil length
+                                            </label>
+                                            <SelectMenu
+                                              id="st-drum-len"
+                                              value={
+                                                stockLengthOptions.find(
+                                                  (o) =>
+                                                    o.lengthFactor ===
+                                                    stockLengthFactor,
+                                                )?.label ??
+                                                stockLengthOptions[0]?.label ??
+                                                ""
+                                              }
+                                              options={stockLengthOptions.map(
+                                                (o) => o.label,
+                                              )}
+                                              required
+                                              onChange={(next) => {
+                                                const opt =
+                                                  stockLengthOptions.find(
+                                                    (o) => o.label === next,
+                                                  );
+                                                if (opt)
+                                                  setStockLengthFactor(
+                                                    opt.lengthFactor,
+                                                  );
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="field" aria-hidden />
+                                        )}
+                                      </div>
+                                      {stockCableSize === "Other" ? (
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size-other">
+                                            Other size{" "}
+                                            <span style={{ color: "red" }}>
+                                              *
+                                            </span>
+                                          </label>
+                                          <input
+                                            id="st-cable-size-other"
+                                            required
+                                            placeholder="Enter size"
+                                            value={stockCableSizeOther}
+                                            onChange={(e) =>
+                                              setStockCableSizeOther(
+                                                e.target.value,
+                                              )
+                                            }
+                                          />
                                         </div>
                                       ) : null}
                                     </div>
