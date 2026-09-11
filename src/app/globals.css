@@ -1659,7 +1659,7 @@ textarea {
 
 .select-menu__list {
   margin: 0;
-  padding: 0.4rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.4rem;
   list-style: none;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -1670,6 +1670,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
+  box-sizing: border-box;
 }
 
 .select-menu__list--searchable {
@@ -1723,6 +1724,7 @@ textarea {
 .select-menu__option {
   appearance: none;
   width: 100%;
+  box-sizing: border-box;
   border: 0;
   background: transparent;
   color: var(--fg);
@@ -1730,7 +1732,7 @@ textarea {
   font: inherit;
   font-size: 0.9rem;
   font-weight: 600;
-  padding: 0.45rem 0.75rem;
+  padding: 0.5rem 1.15rem 0.5rem 0.75rem;
   border-radius: 10px;
   cursor: pointer;
 }

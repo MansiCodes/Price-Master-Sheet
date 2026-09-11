@@ -104,7 +104,7 @@ export function SelectMenu({
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const gap = 6;
-    const edgePad = 12;
+    const edgePad = 16;
     const spaceBelow = window.innerHeight - rect.bottom - gap - edgePad;
     const spaceAbove = rect.top - gap - edgePad;
     const minSpace = searchable ? 220 : 180;
@@ -114,7 +114,8 @@ export function SelectMenu({
       Math.min(searchable ? 320 : 280, openUp ? spaceAbove : spaceBelow),
     );
     const maxWidth = Math.max(120, window.innerWidth - edgePad * 2);
-    const width = Math.min(Math.max(rect.width, 180), maxWidth);
+    // Prefer trigger width; keep a modest floor so short labels still fit.
+    const width = Math.min(Math.max(rect.width, 128), maxWidth);
     // Keep the menu inside the viewport with padding on the right (and left).
     let left = rect.left;
     if (left + width > window.innerWidth - edgePad) {

@@ -48,7 +48,13 @@ import {
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import {
   calculateQuadSignalWip,
+  calculateSharedSignallingInsulation,
+  insulationConsumedFromLaying,
+  isSignallingCableName,
+  lengthValueToFactor,
+  INSULATION_LENGTH_UNIT_ITEMS,
   resolveQuadSignalVariant,
+  type InsulationLengthUnit,
   type WipCalcResult,
 } from "@/lib/quad-signal-wip";
 import "./today-hub.css";
@@ -576,6 +582,19 @@ export function TodayHub({
   const [stockLengthFactor, setStockLengthFactor] = useState<number | null>(
     null,
   );
+  /** Signalling only: extra sizes that share the Insulation pool. */
+  const [stockInsulationExtras, setStockInsulationExtras] = useState<
+    Array<{
+      id: string;
+      size: string;
+      sizeOther: string;
+      /** Numeric length only; unit is separate. */
+      lengthValue: string;
+      lengthUnit: InsulationLengthUnit;
+      lengthUnitOther: string;
+      layingProduced: string;
+    }>
+  >([]);
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
@@ -622,6 +641,7 @@ export function TodayHub({
       setStockCableSizeOther("");
     }
     setStockProcessQtys({});
+    setStockInsulationExtras([]);
   }, [isQuad, stockKind, stockCable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolvedQuadCableName =
@@ -631,6 +651,22 @@ export function TodayHub({
       ? stockCableSizeOther.trim()
       : stockCableSize.trim();
 
+  const isSignallingStock =
+    isQuad &&
+    stockKind === "cable" &&
+    isSignallingCableName(resolvedQuadCableName || stockCable);
+
+  useEffect(() => {
+    if (!isSignallingStock) return;
+    setStockInsulationExtras((prev) =>
+      prev.filter((row) => {
+        const name =
+          row.size === "Other" ? row.sizeOther.trim() : row.size.trim();
+        return name !== resolvedQuadSizeName;
+      }),
+    );
+  }, [isSignallingStock, resolvedQuadSizeName]);
+
   useEffect(() => {
     if (!isQuad || stockKind !== "cable") {
       setStockWipOpening({});
@@ -639,6 +675,7 @@ export function TodayHub({
       setStockWipSalesLines([]);
       setStockLengthOptions([]);
       setStockLengthFactor(null);
+      setStockInsulationExtras([]);
       return;
     }
     if (!resolvedQuadCableName || !resolvedQuadSizeName) return;
@@ -751,6 +788,50 @@ export function TodayHub({
       stockLengthFactor != null && Number.isFinite(stockLengthFactor)
         ? stockLengthFactor
         : variant.lengthFactor;
+
+    let insulationConsumedOverride: number | undefined;
+    if (isSignallingCableName(resolvedQuadCableName)) {
+      const sizeRows: Array<{
+        size: string;
+        layingProduced: number;
+        coreCount: number;
+        lengthFactor: number;
+      }> = [
+        {
+          size: resolvedQuadSizeName,
+          layingProduced: production.Laying ?? 0,
+          coreCount: variant.coreCount,
+          lengthFactor,
+        },
+      ];
+      for (const extra of stockInsulationExtras) {
+        const sizeName =
+          extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
+        if (!sizeName) continue;
+        const ev = resolveQuadSignalVariant(sizeName);
+        if (!ev) continue;
+        const lf = lengthValueToFactor(extra.lengthValue, extra.lengthUnit);
+        if (lf == null) continue;
+        const layRaw = extra.layingProduced.trim();
+        const lay =
+          layRaw === "" || layRaw === "."
+            ? 0
+            : Number(layRaw);
+        sizeRows.push({
+          size: sizeName,
+          layingProduced: Number.isFinite(lay) && lay >= 0 ? lay : 0,
+          coreCount: ev.coreCount,
+          lengthFactor: lf,
+        });
+      }
+      const shared = calculateSharedSignallingInsulation({
+        opening: opening.Insulation ?? 0,
+        production: production.Insulation ?? 0,
+        sizes: sizeRows,
+      });
+      insulationConsumedOverride = shared.consumed;
+    }
+
     return calculateQuadSignalWip({
       processes: quadCableProcessFields,
       opening,
@@ -758,6 +839,7 @@ export function TodayHub({
       salesKm: stockWipSalesKm,
       coreCount: variant.coreCount,
       lengthFactor,
+      insulationConsumedOverride,
     });
   }, [
     isQuad,
@@ -766,8 +848,10 @@ export function TodayHub({
     stockProcessQtys,
     stockWipOpening,
     stockWipSalesKm,
+    resolvedQuadCableName,
     resolvedQuadSizeName,
     stockLengthFactor,
+    stockInsulationExtras,
   ]);
 
   useEffect(() => {
@@ -1485,6 +1569,108 @@ export function TodayHub({
           const selectedLengthLabel =
             stockLengthOptions.find((o) => o.lengthFactor === lengthFactor)
               ?.label ?? variant.drumLabel;
+
+          let insulationConsumedOverride: number | undefined;
+          let sharedInsulationMeta:
+            | {
+                consumed: number;
+                closing: number;
+                contributions: Array<{
+                  size: string;
+                  layingProduced: number;
+                  coreCount: number;
+                  lengthFactor: number;
+                  consumed: number;
+                }>;
+              }
+            | undefined;
+
+          if (isSignallingCableName(resolvedCable)) {
+            const sizeRows: Array<{
+              size: string;
+              layingProduced: number;
+              coreCount: number;
+              lengthFactor: number;
+            }> = [
+              {
+                size: resolvedSize,
+                layingProduced: processes.Laying ?? 0,
+                coreCount: variant.coreCount,
+                lengthFactor,
+              },
+            ];
+            for (const extra of stockInsulationExtras) {
+              const sizeName =
+                extra.size === "Other"
+                  ? extra.sizeOther.trim()
+                  : extra.size.trim();
+              if (!sizeName) {
+                fail("Select a size for each extra Insulation row.");
+                return;
+              }
+              if (sizeName === resolvedSize) {
+                fail(
+                  "Extra Insulation size must differ from the primary size.",
+                );
+                return;
+              }
+              const ev = resolveQuadSignalVariant(sizeName);
+              if (!ev) {
+                fail(
+                  `Could not resolve core count for ${sizeName}.`,
+                );
+                return;
+              }
+              const lf = lengthValueToFactor(
+                extra.lengthValue,
+                extra.lengthUnit,
+              );
+              if (lf == null) {
+                fail(
+                  `Enter length and unit (KM / Meter / Other) for ${sizeName}.`,
+                );
+                return;
+              }
+              if (
+                extra.lengthUnit === "other" &&
+                !extra.lengthUnitOther.trim()
+              ) {
+                fail(`Enter the other unit name for ${sizeName}.`);
+                return;
+              }
+              const layRaw = extra.layingProduced.trim();
+              const lay =
+                layRaw === "" || layRaw === "." ? 0 : Number(layRaw);
+              if (!Number.isFinite(lay) || lay < 0) {
+                fail(
+                  `Laying production for ${sizeName} must be a number ≥ 0.`,
+                );
+                return;
+              }
+              sizeRows.push({
+                size: sizeName,
+                layingProduced: lay,
+                coreCount: ev.coreCount,
+                lengthFactor: lf,
+              });
+            }
+            const shared = calculateSharedSignallingInsulation({
+              opening: openingQty.Insulation ?? 0,
+              production: processes.Insulation ?? 0,
+              sizes: sizeRows,
+            });
+            insulationConsumedOverride = shared.consumed;
+            sharedInsulationMeta = {
+              consumed: shared.consumed,
+              closing: shared.closing,
+              contributions: shared.contributions,
+            };
+            if (shared.warnings.length > 0) {
+              fail(shared.warnings[0] ?? "Insulation validation failed.");
+              return;
+            }
+          }
+
           const wip = calculateQuadSignalWip({
             processes: quadCableProcessFields,
             opening: openingQty,
@@ -1492,6 +1678,7 @@ export function TodayHub({
             salesKm: stockWipSalesKm,
             coreCount: variant.coreCount,
             lengthFactor,
+            insulationConsumedOverride,
           });
           if (wip.warnings.length > 0) {
             fail(wip.warnings[0] ?? "WIP validation failed.");
@@ -1525,6 +1712,9 @@ export function TodayHub({
                   ...wip.calcSnapshot,
                   drumLabel: selectedLengthLabel,
                 },
+                ...(sharedInsulationMeta
+                  ? { sharedInsulation: sharedInsulationMeta }
+                  : {}),
               },
               stockNotes.trim() || `Closing stock as on ${entryDate}`,
             ),
@@ -2454,40 +2644,42 @@ export function TodayHub({
                 ) : null}
                 {isQuad ? (
                   <>
-                    <div className="field">
-                      <label htmlFor="st-kind">Stock type</label>
-                      <SelectMenu
-                        id="st-kind"
-                        value={
-                          stockKind === "cable" ? "Cable" : "Raw Material"
-                        }
-                        options={["Raw Material", "Cable"]}
-                        required
-                        onChange={(next) => {
-                          setStockKind(next === "Cable" ? "cable" : "raw");
-                          setStockProcessQtys({});
-                        }}
-                      />
-                    </div>
                     {stockKind === "raw" ? (
                       <>
-                        <div className="field">
-                          <label htmlFor="st-item">Raw Material</label>
-                          <SelectMenu
-                            id="st-item"
-                            value={stockItem || stockParticulars[0]}
-                            options={stockParticulars}
-                            required
-                            onChange={(next) => {
-                              setStockItem(next);
-                              if (
-                                next !== "Others" &&
-                                next !== "Other" &&
-                                next !== "others"
-                              )
-                                setStockItemOther("");
-                            }}
-                          />
+                        <div className="form-grid two">
+                          <div className="field">
+                            <label htmlFor="st-kind">Stock type</label>
+                            <SelectMenu
+                              id="st-kind"
+                              value="Raw Material"
+                              options={["Raw Material", "Cable"]}
+                              required
+                              onChange={(next) => {
+                                setStockKind(
+                                  next === "Cable" ? "cable" : "raw",
+                                );
+                                setStockProcessQtys({});
+                              }}
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="st-item">Raw Material</label>
+                            <SelectMenu
+                              id="st-item"
+                              value={stockItem || stockParticulars[0]}
+                              options={stockParticulars}
+                              required
+                              onChange={(next) => {
+                                setStockItem(next);
+                                if (
+                                  next !== "Others" &&
+                                  next !== "Other" &&
+                                  next !== "others"
+                                )
+                                  setStockItemOther("");
+                              }}
+                            />
+                          </div>
                         </div>
                         {stockItem === "Others" ||
                         stockItem === "Other" ||
@@ -2513,6 +2705,21 @@ export function TodayHub({
                       <>
                         <div className="form-grid two">
                           <div className="field">
+                            <label htmlFor="st-kind">Stock type</label>
+                            <SelectMenu
+                              id="st-kind"
+                              value="Cable"
+                              options={["Raw Material", "Cable"]}
+                              required
+                              onChange={(next) => {
+                                setStockKind(
+                                  next === "Cable" ? "cable" : "raw",
+                                );
+                                setStockProcessQtys({});
+                              }}
+                            />
+                          </div>
+                          <div className="field">
                             <label htmlFor="st-cable">Cable</label>
                             <SelectMenu
                               id="st-cable"
@@ -2525,6 +2732,8 @@ export function TodayHub({
                               }}
                             />
                           </div>
+                        </div>
+                        <div className="form-grid two">
                           <div className="field">
                             <label htmlFor="st-cable-size">Size</label>
                             <SelectMenu
@@ -2539,6 +2748,35 @@ export function TodayHub({
                               }}
                             />
                           </div>
+                          {stockLengthOptions.length > 0 ? (
+                            <div className="field qs-wip__drum">
+                              <label htmlFor="st-drum-len">
+                                Drum / coil length
+                              </label>
+                              <SelectMenu
+                                id="st-drum-len"
+                                value={
+                                  stockLengthOptions.find(
+                                    (o) =>
+                                      o.lengthFactor === stockLengthFactor,
+                                  )?.label ??
+                                  stockLengthOptions[0]?.label ??
+                                  ""
+                                }
+                                options={stockLengthOptions.map((o) => o.label)}
+                                required
+                                onChange={(next) => {
+                                  const opt = stockLengthOptions.find(
+                                    (o) => o.label === next,
+                                  );
+                                  if (opt)
+                                    setStockLengthFactor(opt.lengthFactor);
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="field" aria-hidden />
+                          )}
                         </div>
                         {stockCable === "Other" ? (
                           <div className="field">
@@ -2576,119 +2814,504 @@ export function TodayHub({
                         ) : null}
                         {quadCableProcessFields.length > 0 ? (
                           <div className="field qs-wip">
-                            {stockLengthOptions.length > 0 ? (
-                              <div className="field">
-                                <label htmlFor="st-drum-len">
-                                  Drum / coil length
-                                </label>
-                                <SelectMenu
-                                  id="st-drum-len"
-                                  value={
-                                    stockLengthOptions.find(
-                                      (o) =>
-                                        o.lengthFactor === stockLengthFactor,
-                                    )?.label ??
-                                    stockLengthOptions[0]?.label ??
-                                    ""
-                                  }
-                                  options={stockLengthOptions.map(
-                                    (o) => o.label,
-                                  )}
-                                  required
-                                  onChange={(next) => {
-                                    const opt = stockLengthOptions.find(
-                                      (o) => o.label === next,
-                                    );
-                                    if (opt)
-                                      setStockLengthFactor(opt.lengthFactor);
-                                  }}
-                                />
-                              </div>
-                            ) : null}
-                            <div className="qs-wip__table-wrap">
-                              <table className="qs-wip__table">
-                                <thead>
-                                  <tr>
-                                    <th>Process</th>
-                                    <th>Opening</th>
-                                    <th>Production</th>
-                                    <th>Out / Sales</th>
-                                    <th>Closing</th>
+                            {(() => {
+                              const renderProcessRow = (
+                                proc: string,
+                                opts?: { hideProcessLabel?: boolean },
+                              ) => {
+                                const stage = stockWipCalc?.stages.find(
+                                  (s) => s.process === proc,
+                                );
+                                const outLabel =
+                                  stage?.outboundKind === "sales"
+                                    ? `Sales ${stage.outbound}`
+                                    : stage?.outboundKind ===
+                                        "insulation_to_laying"
+                                      ? `→ Lay ${stage.outbound}`
+                                      : stage?.outboundKind === "next_process"
+                                        ? String(stage.outbound)
+                                        : stage != null
+                                          ? String(stage.outbound)
+                                          : "—";
+                                const openingVal =
+                                  stage?.opening ??
+                                  (stockWipOpening[proc]?.trim()
+                                    ? Number(stockWipOpening[proc])
+                                    : 0);
+                                return (
+                                  <tr key={proc}>
+                                    {opts?.hideProcessLabel ? null : (
+                                      <td>{proc}</td>
+                                    )}
+                                    <td className="qs-wip__num">
+                                      {stockOpeningEditable ? (
+                                        <DecimalInput
+                                          id={`st-open-${proc}`}
+                                          value={stockWipOpening[proc] ?? ""}
+                                          onChange={(next) =>
+                                            setStockWipOpening((prev) => ({
+                                              ...prev,
+                                              [proc]: next,
+                                            }))
+                                          }
+                                          placeholder="0"
+                                        />
+                                      ) : (
+                                        openingVal
+                                      )}
+                                    </td>
+                                    <td>
+                                      <DecimalInput
+                                        id={`st-proc-${proc}`}
+                                        value={stockProcessQtys[proc] ?? ""}
+                                        onChange={(next) =>
+                                          setStockProcessQtys((prev) => ({
+                                            ...prev,
+                                            [proc]: next,
+                                          }))
+                                        }
+                                        placeholder="0"
+                                      />
+                                    </td>
+                                    <td className="qs-wip__num qs-wip__calc">
+                                      {outLabel}
+                                    </td>
+                                    <td className="qs-wip__num qs-wip__calc">
+                                      {stage != null
+                                        ? String(stage.closing)
+                                        : "—"}
+                                    </td>
                                   </tr>
-                                </thead>
-                                <tbody>
-                                  {quadCableProcessFields.map((proc) => {
-                                    const stage = stockWipCalc?.stages.find(
-                                      (s) => s.process === proc,
-                                    );
-                                    const outLabel =
-                                      stage?.outboundKind === "sales"
-                                        ? `Sales ${stage.outbound}`
-                                        : stage?.outboundKind ===
-                                            "insulation_to_laying"
-                                          ? `→ Lay ${stage.outbound}`
-                                          : stage?.outboundKind ===
-                                              "next_process"
-                                            ? String(stage.outbound)
-                                            : stage != null
-                                              ? String(stage.outbound)
-                                              : "—";
-                                    const openingVal =
-                                      stage?.opening ??
-                                      (stockWipOpening[proc]?.trim()
-                                        ? Number(stockWipOpening[proc])
-                                        : 0);
-                                    return (
-                                      <tr key={proc}>
-                                        <td>{proc}</td>
-                                        <td className="qs-wip__num">
-                                          {stockOpeningEditable ? (
-                                            <DecimalInput
-                                              id={`st-open-${proc}`}
-                                              value={
-                                                stockWipOpening[proc] ?? ""
-                                              }
-                                              onChange={(next) =>
-                                                setStockWipOpening((prev) => ({
-                                                  ...prev,
-                                                  [proc]: next,
-                                                }))
-                                              }
-                                              placeholder="0"
-                                            />
-                                          ) : (
-                                            openingVal
+                                );
+                              };
+
+                              const otherProcesses = isSignallingStock
+                                ? quadCableProcessFields.filter(
+                                    (p) => p.toLowerCase() !== "insulation",
+                                  )
+                                : quadCableProcessFields;
+
+                              const addInsulationExtra = () => {
+                                setStockInsulationExtras((prev) => {
+                                  const size =
+                                    getQuadSignalCableSizes(
+                                      "Signalling Cable",
+                                    ).find(
+                                      (s) =>
+                                        s !== "Other" &&
+                                        s !== resolvedQuadSizeName &&
+                                        !prev.some((p) => p.size === s),
+                                    ) ?? "Other";
+                                  return [
+                                    ...prev,
+                                    {
+                                      id: `ins-extra-${Date.now()}-${prev.length}`,
+                                      size,
+                                      sizeOther: "",
+                                      lengthValue: "",
+                                      lengthUnit: "km" as const,
+                                      lengthUnitOther: "",
+                                      layingProduced: "",
+                                    },
+                                  ];
+                                });
+                              };
+
+                              const insSizeOpts = [
+                                ...getQuadSignalCableSizes("Signalling Cable"),
+                              ].filter(
+                                (s) =>
+                                  s === "Other" || s !== resolvedQuadSizeName,
+                              );
+
+                              if (isSignallingStock) {
+                                const insStage = stockWipCalc?.stages.find(
+                                  (s) =>
+                                    s.process.toLowerCase() === "insulation",
+                                );
+                                return (
+                                  <>
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Insulation
+                                        </h4>
+                                        <button
+                                          type="button"
+                                          className="qs-wip__ins-add"
+                                          aria-label="Add size for Insulation"
+                                          title="Add size"
+                                          onClick={addInsulationExtra}
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <p className="qs-wip__box-note">
+                                        Common across all Signalling sizes.
+                                        Enter Insulation first, then + to add
+                                        other sizes (unit, laying).
+                                      </p>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {renderProcessRow("Insulation", {
+                                              hideProcessLabel: true,
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      {stockInsulationExtras.length > 0 ? (
+                                        <div className="qs-wip__ins-extras">
+                                          {stockInsulationExtras.map(
+                                            (extra) => {
+                                              const sizeName =
+                                                extra.size === "Other"
+                                                  ? extra.sizeOther.trim()
+                                                  : extra.size.trim();
+                                              const ev = sizeName
+                                                ? resolveQuadSignalVariant(
+                                                    sizeName,
+                                                  )
+                                                : null;
+                                              const lf = lengthValueToFactor(
+                                                extra.lengthValue,
+                                                extra.lengthUnit,
+                                              );
+                                              const layRaw =
+                                                extra.layingProduced.trim();
+                                              const lay =
+                                                layRaw === "" ||
+                                                layRaw === "."
+                                                  ? 0
+                                                  : Number(layRaw);
+                                              const rowConsumed =
+                                                ev &&
+                                                lf != null &&
+                                                Number.isFinite(lay) &&
+                                                lay >= 0
+                                                  ? insulationConsumedFromLaying(
+                                                      {
+                                                        layingProduced: lay,
+                                                        coreCount:
+                                                          ev.coreCount,
+                                                        lengthFactor: lf,
+                                                      },
+                                                    )
+                                                  : 0;
+                                              return (
+                                                <div
+                                                  key={extra.id}
+                                                  className="qs-wip__ins-extra-line"
+                                                >
+                                                  <div className="qs-wip__ins-extra-grid">
+                                                    <div className="field">
+                                                      <label>Cable size</label>
+                                                      <SelectMenu
+                                                        value={extra.size}
+                                                        options={insSizeOpts}
+                                                        required
+                                                        onChange={(next) => {
+                                                          setStockInsulationExtras(
+                                                            (prev) =>
+                                                              prev.map(
+                                                                (row) =>
+                                                                  row.id ===
+                                                                  extra.id
+                                                                    ? {
+                                                                        ...row,
+                                                                        size: next,
+                                                                        sizeOther:
+                                                                          next ===
+                                                                          "Other"
+                                                                            ? row.sizeOther
+                                                                            : "",
+                                                                      }
+                                                                    : row,
+                                                              ),
+                                                          );
+                                                        }}
+                                                      />
+                                                    </div>
+                                                    {extra.size === "Other" ? (
+                                                      <div className="field">
+                                                        <label>
+                                                          Other size
+                                                        </label>
+                                                        <input
+                                                          required
+                                                          placeholder="Other size"
+                                                          value={
+                                                            extra.sizeOther
+                                                          }
+                                                          onChange={(e) =>
+                                                            setStockInsulationExtras(
+                                                              (prev) =>
+                                                                prev.map(
+                                                                  (row) =>
+                                                                    row.id ===
+                                                                    extra.id
+                                                                      ? {
+                                                                          ...row,
+                                                                          sizeOther:
+                                                                            e
+                                                                              .target
+                                                                              .value,
+                                                                        }
+                                                                      : row,
+                                                                ),
+                                                            )
+                                                          }
+                                                        />
+                                                      </div>
+                                                    ) : null}
+                                                    <div className="field">
+                                                      <label>Length</label>
+                                                      <DecimalInput
+                                                        value={
+                                                          extra.lengthValue
+                                                        }
+                                                        onChange={(next) =>
+                                                          setStockInsulationExtras(
+                                                            (prev) =>
+                                                              prev.map(
+                                                                (row) =>
+                                                                  row.id ===
+                                                                  extra.id
+                                                                    ? {
+                                                                        ...row,
+                                                                        lengthValue:
+                                                                          next,
+                                                                      }
+                                                                    : row,
+                                                              ),
+                                                          )
+                                                        }
+                                                        placeholder="1.4"
+                                                        aria-label="Length"
+                                                      />
+                                                    </div>
+                                                    <div className="field qs-wip__ins-unit-field">
+                                                      <label>Unit</label>
+                                                      <SelectMenu
+                                                        value={
+                                                          extra.lengthUnit
+                                                        }
+                                                        items={[
+                                                          ...INSULATION_LENGTH_UNIT_ITEMS,
+                                                        ]}
+                                                        required
+                                                        onChange={(next) => {
+                                                          if (
+                                                            next !== "km" &&
+                                                            next !== "m" &&
+                                                            next !== "other"
+                                                          )
+                                                            return;
+                                                          setStockInsulationExtras(
+                                                            (prev) =>
+                                                              prev.map(
+                                                                (row) =>
+                                                                  row.id ===
+                                                                  extra.id
+                                                                    ? {
+                                                                        ...row,
+                                                                        lengthUnit:
+                                                                          next,
+                                                                        lengthUnitOther:
+                                                                          next ===
+                                                                          "other"
+                                                                            ? row.lengthUnitOther
+                                                                            : "",
+                                                                      }
+                                                                    : row,
+                                                              ),
+                                                          );
+                                                        }}
+                                                      />
+                                                    </div>
+                                                    {extra.lengthUnit ===
+                                                    "other" ? (
+                                                      <div className="field">
+                                                        <label>
+                                                          Other unit
+                                                        </label>
+                                                        <input
+                                                          required
+                                                          placeholder="Enter unit"
+                                                          value={
+                                                            extra.lengthUnitOther
+                                                          }
+                                                          onChange={(e) =>
+                                                            setStockInsulationExtras(
+                                                              (prev) =>
+                                                                prev.map(
+                                                                  (row) =>
+                                                                    row.id ===
+                                                                    extra.id
+                                                                      ? {
+                                                                          ...row,
+                                                                          lengthUnitOther:
+                                                                            e
+                                                                              .target
+                                                                              .value,
+                                                                        }
+                                                                      : row,
+                                                                ),
+                                                            )
+                                                          }
+                                                        />
+                                                      </div>
+                                                    ) : null}
+                                                    <div className="field">
+                                                      <label>Laying</label>
+                                                      <DecimalInput
+                                                        value={
+                                                          extra.layingProduced
+                                                        }
+                                                        onChange={(next) =>
+                                                          setStockInsulationExtras(
+                                                            (prev) =>
+                                                              prev.map(
+                                                                (row) =>
+                                                                  row.id ===
+                                                                  extra.id
+                                                                    ? {
+                                                                        ...row,
+                                                                        layingProduced:
+                                                                          next,
+                                                                      }
+                                                                    : row,
+                                                              ),
+                                                          )
+                                                        }
+                                                        placeholder="0"
+                                                      />
+                                                    </div>
+                                                    <div className="field qs-wip__ins-total-field">
+                                                      <label>Total</label>
+                                                      <div className="qs-wip__ins-total-line">
+                                                        <span className="qs-wip__ins-row-total qs-wip__calc">
+                                                          {rowConsumed}
+                                                        </span>
+                                                        <button
+                                                          type="button"
+                                                          className="qs-wip__ins-remove"
+                                                          aria-label="Remove size"
+                                                          title="Remove"
+                                                          onClick={() =>
+                                                            setStockInsulationExtras(
+                                                              (prev) =>
+                                                                prev.filter(
+                                                                  (row) =>
+                                                                    row.id !==
+                                                                    extra.id,
+                                                                ),
+                                                            )
+                                                          }
+                                                        >
+                                                          <svg
+                                                            viewBox="0 0 16 16"
+                                                            width="10"
+                                                            height="10"
+                                                            aria-hidden
+                                                          >
+                                                            <path
+                                                              d="M4 4l8 8M12 4l-8 8"
+                                                              fill="none"
+                                                              stroke="currentColor"
+                                                              strokeWidth="2"
+                                                              strokeLinecap="round"
+                                                            />
+                                                          </svg>
+                                                        </button>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            },
                                           )}
-                                        </td>
-                                        <td>
-                                          <DecimalInput
-                                            id={`st-proc-${proc}`}
-                                            value={
-                                              stockProcessQtys[proc] ?? ""
-                                            }
-                                            onChange={(next) =>
-                                              setStockProcessQtys((prev) => ({
-                                                ...prev,
-                                                [proc]: next,
-                                              }))
-                                            }
-                                            placeholder="0"
-                                          />
-                                        </td>
-                                        <td className="qs-wip__num">
-                                          {outLabel}
-                                        </td>
-                                        <td className="qs-wip__num">
-                                          {stage != null
-                                            ? String(stage.closing)
-                                            : "—"}
-                                        </td>
+                                          {stockWipCalc != null ? (
+                                            <div className="qs-wip__ins-extras-foot">
+                                              Total insulation out:{" "}
+                                              <span className="qs-wip__calc">
+                                                {
+                                                  stockWipCalc.insulationConsumed
+                                                }
+                                              </span>
+                                              {insStage != null ? (
+                                                <>
+                                                  {" "}
+                                                  · Closing{" "}
+                                                  <span className="qs-wip__calc">
+                                                    {insStage.closing}
+                                                  </span>
+                                                </>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Laying → Outer Sheath
+                                        </h4>
+                                      </div>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Process</th>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out / Sales</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {otherProcesses.map((proc) =>
+                                              renderProcessRow(proc),
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              }
+
+                              return (
+                                <div className="qs-wip__table-wrap">
+                                  <table className="qs-wip__table">
+                                    <thead>
+                                      <tr>
+                                        <th>Process</th>
+                                        <th>Opening</th>
+                                        <th>Production</th>
+                                        <th>Out / Sales</th>
+                                        <th>Closing</th>
                                       </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
+                                    </thead>
+                                    <tbody>
+                                      {quadCableProcessFields.map((proc) =>
+                                        renderProcessRow(proc),
+                                      )}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              );
+                            })()}
                             <div className="qs-wip__sales">
                               <div className="field">
                                 <label>Sales</label>

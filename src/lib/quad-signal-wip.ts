@@ -239,6 +239,11 @@ export type WipCalcInput = {
   salesKm: number;
   coreCount: number;
   lengthFactor: number;
+  /**
+   * When set (Signalling multi-size), Insulation outbound uses this total
+   * instead of primary-size laying × cores × factor alone.
+   */
+  insulationConsumedOverride?: number;
 };
 
 export type WipCalcResult = {
@@ -257,9 +262,144 @@ export type WipCalcResult = {
   };
 };
 
+/**
+ * Insulation wire km consumed by laying (existing plant formula).
+ * consumed = layingProduced × coreCount × lengthFactor
+ */
+export function insulationConsumedFromLaying(params: {
+  layingProduced: number;
+  coreCount: number;
+  lengthFactor: number;
+}): number {
+  const laying = Number(params.layingProduced);
+  const cores = Number(params.coreCount);
+  const factor = Number(params.lengthFactor);
+  if (
+    !Number.isFinite(laying) ||
+    !Number.isFinite(cores) ||
+    !Number.isFinite(factor) ||
+    laying < 0 ||
+    cores <= 0 ||
+    factor <= 0
+  ) {
+    return 0;
+  }
+  return round4(laying * cores * factor);
+}
+
+export type SharedInsulationSizeContribution = {
+  size: string;
+  layingProduced: number;
+  coreCount: number;
+  lengthFactor: number;
+  /** laying × cores × lengthFactor */
+  consumed: number;
+};
+
+/**
+ * Signalling Cable: Insulation is one common pool across sizes.
+ * Deduction = Σ (laying_s × cores_s × factor_s) — same formula as single-size WIP.
+ */
+export function calculateSharedSignallingInsulation(params: {
+  opening: number;
+  production: number;
+  sizes: Array<{
+    size: string;
+    layingProduced: number;
+    coreCount: number;
+    lengthFactor: number;
+  }>;
+}): {
+  opening: number;
+  production: number;
+  consumed: number;
+  closing: number;
+  contributions: SharedInsulationSizeContribution[];
+  warnings: string[];
+} {
+  const opening = Math.max(0, Number(params.opening) || 0);
+  const production = Math.max(0, Number(params.production) || 0);
+  const contributions: SharedInsulationSizeContribution[] = params.sizes.map(
+    (s) => {
+      const consumed = insulationConsumedFromLaying({
+        layingProduced: s.layingProduced,
+        coreCount: s.coreCount,
+        lengthFactor: s.lengthFactor,
+      });
+      return {
+        size: s.size,
+        layingProduced: Number(s.layingProduced) || 0,
+        coreCount: s.coreCount,
+        lengthFactor: s.lengthFactor,
+        consumed,
+      };
+    },
+  );
+  const consumed = round4(
+    contributions.reduce((sum, c) => sum + c.consumed, 0),
+  );
+  const available = opening + production;
+  const warnings: string[] = [];
+  if (consumed > available + 1e-9) {
+    warnings.push(
+      `Insulation: outbound ${consumed} exceeds available ${round4(available)}.`,
+    );
+  }
+  return {
+    opening,
+    production,
+    consumed,
+    closing: round4(opening + production - consumed),
+    contributions,
+    warnings,
+  };
+}
+
+export function isSignallingCableName(cable: string): boolean {
+  return cable.trim().toLowerCase() === "signalling cable";
+}
+
+/**
+ * Length value + explicit unit → insulation length factor (km).
+ * Meter → ÷1000; KM / Other → as entered.
+ */
+export type InsulationLengthUnit = "km" | "m" | "other";
+
+export const INSULATION_LENGTH_UNIT_ITEMS = [
+  { value: "km", label: "KM" },
+  { value: "m", label: "Meter" },
+  { value: "other", label: "Other" },
+] as const;
+
+export function lengthValueToFactor(
+  rawValue: string,
+  unit: InsulationLengthUnit,
+): number | null {
+  const s = rawValue.trim().replace(/,/g, "");
+  if (!s || s === ".") return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || n < 0) return null;
+  if (unit === "m") return round4(n / 1000);
+  // KM and Other: value is used directly as the length factor
+  return n;
+}
+
+/** @deprecated Prefer lengthValueToFactor with an explicit unit. */
+export function parseManualLengthFactor(raw: string): number | null {
+  const s = raw.trim().toLowerCase().replace(/,/g, "");
+  if (!s) return null;
+  const mtr = s.match(/^(\d+(?:\.\d+)?)\s*(mtr|meters?|metres?|m)\s*$/i);
+  if (mtr) return lengthValueToFactor(mtr[1]!, "m");
+  const km = s.match(/^(\d+(?:\.\d+)?)\s*(km|kilometers?|kilometres?)?\s*$/i);
+  if (km) return lengthValueToFactor(km[1]!, "km");
+  return null;
+}
+
 function num(map: ProcessQtyMap, key: string): number {
   const v = map[key];
-  return v != null && Number.isFinite(v) ? v : 0;
+  if (v == null || v === ("" as unknown as number)) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 function round4(n: number): number {
@@ -278,8 +418,15 @@ export function displayKm(n: number): number {
  * Final stage: close = open + prod − salesKm
  */
 export function calculateQuadSignalWip(input: WipCalcInput): WipCalcResult {
-  const { processes, opening, production, salesKm, coreCount, lengthFactor } =
-    input;
+  const {
+    processes,
+    opening,
+    production,
+    salesKm,
+    coreCount,
+    lengthFactor,
+    insulationConsumedOverride,
+  } = input;
   const warnings: string[] = [];
   const stages: WipStageResult[] = [];
   const byProcess: ProcessQtyMap = {};
@@ -312,10 +459,20 @@ export function calculateQuadSignalWip(input: WipCalcInput): WipCalcResult {
 
   const layingProduced =
     layingIdx >= 0 ? num(production, processes[layingIdx]!) : 0;
-  const insulationConsumed =
+  const insulationConsumedFromPrimary =
     insulationIdx >= 0 && layingIdx >= 0
-      ? round4(layingProduced * coreCount * lengthFactor)
+      ? insulationConsumedFromLaying({
+          layingProduced,
+          coreCount,
+          lengthFactor,
+        })
       : 0;
+  const insulationConsumed =
+    insulationConsumedOverride != null &&
+    Number.isFinite(insulationConsumedOverride) &&
+    insulationConsumedOverride >= 0
+      ? round4(insulationConsumedOverride)
+      : insulationConsumedFromPrimary;
 
   for (let i = 0; i < processes.length; i++) {
     const process = processes[i]!;

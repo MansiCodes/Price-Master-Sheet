@@ -411,6 +411,21 @@ export type QuadSignalStockMeta = {
     salesKm: number;
     drumLabel?: string;
   };
+  /**
+   * Signalling Cable only: Insulation is one pool across sizes.
+   * Extra size rows contribute laying×cores×factor to the shared deduction.
+   */
+  sharedInsulation?: {
+    consumed: number;
+    closing: number;
+    contributions: Array<{
+      size: string;
+      layingProduced: number;
+      coreCount: number;
+      lengthFactor: number;
+      consumed: number;
+    }>;
+  };
 };
 
 const QS_STOCK_PREFIX = "QSSTOCK:";
