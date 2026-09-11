@@ -76,6 +76,35 @@ function insulationClosingFromMeta(
   return null;
 }
 
+/**
+ * Prefer newest Signalling entry with sharedInsulation.closing (multi-size total).
+ * Else newest Insulation closing. rows must be newest-first.
+ */
+function findLatestSharedInsulationOpening(
+  rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
+): { value: number; fromDate: string | null } | null {
+  for (const row of rows) {
+    const sig = matchesSignallingCable(row);
+    if (!sig.match || !sig.meta?.sharedInsulation) continue;
+    if (!Number.isFinite(sig.meta.sharedInsulation.closing)) continue;
+    return {
+      value: Number(sig.meta.sharedInsulation.closing),
+      fromDate: row.date ? row.date.toISOString().slice(0, 10) : null,
+    };
+  }
+  for (const row of rows) {
+    const sig = matchesSignallingCable(row);
+    if (!sig.match) continue;
+    const ins = insulationClosingFromMeta(sig.meta);
+    if (ins == null) continue;
+    return {
+      value: ins,
+      fromDate: row.date ? row.date.toISOString().slice(0, 10) : null,
+    };
+  }
+  return null;
+}
+
 function recomputeCableNotesWithOpening(
   meta: QuadSignalStockMeta,
   userNotes: string,
@@ -146,12 +175,12 @@ function recomputeCableNotesWithOpening(
 
 /**
  * Opening WIP for Quad/Signal cable stock.
- * Default: editable only once (first entry per cable+size).
- * Designated editor may always override Opening; next day still uses this
- * entry's Closing as Opening.
  *
- * Signalling Cable: Insulation opening is shared across sizes (latest
- * Signalling entry's Insulation closing), while other stages stay size-specific.
+ * Signalling Insulation is one pool for the day:
+ * - Once any Signalling size saves Insulation today, later sizes use that
+ *   entry's Insulation CLOSING (e.g. 227.24), not an older size-specific
+ *   opening (e.g. yesterday's 46).
+ * - Other stages (Laying → Outer) stay size-specific from that size's prior closing.
  */
 export async function resolveQuadSignalStockOpening(params: {
   plantIds: string[];
@@ -166,143 +195,99 @@ export async function resolveQuadSignalStockOpening(params: {
   const itemName = `${cable} · ${size}`;
   const signalling = isSignallingCableName(cable);
 
-  const priorRows = await prisma.stockEntry.findMany({
-    where: {
-      ...pScope,
-      date: { lt: day },
-      category: "FG",
-      OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    take: 80,
-    select: { id: true, date: true, itemName: true, notes: true },
-  });
+  const [priorRows, sameDayRows] = await Promise.all([
+    prisma.stockEntry.findMany({
+      where: {
+        ...pScope,
+        date: { lt: day },
+        category: "FG",
+        OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 80,
+      select: { id: true, date: true, itemName: true, notes: true },
+    }),
+    prisma.stockEntry.findMany({
+      where: {
+        ...pScope,
+        date: day,
+        category: "FG",
+        OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
+      },
+      orderBy: [{ createdAt: "desc" }],
+      take: 80,
+      select: { id: true, date: true, itemName: true, notes: true },
+    }),
+  ]);
 
   let sizeOpening: Record<string, number> | null = null;
   let sizeOpeningFromDate: string | null = null;
-  let sharedInsulationOpening: number | null = null;
-  let sharedInsulationFromDate: string | null = null;
-
-  for (const row of priorRows) {
-    const { match, meta } = matchesCableSize(row, cable, size, itemName);
-    if (match && sizeOpening == null) {
-      sizeOpening = quadSignalClosingFromMeta(meta);
-      sizeOpeningFromDate = row.date.toISOString().slice(0, 10);
-    }
-    if (signalling && sharedInsulationOpening == null) {
-      const sig = matchesSignallingCable(row);
-      if (sig.match) {
-        const ins = insulationClosingFromMeta(sig.meta ?? meta);
-        if (ins != null) {
-          sharedInsulationOpening = ins;
-          sharedInsulationFromDate = row.date.toISOString().slice(0, 10);
-        }
-      }
-    }
-    if (
-      sizeOpening != null &&
-      (!signalling || sharedInsulationOpening != null)
-    ) {
-      break;
-    }
-  }
-
-  if (signalling && sharedInsulationOpening == null) {
-    for (const row of priorRows) {
-      const sig = matchesSignallingCable(row);
-      if (!sig.match) continue;
-      const ins = insulationClosingFromMeta(sig.meta);
-      if (ins != null) {
-        sharedInsulationOpening = ins;
-        sharedInsulationFromDate = row.date.toISOString().slice(0, 10);
-        break;
-      }
-    }
-  }
-
-  if (sizeOpening != null) {
-    const opening = { ...sizeOpening };
-    if (signalling && sharedInsulationOpening != null) {
-      opening[INSULATION_KEY] = sharedInsulationOpening;
-    }
-    return {
-      opening,
-      openingFromDate:
-        signalling && sharedInsulationFromDate
-          ? sharedInsulationFromDate
-          : sizeOpeningFromDate,
-      openingEditable: alwaysEditable,
-      sameDayEntryId: null,
-    };
-  }
-
-  // First entry for this size: still inherit shared Insulation if another size exists
-  if (signalling && sharedInsulationOpening != null) {
-    return {
-      opening: { [INSULATION_KEY]: sharedInsulationOpening },
-      openingFromDate: sharedInsulationFromDate,
-      openingEditable: alwaysEditable,
-      sameDayEntryId: null,
-    };
-  }
-
-  const sameDayRows = await prisma.stockEntry.findMany({
-    where: {
-      ...pScope,
-      date: day,
-      category: "FG",
-      OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
-    },
-    orderBy: [{ createdAt: "asc" }],
-    take: 80,
-    select: { id: true, itemName: true, notes: true },
-  });
+  let sameDayEntryId: string | null = null;
+  let sameDayOpening: Record<string, number> | null = null;
 
   for (const row of sameDayRows) {
     const { match, meta } = matchesCableSize(row, cable, size, itemName);
     if (!match) continue;
-    const opening = { ...(meta?.opening ?? {}) };
+    sameDayEntryId = row.id;
+    sameDayOpening = { ...(meta?.opening ?? {}) };
+    break;
+  }
+
+  for (const row of priorRows) {
+    const { match, meta } = matchesCableSize(row, cable, size, itemName);
+    if (!match) continue;
+    sizeOpening = quadSignalClosingFromMeta(meta);
+    sizeOpeningFromDate = row.date.toISOString().slice(0, 10);
+    break;
+  }
+
+  // Same-day shared Insulation CLOSING beats any prior-day Insulation value.
+  const sharedToday = signalling
+    ? findLatestSharedInsulationOpening(
+        sameDayEntryId
+          ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
+          : sameDayRows,
+      )
+    : null;
+  const sharedPrior = signalling
+    ? findLatestSharedInsulationOpening(priorRows)
+    : null;
+  const sharedIns = sharedToday ?? sharedPrior;
+
+  const hasSizeHistory = sizeOpening != null || sameDayEntryId != null;
+  const openingEditable =
+    alwaysEditable ||
+    (!hasSizeHistory && !(signalling && sharedToday != null));
+
+  let opening: Record<string, number> = {};
+  if (sameDayOpening && Object.keys(sameDayOpening).length > 0) {
+    opening = { ...sameDayOpening };
+  } else if (sizeOpening) {
+    opening = { ...sizeOpening };
+  }
+
+  if (signalling && sharedIns != null && !sameDayEntryId) {
+    // New size today: Insulation opening = today's shared closing (e.g. 227),
+    // never yesterday's size-specific closing (e.g. 46).
+    opening[INSULATION_KEY] = sharedIns.value;
+  }
+
+  if (Object.keys(opening).length === 0 && !sameDayEntryId) {
     return {
-      opening,
+      opening: {},
       openingFromDate: null,
-      openingEditable: alwaysEditable,
-      sameDayEntryId: row.id,
+      openingEditable: true,
+      sameDayEntryId: null,
     };
   }
 
-  if (signalling) {
-    // Same-day: another size may have seeded shared Insulation already
-    for (let i = sameDayRows.length - 1; i >= 0; i--) {
-      const row = sameDayRows[i]!;
-      const sig = matchesSignallingCable(row);
-      if (!sig.match) continue;
-      const openIns = sig.meta?.opening?.[INSULATION_KEY];
-      if (openIns != null && Number.isFinite(openIns)) {
-        return {
-          opening: { [INSULATION_KEY]: Number(openIns) },
-          openingFromDate: null,
-          // Shared Insulation already seeded today — lock unless override editor
-          openingEditable: alwaysEditable,
-          sameDayEntryId: null,
-        };
-      }
-      const closeIns = insulationClosingFromMeta(sig.meta);
-      if (closeIns != null) {
-        return {
-          opening: { [INSULATION_KEY]: closeIns },
-          openingFromDate: null,
-          openingEditable: alwaysEditable,
-          sameDayEntryId: null,
-        };
-      }
-    }
-  }
-
   return {
-    opening: {},
-    openingFromDate: null,
-    openingEditable: true,
-    sameDayEntryId: null,
+    opening,
+    openingFromDate: sharedToday
+      ? null
+      : (sharedIns?.fromDate ?? sizeOpeningFromDate),
+    openingEditable,
+    sameDayEntryId,
   };
 }
 
@@ -363,6 +348,22 @@ export async function applyQuadSignalOpeningLockToNotes(params: {
   }
 
   if (!mustLock) return notes;
+
+  // Always refresh Signalling Insulation from shared pool when locking
+  if (isSignallingCableName(cable)) {
+    const resolved = await resolveQuadSignalStockOpening({
+      plantIds,
+      day,
+      cable,
+      size,
+    });
+    if (resolved.opening[INSULATION_KEY] != null) {
+      opening = {
+        ...opening,
+        [INSULATION_KEY]: resolved.opening[INSULATION_KEY]!,
+      };
+    }
+  }
 
   return recomputeCableNotesWithOpening(meta, userNotes, opening);
 }

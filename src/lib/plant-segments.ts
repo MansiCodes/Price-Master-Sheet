@@ -201,8 +201,10 @@ byCode.set("SIGNALLING", byCode.get("QUAD")!);
 byCode.set("QUADSIGNAL", byCode.get("QUAD")!);
 
 export function getPlantSegment(code: string | null | undefined): PlantSegment | null {
-  if (!code) return null;
-  return byCode.get(code.trim().toUpperCase()) ?? null;
+  if (code == null || typeof code !== "string") return null;
+  const normalized = code.trim().toUpperCase();
+  if (!normalized) return null;
+  return byCode.get(normalized) ?? null;
 }
 
 /** Prefer catalog display name (e.g. merged Quad + Signal) over stale DB labels. */
@@ -210,6 +212,9 @@ export function getPlantDisplayName(
   code: string | null | undefined,
   fallbackName?: string | null,
 ): string {
+  if (code != null && typeof code !== "string") {
+    return typeof fallbackName === "string" ? fallbackName.trim() : "";
+  }
   return getPlantSegment(code)?.name ?? fallbackName?.trim() ?? code?.trim() ?? "";
 }
 

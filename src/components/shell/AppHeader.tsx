@@ -100,6 +100,8 @@ export function AppHeader({
         return tNav("dashboard");
       case "approvals":
         return "Approvals";
+      case "stock":
+        return tNav("stock");
       case "pnl":
         return tNav("pnl");
       case "price-sheet":

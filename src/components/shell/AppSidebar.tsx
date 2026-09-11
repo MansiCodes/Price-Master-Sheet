@@ -28,6 +28,8 @@ function navItemLabel(
       return t("dashboard");
     case "approvals":
       return "Approvals";
+    case "stock":
+      return t("stock");
     case "pnl":
       return t("pnl");
     case "price-sheet":

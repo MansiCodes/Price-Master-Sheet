@@ -116,6 +116,12 @@ export function getNavSections(flags: NavFlags): NavSection[] {
               },
             ]
           : []),
+        {
+          key: "stock",
+          label: "Stock",
+          href: "/stock",
+          icon: "stock" as const,
+        },
         ...(showMachineProduction
           ? [
               {
