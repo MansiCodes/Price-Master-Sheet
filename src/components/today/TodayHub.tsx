@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -308,8 +308,20 @@ export function TodayHub({
   );
   const [customSuppliers, setCustomSuppliers] = useState<string[]>([]);
   const [customCustomers, setCustomCustomers] = useState<string[]>([]);
+  const [customPurchaseItems, setCustomPurchaseItems] = useState<string[]>([]);
+  const [customSaleItems, setCustomSaleItems] = useState<string[]>([]);
   const [customStockItems, setCustomStockItems] = useState<string[]>([]);
   const [customFarVendors, setCustomFarVendors] = useState<string[]>([]);
+  const [customUnits, setCustomUnits] = useState<string[]>([]);
+
+  function rememberCustomOption(
+    setter: Dispatch<SetStateAction<string[]>>,
+    value: string | null | undefined,
+  ) {
+    const v = (value ?? "").trim();
+    if (!v || /^(other|others)$/i.test(v)) return;
+    setter((prev) => (prev.includes(v) ? prev : [...prev, v]));
+  }
 
   const farVendorOptions = useMemo(
     () => {
@@ -336,6 +348,76 @@ export function TodayHub({
     },
     [customers, customCustomers],
   );
+  const purchaseItemOptions = useMemo(() => {
+    const base = purchaseCatalog.goods.filter(
+      (x) => x && x !== "Other" && x !== "Others" && x !== "others",
+    );
+    const custom = customPurchaseItems.filter(
+      (x) => x && x !== "Other" && x !== "Others" && x !== "others",
+    );
+    const otherLabel = purchaseCatalog.goods.includes("others")
+      ? "others"
+      : purchaseCatalog.goods.includes("Others")
+        ? "Others"
+        : "Other";
+    return Array.from(new Set(["", ...base, ...custom, otherLabel]));
+  }, [purchaseCatalog.goods, customPurchaseItems]);
+  const saleItemOptions = useMemo(() => {
+    const base = saleProducts.filter(
+      (x) => x && x !== "Other" && x !== "Others" && x !== "others",
+    );
+    const custom = customSaleItems.filter(
+      (x) => x && x !== "Other" && x !== "Others" && x !== "others",
+    );
+    const otherLabel = saleProducts.includes("others")
+      ? "others"
+      : saleProducts.includes("Others")
+        ? "Others"
+        : saleProducts.includes("Other")
+          ? "Other"
+          : "Other";
+    return Array.from(new Set([...base, ...custom, otherLabel]));
+  }, [saleProducts, customSaleItems]);
+  const purchaseUnitOptions = useMemo(() => {
+    const base = isCat6
+      ? [...CAT6_LINE_UNITS]
+      : [...PRODUCT_UNITS];
+    return Array.from(
+      new Set([
+        ...base.filter((u) => u !== "Other"),
+        ...customUnits,
+        "Other",
+      ]),
+    );
+  }, [isCat6, customUnits]);
+  const saleUnitOptions = useMemo(() => {
+    const base = isCat6
+      ? [...CAT6_LINE_UNITS]
+      : isPvc
+        ? ["KG", "MTR", "KM", "Other"]
+        : [...PRODUCT_UNITS];
+    return Array.from(
+      new Set([
+        ...base.filter((u) => u !== "Other"),
+        ...customUnits,
+        "Other",
+      ]),
+    );
+  }, [isCat6, isPvc, customUnits]);
+  const stockUnitOptions = useMemo(() => {
+    const base = [...(stockCatalog.units ?? [])];
+    return Array.from(
+      new Set([
+        ...base.filter((u) => u !== "Other" && u !== "others"),
+        ...customUnits,
+        "MTR",
+        "KM",
+        ...(base.includes("Other") || base.includes("others")
+          ? [base.includes("others") ? "others" : "Other"]
+          : ["Other"]),
+      ]),
+    );
+  }, [stockCatalog.units, customUnits]);
   const stockParticulars = useMemo(
     () => {
       const source = isQuad
@@ -350,7 +432,11 @@ export function TodayHub({
         (x) => x !== "Other" && x !== "Others" && x !== "others",
       );
       const custom = customStockItems.filter(
-        (x) => x !== "Other" && x !== "Others" && x !== "others",
+        (x) =>
+          x !== "Other" &&
+          x !== "Others" &&
+          x !== "others" &&
+          !x.includes(" · "),
       );
       return Array.from(new Set([...base, ...custom, otherLabel]));
     },
@@ -1081,13 +1167,20 @@ export function TodayHub({
         >;
         customSuppliers?: string[];
         customCustomers?: string[];
+        customPurchaseItems?: string[];
+        customSaleItems?: string[];
         customStockItems?: string[];
         customFarVendors?: string[];
+        customUnits?: string[];
       };
       if (json.customSuppliers) setCustomSuppliers(json.customSuppliers);
       if (json.customCustomers) setCustomCustomers(json.customCustomers);
+      if (json.customPurchaseItems)
+        setCustomPurchaseItems(json.customPurchaseItems);
+      if (json.customSaleItems) setCustomSaleItems(json.customSaleItems);
       if (json.customStockItems) setCustomStockItems(json.customStockItems);
       if (json.customFarVendors) setCustomFarVendors(json.customFarVendors);
+      if (json.customUnits) setCustomUnits(json.customUnits);
 
       if (!json.shifts) return;
       setChecklist((prev) => ({
@@ -1250,9 +1343,9 @@ export function TodayHub({
           rate: l.rate.trim() === "" ? 0 : Number(l.rate),
           ...(isCat6
             ? {
-                inMeter: l.inMeter?.trim() ? Number(l.inMeter) : null,
-                qtyMtr: l.qtyMtr?.trim() ? Number(l.qtyMtr) : null,
-                meterUnit: l.meterUnit?.trim() || null,
+                inMeter: null,
+                qtyMtr: null,
+                meterUnit: null,
               }
             : {}),
         }))
@@ -1805,6 +1898,46 @@ export function TodayHub({
       contactList: "Contact saved",
     };
     toast.success(labels[kind]);
+
+    // Persist "Other" free-text values as selectable options next time.
+    if (kind === "purchase") {
+      const vendor =
+        vendorName === "Other" ? vendorNameOther.trim() : vendorName.trim();
+      rememberCustomOption(setCustomSuppliers, vendor);
+      for (const l of purchaseLines) {
+        rememberCustomOption(setCustomPurchaseItems, l.itemDescription);
+        rememberCustomOption(setCustomUnits, l.unit);
+      }
+      if (farVendor) {
+        rememberCustomOption(
+          setCustomFarVendors,
+          farVendor === "Other" ? farVendorOther.trim() : farVendor,
+        );
+      }
+    } else if (kind === "sale") {
+      const customer =
+        customerName === "Other" || customerName === "Others"
+          ? customerNameOther.trim()
+          : customerName.trim();
+      rememberCustomOption(setCustomCustomers, customer);
+      for (const l of saleLines) {
+        rememberCustomOption(setCustomSaleItems, l.itemDescription);
+        rememberCustomOption(setCustomUnits, l.unit);
+      }
+    } else if (kind === "stock") {
+      if (!(isQuad && stockKind === "cable")) {
+        rememberCustomOption(setCustomStockItems, resolvedStockItemName);
+      }
+      rememberCustomOption(setCustomUnits, stockUnit);
+    } else if (kind === "expense") {
+      if (farVendor) {
+        rememberCustomOption(
+          setCustomFarVendors,
+          farVendor === "Other" ? farVendorOther.trim() : farVendor,
+        );
+      }
+    }
+
     closePanel();
     resetAll();
     if (kind !== "contactList" && entryDate === date) {
@@ -2065,11 +2198,12 @@ export function TodayHub({
                     onChange={setPurchaseLines}
                     defaultUnit="KGS"
                     itemLabel="Raw Material"
-                    itemOptions={["", ...purchaseCatalog.goods]}
+                    itemOptions={purchaseItemOptions}
                     itemPlaceholder="Select raw material"
-                    unitOptions={PRODUCT_UNITS}
+                    unitOptions={purchaseUnitOptions}
                     showGst={true}
                     showDebitQty={true}
+                    rateLabel="Rate (per unit)"
                   />
                 ) : null}
                 {purchaseSource === "atcl" ? null : (
@@ -2146,13 +2280,14 @@ export function TodayHub({
                         ? "Item Details"
                         : "Description"
                   }
-                  itemOptions={["", ...purchaseCatalog.goods]}
+                  itemOptions={purchaseItemOptions}
                   itemPlaceholder={
                     isCat6 ? "Select item details" : "Select description"
                   }
-                  unitOptions={isCat6 ? CAT6_LINE_UNITS : PRODUCT_UNITS}
+                  unitOptions={purchaseUnitOptions}
                   showGst={!isCat6 && purchaseSource !== "atcl"}
                   showDebitQty={true}
+                  rateLabel="Rate (per unit)"
                 />
                 ) : null}
                 <div className="field">
@@ -2272,15 +2407,14 @@ export function TodayHub({
                   onChange={setSaleLines}
                   defaultUnit={isCat6 ? "NOS" : isPvc ? "KG" : PRODUCTS[0].unit}
                   itemLabel={isConductor ? "Conductor size" : "Item Details"}
-                  itemOptions={saleProducts}
+                  itemOptions={saleItemOptions}
                   itemPlaceholder={
                     isConductor ? "Select conductor size" : undefined
                   }
-                  unitOptions={
-                    isCat6 ? CAT6_LINE_UNITS : isPvc ? ["KG", "Other"] : PRODUCT_UNITS
-                  }
-                  showCat6MeterFields={isCat6}
+                  unitOptions={saleUnitOptions}
+                  showCat6MeterFields={false}
                   sizeQtyUnitRow={isConductor}
+                  rateLabel="Rate (per unit)"
                   resolveUnitForItem={(name) =>
                     isPvc ? "KG" : PRODUCTS.find((p) => p.name === name)?.unit
                   }
@@ -2684,11 +2818,11 @@ export function TodayHub({
                     <SelectMenu
                       id="st-unit"
                       value={
-                        stockCatalog.units.includes(stockUnit)
+                        stockUnitOptions.includes(stockUnit)
                           ? stockUnit
                           : stockCatalog.defaultUnit
                       }
-                      options={stockCatalog.units}
+                      options={stockUnitOptions}
                       required
                       onChange={setStockUnit}
                     />
@@ -2737,11 +2871,11 @@ export function TodayHub({
                       <SelectMenu
                         id="st-unit"
                         value={
-                          stockCatalog.units.includes(stockUnit)
+                          stockUnitOptions.includes(stockUnit)
                             ? stockUnit
                             : stockCatalog.defaultUnit
                         }
-                        options={stockCatalog.units}
+                        options={stockUnitOptions}
                         required
                         onChange={setStockUnit}
                       />
@@ -3441,6 +3575,7 @@ function LineEditor({
   showCat6MeterFields = false,
   showDebitQty = false,
   sizeQtyUnitRow = false,
+  rateLabel = "Rate (per unit)",
 }: {
   lines: LineItem[];
   onChange: (lines: LineItem[]) => void;
@@ -3455,6 +3590,7 @@ function LineEditor({
   showDebitQty?: boolean;
   /** Put item/size + Qty + Unit on one row (Rate below). */
   sizeQtyUnitRow?: boolean;
+  rateLabel?: string;
 }) {
   return (
     <div className="line-stack">
@@ -3674,7 +3810,7 @@ function LineEditor({
                   />
                 </div>
                 <div className="field" style={{ margin: 0 }}>
-                  <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                  <label htmlFor={`line-rate-${line.id}`}>{rateLabel}</label>
                   <DecimalInput
                     id={`line-rate-${line.id}`}
                     value={line.rate}
@@ -3761,7 +3897,7 @@ function LineEditor({
               className={`line-stack__row line-stack__row--meta${showGst ? " has-gst" : ""}`}
             >
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <label htmlFor={`line-rate-${line.id}`}>{rateLabel}</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}
@@ -3824,7 +3960,7 @@ function LineEditor({
                 />
               </div>
               <div className="field" style={{ margin: 0 }}>
-                <label htmlFor={`line-rate-${line.id}`}>Rate</label>
+                <label htmlFor={`line-rate-${line.id}`}>{rateLabel}</label>
                 <DecimalInput
                   id={`line-rate-${line.id}`}
                   value={line.rate}

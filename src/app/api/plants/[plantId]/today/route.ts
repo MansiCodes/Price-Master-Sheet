@@ -231,21 +231,56 @@ export async function GET(
     };
   }
 
-  const [purchases, sales, stocks, assets] = await Promise.all([
+  const [
+    purchaseVendors,
+    purchaseItems,
+    purchaseUnits,
+    saleCustomers,
+    saleItems,
+    saleUnits,
+    stockItems,
+    stockUnits,
+    assets,
+  ] = await Promise.all([
     prisma.purchase.findMany({
       where: { ...pScope },
       select: { vendorName: true },
       distinct: ["vendorName"],
+    }),
+    prisma.purchase.findMany({
+      where: { ...pScope },
+      select: { itemDescription: true },
+      distinct: ["itemDescription"],
+    }),
+    prisma.purchase.findMany({
+      where: { ...pScope },
+      select: { unit: true },
+      distinct: ["unit"],
     }),
     prisma.sale.findMany({
       where: { ...pScope },
       select: { customerName: true },
       distinct: ["customerName"],
     }),
+    prisma.sale.findMany({
+      where: { ...pScope },
+      select: { itemDescription: true },
+      distinct: ["itemDescription"],
+    }),
+    prisma.sale.findMany({
+      where: { ...pScope },
+      select: { unit: true },
+      distinct: ["unit"],
+    }),
     prisma.stockEntry.findMany({
       where: { ...pScope },
       select: { itemName: true },
       distinct: ["itemName"],
+    }),
+    prisma.stockEntry.findMany({
+      where: { ...pScope },
+      select: { unit: true },
+      distinct: ["unit"],
     }),
     prisma.fixedAsset.findMany({
       where: { ...pScope, vendor: { not: null } },
@@ -254,10 +289,27 @@ export async function GET(
     }),
   ]);
 
-  const customSuppliers = Array.from(new Set(purchases.map((p) => p.vendorName).filter(Boolean)));
-  const customCustomers = Array.from(new Set(sales.map((s) => s.customerName).filter(Boolean)));
-  const customStockItems = Array.from(new Set(stocks.map((s) => s.itemName).filter(Boolean)));
-  const customFarVendors = Array.from(new Set(assets.map((a) => a.vendor).filter(Boolean))) as string[];
+  const isOtherLabel = (v: string) => /^(other|others)$/i.test(v.trim());
+  const uniq = (values: Array<string | null | undefined>) =>
+    Array.from(
+      new Set(
+        values
+          .map((v) => (v ?? "").trim())
+          .filter((v) => v.length > 0 && !isOtherLabel(v)),
+      ),
+    ).sort((a, b) => a.localeCompare(b));
+
+  const customSuppliers = uniq(purchaseVendors.map((p) => p.vendorName));
+  const customCustomers = uniq(saleCustomers.map((s) => s.customerName));
+  const customPurchaseItems = uniq(purchaseItems.map((p) => p.itemDescription));
+  const customSaleItems = uniq(saleItems.map((s) => s.itemDescription));
+  const customStockItems = uniq(stockItems.map((s) => s.itemName));
+  const customFarVendors = uniq(assets.map((a) => a.vendor));
+  const customUnits = uniq([
+    ...purchaseUnits.map((p) => p.unit),
+    ...saleUnits.map((s) => s.unit),
+    ...stockUnits.map((s) => s.unit),
+  ]);
 
   return NextResponse.json({
     plant,
@@ -284,7 +336,10 @@ export async function GET(
     allComplete: shifts.DAY.allComplete && shifts.NIGHT.allComplete,
     customSuppliers,
     customCustomers,
+    customPurchaseItems,
+    customSaleItems,
     customStockItems,
     customFarVendors,
+    customUnits,
   });
 }
