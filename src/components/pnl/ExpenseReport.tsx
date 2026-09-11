@@ -572,18 +572,35 @@ export function ExpenseReport({
               onChange: crud.setPhotoUrls,
               label: "Upload bill/document (optional)",
             }}
-            onSave={() =>
+            onSave={() => {
+              const head = (crud.values.expenseHead || "").trim();
+              const amount = Number(crud.values.amount || 0);
+              const isWageHead =
+                head === "Contractor Wages" || head === "Labour Contractor";
+              const isSalaryHead = head === "Salary Expenses";
+              // Direct Expense form only edits `amount`. Clear duplicated
+              // salary fields so the register does not show amount × 2.
+              const contractorSalary = isPettyCategory
+                ? Number(crud.values.contractorSalary || 0)
+                : isWageHead || isSalaryHead
+                  ? 0
+                  : Number(crud.values.contractorSalary || 0);
+              const supervisorSalary = isPettyCategory
+                ? Number(crud.values.supervisorSalary || 0)
+                : isWageHead || isSalaryHead
+                  ? 0
+                  : Number(crud.values.supervisorSalary || 0);
               void crud.save({
                 date: crud.values.date,
                 expenseHead: crud.values.expenseHead,
                 description: crud.values.description || null,
-                amount: Number(crud.values.amount || 0),
+                amount,
                 payMode: crud.values.payMode || undefined,
                 nature: crud.values.nature || null,
                 location: crud.values.location || null,
                 billNumber: crud.values.billNumber || null,
-                contractorSalary: Number(crud.values.contractorSalary || 0),
-                supervisorSalary: Number(crud.values.supervisorSalary || 0),
+                contractorSalary,
+                supervisorSalary,
                 openingReading: crud.values.openingReading
                   ? Number(crud.values.openingReading)
                   : null,
@@ -591,8 +608,8 @@ export function ExpenseReport({
                   ? Number(crud.values.closingReading)
                   : null,
                 billPhotoUrls: crud.photoUrls,
-              })
-            }
+              });
+            }}
           />
         </>
       )}

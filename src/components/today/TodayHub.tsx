@@ -1642,7 +1642,7 @@ export function TodayHub({
               .filter(Boolean)
               .join(" · "),
           amount,
-          contractorSalary: amount,
+          contractorSalary: 0,
           supervisorSalary: 0,
           billPhotoUrls: expensePhotos,
         });
@@ -1664,7 +1664,7 @@ export function TodayHub({
               .join(" · "),
           amount,
           contractorSalary: 0,
-          supervisorSalary: amount,
+          supervisorSalary: 0,
           billPhotoUrls: expensePhotos,
         });
       } else if (isUpcast && expenseHead === "Miscellaneous") {
