@@ -18,9 +18,12 @@ import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant, isQuadSignalPlant } from "@/lib
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { getPlantDisplayName } from "@/lib/plant-segments";
 import {
-  getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
 } from "@/lib/plant-catalogs";
+import {
+  QUAD_STOCK_PROCESS_HEADERS,
+  QUAD_STOCK_SHEET_HEADERS,
+} from "@/lib/pnl/excel-import/quad-stock-columns";
 
 /** Safe filename stem from plant display name (e.g. Quad + Signal → Quad-+-Signal). */
 function plantFilenameStem(code: string, name?: string | null): string {
@@ -392,45 +395,49 @@ export async function GET(
         });
       });
     } else if (isQuad) {
-      sheet.columns = [
-        { header: "S.No.", key: "sno", width: 8 },
-        { header: "Date", key: "date", width: 12 },
-        { header: "Type", key: "type", width: 14 },
-        { header: "Raw Material / Cable", key: "item", width: 24 },
-        { header: "Size", key: "size", width: 18 },
-        { header: "Process WIP", key: "process", width: 40 },
-        { header: "Sales km", key: "salesKm", width: 12 },
-        { header: "Finished Qty", key: "qty", width: 14 },
-        { header: "Unit", key: "unit", width: 10 },
-        { header: "Rate", key: "rate", width: 12 },
-        { header: "Value", key: "value", width: 14 },
-      ];
+      // Same headers as import template / Today Entry / P&L Stock.
+      const widthByHeader: Record<string, number> = {
+        Date: 12,
+        Shift: 10,
+        "Stock type": 14,
+        Item: 28,
+        Size: 18,
+        Unit: 10,
+        Qty: 12,
+        Rate: 12,
+        Value: 14,
+        "Sales km": 12,
+        "Drum length": 14,
+        Notes: 28,
+      };
+      sheet.columns = QUAD_STOCK_SHEET_HEADERS.map((header) => ({
+        header,
+        key: header,
+        width: widthByHeader[header] ?? 12,
+      }));
       styleHeader(sheet.getRow(1));
-      rows.forEach((r, i) => {
-        const { meta } = parseQuadSignalStockNotes(r.notes);
+      rows.forEach((r) => {
+        const { meta, userNotes } = parseQuadSignalStockNotes(r.notes);
         let type = r.category === "FG" ? "Cable" : "Raw Material";
         let item = r.itemName;
         let size = "";
-        let process = "";
-        let salesKm = "";
+        const processVals: Record<string, number | ""> = {};
+        for (const h of QUAD_STOCK_PROCESS_HEADERS) processVals[h] = "";
+        let salesKm: number | "" = "";
+        let drumLength = "";
         if (meta?.kind === "cable") {
           type = "Cable";
           item = meta.cable || r.itemName;
           size = meta.size || "";
-          const procs = getQuadSignalCableProcesses(meta.cable ?? "");
           const production = meta.production ?? {};
-          const opening = meta.opening ?? {};
-          const closing = meta.closing ?? meta.processes ?? {};
-          process = (procs.length ? procs : Object.keys(closing))
-            .map((name) => {
-              const bits = [name];
-              if (opening[name] != null) bits.push(`O:${opening[name]}`);
-              if (production[name] != null) bits.push(`P:${production[name]}`);
-              if (closing[name] != null) bits.push(`C:${closing[name]}`);
-              return bits.join(" ");
-            })
-            .join(" · ");
-          if (meta.salesKm != null) salesKm = String(meta.salesKm);
+          for (const [name, val] of Object.entries(production)) {
+            const match = QUAD_STOCK_PROCESS_HEADERS.find(
+              (h) => h.toLowerCase() === name.toLowerCase(),
+            );
+            if (match && val != null) processVals[match] = val;
+          }
+          if (meta.salesKm != null) salesKm = meta.salesKm;
+          drumLength = meta.calcSnapshot?.drumLabel ?? "";
         } else if (meta?.kind === "raw") {
           type = "Raw Material";
           item = r.itemName;
@@ -440,17 +447,19 @@ export async function GET(
           size = parts.slice(1).join(" · ");
         }
         sheet.addRow({
-          sno: i + 1,
-          date: iso(r.date),
-          type,
-          item,
-          size,
-          process,
-          salesKm,
-          qty: toNum(r.quantity),
-          unit: r.unit,
-          rate: toNum(r.rate),
-          value: toNum(r.closingValue),
+          Date: iso(r.date),
+          Shift: r.shift ?? "",
+          "Stock type": type,
+          Item: item,
+          Size: size,
+          Unit: r.unit,
+          Qty: toNum(r.quantity),
+          Rate: toNum(r.rate),
+          Value: toNum(r.closingValue),
+          "Sales km": salesKm,
+          "Drum length": drumLength,
+          Notes: userNotes,
+          ...processVals,
         });
       });
     } else {

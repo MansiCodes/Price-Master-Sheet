@@ -170,13 +170,22 @@ export async function GET(
   const cat6 = isCat6Plant(plant?.code);
   const snapshot = sp.get("snapshot") === "1";
   const atcl = sp.get("atcl") === "1";
+  const kindParam = (sp.get("kind") ?? "").trim().toLowerCase();
   const ownOnly = seesOwnEntriesOnly(session.user.globalRole);
+
+  const categoryFilter =
+    kindParam === "raw"
+      ? { category: StockCategory.RM }
+      : kindParam === "cable"
+        ? { category: StockCategory.FG }
+        : {};
 
   const entries = await prisma.stockEntry.findMany({
     where: {
       ...pScope,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
       ...filter,
+      ...categoryFilter,
       ...(cat6 ? { itemName: { notIn: [...CAT6_PNL_ONLY_STOCK_ITEMS] } } : {}),
       ...(snapshot ? closingStockEntryFilter() : {}),
       ...(atcl ? atclStockEntryFilter() : {}),

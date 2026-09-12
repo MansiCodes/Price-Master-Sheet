@@ -1534,15 +1534,25 @@ textarea {
   min-width: 0;
 }
 
-@media (max-width: 640px) {
-  .form-grid.three {
-    grid-template-columns: 1fr;
-  }
+.field--wide {
+  grid-column: 1 / -1;
 }
 
-@media (max-width: 420px) {
+/* Mobile / tablet: keep compact fields 2-per-row; wide fields stay full width */
+@media (max-width: 720px) {
   .form-grid.two {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  .form-grid.three {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  /* Odd last cell in a 3-col grid (e.g. Rate) spans full width */
+  .form-grid.three > .field:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 }
 

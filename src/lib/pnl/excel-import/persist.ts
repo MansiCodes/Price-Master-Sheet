@@ -345,7 +345,15 @@ export async function persistPnlImport(opts: {
         row.notes?.trim() || `Closing stock as on ${row.date}`,
       );
       category = "RM";
-    } else if (row.qsKind === "cable" && row.qsCable && row.qsSize) {
+    } else if (row.qsKind === "cable") {
+      if (!row.qsCable || !row.qsSize) {
+        summary.skipped.push({
+          sheet: "Stock",
+          row: row.row,
+          reason: "Cable stock requires Item (cable) and Size",
+        });
+        continue;
+      }
       const processes = [...getQuadSignalCableProcesses(row.qsCable)];
       const production: Record<string, number> = {};
       const src = row.qsProduction ?? {};
@@ -358,6 +366,7 @@ export async function persistPnlImport(opts: {
         ["Intermediate"],
         ["DST"],
         ["Outer Sheath", "Outer"],
+        ["Armouring", "Armoring"],
       ];
       for (const p of processes) {
         const group =

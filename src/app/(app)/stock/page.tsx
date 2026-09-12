@@ -9,9 +9,14 @@ import {
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
-import { buildCableStockStatus } from "@/lib/stock-production-status";
+import { QUAD_SIGNAL_STOCK_RAW_MATERIALS } from "@/lib/plant-catalogs";
+import {
+  buildCableStockStatus,
+  buildRawMaterialStockStatus,
+} from "@/lib/stock-production-status";
 import type {
   CableStockStatusBlock,
+  RawMaterialStockRow,
   SharedInsulationStatus,
 } from "@/lib/stock-production-status";
 import { StockStatusClient } from "@/components/stock/StockStatusClient";
@@ -33,7 +38,6 @@ export default async function StockPage({
   if (plantIds.length === 0 || !selectedPlantId) {
     return (
       <div style={{ padding: "2rem" }}>
-        <h1 className="page-title">Stock</h1>
         <p className="page-sub">Select a plant to view stock status.</p>
       </div>
     );
@@ -43,6 +47,10 @@ export default async function StockPage({
     where: { id: selectedPlantId },
     select: { id: true, code: true, name: true },
   });
+
+  if (!plant || !isQuadSignalPlant(plant.code)) {
+    redirect("/");
+  }
 
   const today = todayDateString();
   const date =
@@ -57,11 +65,13 @@ export default async function StockPage({
 
   let cableBlocks: CableStockStatusBlock[] = [];
   let sharedInsulation: SharedInsulationStatus | null = null;
+  let rawRows: RawMaterialStockRow[] = [];
 
-  if (plant && isQuadSignalPlant(plant.code)) {
-    const reportIds = await resolveReportPlantIds(selectedPlantId);
-    const pScope = plantIdFilter(reportIds);
-    const rows = await prisma.stockEntry.findMany({
+  const reportIds = await resolveReportPlantIds(selectedPlantId);
+  const pScope = plantIdFilter(reportIds);
+
+  const [cableEntries, rmEntries] = await Promise.all([
+    prisma.stockEntry.findMany({
       where: {
         ...pScope,
         category: "FG",
@@ -76,11 +86,31 @@ export default async function StockPage({
         itemName: true,
         notes: true,
       },
-    });
-    const built = buildCableStockStatus(rows);
-    cableBlocks = built.blocks;
-    sharedInsulation = built.sharedInsulation;
-  }
+    }),
+    prisma.stockEntry.findMany({
+      where: {
+        ...pScope,
+        category: "RM",
+        date: { lte: endOfDay },
+        notes: { startsWith: "QSSTOCK:" },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 300,
+      select: {
+        itemName: true,
+        date: true,
+        quantity: true,
+        unit: true,
+        rate: true,
+        notes: true,
+      },
+    }),
+  ]);
+
+  const built = buildCableStockStatus(cableEntries);
+  cableBlocks = built.blocks;
+  sharedInsulation = built.sharedInsulation;
+  rawRows = buildRawMaterialStockStatus(QUAD_SIGNAL_STOCK_RAW_MATERIALS, rmEntries);
 
   return (
     <StockStatusClient
@@ -88,6 +118,7 @@ export default async function StockPage({
       tab={tab}
       cableBlocks={cableBlocks}
       sharedInsulation={sharedInsulation}
+      rawRows={rawRows}
     />
   );
 }

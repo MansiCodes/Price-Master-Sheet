@@ -13,6 +13,7 @@ import {
   formatProcessStatusLine,
   formatSharedInsulationLine,
   type CableStockStatusBlock,
+  type RawMaterialStockRow,
   type SharedInsulationStatus,
 } from "@/lib/stock-production-status";
 import "@/components/ui/date-filter.css";
@@ -22,6 +23,13 @@ function formatDisplayDate(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y}`;
+}
+
+function formatNum(n: number): string {
+  if (!Number.isFinite(n)) return "—";
+  return new Intl.NumberFormat("en-IN", {
+    maximumFractionDigits: 4,
+  }).format(n);
 }
 
 function CalendarIcon() {
@@ -61,11 +69,13 @@ export function StockStatusClient({
   tab,
   cableBlocks,
   sharedInsulation,
+  rawRows,
 }: {
   date: string;
   tab: "cable" | "raw";
   cableBlocks: CableStockStatusBlock[];
   sharedInsulation: SharedInsulationStatus | null;
+  rawRows: RawMaterialStockRow[];
 }) {
   const router = useRouter();
   const today = todayDateString();
@@ -244,9 +254,48 @@ export function StockStatusClient({
       </div>
 
       {tab === "raw" ? (
-        <div className="stock-status-placeholder">
-          <h2>Raw Materials</h2>
-          <p>Data for this section will be added later.</p>
+        <div className="stock-status-report">
+          <div className="stock-rm-table-wrap">
+            <table className="stock-rm-table">
+              <thead>
+                <tr>
+                  <th scope="col">S. No.</th>
+                  <th scope="col">Item</th>
+                  <th scope="col">Qty</th>
+                  <th scope="col">Unit</th>
+                  <th scope="col">Rate</th>
+                  <th scope="col">Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rawRows.map((row, idx) => (
+                  <tr
+                    key={row.item}
+                    className={row.hasData ? undefined : "is-empty"}
+                  >
+                    <td>{idx + 1}</td>
+                    <td>{row.item}</td>
+                    <td>
+                      {row.hasData && row.qty != null
+                        ? formatNum(row.qty)
+                        : "—"}
+                    </td>
+                    <td>{row.hasData ? row.unit || "—" : "—"}</td>
+                    <td>
+                      {row.hasData && row.rate != null
+                        ? formatNum(row.rate)
+                        : "—"}
+                    </td>
+                    <td>
+                      {row.hasData && row.value != null
+                        ? formatNum(row.value)
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         <div className="stock-status-report">

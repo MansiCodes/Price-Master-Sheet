@@ -9,9 +9,12 @@ import {
   getPurchaseCatalog,
   getSalesCatalog,
   getStockCatalog,
+  QUAD_SIGNAL_STOCK_CABLES,
+  QUAD_SIGNAL_STOCK_RAW_MATERIALS,
   UPCAST_MISC_NATURES,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
+import { QUAD_STOCK_SHEET_HEADERS } from "@/lib/pnl/excel-import/quad-stock-columns";
 
 export type PnlTemplateOptions = {
   plantCode: string;
@@ -264,28 +267,7 @@ function stockHeaders(family: PlantFamily): string[] {
     case "cat6":
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
     case "quadsignal":
-      return [
-        "Date",
-        "Stock type",
-        "Raw Material / Cable",
-        "Size",
-        "Unit",
-        "Finished Qty",
-        "Rate",
-        "Sales km",
-        "Drum length",
-        "Insulation",
-        "Single Quad",
-        "Laying",
-        "Inner Sheath",
-        "Inner",
-        "Screening",
-        "Intermediate",
-        "DST",
-        "Outer Sheath",
-        "Outer",
-        "Notes",
-      ];
+      return [...QUAD_STOCK_SHEET_HEADERS];
     default:
       return ["Date", "Item", "Unit", "Quantity", "Rate", "Notes"];
   }
@@ -520,7 +502,25 @@ export async function buildPnlImportTemplate(
         "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",
       ]);
       guide.addRow([
-        "   Stock: Stock type = Raw Material or Cable. For Cable fill Size + today's Production under process columns (Insulation, Laying, …). Sales km and Drum length optional (Sales also matches Sales sheet). Opening/closing are calculated in the app.",
+        "   Stock sheet columns match Today Entry + P&L Stock tabs:",
+      ]);
+      guide.addRow([
+        "   • Stock type = Raw Material or Cable (same as form).",
+      ]);
+      guide.addRow([
+        "   • Item = raw material name (RM list) or cable type. Size required for Cable.",
+      ]);
+      guide.addRow([
+        "   • Qty / Unit / Rate / Value = same as form (Value = Qty × Rate if Rate blank and Value filled).",
+      ]);
+      guide.addRow([
+        "   • Cable: fill today's Production in process columns (Insulation, Laying, …). Opening/closing calculated in app. Sales km + Drum length optional.",
+      ]);
+      guide.addRow([
+        `   • Raw materials: ${QUAD_SIGNAL_STOCK_RAW_MATERIALS.filter((x) => x !== "Other").slice(0, 10).join(" · ")}…`,
+      ]);
+      guide.addRow([
+        `   • Cables: ${QUAD_SIGNAL_STOCK_CABLES.filter((x) => x !== "Other").join(" · ")}`,
       ]);
     }
   }

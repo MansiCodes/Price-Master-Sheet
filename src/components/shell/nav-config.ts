@@ -50,6 +50,8 @@ export type NavFlags = {
   /** Admin → Users list (Super Admin manage, Viewer read-only). */
   showUsers?: boolean;
   showApprovals: boolean;
+  /** Stock status page — Quad + Signal plant only for now. */
+  showStock?: boolean;
   /** Super Admin integrations + plants. */
   showSuper: boolean;
   /** Machine Production admin (machines/processes). Super Admin always has this. */
@@ -70,6 +72,7 @@ export function getNavSections(flags: NavFlags): NavSection[] {
     showAdmin,
     showUsers = false,
     showApprovals,
+    showStock = false,
     showSuper,
     showMpAdmin = false,
     primaryPlantId,
@@ -116,12 +119,16 @@ export function getNavSections(flags: NavFlags): NavSection[] {
               },
             ]
           : []),
-        {
-          key: "stock",
-          label: "Stock",
-          href: "/stock",
-          icon: "stock" as const,
-        },
+        ...(showStock
+          ? [
+              {
+                key: "stock",
+                label: "Stock",
+                href: "/stock",
+                icon: "stock" as const,
+              },
+            ]
+          : []),
         ...(showMachineProduction
           ? [
               {

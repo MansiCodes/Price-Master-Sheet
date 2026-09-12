@@ -24,6 +24,7 @@ import {
   PVC_ATCL_PURCHASE_NOTE_PREFIX,
   PVC_ATCL_VENDOR_NAME,
 } from "@/lib/plant-catalogs";
+import { QUAD_STOCK_PROCESS_HEADERS } from "@/lib/pnl/excel-import/quad-stock-columns";
 
 export type ParsedSaleRow = {
   row: number;
@@ -242,17 +243,19 @@ const STOCK_ALIASES: Record<string, string[]> = {
   date: ["date", "entry date", "stock date", "as on"],
   shift: ["shift"],
   item: [
+    "item",
+    "cable",
     "raw material / cable",
     "list of items",
     "particulars",
     "item name",
-    "item",
     "description",
     "product",
   ],
   size: ["size", "conductor size"],
   unit: ["unit", "uom"],
   quantity: [
+    "qty",
     "finished qty",
     "issued quantity",
     "closing stock",
@@ -269,18 +272,7 @@ const STOCK_ALIASES: Record<string, string[]> = {
 };
 
 /** Process production columns used on Quad + Signal stock import template. */
-const QS_STOCK_PROCESS_HEADERS = [
-  "Insulation",
-  "Single Quad",
-  "Laying",
-  "Inner Sheath",
-  "Inner",
-  "Screening",
-  "Intermediate",
-  "DST",
-  "Outer Sheath",
-  "Outer",
-] as const;
+const QS_STOCK_PROCESS_HEADERS = QUAD_STOCK_PROCESS_HEADERS;
 
 const EXPENSE_ALIASES: Record<string, string[]> = {
   date: ["payment date", "date", "entry date", "expense date"],
@@ -973,12 +965,26 @@ export async function parsePnlWorkbook(
 
           let qsKind: "raw" | "cable" | undefined;
           if (isQuadPlant) {
-            qsKind = looksRaw && !looksCable ? "raw" : looksCable ? "cable" : "raw";
+            qsKind =
+              looksRaw && !looksCable ? "raw" : looksCable ? "cable" : "raw";
+          }
+
+          if (qsKind === "cable" && !size) {
+            result.skipped.push({
+              sheet: sheet.name,
+              row: r,
+              reason: "Cable stock requires Size",
+            });
+            continue;
           }
 
           const salesKm = num(getCell(sheet, r, header.map, "salesKm"));
           const drumLength =
             str(getCell(sheet, r, header.map, "drumLength")) || null;
+          const unitRaw = str(getCell(sheet, r, header.map, "unit"));
+          const unit =
+            unitRaw ||
+            (isQuadPlant ? "KGS" : "kg");
 
           result.stock.push({
             row: r,
@@ -989,7 +995,7 @@ export async function parsePnlWorkbook(
               getCell(sheet, r, header.map, "category") ??
                 (qsKind === "cable" ? "FG" : "RM"),
             ),
-            unit: str(getCell(sheet, r, header.map, "unit")) || "kg",
+            unit,
             quantity: qty != null && qty > 0 ? qty : 0,
             rate,
             notes: str(getCell(sheet, r, header.map, "notes")) || null,

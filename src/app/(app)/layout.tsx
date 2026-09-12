@@ -20,6 +20,7 @@ import {
 } from "@/lib/rbac";
 import { resolveSelectedPlantId } from "@/lib/selected-plant";
 import { getPlantRmSummary, getPlantSegment, getPlantDisplayName, isLegacyMergedPlantCode } from "@/lib/plant-segments";
+import { isQuadSignalPlant } from "@/lib/plant-layout";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,7 @@ export default async function AppLayout({
           showAdmin: false,
           showUsers: false,
           showApprovals: false,
+          showStock: false,
           showSuper: false,
           showMpAdmin: mpAdmin,
           isManager: false,
@@ -132,6 +134,9 @@ export default async function AppLayout({
   const showAdmin = role ? isAdminOrHead(role) : false;
   const showUsers = role ? canViewUsersDirectory(role) : false;
   const showApprovals = role ? canApproveEntries(role) : false;
+  const showStock = selectedPlantRaw
+    ? isQuadSignalPlant(selectedPlantRaw.code)
+    : false;
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
   const canEnter = role ? canEnterData(role) : false;
@@ -147,6 +152,7 @@ export default async function AppLayout({
         showAdmin,
         showUsers,
         showApprovals,
+        showStock,
         showSuper,
         showMpAdmin: mpAdmin,
         isManager,

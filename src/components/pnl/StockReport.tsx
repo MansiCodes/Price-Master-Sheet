@@ -17,7 +17,6 @@ import { collectStockPhotoUrls } from "@/lib/bill-photos";
 import {
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
-  PVC_STOCK_ENTRY_TYPES,
 } from "@/lib/plant-catalogs";
 
 type StockRow = {
@@ -74,13 +73,15 @@ export function StockReport({
   const cat6 = isCat6Plant(plantCode);
   const isQuadSignal = isQuadSignalPlant(plantCode);
   const [stockView, setStockView] = useState<"closing" | "atcl">("closing");
+  const [quadKind, setQuadKind] = useState<"raw" | "cable">("raw");
   const baseUrl =
     `/api/plants/${plantId}/stock?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` +
     (isPvc
       ? stockView === "atcl"
         ? "&atcl=1"
         : "&snapshot=1"
-      : "");
+      : "") +
+    (isQuadSignal ? `&kind=${quadKind}` : "");
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<StockRow>(baseUrl, t("networkError"), isPvc ? 20 : 10);
   const totals = response?.totals as
@@ -328,7 +329,7 @@ export function StockReport({
     },
   ];
 
-  const quadSignalColumns: ReportColumn<StockRow>[] = [
+  const quadRawColumns: ReportColumn<StockRow>[] = [
     {
       key: "s",
       label: "S.No",
@@ -343,24 +344,82 @@ export function StockReport({
       render: (r) => isoDate(r.date),
     },
     {
-      key: "kind",
-      label: "Type",
+      key: "item",
+      label: "Item",
+      wrap: true,
+      render: (r) => r.itemName,
+    },
+    {
+      key: "qty",
+      label: "Qty",
+      align: "right",
       compact: true,
-      render: (r) => {
-        const { meta } = parseQuadSignalStockNotes(r.notes);
-        if (meta?.kind === "cable") return "Cable";
-        if (meta?.kind === "raw") return "Raw Material";
-        return r.category === "FG" ? "Cable" : "Raw Material";
-      },
+      render: (r) => formatQty(r.quantity, 4),
+    },
+    {
+      key: "unit",
+      label: "Unit",
+      compact: true,
+      render: (r) => r.unit || "—",
+    },
+    {
+      key: "rate",
+      label: "Rate",
+      align: "right",
+      compact: true,
+      render: (r) =>
+        r.rate != null && r.rate !== "" ? formatINR(Number(r.rate)) : "—",
+    },
+    {
+      key: "value",
+      label: "Value",
+      align: "right",
+      render: (r) => formatINR(r.closingValue),
+    },
+    {
+      key: "excelUploadedAt",
+      label: "Excel upload",
+      compact: true,
+      render: (r) =>
+        r.excelUploadedAt ? formatDayMonthYear(r.excelUploadedAt) : "—",
+    },
+    {
+      key: "approvedByHead",
+      label: "Approval Status",
+      compact: true,
+      render: (r) => <PnlApprovalBadge row={r} level="head" />,
+    },
+    {
+      key: "photos",
+      label: "Image",
+      compact: true,
+      render: (r) => (
+        <BillPhotosCell urls={r.photoUrls} fallbackUrl={r.photoUrl} />
+      ),
+    },
+  ];
+
+  const quadCableColumns: ReportColumn<StockRow>[] = [
+    {
+      key: "s",
+      label: "S.No",
+      render: (_r, index) =>
+        String((page - 1) * pageSize + (index ?? 0) + 1),
+    },
+    {
+      key: "date",
+      label: "Date",
+      align: "center",
+      compact: true,
+      render: (r) => isoDate(r.date),
     },
     {
       key: "item",
-      label: "Raw Material / Cable",
+      label: "Item",
       wrap: true,
       render: (r) => {
         const { meta } = parseQuadSignalStockNotes(r.notes);
         if (meta?.kind === "cable") return meta.cable || r.itemName;
-        if (meta?.kind === "raw") return r.itemName;
         const parts = r.itemName.split(" · ");
         return parts[0] || r.itemName;
       },
@@ -410,7 +469,7 @@ export function StockReport({
     },
     {
       key: "salesKm",
-      label: "Sales",
+      label: "Sales km",
       align: "right",
       compact: true,
       render: (r) => {
@@ -422,7 +481,7 @@ export function StockReport({
     },
     {
       key: "qty",
-      label: "Finished qty",
+      label: "Qty",
       align: "right",
       compact: true,
       render: (r) => `${Number(r.quantity)} ${r.unit}`,
@@ -467,15 +526,19 @@ export function StockReport({
   const activeColumns = useMemo(() => {
     if (isPvc) return pvcColumns;
     if (cat6) return cat6Columns;
-    if (isQuadSignal) return quadSignalColumns;
+    if (isQuadSignal) {
+      return quadKind === "raw" ? quadRawColumns : quadCableColumns;
+    }
     return defaultColumns;
   }, [
     isPvc,
     cat6,
     isQuadSignal,
+    quadKind,
     pvcColumns,
     cat6Columns,
-    quadSignalColumns,
+    quadRawColumns,
+    quadCableColumns,
     defaultColumns,
   ]);
 
@@ -486,6 +549,34 @@ export function StockReport({
           ? "PVC Plant — Closing Stock"
           : t("stockTitle")}
       </h3>
+      {isQuadSignal ? (
+        <div className="pnl-expense-subnav" role="tablist" aria-label="Stock kind">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quadKind === "raw"}
+            className={quadKind === "raw" ? "is-active" : undefined}
+            onClick={() => {
+              setQuadKind("raw");
+              setPage(1);
+            }}
+          >
+            Raw Materials
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={quadKind === "cable"}
+            className={quadKind === "cable" ? "is-active" : undefined}
+            onClick={() => {
+              setQuadKind("cable");
+              setPage(1);
+            }}
+          >
+            Cable
+          </button>
+        </div>
+      ) : null}
       {error ? <div className="alert alert--error">{error}</div> : null}
       <ReportTable
         columns={canMutate ? [...activeColumns, actionCol] : activeColumns}

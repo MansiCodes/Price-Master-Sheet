@@ -957,6 +957,13 @@ export function TodayHub({
     setStockValue((qty * rateForValue).toFixed(2));
   }, [stockPurchaseRate, stockQty, stockRate]);
 
+  const stockTotalValue = useMemo(() => {
+    const qty = Number(stockQty);
+    const rate = Number(stockRate);
+    if (!Number.isFinite(qty) || !Number.isFinite(rate)) return null;
+    return qty * rate;
+  }, [stockQty, stockRate]);
+
   // Production
   const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
   const [productName, setProductName] = useState<string>(PRODUCTS[0].name);
@@ -2257,93 +2264,165 @@ export function TodayHub({
             kind !== "purchase" &&
             kind !== "sale" &&
             !isCat6;
+          const showStockTypeBeside = isQuad && kind === "stock";
           return (
-            <div className={`form-grid ${showShift ? "three" : "two"}`}>
-              <div className="field">
-                <label htmlFor="entry-kind">{t("entryType")}</label>
-                <SelectMenu
-                  id="entry-kind"
-                  value={
-                    entryOptions.find((o) => o.value === kind)?.label ??
-                    t("purchase")
-                  }
-                  options={entryOptions.map((o) => o.label)}
-                  required
-                  onChange={(label) => {
-                    const next = entryOptions.find((o) => o.label === label);
-                    if (next) setKind(next.value);
-                  }}
-                />
-              </div>
-              {kind !== "contactList" && (
+            <>
+              {kind !== "contactList" ? (
+                <div
+                  className={`form-grid today-entry-top-row ${
+                    showShift ? "two" : ""
+                  }`}
+                >
+                  <div className="field">
+                    <label htmlFor="entry-date">
+                      {isCat6
+                        ? kind === "expense"
+                          ? "Date"
+                          : "Bill Date"
+                        : kind === "expense" && expenseHead === "Petty Cash"
+                          ? t("billDate")
+                          : t("date")}
+                    </label>
+                    <input
+                      id="entry-date"
+                      type="date"
+                      required
+                      max={todayLocalISO()}
+                      value={entryDate}
+                      onChange={(e) => setEntryDate(e.target.value)}
+                    />
+                  </div>
+                  {showShift ? (
+                    <div className="field">
+                      <label>{t("shift")}</label>
+                      <div className="shift-toggle">
+                        <button
+                          type="button"
+                          className={shift === "DAY" ? "is-active" : ""}
+                          onClick={() => setShift("DAY")}
+                        >
+                          {tCommon("day")}
+                        </button>
+                        <button
+                          type="button"
+                          className={shift === "NIGHT" ? "is-active" : ""}
+                          onClick={() => setShift("NIGHT")}
+                        >
+                          {tCommon("night")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div
+                className={`form-grid today-entry-kind-row ${
+                  showStockTypeBeside ? "two" : ""
+                }`}
+              >
                 <div className="field">
-                  <label htmlFor="entry-date">
-                    {isCat6
-                      ? kind === "expense"
-                        ? "Date"
-                        : "Bill Date"
-                      : kind === "expense" && expenseHead === "Petty Cash"
-                        ? t("billDate")
-                        : t("date")}
-                  </label>
-                  <input
-                    id="entry-date"
-                    type="date"
+                  <label htmlFor="entry-kind">{t("entryType")}</label>
+                  <SelectMenu
+                    id="entry-kind"
+                    value={
+                      entryOptions.find((o) => o.value === kind)?.label ??
+                      t("purchase")
+                    }
+                    options={entryOptions.map((o) => o.label)}
                     required
-                    max={todayLocalISO()}
-                    value={entryDate}
-                    onChange={(e) => setEntryDate(e.target.value)}
+                    onChange={(label) => {
+                      const next = entryOptions.find((o) => o.label === label);
+                      if (next) setKind(next.value);
+                    }}
                   />
                 </div>
-              )}
-              {showShift && (
-                <div className="field">
-                  <label>{t("shift")}</label>
-                  <div className="shift-toggle">
-                    <button
-                      type="button"
-                      className={shift === "DAY" ? "is-active" : ""}
-                      onClick={() => setShift("DAY")}
-                    >
-                      {tCommon("day")}
-                    </button>
-                    <button
-                      type="button"
-                      className={shift === "NIGHT" ? "is-active" : ""}
-                      onClick={() => setShift("NIGHT")}
-                    >
-                      {tCommon("night")}
-                    </button>
+                {showStockTypeBeside ? (
+                  <div className="field">
+                    <label htmlFor="st-kind">Stock type</label>
+                    <SelectMenu
+                      id="st-kind"
+                      value={stockKind === "cable" ? "Cable" : "Raw Material"}
+                      options={["Raw Material", "Cable"]}
+                      required
+                      onChange={(next) => {
+                        setStockKind(next === "Cable" ? "cable" : "raw");
+                        setStockProcessQtys({});
+                      }}
+                    />
                   </div>
-                </div>
-              )}
-            </div>
+                ) : null}
+              </div>
+            </>
           );
         })()}
 
             {kind === "purchase" ? (
               <>
-                <div className="field">
-                  <label htmlFor="p-type">Type</label>
-                  <SelectMenu
-                    id="p-type"
-                    value={
-                      PURCHASE_TYPES.find((t) => t.value === purchaseType)
-                        ?.label ?? "Raw materials"
-                    }
-                    options={PURCHASE_TYPES.map((t) => t.label)}
-                    required
-                    onChange={(label) => {
-                      const next = PURCHASE_TYPES.find((t) => t.label === label);
-                      if (next) {
-                        setPurchaseType(next.value);
-                        if (next.value !== "OTHERS") setPurchaseTypeOther("");
-                      }
-                    }}
-                  />
-                </div>
+                {(() => {
+                  const purchaseSourceLabels = [
+                    "Purchase from Vendor",
+                    "Stock Taken from ATCL",
+                  ];
+                  const typeLabels = PURCHASE_TYPES.map((t) => t.label);
+                  // Half-width row when both dropdowns have compact option text;
+                  // otherwise stack full-width so long labels stay readable.
+                  const maxOptLen = Math.max(
+                    ...typeLabels.map((l) => l.length),
+                    ...purchaseSourceLabels.map((l) => l.length),
+                  );
+                  const sideBySide = maxOptLen <= 22;
+                  return (
+                    <div
+                      className={`form-grid today-entry-purchase-meta-row ${
+                        sideBySide ? "two" : ""
+                      }`}
+                    >
+                      <div className="field">
+                        <label htmlFor="p-type">Type</label>
+                        <SelectMenu
+                          id="p-type"
+                          value={
+                            PURCHASE_TYPES.find((t) => t.value === purchaseType)
+                              ?.label ?? "Raw materials"
+                          }
+                          options={typeLabels}
+                          required
+                          onChange={(label) => {
+                            const next = PURCHASE_TYPES.find(
+                              (t) => t.label === label,
+                            );
+                            if (next) {
+                              setPurchaseType(next.value);
+                              if (next.value !== "OTHERS")
+                                setPurchaseTypeOther("");
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="field">
+                        <label htmlFor="p-source">Purchase source</label>
+                        <SelectMenu
+                          id="p-source"
+                          value={
+                            purchaseSource === "atcl"
+                              ? "Stock Taken from ATCL"
+                              : "Purchase from Vendor"
+                          }
+                          options={[...purchaseSourceLabels]}
+                          required
+                          onChange={(label) => {
+                            if (label === "Stock Taken from ATCL")
+                              setPurchaseSource("atcl");
+                            else setPurchaseSource("vendor");
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 {purchaseType === "OTHERS" ? (
-                  <div className="field">
+                  <div className="field field--wide">
                     <label htmlFor="p-type-other">Other type</label>
                     <input
                       id="p-type-other"
@@ -2354,27 +2433,6 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
-                <div className="field">
-                  <label htmlFor="p-source">Purchase source</label>
-                  <SelectMenu
-                    id="p-source"
-                    value={
-                      purchaseSource === "atcl"
-                        ? "Stock Taken from ATCL"
-                        : "Purchase from Vendor"
-                    }
-                    options={[
-                      "Purchase from Vendor",
-                      "Stock Taken from ATCL",
-                    ]}
-                    required
-                    onChange={(label) => {
-                      if (label === "Stock Taken from ATCL")
-                        setPurchaseSource("atcl");
-                      else setPurchaseSource("vendor");
-                    }}
-                  />
-                </div>
                 {isCat6 ? (
                 <div className="field">
                   <label htmlFor="p-gstin">GSTIN/GST No</label>
@@ -2483,7 +2541,7 @@ export function TodayHub({
                   rateLabel="Rate (per unit)"
                 />
                 ) : null}
-                <div className="field">
+                <div className="field field--wide">
                   <label htmlFor="p-remarks">{isCat6 ? "Notes" : "Remarks"}</label>
                   <input
                     id="p-remarks"
@@ -2499,7 +2557,7 @@ export function TodayHub({
             {kind === "sale" ? (
               <>
                 {isCat6 ? (
-                <div className="field">
+                <div className="field field--wide">
                   <label htmlFor="s-cust">Customer Name</label>
                   <SelectMenu
                     id="s-cust"
@@ -2513,7 +2571,7 @@ export function TodayHub({
                   />
                 </div>
                 ) : isPvc ? (
-                <div className="field">
+                <div className="field field--wide">
                   <label htmlFor="s-cust">Customer</label>
                   <SelectMenu
                     id="s-cust"
@@ -2612,7 +2670,7 @@ export function TodayHub({
                     isPvc ? "KG" : PRODUCTS.find((p) => p.name === name)?.unit
                   }
                 />
-                <div className="field">
+                <div className="field field--wide">
                   <label htmlFor="s-remarks">Remarks</label>
                   <input
                     id="s-remarks"
@@ -2649,45 +2707,28 @@ export function TodayHub({
                   <>
                     {stockKind === "raw" ? (
                       <>
-                        <div className="form-grid two">
-                          <div className="field">
-                            <label htmlFor="st-kind">Stock type</label>
-                            <SelectMenu
-                              id="st-kind"
-                              value="Raw Material"
-                              options={["Raw Material", "Cable"]}
-                              required
-                              onChange={(next) => {
-                                setStockKind(
-                                  next === "Cable" ? "cable" : "raw",
-                                );
-                                setStockProcessQtys({});
-                              }}
-                            />
-                          </div>
-                          <div className="field">
-                            <label htmlFor="st-item">Raw Material</label>
-                            <SelectMenu
-                              id="st-item"
-                              value={stockItem || stockParticulars[0]}
-                              options={stockParticulars}
-                              required
-                              onChange={(next) => {
-                                setStockItem(next);
-                                if (
-                                  next !== "Others" &&
-                                  next !== "Other" &&
-                                  next !== "others"
-                                )
-                                  setStockItemOther("");
-                              }}
-                            />
-                          </div>
+                        <div className="field field--wide">
+                          <label htmlFor="st-item">Item</label>
+                          <SelectMenu
+                            id="st-item"
+                            value={stockItem || stockParticulars[0]}
+                            options={stockParticulars}
+                            required
+                            onChange={(next) => {
+                              setStockItem(next);
+                              if (
+                                next !== "Others" &&
+                                next !== "Other" &&
+                                next !== "others"
+                              )
+                                setStockItemOther("");
+                            }}
+                          />
                         </div>
                         {stockItem === "Others" ||
                         stockItem === "Other" ||
                         stockItem === "others" ? (
-                          <div className="field">
+                          <div className="field field--wide">
                             <label htmlFor="st-item-other">
                               Other raw material{" "}
                               <span style={{ color: "red" }}>*</span>
@@ -2706,40 +2747,23 @@ export function TodayHub({
                       </>
                     ) : (
                       <>
-                        <div className="form-grid two">
-                          <div className="field">
-                            <label htmlFor="st-kind">Stock type</label>
-                            <SelectMenu
-                              id="st-kind"
-                              value="Cable"
-                              options={["Raw Material", "Cable"]}
-                              required
-                              onChange={(next) => {
-                                setStockKind(
-                                  next === "Cable" ? "cable" : "raw",
-                                );
-                                setStockProcessQtys({});
-                              }}
-                            />
-                          </div>
-                          <div className="field">
-                            <label htmlFor="st-cable">Cable</label>
-                            <SelectMenu
-                              id="st-cable"
-                              value={stockCable}
-                              options={[...QUAD_SIGNAL_STOCK_CABLES]}
-                              required
-                              onChange={(next) => {
-                                setStockCable(next);
-                                if (next !== "Other") setStockCableOther("");
-                              }}
-                            />
-                          </div>
+                        <div className="field field--wide">
+                          <label htmlFor="st-cable">Item</label>
+                          <SelectMenu
+                            id="st-cable"
+                            value={stockCable}
+                            options={[...QUAD_SIGNAL_STOCK_CABLES]}
+                            required
+                            onChange={(next) => {
+                              setStockCable(next);
+                              if (next !== "Other") setStockCableOther("");
+                            }}
+                          />
                         </div>
                         {stockCable === "Other" ? (
-                          <div className="field">
+                          <div className="field field--wide">
                             <label htmlFor="st-cable-other">
-                              Other cable{" "}
+                              Other item{" "}
                               <span style={{ color: "red" }}>*</span>
                             </label>
                             <input
@@ -3399,11 +3423,11 @@ export function TodayHub({
                             })()}
                             <div className="qs-wip__sales">
                               <div className="field">
-                                <label>Sales</label>
+                                <label>Sales km</label>
                                 <input
                                   readOnly
                                   value={`${stockWipSalesKm} km`}
-                                  aria-label="Sales quantity from Sales ledger"
+                                  aria-label="Sales km from Sales ledger"
                                 />
                               </div>
                               {stockWipSalesLines.length > 0 ? (
@@ -3434,7 +3458,7 @@ export function TodayHub({
                                 />
                               </div>
                               <div className="field">
-                                <label htmlFor="st-qty-fin">Finished qty</label>
+                                <label htmlFor="st-qty-fin">Qty</label>
                                 <DecimalInput
                                   id="st-qty-fin"
                                   value={stockQty}
@@ -3449,7 +3473,7 @@ export function TodayHub({
                   </>
                 ) : (
                   <>
-                <div className="field">
+                <div className="field field--wide">
                   <label htmlFor="st-item">
                     {usesStockLedger ? "Particulars" : "Item"}
                   </label>
@@ -3601,9 +3625,24 @@ export function TodayHub({
                       <DecimalInput
                         id="st-rate"
                         value={stockRate}
-                        onChange={setStockRate}
+                        onChange={(next) => {
+                          setStockRate(next);
+                          const qty = Number(stockQty);
+                          const rate = Number(next);
+                          if (Number.isFinite(qty) && Number.isFinite(rate)) {
+                            setStockValue((qty * rate).toFixed(2));
+                          }
+                        }}
                         placeholder="0"
                       />
+                      {stockTotalValue != null ? (
+                        <p className="cost-hint stock-total-value">
+                          Total value{" "}
+                          <span className="cost-hint__amount">
+                            {formatINR(stockTotalValue)}
+                          </span>
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -3614,10 +3653,9 @@ export function TodayHub({
                   <p className="field-hint">
                     Suggested from purchase history: ₹{stockPurchaseRate.toFixed(2)}/
                     {stockUnit || "KGS"} (weighted average — edit if needed)
-                    {stockValue ? ` · Value: ${formatINR(Number(stockValue))}` : ""}
                   </p>
                 ) : null}
-                <div className="field expense-desc">
+                <div className="field field--wide expense-desc">
                   <label htmlFor="st-notes">Notes</label>
                   <textarea
                     id="st-notes"
