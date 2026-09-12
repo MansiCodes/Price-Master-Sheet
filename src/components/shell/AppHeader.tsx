@@ -59,6 +59,7 @@ export type AppHeaderUser = {
   name: string | null;
   email: string;
   role: string;
+  canAccessStock?: boolean;
 };
 
 type AppHeaderProps = {

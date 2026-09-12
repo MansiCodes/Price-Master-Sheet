@@ -30,6 +30,7 @@ export async function DashboardHome({
   scope,
   machineProductionMetrics = null,
   userRole = "",
+  canAccessStock = false,
   pendingApprovals = [],
 }: {
   metrics: DashboardMetrics;
@@ -42,6 +43,7 @@ export async function DashboardHome({
   scope: "org" | "plant";
   machineProductionMetrics?: MpHomeMetrics | null;
   userRole?: string;
+  canAccessStock?: boolean;
   pendingApprovals?: Array<{
     id: string;
     plantId: string;
@@ -157,6 +159,7 @@ export async function DashboardHome({
               canEnter={canEnter}
               embedded
               userRole={userRole}
+              canAccessStock={canAccessStock}
             />
           ) : (
             <section className="mis-panel">

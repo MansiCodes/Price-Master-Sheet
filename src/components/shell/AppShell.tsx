@@ -103,6 +103,7 @@ export function AppShell({
         plant={entryPlant}
         canEnter={canEnter}
         userRole={user?.role ?? ""}
+        canAccessStock={Boolean(user?.canAccessStock)}
       />
     </div>
   );

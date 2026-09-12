@@ -26,6 +26,7 @@ const patchSchema = z.object({
   canViewPriceSheet: z.boolean().optional(),
   canMachineSupervise: z.boolean().optional(),
   canAdminMachineProduction: z.boolean().optional(),
+  canAccessStock: z.boolean().optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(128).optional(),
   plantIds: z.array(z.string().min(1)).optional(),
@@ -143,12 +144,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
     }
-    if (nextRole !== GlobalRole.SUPER_ADMIN && nextRole !== GlobalRole.VIEWER && nextRole !== GlobalRole.MACHINE_SUPERVISOR && plantIds.length === 0) {
-      return NextResponse.json(
-        { ok: false, message: "Assign at least one plant for this user" },
-        { status: 400 },
-      );
-    }
   }
   const passwordHash = data.password
     ? await bcrypt.hash(data.password, 12)
@@ -174,6 +169,25 @@ export async function PATCH(request: Request, context: RouteContext) {
         ? data.canAdminMachineProduction
         : existing.canAdminMachineProduction;
 
+  const nextCanAccessStock =
+    data.canAccessStock !== undefined
+      ? data.canAccessStock
+      : existing.canAccessStock;
+
+  if (data.plantIds) {
+    const plantIds = [...new Set(data.plantIds)];
+    const needsPlant =
+      nextRole !== GlobalRole.SUPER_ADMIN &&
+      nextRole !== GlobalRole.VIEWER &&
+      (nextRole !== GlobalRole.MACHINE_SUPERVISOR || nextCanAccessStock);
+    if (needsPlant && plantIds.length === 0) {
+      return NextResponse.json(
+        { ok: false, message: "Assign at least one plant for this user" },
+        { status: 400 },
+      );
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const user = await tx.user.update({
       where: { id: userId },
@@ -196,6 +210,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             : {}),
         canMachineSupervise: nextCanMachineSupervise,
         canAdminMachineProduction: nextCanAdminMachineProduction,
+        canAccessStock: nextCanAccessStock,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         // For now it is prefilled only for SUPER_ADMIN.
         creditScore: nextCreditScore,
@@ -211,6 +226,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         canViewPriceSheet: true,
         canMachineSupervise: true,
         canAdminMachineProduction: true,
+        canAccessStock: true,
         isActive: true,
       },
     });

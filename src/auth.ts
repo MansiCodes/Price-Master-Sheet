@@ -52,6 +52,7 @@ async function authorizeWithOtp(phoneRaw: string, codeRaw: string) {
     canViewPriceSheet: user.canViewPriceSheet,
     canMachineSupervise: user.canMachineSupervise,
     canAdminMachineProduction: user.canAdminMachineProduction,
+    canAccessStock: user.canAccessStock,
   };
 }
 
@@ -176,6 +177,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
               canViewPriceSheet: user.canViewPriceSheet,
               canMachineSupervise: user.canMachineSupervise,
               canAdminMachineProduction: user.canAdminMachineProduction,
+              canAccessStock: user.canAccessStock,
               rememberMe: rememberFlag,
             };
           } catch (err) {
@@ -197,6 +199,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async (req) => {
           token.canAdminMachineProduction = Boolean(
             user.canAdminMachineProduction,
           );
+          token.canAccessStock = Boolean(user.canAccessStock);
           token.rememberMe = Boolean(
             (user as { rememberMe?: boolean }).rememberMe,
           );

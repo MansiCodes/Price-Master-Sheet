@@ -25,6 +25,7 @@ type UserFormModalProps = {
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
+    canAccessStock: boolean;
     isActive: boolean;
     plantIds: string[];
   }) => Promise<void>;
@@ -58,6 +59,7 @@ export function UserFormModal({
   const [canMachineSupervise, setCanMachineSupervise] = useState(false);
   const [canAdminMachineProduction, setCanAdminMachineProduction] =
     useState(false);
+  const [canAccessStock, setCanAccessStock] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
   const [plantError, setPlantError] = useState<string | null>(null);
@@ -66,10 +68,19 @@ export function UserFormModal({
     () => plants.filter((p) => p.isActive),
     [plants],
   );
+  const selectedHasQuadSignal = useMemo(
+    () =>
+      selectedPlantIds.some((id) => {
+        const code = activePlants.find((p) => p.id === id)?.code?.toUpperCase();
+        return code === "QUAD" || code === "SIGNALLING" || code === "QUADSIGNAL";
+      }),
+    [selectedPlantIds, activePlants],
+  );
+  const showPlantPicker =
+    globalRole !== "SUPER_ADMIN" && globalRole !== "VIEWER";
   const requiresPlants =
-    globalRole !== "SUPER_ADMIN" &&
-    globalRole !== "VIEWER" &&
-    globalRole !== "MACHINE_SUPERVISOR";
+    showPlantPicker &&
+    (globalRole !== "MACHINE_SUPERVISOR" || canAccessStock);
   const canAddMachineSupervise =
     globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT";
   const priceSheetLocked =
@@ -95,8 +106,19 @@ export function UserFormModal({
       label: "MP Admin",
       locked: mpAdminLocked,
     });
+    if (selectedHasQuadSignal) {
+      opts.push({
+        id: "STOCK",
+        label: "Stock (page + Today's Entry)",
+      });
+    }
     return opts;
-  }, [canAddMachineSupervise, priceSheetLocked, mpAdminLocked]);
+  }, [
+    canAddMachineSupervise,
+    priceSheetLocked,
+    mpAdminLocked,
+    selectedHasQuadSignal,
+  ]);
 
   const extraAccessValue = useMemo<ExtraAccessKey[]>(() => {
     const selected: ExtraAccessKey[] = [];
@@ -105,14 +127,17 @@ export function UserFormModal({
       selected.push("MACHINE_SUPERVISOR");
     }
     if (canAdminMachineProduction || mpAdminLocked) selected.push("MP_ADMIN");
+    if (canAccessStock && selectedHasQuadSignal) selected.push("STOCK");
     return selected;
   }, [
     canViewPriceSheet,
     canMachineSupervise,
     canAdminMachineProduction,
+    canAccessStock,
     canAddMachineSupervise,
     priceSheetLocked,
     mpAdminLocked,
+    selectedHasQuadSignal,
   ]);
 
   useEffect(() => {
@@ -139,6 +164,7 @@ export function UserFormModal({
       setCanViewPriceSheet(editing.canViewPriceSheet);
       setCanMachineSupervise(Boolean(editing.canMachineSupervise));
       setCanAdminMachineProduction(Boolean(editing.canAdminMachineProduction));
+      setCanAccessStock(Boolean(editing.canAccessStock));
       setSelectedPlantIds(
         editing.plantRoles?.map((role) => role.plantId) ?? [],
       );
@@ -151,6 +177,7 @@ export function UserFormModal({
       setCanViewPriceSheet(false);
       setCanMachineSupervise(false);
       setCanAdminMachineProduction(false);
+      setCanAccessStock(false);
       setSelectedPlantIds(
         activePlants[0] ? [activePlants[0].id] : [],
       );
@@ -166,21 +193,32 @@ export function UserFormModal({
   }, [visible, editingId]);
 
   useEffect(() => {
+    if (!selectedHasQuadSignal && canAccessStock) {
+      setCanAccessStock(false);
+    }
+  }, [selectedHasQuadSignal, canAccessStock]);
+
+  useEffect(() => {
     if (!open) return;
     if (
       globalRole === "SUPER_ADMIN" ||
-      globalRole === "VIEWER" ||
-      globalRole === "MACHINE_SUPERVISOR"
+      globalRole === "VIEWER"
     ) {
       setSelectedPlantIds([]);
       setPlantError(null);
       setCanMachineSupervise(false);
+      setCanAccessStock(false);
       if (globalRole === "SUPER_ADMIN") {
         setCanViewPriceSheet(true);
         setCanAdminMachineProduction(true);
       } else if (globalRole === "VIEWER") {
         setCanViewPriceSheet(true);
       }
+      return;
+    }
+    if (globalRole === "MACHINE_SUPERVISOR") {
+      setCanMachineSupervise(false);
+      // Keep plants when Stock is enabled; otherwise optional plant pick for Stock extra.
       return;
     }
     if (
@@ -193,7 +231,7 @@ export function UserFormModal({
     if (selectedPlantIds.length === 0 && activePlants[0] && !editing) {
       setSelectedPlantIds([activePlants[0].id]);
     }
-  }, [globalRole, open, activePlants, editing, selectedPlantIds.length, canMachineSupervise]);
+  }, [globalRole, open, activePlants, editing, selectedPlantIds.length, canMachineSupervise, canAccessStock]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -240,11 +278,12 @@ export function UserFormModal({
           ? canMachineSupervise
           : false,
       canAdminMachineProduction: mpAdminLocked || canAdminMachineProduction,
+      canAccessStock: selectedHasQuadSignal ? canAccessStock : false,
       isActive: editing?.isActive ?? true,
       plantIds:
         globalRole === "SUPER_ADMIN" ||
         globalRole === "VIEWER" ||
-        globalRole === "MACHINE_SUPERVISOR"
+        (globalRole === "MACHINE_SUPERVISOR" && !canAccessStock)
           ? []
           : selectedPlantIds,
     });
@@ -261,6 +300,21 @@ export function UserFormModal({
       canAddMachineSupervise && next.includes("MACHINE_SUPERVISOR"),
     );
     setCanAdminMachineProduction(mpAdminLocked || next.includes("MP_ADMIN"));
+    const stockOn = selectedHasQuadSignal && next.includes("STOCK");
+    setCanAccessStock(stockOn);
+    if (
+      stockOn &&
+      globalRole === "MACHINE_SUPERVISOR" &&
+      selectedPlantIds.length === 0 &&
+      activePlants[0]
+    ) {
+      const quad =
+        activePlants.find((p) => {
+          const c = p.code.toUpperCase();
+          return c === "QUAD" || c === "SIGNALLING" || c === "QUADSIGNAL";
+        }) ?? activePlants[0];
+      setSelectedPlantIds([quad.id]);
+    }
   }
 
   const extraAccessField = (
@@ -424,14 +478,14 @@ export function UserFormModal({
                 }}
               />
             </div>
-            {requiresPlants ? (
+            {showPlantPicker ? (
               <div className="field">
                 <label htmlFor="user-plant">{t("plant")}</label>
                 <PlantMultiSelect
                   id="user-plant"
                   plants={activePlants}
                   value={selectedPlantIds}
-                  required
+                  required={requiresPlants}
                   disabled={saving || activePlants.length === 0}
                   placeholder={t("selectPlants")}
                   onChange={onPlantIdsChange}
@@ -445,7 +499,7 @@ export function UserFormModal({
             ) : (
               extraAccessField
             )}
-            {requiresPlants ? extraAccessField : null}
+            {showPlantPicker ? extraAccessField : null}
           </div>
         </form>
 

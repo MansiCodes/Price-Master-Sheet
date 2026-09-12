@@ -164,6 +164,9 @@ const SIZE_OF_CABLE_MASTER: MasterRow[] = [
   { size: "5P x 0.5mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 10 },
   { size: "2P x 0.5mm Unamoured", drumLabel: "1KM/500mtr", coreCount: 4 },
   { size: "20P x 0.5mm Armoured", drumLabel: "1KM/500mtr", coreCount: 40 },
+  { size: "5P x 0.63mm Armoured", drumLabel: "1KM/500mtr", coreCount: 10 },
+  { size: "5Pair x 0.63mm Armoured", drumLabel: "1KM/500mtr", coreCount: 10 },
+  { size: "5 Pair x 0.63mm Armoured", drumLabel: "1KM/500mtr", coreCount: 10 },
 ];
 
 function buildVariantMap(): Record<string, QuadSignalVariantConfig> {
@@ -187,17 +190,21 @@ function buildVariantMap(): Record<string, QuadSignalVariantConfig> {
 const VARIANT_BY_SIZE = buildVariantMap();
 
 function normalizeSizeKey(size: string): string {
-  return size.trim().replace(/\s+/g, " ");
+  return size
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/(\d)\s*P(?:air|airs)?\b/gi, "$1P");
 }
 
-/** Parse "12 Core x 1.5 sqmm" / "6 Quad x 0.9mm" → core/wire count. */
+/** Parse "12 Core x 1.5 sqmm" / "6 Quad x 0.9mm" / "5P" / "5Pair" → core/wire count. */
 export function parseCoreOrQuadCount(size: string): number | null {
   const s = size.trim();
   const core = s.match(/(\d+)\s*Core\b/i);
   if (core) return Number(core[1]);
   const quad = s.match(/(\d+)\s*Quad\b/i);
   if (quad) return Number(quad[1]) * 4;
-  const pair = s.match(/(\d+)\s*P\b/i);
+  // PIJF: 10P, 5P, 5Pair, 5 Pair, 20Pairs …
+  const pair = s.match(/(\d+)\s*P(?:airs?|air)?\b/i);
   if (pair) return Number(pair[1]) * 2;
   return null;
 }
@@ -450,9 +457,11 @@ export function calculateQuadSignalWip(input: WipCalcInput): WipCalcResult {
   }
 
   const finishedProcess = processes[processes.length - 1]!;
-  const layingIdx = processes.findIndex(
-    (p) => p.toLowerCase() === "laying",
-  );
+  // Exact "Laying" or split stages like "Laying 1st part" / "Laying 2nd part"
+  const layingIdx = processes.findIndex((p) => {
+    const n = p.toLowerCase();
+    return n === "laying" || n.startsWith("laying ");
+  });
   const insulationIdx = processes.findIndex(
     (p) => p.toLowerCase() === "insulation",
   );

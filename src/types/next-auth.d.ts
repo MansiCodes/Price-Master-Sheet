@@ -9,6 +9,7 @@ declare module "next-auth" {
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
+    canAccessStock: boolean;
     rememberMe?: boolean;
   }
 
@@ -20,6 +21,7 @@ declare module "next-auth" {
       canViewPriceSheet: boolean;
       canMachineSupervise: boolean;
       canAdminMachineProduction: boolean;
+      canAccessStock: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -32,6 +34,7 @@ declare module "next-auth/jwt" {
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
+    canAccessStock: boolean;
     rememberMe?: boolean;
   }
 }

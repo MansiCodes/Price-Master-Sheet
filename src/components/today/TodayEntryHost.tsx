@@ -55,10 +55,12 @@ export function TodayEntryHost({
   plant,
   canEnter,
   userRole = "",
+  canAccessStock = false,
 }: {
   plant: PlantInfo | null;
   canEnter: boolean;
   userRole?: string;
+  canAccessStock?: boolean;
 }) {
   const pathname = usePathname();
   const date = useMemo(() => todayLocalISO(), []);
@@ -67,7 +69,13 @@ export function TodayEntryHost({
   );
   const [open, setOpen] = useState(false);
 
-  const enabled = Boolean(plant && canEnter && pathname !== "/");
+  // Dashboard "/" normally uses embedded TodayHub. Machine Supervisor + Stock
+  // only has MachineProductionHome on "/", so the global host must work there too.
+  const allowOnHome =
+    userRole === "MACHINE_SUPERVISOR" && canAccessStock;
+  const enabled = Boolean(
+    plant && canEnter && (pathname !== "/" || allowOnHome),
+  );
 
   useEffect(() => {
     if (!enabled || !plant) return;
@@ -122,6 +130,7 @@ export function TodayEntryHost({
       externalOpen={open}
       onExternalOpenChange={setOpen}
       userRole={userRole}
+      canAccessStock={canAccessStock}
     />
   );
 }

@@ -70,7 +70,19 @@ export default async function DashboardPage({
   const { period: periodParam } = await searchParams;
   const period = parseDashboardPeriod(periodParam);
 
-  const user = session.user;
+  const dbFlags = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { canAccessStock: true, globalRole: true, isActive: true },
+  });
+  if (!dbFlags?.isActive) redirect("/login");
+
+  const user = {
+    ...session.user,
+    globalRole: dbFlags.globalRole,
+    canAccessStock: Boolean(dbFlags.canAccessStock),
+  };
+
+  // Stock-enabled Machine Supervisors keep MP home; layout provides Stock + Today's Entry.
   if (isMachineSupervisorOnly(user.globalRole)) {
     const metrics = await getMachineProductionHomeMetrics();
     return <MachineProductionHome metrics={metrics} />;
@@ -181,6 +193,7 @@ export default async function DashboardPage({
       scope={primary ? "plant" : "org"}
       machineProductionMetrics={machineProductionMetrics}
       userRole={user.globalRole}
+      canAccessStock={Boolean(user.canAccessStock)}
       pendingApprovals={pendingApprovals}
     />
   );

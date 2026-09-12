@@ -14,7 +14,8 @@ import { createPortal } from "react-dom";
 export type ExtraAccessKey =
   | "PRICE_SHEET"
   | "MACHINE_SUPERVISOR"
-  | "MP_ADMIN";
+  | "MP_ADMIN"
+  | "STOCK";
 
 export type ExtraAccessOption = {
   id: ExtraAccessKey;

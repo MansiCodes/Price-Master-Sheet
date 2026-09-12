@@ -33,7 +33,33 @@ export default async function AppLayout({
   if (!session?.user) {
     redirect("/login");
   }
-  const user = session.user;
+  // Fresh flags from DB — JWT can lag after Extra access edits until re-login.
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      canAccessStock: true,
+      canMachineSupervise: true,
+      canAdminMachineProduction: true,
+      canViewPriceSheet: true,
+      globalRole: true,
+      name: true,
+      email: true,
+      isActive: true,
+    },
+  });
+  if (!dbUser || !dbUser.isActive) {
+    redirect("/login");
+  }
+  const user = {
+    ...session.user,
+    globalRole: dbUser.globalRole,
+    canAccessStock: Boolean(dbUser.canAccessStock),
+    canMachineSupervise: Boolean(dbUser.canMachineSupervise),
+    canAdminMachineProduction: Boolean(dbUser.canAdminMachineProduction),
+    canViewPriceSheet: Boolean(dbUser.canViewPriceSheet),
+    name: dbUser.name ?? session.user.name,
+    email: dbUser.email ?? session.user.email,
+  };
   const role = user.globalRole;
   const superAdmin = role ? isSuperAdmin(role) : false;
   const globalPlantAccess = role ? hasGlobalPlantAccess(role) : false;
@@ -45,7 +71,9 @@ export default async function AppLayout({
     canAdminMachineProduction: Boolean(user.canAdminMachineProduction),
   };
   const mpAdmin = role ? canAdminMachineProduction(role, mpOpts) : false;
-  if (role && isMachineSupervisorOnly(role)) {
+  // Pure Machine Supervisors without Stock extra keep the slim MS shell.
+  // With Stock extra they use the plant shell (Stock page + Today's Entry stock).
+  if (role && isMachineSupervisorOnly(role) && !user.canAccessStock) {
     return (
       <AppShell
         navFlags={{
@@ -68,6 +96,7 @@ export default async function AppLayout({
           name: user.name ?? null,
           email: user.email ?? "",
           role: user.globalRole,
+          canAccessStock: false,
         }}
         canEnter={false}
         plants={[]}
@@ -79,7 +108,41 @@ export default async function AppLayout({
     );
   }
 
-  const plantIds = user ? await getAccessiblePlantIds(user.id) : [];
+  const plantIdsRaw = user ? await getAccessiblePlantIds(user.id) : [];
+  // Machine Supervisor + Stock must have Quad plant assignment; repair empty roles.
+  let plantIds = plantIdsRaw;
+  if (
+    role &&
+    isMachineSupervisorOnly(role) &&
+    user.canAccessStock &&
+    plantIds.length === 0
+  ) {
+    const quad = await prisma.plant.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { code: { equals: "QUAD", mode: "insensitive" } },
+          { code: { equals: "QUADSIGNAL", mode: "insensitive" } },
+          { code: { equals: "SIGNALLING", mode: "insensitive" } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (quad) {
+      await prisma.userPlantRole.upsert({
+        where: {
+          userId_plantId: { userId: user.id, plantId: quad.id },
+        },
+        create: {
+          userId: user.id,
+          plantId: quad.id,
+          role: user.globalRole,
+        },
+        update: {},
+      });
+      plantIds = [quad.id];
+    }
+  }
   const selectedPlantId = user
     ? await resolveSelectedPlantId(user.id, {
         hasGlobalPlantAccess: globalPlantAccess,
@@ -123,20 +186,27 @@ export default async function AppLayout({
       }
     : null;
 
-  const showPnl = role ? canViewPnl(role) : false;
+  const showPnl =
+    role && !isMachineSupervisorOnly(role) ? canViewPnl(role) : false;
   const pnlSalesPurchaseOnly = role ? isAccountantPnlLimited(role) : false;
   const showPriceSheet =
     !!user &&
+    !isMachineSupervisorOnly(role) &&
     (hasGlobalPlantAccess(user.globalRole) || canViewPriceSheet(user));
   const showMachineProduction = role
     ? canAccessMachineProduction(role, mpOpts)
     : false;
-  const showAdmin = role ? isAdminOrHead(role) : false;
-  const showUsers = role ? canViewUsersDirectory(role) : false;
-  const showApprovals = role ? canApproveEntries(role) : false;
-  const showStock = selectedPlantRaw
-    ? isQuadSignalPlant(selectedPlantRaw.code)
-    : false;
+  const showAdmin = role && !isMachineSupervisorOnly(role) ? isAdminOrHead(role) : false;
+  const showUsers =
+    role && !isMachineSupervisorOnly(role)
+      ? canViewUsersDirectory(role)
+      : false;
+  const showApprovals =
+    role && !isMachineSupervisorOnly(role) ? canApproveEntries(role) : false;
+  const showStock =
+    !!selectedPlantRaw &&
+    isQuadSignalPlant(selectedPlantRaw.code) &&
+    (role !== "MACHINE_SUPERVISOR" || Boolean(user?.canAccessStock));
   const showSuper = role ? isSuperAdmin(role) : false;
   const isManager = role ? isPlantManager(role) : false;
   const canEnter = role ? canEnterData(role) : false;
@@ -149,6 +219,7 @@ export default async function AppLayout({
         pnlSalesPurchaseOnly,
         showPriceSheet,
         showMachineProduction,
+        isMachineSupervisor: role ? isMachineSupervisorOnly(role) : false,
         showAdmin,
         showUsers,
         showApprovals,
@@ -162,7 +233,12 @@ export default async function AppLayout({
       }}
       user={
         user
-          ? { name: user.name ?? null, email: user.email ?? "", role: user.globalRole }
+          ? {
+              name: user.name ?? null,
+              email: user.email ?? "",
+              role: user.globalRole,
+              canAccessStock: Boolean(user.canAccessStock),
+            }
           : null
       }
       canEnter={canEnter}

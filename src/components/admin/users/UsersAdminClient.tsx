@@ -162,6 +162,7 @@ export function UsersAdminClient() {
     canViewPriceSheet: boolean;
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
+    canAccessStock: boolean;
     isActive: boolean;
     plantIds: string[];
   }) {
@@ -178,6 +179,7 @@ export function UsersAdminClient() {
           canViewPriceSheet: payload.canViewPriceSheet,
           canMachineSupervise: payload.canMachineSupervise,
           canAdminMachineProduction: payload.canAdminMachineProduction,
+          canAccessStock: payload.canAccessStock,
           isActive: payload.isActive,
           plantIds: payload.plantIds,
         };
@@ -205,6 +207,7 @@ export function UsersAdminClient() {
             canViewPriceSheet: payload.canViewPriceSheet,
             canMachineSupervise: payload.canMachineSupervise,
             canAdminMachineProduction: payload.canAdminMachineProduction,
+            canAccessStock: payload.canAccessStock,
             plantIds: payload.plantIds,
           }),
         });

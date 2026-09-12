@@ -325,6 +325,8 @@ const PIJF_CABLE_SIZES = [
   "20P x 0.9mm Armoured",
   "10P x 0.9mm Un-Armoured",
   "5P x 0.5mm Unamoured",
+  "5P x 0.63mm Armoured",
+  "5Pair x 0.63mm Armoured",
   "2P x 0.5mm Unamoured",
   "20P x 0.5mm Armoured",
   "Other",
@@ -349,6 +351,22 @@ const SIGNALLING_PROCESSES = [
   "Inner Sheath",
   "DST",
   "Outer Sheath",
+] as const;
+
+/** Indoor Multi-Core (Mc): Conductor → Insulation → Laying 1st/2nd → Outer Sheath. */
+const INDOOR_MULTI_CORE_PROCESSES = [
+  "Conductor",
+  "Insulation",
+  "Laying 1st part",
+  "Laying 2nd part",
+  "Outer Sheath",
+] as const;
+
+/** Indoor Single-Core / Signal Core (SC): Conductor → Insulation → Coils. */
+const INDOOR_SINGLE_CORE_PROCESSES = [
+  "Conductor",
+  "Insulation",
+  "Coils",
 ] as const;
 
 /** Quad: Insulation → Single Quad → Laying → Inner → Screening → Intermediate → DST → Outer (TJ Sir). */
@@ -381,8 +399,8 @@ const SINGLE_CORE_PROCESSES = [
 export const QUAD_SIGNAL_CABLE_PROCESSES: Record<string, readonly string[]> = {
   "Signalling Cable": SIGNALLING_PROCESSES,
   "Power Cable": POWER_PROCESSES,
-  "Indoor Multi-Core Cable": SIGNALLING_PROCESSES,
-  "Indoor Single-Core Cable": SINGLE_CORE_PROCESSES,
+  "Indoor Multi-Core Cable": INDOOR_MULTI_CORE_PROCESSES,
+  "Indoor Single-Core Cable": INDOOR_SINGLE_CORE_PROCESSES,
   "Fire Survival Cable": POWER_PROCESSES,
   "Quad Cable": QUAD_PROCESSES,
   "PIJF Cable": QUAD_PROCESSES,

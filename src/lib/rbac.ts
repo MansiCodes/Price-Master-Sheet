@@ -235,6 +235,23 @@ export function canEnterStockData(role: GlobalRole | Role): boolean {
   return canEnterData(role) && !isAccountant(role);
 }
 
+/** Stock page / stock-only Today's Entry via Extra access flag. */
+export function hasStockExtraAccess(opts?: {
+  canAccessStock?: boolean;
+}): boolean {
+  return Boolean(opts?.canAccessStock);
+}
+
+/**
+ * Machine supervisors with Stock extra only enter Stock (not purchase/sale/expense).
+ */
+export function isStockEntryOnly(
+  role: GlobalRole | Role,
+  opts?: { canAccessStock?: boolean },
+): boolean {
+  return role === GlobalRole.MACHINE_SUPERVISOR && Boolean(opts?.canAccessStock);
+}
+
 export function canEnterExpenseData(role: GlobalRole | Role): boolean {
   return canEnterData(role) && !isAccountant(role);
 }

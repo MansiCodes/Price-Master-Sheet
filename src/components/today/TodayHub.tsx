@@ -259,6 +259,8 @@ type TodayHubProps = {
   onExternalOpenChange?: (open: boolean) => void;
   /** Used to limit entry kinds (e.g. accountants → purchase + sales only). */
   userRole?: string;
+  /** Machine Supervisor Extra Stock → Today's Entry stock only. */
+  canAccessStock?: boolean;
 };
 
 function moduleScore(mod: TodayModuleStatus) {
@@ -277,6 +279,7 @@ export function TodayHub({
   externalOpen,
   onExternalOpenChange,
   userRole = "",
+  canAccessStock = false,
 }: TodayHubProps) {
   const router = useRouter();
   const t = useTranslations("today");
@@ -449,28 +452,33 @@ export function TodayHub({
     [stockCatalog.particulars, customStockItems, isQuad],
   );
 
-  const accountantOnly =
-    userRole === "ACCOUNTANT";
+  const accountantOnly = userRole === "ACCOUNTANT";
+  const stockEntryOnly =
+    userRole === "MACHINE_SUPERVISOR" && canAccessStock;
   const allowedEntryKinds = useMemo(
     () =>
-      accountantOnly
-        ? (["purchase", "sale"] as EntryKind[])
-        : ENTRY_KINDS,
-    [accountantOnly],
+      stockEntryOnly
+        ? (["stock"] as EntryKind[])
+        : accountantOnly
+          ? (["purchase", "sale"] as EntryKind[])
+          : ENTRY_KINDS,
+    [accountantOnly, stockEntryOnly],
   );
   const allowedModuleKeys = useMemo(
     () =>
       new Set(
-        accountantOnly
-          ? (["purchaseFilled", "saleFilled"] as TodayModuleKey[])
-          : ([
-              "purchaseFilled",
-              "saleFilled",
-              "stockFilled",
-              "pettyCashFilled",
-            ] as TodayModuleKey[]),
+        stockEntryOnly
+          ? (["stockFilled"] as TodayModuleKey[])
+          : accountantOnly
+            ? (["purchaseFilled", "saleFilled"] as TodayModuleKey[])
+            : ([
+                "purchaseFilled",
+                "saleFilled",
+                "stockFilled",
+                "pettyCashFilled",
+              ] as TodayModuleKey[]),
       ),
-    [accountantOnly],
+    [accountantOnly, stockEntryOnly],
   );
 
   const entryOptions = useMemo(
@@ -2239,7 +2247,7 @@ export function TodayHub({
       <SlideOver
         open={panelOpen}
         onClose={closePanel}
-        title={t("title")}
+        title={stockEntryOnly ? "Stock" : t("title")}
         footer={
           <>
             <Button variant="secondary" onClick={closePanel}>
@@ -2316,28 +2324,8 @@ export function TodayHub({
                 </div>
               ) : null}
 
-              <div
-                className={`form-grid today-entry-kind-row ${
-                  showStockTypeBeside ? "two" : ""
-                }`}
-              >
-                <div className="field">
-                  <label htmlFor="entry-kind">{t("entryType")}</label>
-                  <SelectMenu
-                    id="entry-kind"
-                    value={
-                      entryOptions.find((o) => o.value === kind)?.label ??
-                      t("purchase")
-                    }
-                    options={entryOptions.map((o) => o.label)}
-                    required
-                    onChange={(label) => {
-                      const next = entryOptions.find((o) => o.label === label);
-                      if (next) setKind(next.value);
-                    }}
-                  />
-                </div>
-                {showStockTypeBeside ? (
+              {stockEntryOnly ? (
+                showStockTypeBeside ? (
                   <div className="field">
                     <label htmlFor="st-kind">Stock type</label>
                     <SelectMenu
@@ -2351,8 +2339,46 @@ export function TodayHub({
                       }}
                     />
                   </div>
-                ) : null}
-              </div>
+                ) : null
+              ) : (
+                <div
+                  className={`form-grid today-entry-kind-row ${
+                    showStockTypeBeside ? "two" : ""
+                  }`}
+                >
+                  <div className="field">
+                    <label htmlFor="entry-kind">{t("entryType")}</label>
+                    <SelectMenu
+                      id="entry-kind"
+                      value={
+                        entryOptions.find((o) => o.value === kind)?.label ??
+                        t("purchase")
+                      }
+                      options={entryOptions.map((o) => o.label)}
+                      required
+                      onChange={(label) => {
+                        const next = entryOptions.find((o) => o.label === label);
+                        if (next) setKind(next.value);
+                      }}
+                    />
+                  </div>
+                  {showStockTypeBeside ? (
+                    <div className="field">
+                      <label htmlFor="st-kind">Stock type</label>
+                      <SelectMenu
+                        id="st-kind"
+                        value={stockKind === "cable" ? "Cable" : "Raw Material"}
+                        options={["Raw Material", "Cable"]}
+                        required
+                        onChange={(next) => {
+                          setStockKind(next === "Cable" ? "cable" : "raw");
+                          setStockProcessQtys({});
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              )}
             </>
           );
         })()}

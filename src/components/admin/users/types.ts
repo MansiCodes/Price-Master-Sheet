@@ -21,6 +21,7 @@ export type UserRow = {
   canViewPriceSheet: boolean;
   canMachineSupervise: boolean;
   canAdminMachineProduction: boolean;
+  canAccessStock: boolean;
   isActive: boolean;
   coinsBalance: number;
   createdAt: string;

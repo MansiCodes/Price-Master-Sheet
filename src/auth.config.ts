@@ -62,6 +62,7 @@ export const authConfig = {
         token.canAdminMachineProduction = Boolean(
           user.canAdminMachineProduction,
         );
+        token.canAccessStock = Boolean(user.canAccessStock);
       }
       return token;
     },
@@ -76,6 +77,7 @@ export const authConfig = {
         session.user.canAdminMachineProduction = Boolean(
           token.canAdminMachineProduction,
         );
+        session.user.canAccessStock = Boolean(token.canAccessStock);
       }
       return session;
     },
