@@ -358,6 +358,7 @@ export async function persistPnlImport(opts: {
       const production: Record<string, number> = {};
       const src = row.qsProduction ?? {};
       const aliasGroups: string[][] = [
+        ["Conductor"],
         ["Insulation"],
         ["Single Quad"],
         ["Laying"],
@@ -455,6 +456,18 @@ export async function persistPnlImport(opts: {
           closing: wip.byProcess,
           processes: wip.byProcess,
           salesKm,
+          ...(row.qsCallPutup?.trim()
+            ? { callPutup: row.qsCallPutup.trim() }
+            : {}),
+          ...(row.qsPutupDate?.trim()
+            ? { putupDate: row.qsPutupDate.trim() }
+            : {}),
+          ...(row.qsPartyName?.trim()
+            ? { partyName: row.qsPartyName.trim() }
+            : {}),
+          ...(row.qsDispatchPending != null
+            ? { dispatchPending: row.qsDispatchPending }
+            : {}),
           calcSnapshot: {
             ...wip.calcSnapshot,
             drumLabel: drumLabel || undefined,

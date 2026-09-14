@@ -408,6 +408,10 @@ export async function GET(
         Value: 14,
         "Sales km": 12,
         "Drum length": 14,
+        "Call putup": 14,
+        "Put up date": 12,
+        "Party name": 22,
+        "Dispatch pending": 14,
         Notes: 28,
       };
       sheet.columns = QUAD_STOCK_SHEET_HEADERS.map((header) => ({
@@ -425,6 +429,10 @@ export async function GET(
         for (const h of QUAD_STOCK_PROCESS_HEADERS) processVals[h] = "";
         let salesKm: number | "" = "";
         let drumLength = "";
+        let callPutup = "";
+        let putupDate = "";
+        let partyName = "";
+        let dispatchPending: number | "" = "";
         if (meta?.kind === "cable") {
           type = "Cable";
           item = meta.cable || r.itemName;
@@ -438,6 +446,10 @@ export async function GET(
           }
           if (meta.salesKm != null) salesKm = meta.salesKm;
           drumLength = meta.calcSnapshot?.drumLabel ?? "";
+          callPutup = meta.callPutup ?? "";
+          putupDate = meta.putupDate ?? "";
+          partyName = meta.partyName ?? "";
+          if (meta.dispatchPending != null) dispatchPending = meta.dispatchPending;
         } else if (meta?.kind === "raw") {
           type = "Raw Material";
           item = r.itemName;
@@ -458,6 +470,10 @@ export async function GET(
           Value: toNum(r.closingValue),
           "Sales km": salesKm,
           "Drum length": drumLength,
+          "Call putup": callPutup,
+          "Put up date": putupDate,
+          "Party name": partyName,
+          "Dispatch pending": dispatchPending,
           Notes: userNotes,
           ...processVals,
         });

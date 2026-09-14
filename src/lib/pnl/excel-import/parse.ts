@@ -81,6 +81,10 @@ export type ParsedStockRow = {
   qsProduction?: Record<string, number>;
   qsSalesKm?: number;
   qsDrumLabel?: string | null;
+  qsCallPutup?: string | null;
+  qsPutupDate?: string | null;
+  qsPartyName?: string | null;
+  qsDispatchPending?: number;
 };
 
 export type ExpenseTarget = "petty" | "electricity" | "rent" | "far";
@@ -268,6 +272,10 @@ const STOCK_ALIASES: Record<string, string[]> = {
   stockType: ["stock type"],
   salesKm: ["sales km", "sales"],
   drumLength: ["drum length", "coil length", "drum / coil length"],
+  callPutup: ["call putup", "call put-up"],
+  putupDate: ["put up date", "putup date", "put-up date"],
+  partyName: ["party name", "party", "customer name"],
+  dispatchPending: ["dispatch pending", "pending dispatch"],
   notes: ["notes", "remarks", "remark"],
 };
 
@@ -1011,6 +1019,34 @@ export async function parsePnlWorkbook(
                   qsSalesKm:
                     qsKind === "cable" && salesKm != null ? salesKm : undefined,
                   qsDrumLabel: qsKind === "cable" ? drumLength : undefined,
+                  qsCallPutup:
+                    qsKind === "cable"
+                      ? str(getCell(sheet, r, header.map, "callPutup")) || null
+                      : undefined,
+                  qsPutupDate:
+                    qsKind === "cable"
+                      ? (() => {
+                          const raw = getCell(
+                            sheet,
+                            r,
+                            header.map,
+                            "putupDate",
+                          );
+                          const parsed = asUtcDate(raw);
+                          if (parsed) return ymd(parsed);
+                          const s = str(raw);
+                          return s || null;
+                        })()
+                      : undefined,
+                  qsPartyName:
+                    qsKind === "cable"
+                      ? str(getCell(sheet, r, header.map, "partyName")) || null
+                      : undefined,
+                  qsDispatchPending:
+                    qsKind === "cable"
+                      ? num(getCell(sheet, r, header.map, "dispatchPending")) ??
+                        undefined
+                      : undefined,
                 }
               : {}),
           });

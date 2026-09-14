@@ -35,6 +35,7 @@ export type SharedInsulationStatus = {
 
 function shortProcessName(name: string): string {
   const n = name.trim().toLowerCase();
+  if (n === "conductor") return "Conductor";
   if (n === "insulation") return "Insul";
   if (n === "laying") return "Laying";
   if (n === "inner sheath") return "Inner";
@@ -141,7 +142,12 @@ export function buildCableStockStatus(rows: Array<{
       production: Number(production[name]) || 0,
     }));
 
-    const totalKm = processes.reduce((s, p) => s + p.closing, 0);
+    // Insul + Single Quad stay visible on the card but are not part of Total.
+    const totalKm = processes.reduce((s, p) => {
+      const n = p.name.trim().toLowerCase();
+      if (n === "insulation" || n === "single quad") return s;
+      return s + p.closing;
+    }, 0);
 
     byKey.set(key, {
       key,

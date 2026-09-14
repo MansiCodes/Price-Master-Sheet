@@ -909,6 +909,10 @@
 .qs-wip__sales {
   margin-bottom: 0.75rem;
 }
+.qs-wip__sales-row.form-grid.two {
+  margin: 0;
+  gap: 0.65rem;
+}
 .qs-wip__sales-list {
   margin: 0.35rem 0 0;
   padding-left: 1.1rem;

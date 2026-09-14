@@ -382,6 +382,16 @@ const QUAD_PROCESSES = [
 ] as const;
 
 const POWER_PROCESSES = [
+  "Conductor",
+  "Insulation",
+  "Laying",
+  "Inner Sheath",
+  "Outer Sheath",
+  "Armouring",
+] as const;
+
+/** Fire Survival keeps the prior chain (no Conductor stage). */
+const FIRE_SURVIVAL_PROCESSES = [
   "Insulation",
   "Laying",
   "Inner Sheath",
@@ -401,7 +411,7 @@ export const QUAD_SIGNAL_CABLE_PROCESSES: Record<string, readonly string[]> = {
   "Power Cable": POWER_PROCESSES,
   "Indoor Multi-Core Cable": INDOOR_MULTI_CORE_PROCESSES,
   "Indoor Single-Core Cable": INDOOR_SINGLE_CORE_PROCESSES,
-  "Fire Survival Cable": POWER_PROCESSES,
+  "Fire Survival Cable": FIRE_SURVIVAL_PROCESSES,
   "Quad Cable": QUAD_PROCESSES,
   "PIJF Cable": QUAD_PROCESSES,
   Other: SINGLE_CORE_PROCESSES,
@@ -429,6 +439,14 @@ export type QuadSignalStockMeta = {
   closing?: Record<string, number>;
   /** Finished-stock sales km summed from Sales ledger (v2). */
   salesKm?: number;
+  /** Call put-up reference (per cable/size entry). */
+  callPutup?: string;
+  /** Put-up date (per cable/size entry). */
+  putupDate?: string;
+  /** Party / customer name for this stock line. */
+  partyName?: string;
+  /** Dispatch pending qty (km). */
+  dispatchPending?: number;
   calcSnapshot?: {
     coreCount: number;
     lengthFactor: number;

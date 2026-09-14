@@ -5,7 +5,11 @@ import {
 } from "@/lib/api";
 import { dateOnlyRegex, parseDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
-import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
+import {
+  getQuadSignalCableProcesses,
+  parseQuadSignalStockNotes,
+} from "@/lib/plant-catalogs";
+import { ManpowerShift } from "@prisma/client";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
@@ -47,6 +51,11 @@ export async function GET(
   const dateRaw = (request.nextUrl.searchParams.get("date") ?? "").trim();
   const cable = (request.nextUrl.searchParams.get("cable") ?? "").trim();
   const size = (request.nextUrl.searchParams.get("size") ?? "").trim();
+  const shiftRaw = (request.nextUrl.searchParams.get("shift") ?? "DAY")
+    .trim()
+    .toUpperCase();
+  const shift =
+    shiftRaw === "NIGHT" ? ManpowerShift.NIGHT : ManpowerShift.DAY;
 
   if (!dateOnlyRegex.test(dateRaw)) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
@@ -105,6 +114,32 @@ export async function GET(
     size,
   );
 
+  const existingStock = await prisma.stockEntry.findFirst({
+    where: {
+      ...pScope,
+      date: day,
+      shift,
+      itemName,
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { notes: true },
+  });
+  const { meta: existingMeta } = parseQuadSignalStockNotes(
+    existingStock?.notes,
+  );
+  const stockMeta =
+    existingMeta?.kind === "cable"
+      ? {
+          callPutup: existingMeta.callPutup ?? "",
+          putupDate: existingMeta.putupDate ?? "",
+          partyName: existingMeta.partyName ?? "",
+          dispatchPending:
+            existingMeta.dispatchPending != null
+              ? String(existingMeta.dispatchPending)
+              : "",
+        }
+      : null;
+
   return NextResponse.json({
     date: dateRaw,
     cable,
@@ -125,5 +160,6 @@ export async function GET(
       unit: s.unit,
     })),
     variant,
+    stockMeta,
   });
 }

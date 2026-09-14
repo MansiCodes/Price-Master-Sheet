@@ -15,9 +15,12 @@ import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
 import { collectStockPhotoUrls } from "@/lib/bill-photos";
 import {
+  encodeQuadSignalStockNotes,
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
+  type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
+import type { EditField } from "@/components/pnl/EntryEditDrawer";
 
 type StockRow = {
   id: string;
@@ -95,7 +98,9 @@ export function StockReport({
     compact: true,
     render: (r) => (
       <ReportRowActions
-        onEdit={() =>
+        onEdit={() => {
+          const { meta, userNotes } = parseQuadSignalStockNotes(r.notes);
+          const cableMeta = meta?.kind === "cable" ? meta : null;
           crud.openEdit(
             r,
             {
@@ -106,11 +111,21 @@ export function StockReport({
               unit: r.unit ?? "",
               rate: String(r.rate ?? ""),
               value: String(r.closingValue ?? ""),
-              notes: r.notes ?? "",
+              notes:
+                isQuadSignal && quadKind === "cable"
+                  ? userNotes
+                  : (r.notes ?? ""),
+              callPutup: cableMeta?.callPutup ?? "",
+              putupDate: cableMeta?.putupDate ?? "",
+              partyName: cableMeta?.partyName ?? "",
+              dispatchPending:
+                cableMeta?.dispatchPending != null
+                  ? String(cableMeta.dispatchPending)
+                  : "",
             },
             collectStockPhotoUrls(r),
-          )
-        }
+          );
+        }}
         onDelete={() => void crud.remove(r.id)}
       />
     ),
@@ -480,6 +495,51 @@ export function StockReport({
       },
     },
     {
+      key: "callPutup",
+      label: "Call putup",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        return meta.callPutup?.trim() || "—";
+      },
+    },
+    {
+      key: "putupDate",
+      label: "Put up date",
+      align: "center",
+      compact: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        const raw = meta.putupDate?.trim();
+        if (!raw) return "—";
+        return isoDate(raw);
+      },
+    },
+    {
+      key: "partyName",
+      label: "Party name",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        return meta.partyName?.trim() || "—";
+      },
+    },
+    {
+      key: "dispatchPending",
+      label: "Dispatch pending",
+      align: "right",
+      compact: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        if (meta.dispatchPending == null) return "—";
+        return formatQty(meta.dispatchPending, 2);
+      },
+    },
+    {
       key: "qty",
       label: "Qty",
       align: "right",
@@ -609,12 +669,39 @@ export function StockReport({
         fields={[
           { name: "date", label: "Date", type: "date", required: true },
           ...(isPvc
-            ? [{ name: "category", label: "Stock (RM/FG)", required: true }]
+            ? ([
+                {
+                  name: "category",
+                  label: "Stock (RM/FG)",
+                  required: true,
+                },
+              ] satisfies EditField[])
             : []),
-          { name: "itemName", label: isPvc ? "Particulars" : "Item Name", required: true },
-          { name: "quantity", label: isPvc ? "Closing Stock" : "QTY", type: "number", required: true },
+          {
+            name: "itemName",
+            label: isPvc ? "Particulars" : "Item Name",
+            required: true,
+          },
+          {
+            name: "quantity",
+            label: isPvc ? "Closing Stock" : "QTY",
+            type: "number",
+            required: true,
+          },
           { name: "unit", label: "Unit", required: true },
           { name: "rate", label: "Rate", type: "number", required: false },
+          ...(isQuadSignal && quadKind === "cable"
+            ? ([
+                { name: "callPutup", label: "Call putup" },
+                { name: "putupDate", label: "Put up date", type: "date" },
+                { name: "partyName", label: "Party name" },
+                {
+                  name: "dispatchPending",
+                  label: "Dispatch pending",
+                  type: "number",
+                },
+              ] satisfies EditField[])
+            : []),
           { name: "notes", label: "Notes", type: "textarea" },
         ]}
         values={crud.values}
@@ -630,6 +717,34 @@ export function StockReport({
         onSave={() => {
           const qty = Number(crud.values.quantity) || 0;
           const rate = Number(crud.values.rate) || 0;
+          let notes: string | null = crud.values.notes || null;
+          if (isQuadSignal && quadKind === "cable" && crud.editing) {
+            const { meta } = parseQuadSignalStockNotes(crud.editing.notes);
+            if (meta?.kind === "cable") {
+              const nextMeta: QuadSignalStockMeta = { ...meta };
+              const callPutup = crud.values.callPutup?.trim() ?? "";
+              const putupDate = crud.values.putupDate?.trim() ?? "";
+              const partyName = crud.values.partyName?.trim() ?? "";
+              const dispatchRaw = crud.values.dispatchPending?.trim() ?? "";
+              if (callPutup) nextMeta.callPutup = callPutup;
+              else delete nextMeta.callPutup;
+              if (putupDate) nextMeta.putupDate = putupDate;
+              else delete nextMeta.putupDate;
+              if (partyName) nextMeta.partyName = partyName;
+              else delete nextMeta.partyName;
+              if (dispatchRaw !== "") {
+                const n = Number(dispatchRaw);
+                if (Number.isFinite(n) && n >= 0) nextMeta.dispatchPending = n;
+                else delete nextMeta.dispatchPending;
+              } else {
+                delete nextMeta.dispatchPending;
+              }
+              notes = encodeQuadSignalStockNotes(
+                nextMeta,
+                crud.values.notes?.trim() || null,
+              );
+            }
+          }
           void crud.save({
             date: crud.values.date,
             ...(isPvc ? { category: crud.values.category || null } : {}),
@@ -638,7 +753,7 @@ export function StockReport({
             unit: crud.values.unit,
             rate: rate,
             value: qty * rate,
-            notes: crud.values.notes || null,
+            notes,
             photoUrls: crud.photoUrls,
           });
         }}

@@ -505,6 +505,7 @@ export function TodayHub({
 
   // Shared / purchase
   const [entryDate, setEntryDate] = useState(date || today);
+  const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
   const [purchaseType, setPurchaseType] =
     useState<PurchaseTypeValue>("RAW_MATERIAL");
   const [purchaseTypeOther, setPurchaseTypeOther] = useState("");
@@ -584,6 +585,10 @@ export function TodayHub({
       unit: string;
     }>
   >([]);
+  const [stockCallPutup, setStockCallPutup] = useState("");
+  const [stockPutupDate, setStockPutupDate] = useState("");
+  const [stockPartyName, setStockPartyName] = useState("");
+  const [stockDispatchPending, setStockDispatchPending] = useState("");
   const [stockLengthOptions, setStockLengthOptions] = useState<
     Array<{ label: string; lengthFactor: number }>
   >([]);
@@ -681,6 +686,10 @@ export function TodayHub({
       setStockOpeningEditable(false);
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
+      setStockCallPutup("");
+      setStockPutupDate("");
+      setStockPartyName("");
+      setStockDispatchPending("");
       setStockLengthOptions([]);
       setStockLengthFactor(null);
       setStockInsulationExtras([]);
@@ -691,6 +700,7 @@ export function TodayHub({
     const ac = new AbortController();
     const q = new URLSearchParams({
       date: entryDate,
+      shift,
       cable: resolvedQuadCableName,
       size: resolvedQuadSizeName,
     });
@@ -713,6 +723,12 @@ export function TodayHub({
             drumLabel?: string;
             factorAmbiguous?: boolean;
             lengthOptions?: Array<{ label: string; lengthFactor: number }>;
+          } | null;
+          stockMeta: {
+            callPutup: string;
+            putupDate: string;
+            partyName: string;
+            dispatchPending: string;
           } | null;
         }>;
       })
@@ -747,6 +763,11 @@ export function TodayHub({
           setStockLengthOptions([]);
           setStockLengthFactor(null);
         }
+        const meta = data.stockMeta;
+        setStockCallPutup(meta?.callPutup ?? "");
+        setStockPutupDate(meta?.putupDate ?? "");
+        setStockPartyName(meta?.partyName ?? "");
+        setStockDispatchPending(meta?.dispatchPending ?? "");
       })
       .catch((err) => {
         if (ac.signal.aborted) return;
@@ -755,6 +776,10 @@ export function TodayHub({
         setStockOpeningEditable(false);
         setStockWipSalesKm(0);
         setStockWipSalesLines([]);
+        setStockCallPutup("");
+        setStockPutupDate("");
+        setStockPartyName("");
+        setStockDispatchPending("");
       });
 
     return () => ac.abort();
@@ -763,6 +788,7 @@ export function TodayHub({
     stockKind,
     plantId,
     entryDate,
+    shift,
     resolvedQuadCableName,
     resolvedQuadSizeName,
   ]);
@@ -973,7 +999,6 @@ export function TodayHub({
   }, [stockQty, stockRate]);
 
   // Production
-  const [shift, setShift] = useState<"DAY" | "NIGHT">("DAY");
   const [productName, setProductName] = useState<string>(PRODUCTS[0].name);
   const [prodQty, setProdQty] = useState("");
   const [prodUnit, setProdUnit] = useState<(typeof PRODUCT_UNITS)[number]>(
@@ -1151,6 +1176,10 @@ export function TodayHub({
     setStockProcessQtys({});
     setStockWipOpening({});
     setStockOpeningEditable(false);
+    setStockCallPutup("");
+    setStockPutupDate("");
+    setStockPartyName("");
+    setStockDispatchPending("");
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -1706,6 +1735,16 @@ export function TodayHub({
             wip.finishedProcess != null
               ? (wip.byProcess[wip.finishedProcess] ?? issuedQty)
               : issuedQty;
+          const dispatchPendingRaw = stockDispatchPending.trim();
+          let dispatchPending: number | undefined;
+          if (dispatchPendingRaw !== "") {
+            const n = Number(dispatchPendingRaw);
+            if (!Number.isFinite(n) || n < 0) {
+              fail("Dispatch pending must be a number ≥ 0.");
+              return;
+            }
+            dispatchPending = n;
+          }
           result = await postJson(`/api/plants/${plantId}/stock`, {
             date: entryDate,
             shift,
@@ -1726,6 +1765,18 @@ export function TodayHub({
                 closing: wip.byProcess,
                 processes: wip.byProcess,
                 salesKm: stockWipSalesKm,
+                ...(stockCallPutup.trim()
+                  ? { callPutup: stockCallPutup.trim() }
+                  : {}),
+                ...(stockPutupDate.trim()
+                  ? { putupDate: stockPutupDate.trim() }
+                  : {}),
+                ...(stockPartyName.trim()
+                  ? { partyName: stockPartyName.trim() }
+                  : {}),
+                ...(dispatchPending != null
+                  ? { dispatchPending }
+                  : {}),
                 calcSnapshot: {
                   ...wip.calcSnapshot,
                   drumLabel: selectedLengthLabel,
@@ -2276,109 +2327,142 @@ export function TodayHub({
           return (
             <>
               {kind !== "contactList" ? (
-                <div
-                  className={`form-grid today-entry-top-row ${
-                    showShift ? "two" : ""
-                  }`}
-                >
-                  <div className="field">
-                    <label htmlFor="entry-date">
-                      {isCat6
-                        ? kind === "expense"
-                          ? "Date"
-                          : "Bill Date"
-                        : kind === "expense" && expenseHead === "Petty Cash"
-                          ? t("billDate")
-                          : t("date")}
-                    </label>
-                    <input
-                      id="entry-date"
-                      type="date"
-                      required
-                      max={todayLocalISO()}
-                      value={entryDate}
-                      onChange={(e) => setEntryDate(e.target.value)}
-                    />
-                  </div>
-                  {showShift ? (
-                    <div className="field">
-                      <label>{t("shift")}</label>
-                      <div className="shift-toggle">
-                        <button
-                          type="button"
-                          className={shift === "DAY" ? "is-active" : ""}
-                          onClick={() => setShift("DAY")}
-                        >
-                          {tCommon("day")}
-                        </button>
-                        <button
-                          type="button"
-                          className={shift === "NIGHT" ? "is-active" : ""}
-                          onClick={() => setShift("NIGHT")}
-                        >
-                          {tCommon("night")}
-                        </button>
+                <>
+                  {stockEntryOnly ? (
+                    <div
+                      className={`form-grid today-entry-top-row ${
+                        showStockTypeBeside ? "two" : ""
+                      }`}
+                    >
+                      {showStockTypeBeside ? (
+                        <div className="field">
+                          <label htmlFor="st-kind">Stock type</label>
+                          <SelectMenu
+                            id="st-kind"
+                            value={
+                              stockKind === "cable" ? "Cable" : "Raw Material"
+                            }
+                            options={["Raw Material", "Cable"]}
+                            required
+                            onChange={(next) => {
+                              setStockKind(next === "Cable" ? "cable" : "raw");
+                              setStockProcessQtys({});
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      <div className="field">
+                        <label htmlFor="entry-date">{t("date")}</label>
+                        <input
+                          id="entry-date"
+                          type="date"
+                          required
+                          max={todayLocalISO()}
+                          value={entryDate}
+                          onChange={(e) => setEntryDate(e.target.value)}
+                        />
                       </div>
                     </div>
-                  ) : null}
-                </div>
+                  ) : (
+                    <>
+                      <div className="form-grid today-entry-top-row two">
+                        <div className="field">
+                          <label htmlFor="entry-kind">{t("entryType")}</label>
+                          <SelectMenu
+                            id="entry-kind"
+                            value={
+                              entryOptions.find((o) => o.value === kind)
+                                ?.label ?? t("purchase")
+                            }
+                            options={entryOptions.map((o) => o.label)}
+                            required
+                            onChange={(label) => {
+                              const next = entryOptions.find(
+                                (o) => o.label === label,
+                              );
+                              if (next) setKind(next.value);
+                            }}
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="entry-date">
+                            {isCat6
+                              ? kind === "expense"
+                                ? "Date"
+                                : "Bill Date"
+                              : kind === "expense" &&
+                                  expenseHead === "Petty Cash"
+                                ? t("billDate")
+                                : t("date")}
+                          </label>
+                          <input
+                            id="entry-date"
+                            type="date"
+                            required
+                            max={todayLocalISO()}
+                            value={entryDate}
+                            onChange={(e) => setEntryDate(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {showShift || showStockTypeBeside ? (
+                        <div
+                          className={`form-grid today-entry-kind-row ${
+                            showShift && showStockTypeBeside ? "two" : ""
+                          }`}
+                        >
+                          {showShift ? (
+                            <div className="field">
+                              <label>{t("shift")}</label>
+                              <div className="shift-toggle">
+                                <button
+                                  type="button"
+                                  className={
+                                    shift === "DAY" ? "is-active" : ""
+                                  }
+                                  onClick={() => setShift("DAY")}
+                                >
+                                  {tCommon("day")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={
+                                    shift === "NIGHT" ? "is-active" : ""
+                                  }
+                                  onClick={() => setShift("NIGHT")}
+                                >
+                                  {tCommon("night")}
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                          {showStockTypeBeside ? (
+                            <div className="field">
+                              <label htmlFor="st-kind">Stock type</label>
+                              <SelectMenu
+                                id="st-kind"
+                                value={
+                                  stockKind === "cable"
+                                    ? "Cable"
+                                    : "Raw Material"
+                                }
+                                options={["Raw Material", "Cable"]}
+                                required
+                                onChange={(next) => {
+                                  setStockKind(
+                                    next === "Cable" ? "cable" : "raw",
+                                  );
+                                  setStockProcessQtys({});
+                                }}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
+                  )}
+                </>
               ) : null}
-
-              {stockEntryOnly ? (
-                showStockTypeBeside ? (
-                  <div className="field">
-                    <label htmlFor="st-kind">Stock type</label>
-                    <SelectMenu
-                      id="st-kind"
-                      value={stockKind === "cable" ? "Cable" : "Raw Material"}
-                      options={["Raw Material", "Cable"]}
-                      required
-                      onChange={(next) => {
-                        setStockKind(next === "Cable" ? "cable" : "raw");
-                        setStockProcessQtys({});
-                      }}
-                    />
-                  </div>
-                ) : null
-              ) : (
-                <div
-                  className={`form-grid today-entry-kind-row ${
-                    showStockTypeBeside ? "two" : ""
-                  }`}
-                >
-                  <div className="field">
-                    <label htmlFor="entry-kind">{t("entryType")}</label>
-                    <SelectMenu
-                      id="entry-kind"
-                      value={
-                        entryOptions.find((o) => o.value === kind)?.label ??
-                        t("purchase")
-                      }
-                      options={entryOptions.map((o) => o.label)}
-                      required
-                      onChange={(label) => {
-                        const next = entryOptions.find((o) => o.label === label);
-                        if (next) setKind(next.value);
-                      }}
-                    />
-                  </div>
-                  {showStockTypeBeside ? (
-                    <div className="field">
-                      <label htmlFor="st-kind">Stock type</label>
-                      <SelectMenu
-                        id="st-kind"
-                        value={stockKind === "cable" ? "Cable" : "Raw Material"}
-                        options={["Raw Material", "Cable"]}
-                        required
-                        onChange={(next) => {
-                          setStockKind(next === "Cable" ? "cable" : "raw");
-                          setStockProcessQtys({});
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              )}
             </>
           );
         })()}
@@ -3448,13 +3532,29 @@ export function TodayHub({
                               );
                             })()}
                             <div className="qs-wip__sales">
-                              <div className="field">
-                                <label>Sales km</label>
-                                <input
-                                  readOnly
-                                  value={`${stockWipSalesKm} km`}
-                                  aria-label="Sales km from Sales ledger"
-                                />
+                              <div className="form-grid two qs-wip__sales-row">
+                                <div className="field">
+                                  <label>Sales km</label>
+                                  <input
+                                    readOnly
+                                    value={`${stockWipSalesKm} km`}
+                                    aria-label="Sales km from Sales ledger"
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="st-unit">Unit</label>
+                                  <SelectMenu
+                                    id="st-unit"
+                                    value={
+                                      stockUnitOptions.includes(stockUnit)
+                                        ? stockUnit
+                                        : stockCatalog.defaultUnit
+                                    }
+                                    options={stockUnitOptions}
+                                    required
+                                    onChange={setStockUnit}
+                                  />
+                                </div>
                               </div>
                               {stockWipSalesLines.length > 0 ? (
                                 <ul className="qs-wip__sales-list">
@@ -3467,6 +3567,55 @@ export function TodayHub({
                                   ))}
                                 </ul>
                               ) : null}
+                            </div>
+                            <div className="form-grid two">
+                              <div className="field">
+                                <label htmlFor="st-call-putup">Call putup</label>
+                                <input
+                                  id="st-call-putup"
+                                  value={stockCallPutup}
+                                  onChange={(e) =>
+                                    setStockCallPutup(e.target.value)
+                                  }
+                                  placeholder="Call putup"
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor="st-putup-date">
+                                  Put up date
+                                </label>
+                                <input
+                                  id="st-putup-date"
+                                  type="date"
+                                  max={todayLocalISO()}
+                                  value={stockPutupDate}
+                                  onChange={(e) =>
+                                    setStockPutupDate(e.target.value)
+                                  }
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor="st-party-name">Party name</label>
+                                <input
+                                  id="st-party-name"
+                                  value={stockPartyName}
+                                  onChange={(e) =>
+                                    setStockPartyName(e.target.value)
+                                  }
+                                  placeholder="Party name"
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor="st-dispatch-pending">
+                                  Dispatch pending
+                                </label>
+                                <DecimalInput
+                                  id="st-dispatch-pending"
+                                  value={stockDispatchPending}
+                                  onChange={setStockDispatchPending}
+                                  placeholder="0"
+                                />
+                              </div>
                             </div>
                             {stockWipCalc?.warnings?.length ? (
                               <div className="alert alert--error">
@@ -3570,22 +3719,11 @@ export function TodayHub({
                     />
                   </div>
                 ) : null}
-                {isQuad && stockKind === "cable" && quadCableProcessFields.length > 0 ? (
-                  <div className="field">
-                    <label htmlFor="st-unit">Unit</label>
-                    <SelectMenu
-                      id="st-unit"
-                      value={
-                        stockUnitOptions.includes(stockUnit)
-                          ? stockUnit
-                          : stockCatalog.defaultUnit
-                      }
-                      options={stockUnitOptions}
-                      required
-                      onChange={setStockUnit}
-                    />
-                  </div>
-                ) : (
+                {!(
+                  isQuad &&
+                  stockKind === "cable" &&
+                  quadCableProcessFields.length > 0
+                ) ? (
                 <div
                   className={
                     isQuad &&
@@ -3672,7 +3810,7 @@ export function TodayHub({
                     </div>
                   ) : null}
                 </div>
-                )}
+                ) : null}
                 {stockPurchaseRateLoading ? (
                   <p className="field-hint">Loading rate from purchase history…</p>
                 ) : stockPurchaseRate != null ? (
