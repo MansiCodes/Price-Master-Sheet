@@ -21,6 +21,12 @@ export type CableStockStatusBlock = {
   processes: StockProcessLine[];
   totalKm: number;
   salesKm: number;
+  /** Put-up km from Call putup (subtracted from Outer for display + Total). */
+  putupKm: number;
+  callPutup: string;
+  putupDate: string;
+  partyName: string;
+  dispatchPending: number;
   userNotes: string;
 };
 
@@ -58,6 +64,54 @@ export function formatProcessStatusLine(line: StockProcessLine): string {
   return `${line.shortName}: ${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
 }
 
+/** Parse put-up km from Call putup text (e.g. "5", "5km"). */
+function parsePutupKm(raw: string | null | undefined): number {
+  const s = String(raw ?? "")
+    .trim()
+    .replace(/\s*km\s*$/i, "")
+    .trim();
+  if (!s) return 0;
+  const n = Number(s);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function isOuterProcess(name: string): boolean {
+  const n = String(name ?? "")
+    .trim()
+    .toLowerCase();
+  return n === "outer sheath" || n === "outer";
+}
+
+export function formatCallPutupLine(
+  block: Pick<
+    CableStockStatusBlock,
+    "putupKm" | "callPutup" | "putupDate" | "partyName"
+  >,
+): string | null {
+  const putupKm = Number(block.putupKm) || 0;
+  const callPutup = String(block.callPutup ?? "").trim();
+  const putupDate = String(block.putupDate ?? "").trim();
+  const partyName = String(block.partyName ?? "").trim();
+  if (!putupKm && !callPutup && !putupDate && !partyName) return null;
+
+  const kmPart =
+    putupKm > 0 ? `${fmtKm(putupKm)}km` : callPutup || "—";
+  const datePart = putupDate ? ` dated ${putupDate}` : "";
+  const partyPart = partyName ? ` (${partyName})` : "";
+  return `Call putup: ${kmPart}${datePart}${partyPart}`;
+}
+
+export function formatDispatchLine(
+  block: Pick<CableStockStatusBlock, "partyName" | "dispatchPending">,
+): string | null {
+  const partyName = String(block.partyName ?? "").trim();
+  const qtyRaw = Number(block.dispatchPending);
+  const qty = Number.isFinite(qtyRaw) ? Math.max(0, qtyRaw) : 0;
+  if (!partyName && qty <= 0) return null;
+  const party = partyName || "—";
+  return `Dispatch: ${party} — ${fmtKm(qty)}km`;
+}
+
 export function formatSharedInsulationLine(
   status: SharedInsulationStatus,
 ): string {
@@ -82,6 +136,7 @@ export function buildCableStockStatus(rows: Array<{
   let sharedInsulation: SharedInsulationStatus | null = null;
 
   for (const row of rows) {
+    try {
     const { meta, userNotes } = parseQuadSignalStockNotes(row.notes);
     if (!meta || meta.kind !== "cable") continue;
     const cable = (meta.cable ?? "").trim();
@@ -135,14 +190,30 @@ export function buildCableStockStatus(rows: Array<{
       names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
     }
 
-    const processes: StockProcessLine[] = names.map((name) => ({
-      name,
-      shortName: shortProcessName(name),
-      closing: Number(closing[name]) || 0,
-      production: Number(production[name]) || 0,
-    }));
+    const putupKm = parsePutupKm(meta.callPutup);
+    const callPutup = String(meta.callPutup ?? "").trim();
+    const putupDate = String(meta.putupDate ?? "").trim();
+    const partyName = String(meta.partyName ?? "").trim();
+    const dispatchRaw = Number(meta.dispatchPending);
+    const dispatchPending =
+      Number.isFinite(dispatchRaw) && dispatchRaw > 0 ? dispatchRaw : 0;
+
+    const processes: StockProcessLine[] = names.map((name) => {
+      let closingQty = Number(closing[name]) || 0;
+      // Outer = Outer − put up (card display + Total).
+      if (putupKm > 0 && isOuterProcess(name)) {
+        closingQty = Math.max(0, closingQty - putupKm);
+      }
+      return {
+        name,
+        shortName: shortProcessName(name),
+        closing: Math.round(closingQty * 1000) / 1000,
+        production: Number(production[name]) || 0,
+      };
+    });
 
     // Insul + Single Quad stay visible on the card but are not part of Total.
+    // Outer already reflects put-up deduction above.
     const totalKm = processes.reduce((s, p) => {
       const n = p.name.trim().toLowerCase();
       if (n === "insulation" || n === "single quad") return s;
@@ -157,8 +228,16 @@ export function buildCableStockStatus(rows: Array<{
       processes,
       totalKm: Math.round(totalKm * 1000) / 1000,
       salesKm: Number(meta.salesKm) || 0,
-      userNotes: userNotes.trim(),
+      putupKm: Math.round(putupKm * 1000) / 1000,
+      callPutup,
+      putupDate,
+      partyName,
+      dispatchPending: Math.round(dispatchPending * 1000) / 1000,
+      userNotes: String(userNotes ?? "").trim(),
     });
+    } catch (err) {
+      console.error("[buildCableStockStatus] skipped bad row", row.id, err);
+    }
   }
 
   return {

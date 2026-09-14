@@ -67,50 +67,58 @@ export default async function StockPage({
   let sharedInsulation: SharedInsulationStatus | null = null;
   let rawRows: RawMaterialStockRow[] = [];
 
-  const reportIds = await resolveReportPlantIds(selectedPlantId);
-  const pScope = plantIdFilter(reportIds);
+  try {
+    const reportIds = await resolveReportPlantIds(selectedPlantId);
+    const pScope = plantIdFilter(reportIds);
 
-  const [cableEntries, rmEntries] = await Promise.all([
-    prisma.stockEntry.findMany({
-      where: {
-        ...pScope,
-        category: "FG",
-        date: { lte: endOfDay },
-        notes: { startsWith: "QSSTOCK:" },
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 200,
-      select: {
-        id: true,
-        date: true,
-        itemName: true,
-        notes: true,
-      },
-    }),
-    prisma.stockEntry.findMany({
-      where: {
-        ...pScope,
-        category: "RM",
-        date: { lte: endOfDay },
-        notes: { startsWith: "QSSTOCK:" },
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 300,
-      select: {
-        itemName: true,
-        date: true,
-        quantity: true,
-        unit: true,
-        rate: true,
-        notes: true,
-      },
-    }),
-  ]);
+    const [cableEntries, rmEntries] = await Promise.all([
+      prisma.stockEntry.findMany({
+        where: {
+          ...pScope,
+          category: "FG",
+          date: { lte: endOfDay },
+          notes: { startsWith: "QSSTOCK:" },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: 200,
+        select: {
+          id: true,
+          date: true,
+          itemName: true,
+          notes: true,
+        },
+      }),
+      prisma.stockEntry.findMany({
+        where: {
+          ...pScope,
+          category: "RM",
+          date: { lte: endOfDay },
+          notes: { startsWith: "QSSTOCK:" },
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: 300,
+        select: {
+          itemName: true,
+          date: true,
+          quantity: true,
+          unit: true,
+          rate: true,
+          notes: true,
+        },
+      }),
+    ]);
 
-  const built = buildCableStockStatus(cableEntries);
-  cableBlocks = built.blocks;
-  sharedInsulation = built.sharedInsulation;
-  rawRows = buildRawMaterialStockStatus(QUAD_SIGNAL_STOCK_RAW_MATERIALS, rmEntries);
+    const built = buildCableStockStatus(cableEntries);
+    cableBlocks = built.blocks;
+    sharedInsulation = built.sharedInsulation;
+    rawRows = buildRawMaterialStockStatus(
+      QUAD_SIGNAL_STOCK_RAW_MATERIALS,
+      rmEntries,
+    );
+  } catch (err) {
+    // Keep Stock page up even if one bad QSSTOCK row / DB hiccup occurs.
+    console.error("[stock-page] failed to load stock status", err);
+  }
 
   return (
     <StockStatusClient

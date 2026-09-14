@@ -222,6 +222,17 @@
   font-weight: 700;
 }
 
+.stock-status-card__sno {
+  font-weight: 500;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-status-card__name {
+  font-weight: 700;
+  color: var(--fg);
+}
+
 .stock-status-card__cable {
   font-weight: 500;
   color: var(--fg-muted);
@@ -235,8 +246,14 @@
   flex-direction: column;
   gap: 0.2rem;
   font-size: 0.88rem;
+  font-weight: 400;
+  color: var(--fg);
   font-variant-numeric: tabular-nums;
   line-height: 1.4;
+}
+
+.stock-status-card__procs--after-total {
+  margin-top: 0.35rem;
 }
 
 .stock-status-card__total {

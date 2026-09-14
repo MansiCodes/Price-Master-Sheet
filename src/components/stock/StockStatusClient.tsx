@@ -10,6 +10,8 @@ import {
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
+  formatCallPutupLine,
+  formatDispatchLine,
   formatProcessStatusLine,
   formatSharedInsulationLine,
   type CableStockStatusBlock,
@@ -365,13 +367,30 @@ export function StockStatusClient({
 
             {displayCards.map((card, idx) => {
               const block = card.block;
+              const putupLine = block
+                ? formatCallPutupLine({
+                    putupKm: block.putupKm ?? 0,
+                    callPutup: block.callPutup ?? "",
+                    putupDate: block.putupDate
+                      ? formatDisplayDate(block.putupDate)
+                      : "",
+                    partyName: block.partyName ?? "",
+                  })
+                : null;
+              const dispatchLine = block
+                ? formatDispatchLine({
+                    partyName: block.partyName ?? "",
+                    dispatchPending: block.dispatchPending ?? 0,
+                  })
+                : null;
               return (
                 <li
                   key={card.key}
                   className={`stock-status-card${block ? "" : " is-empty"}`}
                 >
                   <h3 className="stock-status-card__size">
-                    {idx + 1}- {card.size}
+                    <span className="stock-status-card__sno">({idx + 1})</span>{" "}
+                    <span className="stock-status-card__name">{card.size}</span>
                     {showAllCables ? (
                       <span className="stock-status-card__cable">
                         {" "}
@@ -386,10 +405,18 @@ export function StockStatusClient({
                         {block.processes.map((p) => (
                           <li key={p.name}>{formatProcessStatusLine(p)}</li>
                         ))}
+                        {putupLine ? (
+                          <li key="call-putup">{putupLine}</li>
+                        ) : null}
                       </ul>
                       <p className="stock-status-card__total">
                         Total — {block.totalKm}km
                       </p>
+                      {dispatchLine ? (
+                        <ul className="stock-status-card__procs stock-status-card__procs--after-total">
+                          <li>{dispatchLine}</li>
+                        </ul>
+                      ) : null}
                       {block.salesKm > 0 ? (
                         <p className="stock-status-card__meta">
                           Sales — {block.salesKm}km
