@@ -65,30 +65,34 @@ export function formatProcessStatusLine(line: StockProcessLine): string {
 }
 
 export function formatCallPutupLine(block: CableStockStatusBlock): string | null {
-  const hasKm = block.putupKm > 0;
-  const hasText = Boolean(block.callPutup.trim());
-  const hasDate = Boolean(block.putupDate.trim());
-  const hasParty = Boolean(block.partyName.trim());
+  const callPutup = (block.callPutup ?? "").trim();
+  const putupDate = (block.putupDate ?? "").trim();
+  const partyName = (block.partyName ?? "").trim();
+  const putupKm = Number(block.putupKm) || 0;
+  const hasKm = putupKm > 0;
+  const hasText = Boolean(callPutup);
+  const hasDate = Boolean(putupDate);
+  const hasParty = Boolean(partyName);
   if (!hasKm && !hasText && !hasDate && !hasParty) return null;
 
   const kmPart = hasKm
-    ? `${fmtKm(block.putupKm)}km`
+    ? `${fmtKm(putupKm)}km`
     : hasText
-      ? block.callPutup.trim()
+      ? callPutup
       : "—";
-  const datePart = hasDate ? ` dated on ${block.putupDate.trim()}` : "";
-  const partyPart = hasParty ? ` (${block.partyName.trim()})` : "";
+  const datePart = hasDate ? ` dated on ${putupDate}` : "";
+  const partyPart = hasParty ? ` (${partyName})` : "";
   return `Call putup: ${kmPart}${datePart}${partyPart}`;
 }
 
 export function formatDispatchLine(block: CableStockStatusBlock): string | null {
-  const hasParty = Boolean(block.partyName.trim());
-  const qty = Number.isFinite(block.dispatchPending)
-    ? Math.max(0, block.dispatchPending)
-    : 0;
+  const partyName = (block.partyName ?? "").trim();
+  const hasParty = Boolean(partyName);
+  const qtyRaw = Number(block.dispatchPending);
+  const qty = Number.isFinite(qtyRaw) ? Math.max(0, qtyRaw) : 0;
   // Show when party or qty is present (always print qty, including 0).
   if (!hasParty && qty <= 0) return null;
-  const party = hasParty ? block.partyName.trim() : "—";
+  const party = hasParty ? partyName : "—";
   return `Dispatch: ${fmtKm(qty)}km (${party})`;
 }
 

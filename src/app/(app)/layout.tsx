@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { GlobalRole } from "@prisma/client";
 import { auth } from "@/auth";
 import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
@@ -24,6 +25,60 @@ import { isQuadSignalPlant } from "@/lib/plant-layout";
 
 export const dynamic = "force-dynamic";
 
+type DbUserFlags = {
+  canAccessStock: boolean;
+  canMachineSupervise: boolean;
+  canAdminMachineProduction: boolean;
+  canViewPriceSheet: boolean;
+  globalRole: GlobalRole;
+  name: string | null;
+  email: string;
+  isActive: boolean;
+};
+
+async function loadDbUserFlags(userId: string): Promise<DbUserFlags | null> {
+  try {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        canAccessStock: true,
+        canMachineSupervise: true,
+        canAdminMachineProduction: true,
+        canViewPriceSheet: true,
+        globalRole: true,
+        name: true,
+        email: true,
+        isActive: true,
+      },
+    });
+  } catch (err) {
+    // Older DBs / failed db push: retry without canAccessStock so the shell still loads.
+    console.error(
+      "[layout] user flags query failed; retrying without canAccessStock",
+      err,
+    );
+    try {
+      const fallback = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          canMachineSupervise: true,
+          canAdminMachineProduction: true,
+          canViewPriceSheet: true,
+          globalRole: true,
+          name: true,
+          email: true,
+          isActive: true,
+        },
+      });
+      if (!fallback) return null;
+      return { ...fallback, canAccessStock: false };
+    } catch (err2) {
+      console.error("[layout] user flags fallback also failed", err2);
+      throw err2;
+    }
+  }
+}
+
 export default async function AppLayout({
   children,
 }: {
@@ -34,19 +89,7 @@ export default async function AppLayout({
     redirect("/login");
   }
   // Fresh flags from DB — JWT can lag after Extra access edits until re-login.
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      canAccessStock: true,
-      canMachineSupervise: true,
-      canAdminMachineProduction: true,
-      canViewPriceSheet: true,
-      globalRole: true,
-      name: true,
-      email: true,
-      isActive: true,
-    },
-  });
+  const dbUser = await loadDbUserFlags(session.user.id);
   if (!dbUser || !dbUser.isActive) {
     redirect("/login");
   }
