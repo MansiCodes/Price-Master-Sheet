@@ -10,8 +10,6 @@ import {
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
-  formatCallPutupLine,
-  formatDispatchLine,
   formatProcessStatusLine,
   formatSharedInsulationLine,
   type CableStockStatusBlock,
@@ -373,8 +371,7 @@ export function StockStatusClient({
                   className={`stock-status-card${block ? "" : " is-empty"}`}
                 >
                   <h3 className="stock-status-card__size">
-                    <span className="stock-status-card__sno">{idx + 1}.</span>{" "}
-                    <span className="stock-status-card__name">{card.size}</span>
+                    {idx + 1}- {card.size}
                     {showAllCables ? (
                       <span className="stock-status-card__cable">
                         {" "}
@@ -389,29 +386,10 @@ export function StockStatusClient({
                         {block.processes.map((p) => (
                           <li key={p.name}>{formatProcessStatusLine(p)}</li>
                         ))}
-                        {(() => {
-                          const putupLine = formatCallPutupLine({
-                            ...block,
-                            putupDate: block.putupDate
-                              ? formatDisplayDate(block.putupDate)
-                              : "",
-                          });
-                          return putupLine ? (
-                            <li key="call-putup">{putupLine}</li>
-                          ) : null;
-                        })()}
                       </ul>
                       <p className="stock-status-card__total">
                         Total — {block.totalKm}km
                       </p>
-                      {(() => {
-                        const dispatchLine = formatDispatchLine(block);
-                        return dispatchLine ? (
-                          <ul className="stock-status-card__procs stock-status-card__procs--after-total">
-                            <li>{dispatchLine}</li>
-                          </ul>
-                        ) : null;
-                      })()}
                       {block.salesKm > 0 ? (
                         <p className="stock-status-card__meta">
                           Sales — {block.salesKm}km

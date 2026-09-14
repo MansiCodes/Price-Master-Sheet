@@ -21,12 +21,6 @@ export type CableStockStatusBlock = {
   processes: StockProcessLine[];
   totalKm: number;
   salesKm: number;
-  /** Put-up km (parsed from Call putup). Subtracted from Outer for display/total. */
-  putupKm: number;
-  callPutup: string;
-  putupDate: string;
-  partyName: string;
-  dispatchPending: number;
   userNotes: string;
 };
 
@@ -62,50 +56,6 @@ function fmtKm(n: number): string {
 
 export function formatProcessStatusLine(line: StockProcessLine): string {
   return `${line.shortName}: ${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
-}
-
-export function formatCallPutupLine(block: CableStockStatusBlock): string | null {
-  const hasKm = block.putupKm > 0;
-  const hasText = Boolean(block.callPutup.trim());
-  const hasDate = Boolean(block.putupDate.trim());
-  const hasParty = Boolean(block.partyName.trim());
-  if (!hasKm && !hasText && !hasDate && !hasParty) return null;
-
-  const kmPart = hasKm
-    ? `${fmtKm(block.putupKm)}km`
-    : hasText
-      ? block.callPutup.trim()
-      : "—";
-  const datePart = hasDate ? ` dated on ${block.putupDate.trim()}` : "";
-  const partyPart = hasParty ? ` (${block.partyName.trim()})` : "";
-  return `Call putup: ${kmPart}${datePart}${partyPart}`;
-}
-
-export function formatDispatchLine(block: CableStockStatusBlock): string | null {
-  const hasParty = Boolean(block.partyName.trim());
-  const qty = Number.isFinite(block.dispatchPending)
-    ? Math.max(0, block.dispatchPending)
-    : 0;
-  // Show when party or qty is present (always print qty, including 0).
-  if (!hasParty && qty <= 0) return null;
-  const party = hasParty ? block.partyName.trim() : "—";
-  return `Dispatch: ${fmtKm(qty)}km (${party})`;
-}
-
-/** Parse a put-up km value from Call putup text (e.g. "5", "5km", "5 km"). */
-function parsePutupKm(raw: string | undefined | null): number {
-  const s = (raw ?? "")
-    .trim()
-    .replace(/\s*km\s*$/i, "")
-    .trim();
-  if (!s) return 0;
-  const n = Number(s);
-  return Number.isFinite(n) && n > 0 ? n : 0;
-}
-
-function isOuterProcess(name: string): boolean {
-  const n = name.trim().toLowerCase();
-  return n === "outer sheath" || n === "outer";
 }
 
 export function formatSharedInsulationLine(
@@ -185,32 +135,14 @@ export function buildCableStockStatus(rows: Array<{
       names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
     }
 
-    const putupKm = parsePutupKm(meta.callPutup);
-    const callPutup = (meta.callPutup ?? "").trim();
-    const putupDate = (meta.putupDate ?? "").trim();
-    const partyName = (meta.partyName ?? "").trim();
-    const dispatchPending = Number(meta.dispatchPending);
-    const dispatchQty =
-      Number.isFinite(dispatchPending) && dispatchPending > 0
-        ? dispatchPending
-        : 0;
-
-    const processes: StockProcessLine[] = names.map((name) => {
-      let closingQty = Number(closing[name]) || 0;
-      // Outer = Outer − put up (for card display + Total).
-      if (putupKm > 0 && isOuterProcess(name)) {
-        closingQty = Math.max(0, closingQty - putupKm);
-      }
-      return {
-        name,
-        shortName: shortProcessName(name),
-        closing: Math.round(closingQty * 1000) / 1000,
-        production: Number(production[name]) || 0,
-      };
-    });
+    const processes: StockProcessLine[] = names.map((name) => ({
+      name,
+      shortName: shortProcessName(name),
+      closing: Number(closing[name]) || 0,
+      production: Number(production[name]) || 0,
+    }));
 
     // Insul + Single Quad stay visible on the card but are not part of Total.
-    // Outer already reflects put-up deduction above.
     const totalKm = processes.reduce((s, p) => {
       const n = p.name.trim().toLowerCase();
       if (n === "insulation" || n === "single quad") return s;
@@ -225,11 +157,6 @@ export function buildCableStockStatus(rows: Array<{
       processes,
       totalKm: Math.round(totalKm * 1000) / 1000,
       salesKm: Number(meta.salesKm) || 0,
-      putupKm: Math.round(putupKm * 1000) / 1000,
-      callPutup,
-      putupDate,
-      partyName,
-      dispatchPending: Math.round(dispatchQty * 1000) / 1000,
       userNotes: userNotes.trim(),
     });
   }
