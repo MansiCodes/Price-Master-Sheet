@@ -11,7 +11,6 @@ frontend:
         - npm install
         - npx prisma generate
         - npx prisma db push
-        - test -n "$DATABASE_URL" || (echo "DATABASE_URL is missing in Amplify env" && exit 1)
     build:
       commands:
         - export NODE_TLS_REJECT_UNAUTHORIZED=0

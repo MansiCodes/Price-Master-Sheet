@@ -73,15 +73,6 @@ export default async function DashboardPage({
   const dbFlags = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { canAccessStock: true, globalRole: true, isActive: true },
-  }).catch(async (err) => {
-    console.error("[dashboard] canAccessStock query failed; retrying", err);
-    const fallback = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { globalRole: true, isActive: true },
-    });
-    return fallback
-      ? { ...fallback, canAccessStock: false }
-      : null;
   });
   if (!dbFlags?.isActive) redirect("/login");
 
