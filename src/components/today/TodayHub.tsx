@@ -43,7 +43,10 @@ import {
   QUAD_SIGNAL_STOCK_CABLES,
   QUAD_SIGNAL_STOCK_RAW_MATERIALS,
   pvcStockEntryNotes,
+  upcastStockEntryNotes,
+  UPCAST_STOCK_ENTRY_TYPES,
   type PvcStockEntryType,
+  type UpcastStockEntryType,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import {
@@ -621,7 +624,9 @@ export function TodayHub({
   const [stockPurchaseRate, setStockPurchaseRate] = useState<number | null>(null);
   const [stockPurchaseRateLoading, setStockPurchaseRateLoading] = useState(false);
   const [stockNotes, setStockNotes] = useState("");
-  const [stockType, setStockType] = useState<PvcStockEntryType>("closing");
+  const [stockType, setStockType] = useState<"issued" | "closing">(
+    isUpcast ? "issued" : "closing",
+  );
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
 
   const quadCableSizeOptions = useMemo(() => {
@@ -1193,7 +1198,7 @@ export function TodayHub({
     setStockRate("");
     setStockValue("");
     setStockNotes("");
-    setStockType("closing");
+    setStockType(isUpcast ? "issued" : "closing");
     setStockPhotos([]);
     setShift("DAY");
     setProductName(saleProducts[0] ?? PRODUCTS[0].name);
@@ -1833,10 +1838,13 @@ export function TodayHub({
         rate: closingRate,
         value: closingValue,
         notes: isPvc
-          ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
+          ? pvcStockEntryNotes(stockType as PvcStockEntryType, entryDate, stockNotes)
           : isUpcast
-            ? stockNotes.trim() ||
-              `Issued quantity as on ${entryDate}`
+            ? upcastStockEntryNotes(
+                stockType as UpcastStockEntryType,
+                entryDate,
+                stockNotes,
+              )
             : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
@@ -2799,20 +2807,6 @@ export function TodayHub({
 
             {kind === "stock" ? (
               <>
-                {usesStockLedger ? (
-                  <div className="field">
-                    <label htmlFor="st-category">Stock</label>
-                    <SelectMenu
-                      id="st-category"
-                      value={stockCategory}
-                      options={STOCK_CATEGORIES_OPTIONS}
-                      required
-                      onChange={(next) =>
-                        setStockCategory(next as (typeof STOCK_CATEGORIES)[number])
-                      }
-                    />
-                  </div>
-                ) : null}
                 {isQuad ? (
                   <>
                     {stockKind === "raw" ? (
@@ -3648,26 +3642,75 @@ export function TodayHub({
                   </>
                 ) : (
                   <>
-                <div className="field field--wide">
-                  <label htmlFor="st-item">
-                    {usesStockLedger ? "Particulars" : "Item"}
-                  </label>
-                  <SelectMenu
-                    id="st-item"
-                    value={stockItem || stockParticulars[0]}
-                    options={stockParticulars}
-                    required
-                    onChange={(next) => {
-                      setStockItem(next);
-                      if (
-                        next !== "Others" &&
-                        next !== "Other" &&
-                        next !== "others"
-                      )
-                        setStockItemOther("");
-                    }}
-                  />
-                </div>
+                {usesStockLedger ? (
+                  <div className="form-grid two">
+                    <div className="field">
+                      <label htmlFor="st-category">Stock</label>
+                      <SelectMenu
+                        id="st-category"
+                        value={stockCategory}
+                        options={STOCK_CATEGORIES_OPTIONS}
+                        required
+                        onChange={(next) =>
+                          setStockCategory(
+                            next as (typeof STOCK_CATEGORIES)[number],
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="st-item">Particulars</label>
+                      <SelectMenu
+                        id="st-item"
+                        value={stockItem || stockParticulars[0]}
+                        options={stockParticulars}
+                        required
+                        onChange={(next) => {
+                          setStockItem(next);
+                          if (
+                            next !== "Others" &&
+                            next !== "Other" &&
+                            next !== "others"
+                          )
+                            setStockItemOther("");
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="field field--wide">
+                    <label htmlFor="st-item">Item</label>
+                    <SelectMenu
+                      id="st-item"
+                      value={stockItem || stockParticulars[0]}
+                      options={stockParticulars}
+                      required
+                      onChange={(next) => {
+                        setStockItem(next);
+                        if (
+                          next !== "Others" &&
+                          next !== "Other" &&
+                          next !== "others"
+                        )
+                          setStockItemOther("");
+                      }}
+                    />
+                  </div>
+                )}
+                {isUpcast ? (
+                  <div className="field">
+                    <label htmlFor="st-entry-type">Stock entry type</label>
+                    <SelectMenu
+                      id="st-entry-type"
+                      value={stockType}
+                      items={[...UPCAST_STOCK_ENTRY_TYPES]}
+                      required
+                      onChange={(next) =>
+                        setStockType(next as UpcastStockEntryType)
+                      }
+                    />
+                  </div>
+                ) : null}
                 {stockItem === "Others" ||
                 stockItem === "Other" ||
                 stockItem === "others" ? (
@@ -3736,7 +3779,9 @@ export function TodayHub({
                   <div className="field">
                     <label htmlFor="st-qty">
                       {isUpcast
-                        ? "Issued quantity"
+                        ? stockType === "closing"
+                          ? "Closing Stock"
+                          : "Issued quantity"
                         : usesStockLedger
                           ? "Closing Stock"
                           : "Quantity"}
@@ -3747,7 +3792,7 @@ export function TodayHub({
                       value={stockQty}
                       onChange={(next) => {
                         setStockQty(next);
-                        if (!isUpcast) {
+                        if (!isUpcast || stockType === "closing") {
                           const qty = Number(next);
                           const rate = Number(stockRate);
                           if (

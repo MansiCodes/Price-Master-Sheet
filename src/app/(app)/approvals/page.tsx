@@ -19,6 +19,12 @@ import {
 import { pendingEntryWhere } from "@/lib/entry-approval";
 import type { EntryApprovalKind } from "@/lib/entry-approval";
 import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
+import {
+  formatElectricityApprovalDetail,
+  isElectricityExpenseHead,
+} from "@/lib/electricity-readings";
+import { enrichExpenseElectricityReadings } from "@/lib/electricity-readings-enrich";
+import { resolveCanonicalWritePlantId } from "@/lib/plant-merge";
 
 const VALID_TABS = new Set<EntryApprovalKind>([
   "purchase",
@@ -131,6 +137,20 @@ export default async function ApprovalsPage({
     ? (tabParam as EntryApprovalKind)
     : (TAB_ORDER.find((tab) => tabCounts[tab] > 0) ?? "purchase");
 
+  const expensesByPlant = new Map<string, typeof expenses>();
+  for (const e of expenses) {
+    const list = expensesByPlant.get(e.plantId) ?? [];
+    list.push(e);
+    expensesByPlant.set(e.plantId, list);
+  }
+  const enrichedExpenses: typeof expenses = [];
+  for (const [plantId, rows] of expensesByPlant) {
+    const writePlantId = await resolveCanonicalWritePlantId(plantId);
+    enrichedExpenses.push(
+      ...(await enrichExpenseElectricityReadings(writePlantId, rows)),
+    );
+  }
+
   const entries: PendingEntryRow[] = [
     ...purchases.map((p) => ({
       id: p.id,
@@ -158,20 +178,33 @@ export default async function ApprovalsPage({
       remark: s.notes?.trim() || null,
       amount: Number(s.salesValue),
     })),
-    ...stocks.map((s) => ({
-      id: s.id,
-      kind: "stock" as const,
-      plantId: s.plantId,
-      date: s.date.toISOString(),
-      shift: s.shift,
-      plantName: getPlantDisplayName(s.plant.code, s.plant.name),
-      enteredByName: s.enteredBy.name,
-      label: s.itemName,
-      detail: "",
-      remark: stockUserRemark(s.notes) || null,
-      amount: Number(s.closingValue),
-    })),
-    ...expenses.map((e) => ({
+    ...stocks.map((s) => {
+      const qty = Number(s.quantity);
+      const unit = String(s.unit ?? "").trim() || "kg";
+      const note = String(s.notes ?? "");
+      const entryKind = note.startsWith("Closing stock")
+        ? "Closing stock"
+        : note.startsWith("Issued quantity")
+          ? "Issued quantity"
+          : null;
+      const qtyPart = Number.isFinite(qty)
+        ? `${qty.toLocaleString("en-IN")} ${unit}`
+        : unit;
+      return {
+        id: s.id,
+        kind: "stock" as const,
+        plantId: s.plantId,
+        date: s.date.toISOString(),
+        shift: s.shift,
+        plantName: getPlantDisplayName(s.plant.code, s.plant.name),
+        enteredByName: s.enteredBy.name,
+        label: s.itemName,
+        detail: [entryKind, qtyPart].filter(Boolean).join(" · "),
+        remark: stockUserRemark(s.notes) || null,
+        amount: Number(s.closingValue),
+      };
+    }),
+    ...enrichedExpenses.map((e) => ({
       id: e.id,
       kind: "expense" as const,
       plantId: e.plantId,
@@ -180,7 +213,13 @@ export default async function ApprovalsPage({
       plantName: getPlantDisplayName(e.plant.code, e.plant.name),
       enteredByName: e.enteredBy.name,
       label: e.expenseHead,
-      detail: e.nature ?? "",
+      detail: isElectricityExpenseHead(e.expenseHead)
+        ? formatElectricityApprovalDetail({
+            nature: e.nature,
+            openingReading: e.openingReading,
+            closingReading: e.closingReading,
+          })
+        : (e.nature ?? ""),
       remark: e.description?.trim() || null,
       amount:
         Number(e.amount) +

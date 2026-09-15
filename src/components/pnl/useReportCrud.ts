@@ -21,6 +21,10 @@ export function useReportCrud<T extends { id: string }>(
     setValues((prev) => ({ ...prev, [name]: value }));
   }
 
+  function patchValues(patch: Record<string, string>) {
+    setValues((prev) => ({ ...prev, ...patch }));
+  }
+
   function openEdit(
     row: T,
     nextValues: Record<string, string>,
@@ -97,6 +101,7 @@ export function useReportCrud<T extends { id: string }>(
     deleting,
     error,
     setField,
+    patchValues,
     openEdit,
     closeEdit,
     save,

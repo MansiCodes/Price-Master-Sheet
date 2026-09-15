@@ -192,6 +192,8 @@ export async function POST(request: Request, context: Ctx) {
         enteredById: session.user.id,
         description: parsed.data.notes ?? null,
         payMode: parsed.data.payMode,
+        openingReading: data.openingReading ?? null,
+        closingReading: data.closingReading ?? null,
       });
     }
 

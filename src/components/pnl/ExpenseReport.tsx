@@ -28,6 +28,11 @@ import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
 import { collectBillPhotoUrls } from "@/lib/bill-photos";
 import { FixedAssetsReport } from "@/components/pnl/FixedAssetsReport";
+import {
+  electricityUnitsKwh,
+  isElectricityExpenseHead,
+} from "@/lib/electricity-readings";
+import { postJson } from "@/lib/client-forms";
 
 type ExpenseRow = {
   id: string;
@@ -230,6 +235,45 @@ export function ExpenseReport({
                 render: (r) => r.description || tCommon("dash"),
               },
               {
+                key: "opening",
+                label: "Opening",
+                align: "right",
+                render: (r) =>
+                  isElectricityExpenseHead(r.expenseHead) &&
+                  r.openingReading != null &&
+                  r.openingReading !== ""
+                    ? Number(r.openingReading).toLocaleString("en-IN")
+                    : tCommon("dash"),
+              },
+              {
+                key: "closing",
+                label: "Closing",
+                align: "right",
+                render: (r) =>
+                  isElectricityExpenseHead(r.expenseHead) &&
+                  r.closingReading != null &&
+                  r.closingReading !== ""
+                    ? Number(r.closingReading).toLocaleString("en-IN")
+                    : tCommon("dash"),
+              },
+              {
+                key: "units",
+                label: "Units (kWh)",
+                align: "right",
+                render: (r) => {
+                  if (!isElectricityExpenseHead(r.expenseHead)) {
+                    return tCommon("dash");
+                  }
+                  const units = electricityUnitsKwh(
+                    r.openingReading,
+                    r.closingReading,
+                  );
+                  return units == null
+                    ? tCommon("dash")
+                    : units.toLocaleString("en-IN");
+                },
+              },
+              {
                 key: "amount",
                 label: t("amount"),
                 align: "right",
@@ -316,13 +360,63 @@ export function ExpenseReport({
 
   const activeColumns = useMemo(() => columns, [columns]);
 
+  const editingElectricity = isElectricityExpenseHead(
+    crud.values.expenseHead || category,
+  );
+
   const expenseEditFields = useMemo(() => {
     const base: Array<{
       name: string;
       label: string;
-      type?: "text" | "number" | "date" | "textarea";
+      type?: "text" | "number" | "date" | "month" | "textarea";
       required?: boolean;
-    }> = [
+      readOnly?: boolean;
+    }> = [];
+
+    if (editingElectricity) {
+      return [
+        {
+          name: "expenseHead",
+          label: t("category"),
+          required: true,
+          readOnly: true,
+        },
+        {
+          name: "month",
+          label: "Month",
+          type: "month" as const,
+          required: true,
+        },
+        {
+          name: "openingReading",
+          label: "Opening reading",
+          type: "number" as const,
+        },
+        {
+          name: "closingReading",
+          label: "Closing reading",
+          type: "number" as const,
+        },
+        {
+          name: "rate",
+          label: "Rate (₹/unit)",
+          type: "number" as const,
+        },
+        {
+          name: "amount",
+          label: "Electricity bill Amt",
+          type: "number" as const,
+          readOnly: true,
+        },
+        {
+          name: "description",
+          label: t("remarksNotes"),
+          type: "textarea" as const,
+        },
+      ];
+    }
+
+    base.push(
       {
         name: "date",
         label: cat6 ? "Months" : t("date"),
@@ -335,7 +429,7 @@ export function ExpenseReport({
         label: cat6 ? "Remarks" : t("remarksNotes"),
         type: "textarea",
       },
-    ];
+    );
 
     if (isPettyCategory) {
       base.push(
@@ -373,22 +467,12 @@ export function ExpenseReport({
           { name: "nature", label: "Nature" },
           { name: "location", label: "Location" },
           { name: "billNumber", label: "Bill Number" },
-          {
-            name: "openingReading",
-            label: "Opening Reading",
-            type: "number",
-          },
-          {
-            name: "closingReading",
-            label: "Closing Reading",
-            type: "number",
-          },
         );
       }
     }
 
     return base;
-  }, [cat6, isPettyCategory, t]);
+  }, [cat6, editingElectricity, isPettyCategory, t]);
 
   function onSectionChange(next: PvcExpenseSection) {
     setSection(next);
@@ -500,36 +584,54 @@ export function ExpenseReport({
                       compact: true,
                       render: (r) => (
                         <ReportRowActions
-                          onEdit={() =>
+                          onEdit={() => {
+                            const ymd = toYmd(r.date);
+                            const opening =
+                              r.openingReading == null
+                                ? ""
+                                : String(r.openingReading);
+                            const closing =
+                              r.closingReading == null
+                                ? ""
+                                : String(r.closingReading);
+                            const amountNum = Number(r.amount ?? 0);
+                            const units = electricityUnitsKwh(
+                              opening,
+                              closing,
+                            );
+                            const rate =
+                              units != null && units > 0 && amountNum > 0
+                                ? String(
+                                    Math.round((amountNum / units) * 10000) /
+                                      10000,
+                                  )
+                                : "";
                             crud.openEdit(
                               r,
                               {
-                                date: toYmd(r.date),
+                                date: ymd,
+                                month: ymd.slice(0, 7),
                                 expenseHead: r.expenseHead ?? "",
                                 description: r.description ?? "",
                                 amount: String(r.amount ?? ""),
+                                rate,
                                 contractorSalary: String(
                                   r.contractorSalary ?? "0",
                                 ),
                                 supervisorSalary: String(
                                   r.supervisorSalary ?? "0",
                                 ),
-                                payMode: r.payMode ?? "",
+                                payMode: r.payMode ?? "Cash",
                                 nature: r.nature ?? "",
                                 location: r.location ?? "",
                                 billNumber: r.billNumber ?? "",
-                                openingReading:
-                                  r.openingReading == null
-                                    ? ""
-                                    : String(r.openingReading),
-                                closingReading:
-                                  r.closingReading == null
-                                    ? ""
-                                    : String(r.closingReading),
+                                openingReading: opening,
+                                closingReading: closing,
+                                shift: r.shift ?? "DAY",
                               },
                               collectBillPhotoUrls(r),
-                            )
-                          }
+                            );
+                          }}
                           onDelete={() => void crud.remove(r.id)}
                         />
                       ),
@@ -560,12 +662,38 @@ export function ExpenseReport({
           ) : null}
           <EntryEditDrawer
             open={Boolean(crud.editing)}
-            title="Edit expense"
+            title={
+              editingElectricity ? "Edit electricity" : "Edit expense"
+            }
             fields={expenseEditFields}
             values={crud.values}
             saving={crud.saving}
             error={crud.error}
-            onChange={crud.setField}
+            onChange={(name, value) => {
+              if (
+                editingElectricity &&
+                (name === "openingReading" ||
+                  name === "closingReading" ||
+                  name === "rate")
+              ) {
+                const next = { ...crud.values, [name]: value };
+                const units = electricityUnitsKwh(
+                  next.openingReading,
+                  next.closingReading,
+                );
+                const rate = Number(next.rate) || 0;
+                const amount =
+                  units != null && rate > 0
+                    ? String(Math.round(units * rate * 100) / 100)
+                    : next.amount;
+                crud.patchValues({
+                  [name]: value,
+                  amount,
+                });
+                return;
+              }
+              crud.setField(name, value);
+            }}
             onClose={crud.closeEdit}
             upload={{
               urls: crud.photoUrls,
@@ -574,12 +702,27 @@ export function ExpenseReport({
             }}
             onSave={() => {
               const head = (crud.values.expenseHead || "").trim();
-              const amount = Number(crud.values.amount || 0);
+              const isElec = isElectricityExpenseHead(head);
+              const month =
+                crud.values.month?.trim() ||
+                (crud.values.date || "").slice(0, 7);
+              const dayPart = (crud.values.date || "").slice(8, 10) || "01";
+              const date = isElec && month ? `${month}-${dayPart}` : crud.values.date;
+              const opening = crud.values.openingReading
+                ? Number(crud.values.openingReading)
+                : null;
+              const closing = crud.values.closingReading
+                ? Number(crud.values.closingReading)
+                : null;
+              const rate = Number(crud.values.rate) || 0;
+              const units = electricityUnitsKwh(opening, closing);
+              const amount =
+                isElec && units != null && rate > 0
+                  ? Math.round(units * rate * 100) / 100
+                  : Number(crud.values.amount || 0);
               const isWageHead =
                 head === "Contractor Wages" || head === "Labour Contractor";
               const isSalaryHead = head === "Salary Expenses";
-              // Direct Expense form only edits `amount`. Clear duplicated
-              // salary fields so the register does not show amount × 2.
               const contractorSalary = isPettyCategory
                 ? Number(crud.values.contractorSalary || 0)
                 : isWageHead || isSalaryHead
@@ -590,25 +733,38 @@ export function ExpenseReport({
                 : isWageHead || isSalaryHead
                   ? 0
                   : Number(crud.values.supervisorSalary || 0);
-              void crud.save({
-                date: crud.values.date,
-                expenseHead: crud.values.expenseHead,
-                description: crud.values.description || null,
-                amount,
-                payMode: crud.values.payMode || undefined,
-                nature: crud.values.nature || null,
-                location: crud.values.location || null,
-                billNumber: crud.values.billNumber || null,
-                contractorSalary,
-                supervisorSalary,
-                openingReading: crud.values.openingReading
-                  ? Number(crud.values.openingReading)
-                  : null,
-                closingReading: crud.values.closingReading
-                  ? Number(crud.values.closingReading)
-                  : null,
-                billPhotoUrls: crud.photoUrls,
-              });
+
+              void (async () => {
+                if (isElec && month) {
+                  await postJson(`/api/plants/${plantId}/electricity`, {
+                    month,
+                    openingReading: opening,
+                    closingReading: closing,
+                    consumedUnits: units,
+                    billAmount: amount,
+                    notes: crud.values.description || null,
+                    dailyDate: date,
+                    shift: crud.values.shift || "DAY",
+                    expenseHead: head,
+                    payMode: crud.values.payMode || "Cash",
+                  });
+                }
+                void crud.save({
+                  date,
+                  expenseHead: crud.values.expenseHead,
+                  description: crud.values.description || null,
+                  amount,
+                  payMode: crud.values.payMode || undefined,
+                  nature: isElec ? null : crud.values.nature || null,
+                  location: isElec ? null : crud.values.location || null,
+                  billNumber: isElec ? null : crud.values.billNumber || null,
+                  contractorSalary,
+                  supervisorSalary,
+                  openingReading: opening,
+                  closingReading: closing,
+                  billPhotoUrls: crud.photoUrls,
+                });
+              })();
             }}
           />
         </>

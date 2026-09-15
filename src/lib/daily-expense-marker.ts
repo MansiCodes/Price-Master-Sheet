@@ -5,6 +5,7 @@ import {
   entryApprovalResetOnEdit,
 } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
+import { isElectricityExpenseHead } from "@/lib/electricity-readings";
 
 function startOfUtcDay(date: Date): Date {
   return new Date(
@@ -26,11 +27,14 @@ export async function syncDailyExpenseMarker(params: {
   enteredById: string;
   description?: string | null;
   payMode?: string;
+  openingReading?: number | null;
+  closingReading?: number | null;
 }) {
   if (!(params.amount > 0)) return;
 
   const day = startOfUtcDay(params.date);
   const payMode = params.payMode?.trim() || "Cash";
+  const isElectricity = isElectricityExpenseHead(params.expenseHead);
 
   const enteredBy = await prisma.user.findUnique({
     where: { id: params.enteredById },
@@ -55,6 +59,18 @@ export async function syncDailyExpenseMarker(params: {
     description: params.description ?? null,
     contractorSalary: 0,
     supervisorSalary: 0,
+    ...(isElectricity
+      ? {
+          openingReading:
+            params.openingReading !== undefined
+              ? params.openingReading
+              : null,
+          closingReading:
+            params.closingReading !== undefined
+              ? params.closingReading
+              : null,
+        }
+      : {}),
   };
 
   if (existing) {

@@ -117,6 +117,13 @@ export function ElectricityRentReport({
         render: (r) => formatReading(r.consumedUnits),
       },
       {
+        key: "unit",
+        label: "Unit",
+        compact: true,
+        width: "4.5rem",
+        render: () => "kWh",
+      },
+      {
         key: "avg",
         label: "Avg rate",
         align: "right",

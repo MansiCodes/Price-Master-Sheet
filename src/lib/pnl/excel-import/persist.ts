@@ -591,6 +591,8 @@ export async function persistPnlImport(opts: {
           enteredById,
           description: row.description,
           payMode: row.payMode,
+          openingReading: row.openingReading,
+          closingReading: row.closingReading,
         });
       } catch {
         /* best-effort */

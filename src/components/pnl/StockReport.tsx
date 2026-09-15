@@ -18,6 +18,7 @@ import {
   encodeQuadSignalStockNotes,
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
+  stockEntryTypeLabel,
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import type { EditField } from "@/components/pnl/EntryEditDrawer";
@@ -226,6 +227,12 @@ export function StockReport({
       label: "Category",
       compact: true,
       render: (r) => r.category || "—",
+    },
+    {
+      key: "entryType",
+      label: "Type",
+      compact: true,
+      render: (r) => stockEntryTypeLabel(r.notes),
     },
     { key: "item", label: "Item", render: (r) => r.itemName },
     {

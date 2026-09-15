@@ -9,8 +9,9 @@ import "@/components/today/today-hub.css";
 export type EditField = {
   name: string;
   label: string;
-  type?: "text" | "number" | "date" | "textarea";
+  type?: "text" | "number" | "date" | "month" | "textarea";
   required?: boolean;
+  readOnly?: boolean;
 };
 
 export function toYmd(value: string | Date | null | undefined) {
@@ -81,13 +82,26 @@ export function EntryEditDrawer({
                 rows={3}
                 value={values[field.name] ?? ""}
                 onChange={(e) => onChange(field.name, e.target.value)}
+                readOnly={field.readOnly}
               />
             ) : (
               <input
                 id={`edit-${field.name}`}
-                type={field.type === "number" ? "text" : field.type ?? "text"}
+                type={
+                  field.type === "number"
+                    ? "text"
+                    : field.type === "month"
+                      ? "month"
+                      : (field.type ?? "text")
+                }
                 inputMode={field.type === "number" ? "decimal" : undefined}
                 required={field.required}
+                readOnly={field.readOnly}
+                style={
+                  field.readOnly
+                    ? { backgroundColor: "#f3f4f6" }
+                    : undefined
+                }
                 value={values[field.name] ?? ""}
                 onChange={(e) => onChange(field.name, e.target.value)}
               />

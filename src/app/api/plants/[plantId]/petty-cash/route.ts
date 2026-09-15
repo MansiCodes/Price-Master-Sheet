@@ -23,6 +23,7 @@ import {
   resolveCanonicalWritePlantId,
   resolveReportPlantIds,
 } from "@/lib/plant-merge";
+import { enrichExpenseElectricityReadings } from "@/lib/electricity-readings-enrich";
 
 const pettyCashSchema = z.object({
   date: z.string().regex(dateOnlyRegex),
@@ -60,6 +61,7 @@ export async function GET(
 
   const plantIds = await resolveReportPlantIds(plantId);
   const pScope = plantIdFilter(plantIds);
+  const writePlantId = await resolveCanonicalWritePlantId(plantId);
 
   const sp = request.nextUrl.searchParams;
   const { filter, error } = dateRangeFromSearchParams(sp);
@@ -109,11 +111,15 @@ export async function GET(
   ]);
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
+  const enrichedSlice = await enrichExpenseElectricityReadings(
+    writePlantId,
+    slice,
+  );
   const expenses = Number(aggregate._sum.amount ?? 0);
   const contractorSalary = Number(aggregate._sum.contractorSalary ?? 0);
   const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
 
-  const rowsWithStatus = slice.map((entry) => ({
+  const rowsWithStatus = enrichedSlice.map((entry) => ({
     ...entry,
     nature: entry.nature,
     location: entry.location,
