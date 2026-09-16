@@ -106,10 +106,6 @@ export default function AdminIntegrationsPage() {
     <div className="integrations-page">
       <header className="integrations-page__head">
         <h1 className="page-title">{t("integrations")}</h1>
-        <p className="page-sub">
-          WhatsApp / AiSensy credentials are stored securely in the database.
-          Campaign names must match the live AiSensy templates exactly.
-        </p>
       </header>
 
       {error ? <div className="alert alert--error">{error}</div> : null}
@@ -124,10 +120,6 @@ export default function AdminIntegrationsPage() {
       ) : (
         <form className="integrations-card" onSubmit={onSubmit}>
           <h2>AiSensy WhatsApp</h2>
-          <p className="integrations-card__hint">
-            Leave API key blank to keep the current value. Template variables are
-            filled automatically when messages are sent.
-          </p>
 
           <ul className="integrations-status-list">
             <li
@@ -195,10 +187,6 @@ export default function AdminIntegrationsPage() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
-            <p className="integrations-card__hint">
-              Only paste a new key if you are replacing it. Leave blank to keep the
-              current key.
-            </p>
           </div>
 
           <div className="field">
@@ -248,16 +236,6 @@ export default function AdminIntegrationsPage() {
               onChange={(e) => setPriceSheetCampaignName(e.target.value)}
               placeholder="Atlanta Telecables Price Sheet Share"
             />
-            <p className="integrations-card__hint">
-              Campaign name must match AiSensy exactly ({" "}
-              <code>cable_price_camp</code> etc.). The WhatsApp template linked
-              to this campaign must be type <strong>Document / File</strong>{" "}
-              (not Text) — otherwise only the message text is delivered and the
-              PDF is skipped. Params: {"{{1}}"} name, {"{{2}}"} item count,{" "}
-              {"{{3}}"} date, {"{{4}}"} PDF link. After Meta approves the
-              document template, create/update the API campaign to use it and
-              set it Live.
-            </p>
           </div>
 
           <button className="btn btn-primary" type="submit" disabled={saving}>
