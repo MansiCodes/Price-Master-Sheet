@@ -633,9 +633,8 @@ export const PVC_STOCK_ENTRY_TYPES = [
 
 export type PvcStockEntryType = (typeof PVC_STOCK_ENTRY_TYPES)[number]["value"];
 
-/** Upcast: keep issued qty for ops, plus closing stock for P&L formula. */
+/** Upcast stock entries are closing snapshots (same P&L notes as PVC). */
 export const UPCAST_STOCK_ENTRY_TYPES = [
-  { value: "issued", label: "Issued quantity" },
   { value: "closing", label: "Closing stock" },
 ] as const;
 
@@ -643,16 +642,13 @@ export type UpcastStockEntryType =
   (typeof UPCAST_STOCK_ENTRY_TYPES)[number]["value"];
 
 export function upcastStockEntryNotes(
-  entryType: UpcastStockEntryType,
+  _entryType: UpcastStockEntryType,
   date: string,
   customNotes?: string | null,
 ): string {
   const custom = customNotes?.trim();
   if (custom) return custom;
-  if (entryType === "closing") {
-    return `${STOCK_CLOSING_NOTE_PREFIX} as on ${date}`;
-  }
-  return `Issued quantity as on ${date}`;
+  return `${STOCK_CLOSING_NOTE_PREFIX} as on ${date}`;
 }
 
 /** Label for Stock report / approvals from notes tag. */

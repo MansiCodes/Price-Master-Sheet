@@ -43,10 +43,7 @@ import {
   QUAD_SIGNAL_STOCK_CABLES,
   QUAD_SIGNAL_STOCK_RAW_MATERIALS,
   pvcStockEntryNotes,
-  upcastStockEntryNotes,
-  UPCAST_STOCK_ENTRY_TYPES,
   type PvcStockEntryType,
-  type UpcastStockEntryType,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import {
@@ -577,6 +574,8 @@ export function TodayHub({
     Record<string, string>
   >({});
   const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
+  /** True while quad-wip-context is loading for the selected cable+size. */
+  const [stockWipContextLoading, setStockWipContextLoading] = useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
   const [stockWipSalesLines, setStockWipSalesLines] = useState<
     Array<{
@@ -625,9 +624,7 @@ export function TodayHub({
   const [stockPurchaseRate, setStockPurchaseRate] = useState<number | null>(null);
   const [stockPurchaseRateLoading, setStockPurchaseRateLoading] = useState(false);
   const [stockNotes, setStockNotes] = useState("");
-  const [stockType, setStockType] = useState<"issued" | "closing">(
-    isUpcast ? "issued" : "closing",
-  );
+  const [stockType, setStockType] = useState<PvcStockEntryType>("closing");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
 
   const quadCableSizeOptions = useMemo(() => {
@@ -661,6 +658,8 @@ export function TodayHub({
     }
     setStockProcessQtys({});
     setStockInsulationExtras([]);
+    setStockWipOpening({});
+    setStockOpeningEditable(false);
   }, [isQuad, stockKind, stockCable]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resolvedQuadCableName =
@@ -686,10 +685,22 @@ export function TodayHub({
     );
   }, [isSignallingStock, resolvedQuadSizeName]);
 
+  // Clear stale Opening / production when size changes so Insulation does not
+  // flash the previous size (e.g. 239) or keep "editable" and re-deduct.
+  useEffect(() => {
+    if (!isQuad || stockKind !== "cable") return;
+    setStockProcessQtys({});
+    setStockWipOpening({});
+    setStockOpeningEditable(false);
+    setStockWipSalesKm(0);
+    setStockWipSalesLines([]);
+  }, [isQuad, stockKind, resolvedQuadCableName, resolvedQuadSizeName]);
+
   useEffect(() => {
     if (!isQuad || stockKind !== "cable") {
       setStockWipOpening({});
       setStockOpeningEditable(false);
+      setStockWipContextLoading(false);
       setStockWipSalesKm(0);
       setStockWipSalesLines([]);
       setStockCallPutup("");
@@ -705,6 +716,7 @@ export function TodayHub({
     if (!resolvedQuadCableName || !resolvedQuadSizeName) return;
 
     const ac = new AbortController();
+    setStockWipContextLoading(true);
     const q = new URLSearchParams({
       date: entryDate,
       shift,
@@ -741,6 +753,7 @@ export function TodayHub({
         }>;
       })
       .then((data) => {
+        if (ac.signal.aborted) return;
         const openingStrings: Record<string, string> = {};
         for (const [key, raw] of Object.entries(data.opening ?? {})) {
           const n = Number(raw);
@@ -777,6 +790,7 @@ export function TodayHub({
         setStockPartyName(meta?.partyName ?? "");
         setStockDispatchPending(meta?.dispatchPending ?? "");
         setStockDispatchParty(meta?.dispatchParty ?? "");
+        setStockWipContextLoading(false);
       })
       .catch((err) => {
         if (ac.signal.aborted) return;
@@ -790,9 +804,12 @@ export function TodayHub({
         setStockPartyName("");
         setStockDispatchPending("");
         setStockDispatchParty("");
+        setStockWipContextLoading(false);
       });
 
-    return () => ac.abort();
+    return () => {
+      ac.abort();
+    };
   }, [
     isQuad,
     stockKind,
@@ -806,6 +823,8 @@ export function TodayHub({
   const stockWipCalc: WipCalcResult | null = useMemo(() => {
     if (!isQuad || stockKind !== "cable" || quadCableProcessFields.length === 0)
       return null;
+    // Avoid using previous size's Opening while the new context is loading.
+    if (stockWipContextLoading) return null;
     const variant = resolveQuadSignalVariant(resolvedQuadSizeName);
     if (!variant) return null;
     const production: Record<string, number> = {};
@@ -841,6 +860,9 @@ export function TodayHub({
         coreCount: number;
         lengthFactor: number;
       }> = [];
+      // Insulation pool is only adjusted on the first Signalling entry of the
+      // day (opening editable) or via explicit extra-size rows — not again
+      // when filling the next size's Laying.
       if (stockOpeningEditable || stockInsulationExtras.length > 0) {
         sizeRows.push({
           size: resolvedQuadSizeName,
@@ -869,12 +891,17 @@ export function TodayHub({
           lengthFactor: lf,
         });
       }
-      const shared = calculateSharedSignallingInsulation({
-        opening: opening.Insulation ?? 0,
-        production: production.Insulation ?? 0,
-        sizes: sizeRows,
-      });
-      insulationConsumedOverride = shared.consumed;
+      if (sizeRows.length > 0) {
+        const shared = calculateSharedSignallingInsulation({
+          opening: opening.Insulation ?? 0,
+          production: production.Insulation ?? 0,
+          sizes: sizeRows,
+        });
+        insulationConsumedOverride = shared.consumed;
+      } else {
+        // Locked shared pool: do not re-deduct from this size's Laying.
+        insulationConsumedOverride = 0;
+      }
     }
 
     return calculateQuadSignalWip({
@@ -898,6 +925,7 @@ export function TodayHub({
     stockLengthFactor,
     stockInsulationExtras,
     stockOpeningEditable,
+    stockWipContextLoading,
   ]);
 
   useEffect(() => {
@@ -1186,6 +1214,7 @@ export function TodayHub({
     setStockProcessQtys({});
     setStockWipOpening({});
     setStockOpeningEditable(false);
+    setStockWipContextLoading(false);
     setStockCallPutup("");
     setStockPutupDate("");
     setStockPartyName("");
@@ -1204,7 +1233,7 @@ export function TodayHub({
     setStockRate("");
     setStockValue("");
     setStockNotes("");
-    setStockType(isUpcast ? "issued" : "closing");
+    setStockType("closing");
     setStockPhotos([]);
     setShift("DAY");
     setProductName(saleProducts[0] ?? PRODUCTS[0].name);
@@ -1717,15 +1746,21 @@ export function TodayHub({
               production: processes.Insulation ?? 0,
               sizes: sizeRows,
             });
-            insulationConsumedOverride = shared.consumed;
-            sharedInsulationMeta = {
-              consumed: shared.consumed,
-              closing: shared.closing,
-              contributions: shared.contributions,
-            };
-            if (shared.warnings.length > 0) {
-              fail(shared.warnings[0] ?? "Insulation validation failed.");
-              return;
+            // Only update the shared Insulation pool when this entry is meant
+            // to adjust it (first editable entry or extra-size rows).
+            if (sizeRows.length > 0) {
+              insulationConsumedOverride = shared.consumed;
+              sharedInsulationMeta = {
+                consumed: shared.consumed,
+                closing: shared.closing,
+                contributions: shared.contributions,
+              };
+              if (shared.warnings.length > 0) {
+                fail(shared.warnings[0] ?? "Insulation validation failed.");
+                return;
+              }
+            } else {
+              insulationConsumedOverride = 0;
             }
           }
 
@@ -1846,15 +1881,9 @@ export function TodayHub({
         quantity: issuedQty,
         rate: closingRate,
         value: closingValue,
-        notes: isPvc
-          ? pvcStockEntryNotes(stockType as PvcStockEntryType, entryDate, stockNotes)
-          : isUpcast
-            ? upcastStockEntryNotes(
-                stockType as UpcastStockEntryType,
-                entryDate,
-                stockNotes,
-              )
-            : stockNotes.trim() || `Closing stock as on ${entryDate}`,
+        notes: isPvc || isUpcast
+          ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
+          : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
       }
@@ -3093,8 +3122,9 @@ export function TodayHub({
                                         </button>
                                       </div>
                                       <p className="qs-wip__box-note">
-                                        Shared for all Signalling sizes. Use +
-                                        to add another size.
+                                        {stockWipContextLoading
+                                          ? "Loading opening from stock…"
+                                          : "Shared for all Signalling sizes. Use + to add another size."}
                                       </p>
                                       <div className="qs-wip__table-wrap">
                                         <table className="qs-wip__table">
@@ -3679,20 +3709,6 @@ export function TodayHub({
                     />
                   </div>
                 )}
-                {isUpcast ? (
-                  <div className="field">
-                    <label htmlFor="st-entry-type">Stock entry type</label>
-                    <SelectMenu
-                      id="st-entry-type"
-                      value={stockType}
-                      items={[...UPCAST_STOCK_ENTRY_TYPES]}
-                      required
-                      onChange={(next) =>
-                        setStockType(next as UpcastStockEntryType)
-                      }
-                    />
-                  </div>
-                ) : null}
                 {stockItem === "Others" ||
                 stockItem === "Other" ||
                 stockItem === "others" ? (
@@ -3760,13 +3776,7 @@ export function TodayHub({
                 >
                   <div className="field">
                     <label htmlFor="st-qty">
-                      {isUpcast
-                        ? stockType === "closing"
-                          ? "Closing Stock"
-                          : "Issued quantity"
-                        : usesStockLedger
-                          ? "Closing Stock"
-                          : "Quantity"}
+                      {usesStockLedger ? "Closing Stock" : "Quantity"}
                     </label>
                     <DecimalInput
                       id="st-qty"
@@ -3774,16 +3784,14 @@ export function TodayHub({
                       value={stockQty}
                       onChange={(next) => {
                         setStockQty(next);
-                        if (!isUpcast || stockType === "closing") {
-                          const qty = Number(next);
-                          const rate = Number(stockRate);
-                          if (
-                            usesStockLedger &&
-                            Number.isFinite(qty) &&
-                            Number.isFinite(rate)
-                          ) {
-                            setStockValue((qty * rate).toFixed(2));
-                          }
+                        const qty = Number(next);
+                        const rate = Number(stockRate);
+                        if (
+                          usesStockLedger &&
+                          Number.isFinite(qty) &&
+                          Number.isFinite(rate)
+                        ) {
+                          setStockValue((qty * rate).toFixed(2));
                         }
                       }}
                     />

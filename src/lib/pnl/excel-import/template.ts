@@ -238,7 +238,7 @@ function stockHeaders(family: PlantFamily): string[] {
         "Category",
         "Particulars",
         "Unit",
-        "Issued quantity",
+        "Closing Stock",
         "Rate",
         "Closing Value",
         "Notes",

@@ -74,6 +74,7 @@ export function StockReport({
 }) {
   const t = useTranslations("pnl");
   const isPvc = plantCode?.toUpperCase() === "PVC";
+  const isUpcast = plantCode?.toUpperCase() === "UPCAST";
   const cat6 = isCat6Plant(plantCode);
   const isQuadSignal = isQuadSignalPlant(plantCode);
   const [stockView, setStockView] = useState<"closing" | "atcl">("closing");
@@ -229,16 +230,20 @@ export function StockReport({
       compact: true,
       render: (r) => r.category || "—",
     },
-    {
-      key: "entryType",
-      label: "Type",
-      compact: true,
-      render: (r) => stockEntryTypeLabel(r.notes),
-    },
+    ...(isUpcast
+      ? []
+      : ([
+          {
+            key: "entryType",
+            label: "Type",
+            compact: true,
+            render: (r: StockRow) => stockEntryTypeLabel(r.notes),
+          },
+        ] satisfies ReportColumn<StockRow>[])),
     { key: "item", label: "Item", render: (r) => r.itemName },
     {
       key: "qty",
-      label: "Qty",
+      label: isUpcast ? "Closing Stock" : "Qty",
       align: "right",
       render: (r) => `${Number(r.quantity)} ${r.unit}`,
     },
@@ -695,7 +700,7 @@ export function StockReport({
           },
           {
             name: "quantity",
-            label: isPvc ? "Closing Stock" : "QTY",
+            label: isPvc || isUpcast ? "Closing Stock" : "QTY",
             type: "number",
             required: true,
           },
