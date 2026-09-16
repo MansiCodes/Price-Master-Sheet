@@ -26,6 +26,26 @@ import {
 import { enrichExpenseElectricityReadings } from "@/lib/electricity-readings-enrich";
 import { resolveCanonicalWritePlantId } from "@/lib/plant-merge";
 
+function fmtQty(n: number): string {
+  return n.toLocaleString("en-IN", {
+    maximumFractionDigits: 4,
+  });
+}
+
+function fmtRate(n: number): string {
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function joinDetail(parts: Array<string | null | undefined>): string {
+  return parts
+    .map((p) => (p == null ? "" : String(p).trim()))
+    .filter(Boolean)
+    .join(" · ");
+}
+
 const VALID_TABS = new Set<EntryApprovalKind>([
   "purchase",
   "sale",
@@ -152,34 +172,58 @@ export default async function ApprovalsPage({
   }
 
   const entries: PendingEntryRow[] = [
-    ...purchases.map((p) => ({
-      id: p.id,
-      kind: "purchase" as const,
-      plantId: p.plantId,
-      date: p.date.toISOString(),
-      shift: p.shift,
-      plantName: getPlantDisplayName(p.plant.code, p.plant.name),
-      enteredByName: p.enteredBy.name,
-      label: p.itemDescription,
-      detail: p.vendorName,
-      remark: p.notes?.trim() || null,
-      amount: Number(p.invoiceValue),
-    })),
-    ...sales.map((s) => ({
-      id: s.id,
-      kind: "sale" as const,
-      plantId: s.plantId,
-      date: s.date.toISOString(),
-      shift: s.shift,
-      plantName: getPlantDisplayName(s.plant.code, s.plant.name),
-      enteredByName: s.enteredBy.name,
-      label: s.itemDescription,
-      detail: s.customerName,
-      remark: s.notes?.trim() || null,
-      amount: Number(s.salesValue),
-    })),
+    ...purchases.map((p) => {
+      const qty = Number(p.quantity);
+      const rate = Number(p.rate);
+      return {
+        id: p.id,
+        kind: "purchase" as const,
+        plantId: p.plantId,
+        date: p.date.toISOString(),
+        shift: p.shift,
+        plantName: getPlantDisplayName(p.plant.code, p.plant.name),
+        enteredByName: p.enteredBy.name,
+        label: p.itemDescription,
+        detail: joinDetail([
+          p.vendorName,
+          Number.isFinite(qty)
+            ? `${fmtQty(qty)} ${p.unit || ""}`.trim()
+            : null,
+          Number.isFinite(rate) && rate > 0 ? `@ ₹${fmtRate(rate)}` : null,
+          p.billNumber?.trim() ? `Bill ${p.billNumber.trim()}` : null,
+          Number(p.gstPercent) > 0 ? `GST ${Number(p.gstPercent)}%` : null,
+        ]),
+        remark: p.notes?.trim() || null,
+        amount: Number(p.invoiceValue),
+      };
+    }),
+    ...sales.map((s) => {
+      const qty = Number(s.quantity);
+      const rate = Number(s.rate);
+      return {
+        id: s.id,
+        kind: "sale" as const,
+        plantId: s.plantId,
+        date: s.date.toISOString(),
+        shift: s.shift,
+        plantName: getPlantDisplayName(s.plant.code, s.plant.name),
+        enteredByName: s.enteredBy.name,
+        label: s.itemDescription,
+        detail: joinDetail([
+          s.customerName,
+          Number.isFinite(qty)
+            ? `${fmtQty(qty)} ${s.unit || ""}`.trim()
+            : null,
+          Number.isFinite(rate) && rate > 0 ? `@ ₹${fmtRate(rate)}` : null,
+          s.billNumber?.trim() ? `Bill ${s.billNumber.trim()}` : null,
+        ]),
+        remark: s.notes?.trim() || null,
+        amount: Number(s.salesValue),
+      };
+    }),
     ...stocks.map((s) => {
       const qty = Number(s.quantity);
+      const rate = Number(s.rate);
       const unit = String(s.unit ?? "").trim() || "kg";
       const note = String(s.notes ?? "");
       const entryKind = note.startsWith("Closing stock")
@@ -187,9 +231,6 @@ export default async function ApprovalsPage({
         : note.startsWith("Issued quantity")
           ? "Issued quantity"
           : null;
-      const qtyPart = Number.isFinite(qty)
-        ? `${qty.toLocaleString("en-IN")} ${unit}`
-        : unit;
       return {
         id: s.id,
         kind: "stock" as const,
@@ -199,7 +240,12 @@ export default async function ApprovalsPage({
         plantName: getPlantDisplayName(s.plant.code, s.plant.name),
         enteredByName: s.enteredBy.name,
         label: s.itemName,
-        detail: [entryKind, qtyPart].filter(Boolean).join(" · "),
+        detail: joinDetail([
+          s.category ? String(s.category) : null,
+          entryKind,
+          Number.isFinite(qty) ? `${fmtQty(qty)} ${unit}` : unit,
+          Number.isFinite(rate) && rate > 0 ? `@ ₹${fmtRate(rate)}` : null,
+        ]),
         remark: stockUserRemark(s.notes) || null,
         amount: Number(s.closingValue),
       };
@@ -213,13 +259,18 @@ export default async function ApprovalsPage({
       plantName: getPlantDisplayName(e.plant.code, e.plant.name),
       enteredByName: e.enteredBy.name,
       label: e.expenseHead,
-      detail: isElectricityExpenseHead(e.expenseHead)
-        ? formatElectricityApprovalDetail({
-            nature: e.nature,
-            openingReading: e.openingReading,
-            closingReading: e.closingReading,
-          })
-        : (e.nature ?? ""),
+      detail: joinDetail([
+        isElectricityExpenseHead(e.expenseHead)
+          ? formatElectricityApprovalDetail({
+              nature: e.nature,
+              openingReading: e.openingReading,
+              closingReading: e.closingReading,
+            })
+          : e.nature,
+        e.payMode?.trim() ? `Pay ${e.payMode.trim()}` : null,
+        e.location?.trim() || null,
+        e.billNumber?.trim() ? `Bill ${e.billNumber.trim()}` : null,
+      ]),
       remark: e.description?.trim() || null,
       amount:
         Number(e.amount) +

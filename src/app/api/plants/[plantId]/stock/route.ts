@@ -14,13 +14,15 @@ import { writeAuditLog, safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData, entryApprovalResetOnEdit, resolveEntryApprovalFlags } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore, maybeRevokeCreditScore } from "@/lib/credit-score";
-import { dateOnlyRegex, isBackdated, parseDateOnly } from "@/lib/dates";
+import { dateOnlyRegex, isBackdated, parseDateOnly, todayDateString, toIsoDateString } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
-import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant } from "@/lib/plant-layout";
+import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import {
   atclStockEntryFilter,
   closingStockEntryFilter,
+  parseQuadSignalStockNotes,
+  quadSignalCableSizeDedupeKey,
 } from "@/lib/plant-catalogs";
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
@@ -34,7 +36,6 @@ import {
 import {
   applyQuadSignalOpeningLockToNotes,
 } from "@/lib/quad-signal-opening";
-import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
 import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
 
 const stockLineSchema = z.object({
@@ -70,6 +71,34 @@ const stockSingleSchema = z.object({
 });
 
 type RouteContext = { params: Promise<{ plantId: string }> };
+
+/**
+ * For Quad/Signal P&L Stock table: on today's date only, collapse near-duplicate
+ * FG cable rows (Other spellings / double submits). Keeps newest (list is newest-first).
+ */
+function dedupeTodayQuadCableRows<
+  T extends { date: Date; notes: string | null; category?: string | null },
+>(rows: T[], todayIso: string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const row of rows) {
+    const day = toIsoDateString(row.date);
+    if (day !== todayIso || row.category !== StockCategory.FG) {
+      out.push(row);
+      continue;
+    }
+    const { meta } = parseQuadSignalStockNotes(row.notes);
+    if (!meta || meta.kind !== "cable" || !meta.cable || !meta.size) {
+      out.push(row);
+      continue;
+    }
+    const key = quadSignalCableSizeDedupeKey(meta.cable, meta.size);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+}
 
 function lineAmounts(quantity: number, rate?: number, value?: number) {
   if (value != null && Number.isFinite(value)) {
@@ -168,6 +197,7 @@ export async function GET(
     select: { code: true },
   });
   const cat6 = isCat6Plant(plant?.code);
+  const quadSignal = isQuadSignalPlant(plant?.code);
   const snapshot = sp.get("snapshot") === "1";
   const atcl = sp.get("atcl") === "1";
   const kindParam = (sp.get("kind") ?? "").trim().toLowerCase();
@@ -180,7 +210,7 @@ export async function GET(
         ? { category: StockCategory.FG }
         : {};
 
-  const entries = await prisma.stockEntry.findMany({
+  const entriesRaw = await prisma.stockEntry.findMany({
     where: {
       ...pScope,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
@@ -193,6 +223,11 @@ export async function GET(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     include: { enteredBy: { select: { globalRole: true } } },
   });
+
+  const entries =
+    quadSignal && (kindParam === "cable" || kindParam === "")
+      ? dedupeTodayQuadCableRows(entriesRaw, todayDateString())
+      : entriesRaw;
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);
   const totals = entries.reduce(

@@ -184,6 +184,19 @@
   border-bottom: 0;
 }
 
+.stock-rm-table tfoot td {
+  border-bottom: 0;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--fg) 3%, #fff);
+}
+
+.stock-rm-table__total td:nth-child(3),
+.stock-rm-table__total td:nth-child(5),
+.stock-rm-table__total td:nth-child(6) {
+  text-align: right;
+}
+
 .stock-status-grid {
   margin: 0;
   padding: 0;

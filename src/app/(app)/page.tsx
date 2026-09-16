@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { getDashboardMetrics } from "@/lib/dashboard/metrics";
 import { parseDashboardPeriod } from "@/lib/dashboard/period";
 import {
-  canApproveEntries,
   canEnterData,
   canViewFullPnl,
   getAccessiblePlantIds,
@@ -24,7 +23,6 @@ import {
 } from "@/components/today/TodayHub";
 import { computeDayShiftCompletions } from "@/lib/shift-completion";
 import { refreshDailyStatusForDate } from "@/lib/daily-status";
-import { getEntryApprovalStartDate } from "@/lib/entry-approval";
 import "@/components/dashboard/dashboard.css";
 
 const MODULES: { key: TodayModuleStatus["key"]; label: string }[] = [
@@ -144,36 +142,6 @@ export default async function DashboardPage({
       ? await getMachineProductionHomeMetrics()
       : null;
 
-  const pendingApprovals =
-    canApproveEntries(user.globalRole) && scopedPlantIds.length > 0
-      ? (
-          await prisma.dailyEntryStatus.findMany({
-            where: {
-              plantId: { in: scopedPlantIds },
-              allComplete: true,
-              approvedByHead: false,
-              rejectedByHead: false,
-              date: { gte: getEntryApprovalStartDate() },
-            },
-            include: {
-              plant: { select: { name: true, code: true } },
-            },
-            orderBy: [{ date: "desc" }, { shift: "asc" }],
-            take: 50,
-          })
-        ).map((row) => ({
-          id: row.id,
-          plantId: row.plantId,
-          date: row.date.toISOString(),
-          shift: row.shift,
-          approvedByHead: row.approvedByHead,
-          approvedByAdmin: row.approvedByAdmin,
-          plant: {
-            name: getPlantDisplayName(row.plant.code, row.plant.name),
-          },
-        }))
-      : [];
-
   return (
     <DashboardHome
       metrics={metrics}
@@ -194,7 +162,6 @@ export default async function DashboardPage({
       machineProductionMetrics={machineProductionMetrics}
       userRole={user.globalRole}
       canAccessStock={Boolean(user.canAccessStock)}
-      pendingApprovals={pendingApprovals}
     />
   );
 }

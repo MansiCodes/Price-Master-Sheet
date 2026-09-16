@@ -1,4 +1,4 @@
-import { getTranslations, getLocale } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import { formatMoney, KpiCard } from "@/components/dashboard/KpiKra";
 import { SalesPurchasePieChart } from "@/components/dashboard/Charts";
 import {
@@ -8,8 +8,6 @@ import {
 import { MachineProductionHome } from "@/components/machine-production/MachineProductionHome";
 import type { DashboardMetrics } from "@/lib/dashboard/metrics";
 import type { MpHomeMetrics } from "@/lib/machine-production/home-metrics";
-import type { AppLocale } from "@/i18n/config";
-import { PendingApprovalsTable } from "@/components/dashboard/PendingApprovalsTable";
 import { DashboardPeriodFilter } from "@/components/dashboard/DashboardPeriodFilter";
 import type { DashboardPeriod } from "@/lib/dashboard/period";
 
@@ -31,7 +29,6 @@ export async function DashboardHome({
   machineProductionMetrics = null,
   userRole = "",
   canAccessStock = false,
-  pendingApprovals = [],
 }: {
   metrics: DashboardMetrics;
   period: DashboardPeriod;
@@ -44,19 +41,9 @@ export async function DashboardHome({
   machineProductionMetrics?: MpHomeMetrics | null;
   userRole?: string;
   canAccessStock?: boolean;
-  pendingApprovals?: Array<{
-    id: string;
-    plantId: string;
-    date: string;
-    shift: string;
-    approvedByHead: boolean;
-    approvedByAdmin: boolean;
-    plant: { name: string };
-  }>;
 }) {
   const t = await getTranslations("dashboard");
   const tCommon = await getTranslations("common");
-  const locale = (await getLocale()) as AppLocale;
 
   const kpiHint =
     scope === "plant" && plant
@@ -186,14 +173,6 @@ export async function DashboardHome({
           </section>
         </div>
       </div>
-
-      {pendingApprovals && pendingApprovals.length > 0 ? (
-        <PendingApprovalsTable
-          pendingApprovals={pendingApprovals}
-          userRole={userRole}
-          locale={locale}
-        />
-      ) : null}
 
       {machineProductionMetrics ? (
         <section

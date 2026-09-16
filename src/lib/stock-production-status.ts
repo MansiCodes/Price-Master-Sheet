@@ -1,6 +1,7 @@
 import {
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
+  quadSignalCableSizeDedupeKey,
   quadSignalClosingFromMeta,
 } from "@/lib/plant-catalogs";
 import { toIsoDateString } from "@/lib/dates";
@@ -127,6 +128,7 @@ export function formatSharedInsulationLine(
 /**
  * Build cable-size production status blocks from QSSTOCK FG rows.
  * Keeps the newest entry per cable · size (rows should be newest-first).
+ * Near-duplicate "Other" spellings collapse via normalizeQuadSignalCableSizeKey.
  * Signalling Insulation is returned separately (shared across sizes).
  */
 export function buildCableStockStatus(rows: Array<{
@@ -178,7 +180,8 @@ export function buildCableStockStatus(rows: Array<{
       }
     }
 
-    const key = `${cable} · ${size}`;
+    // Prefer normalized key so "100P" / "100 Pair" / "100Pair" show as one card.
+    const key = quadSignalCableSizeDedupeKey(cable, size);
     if (byKey.has(key)) continue;
 
     const procs = [...getQuadSignalCableProcesses(cable)];
@@ -228,7 +231,7 @@ export function buildCableStockStatus(rows: Array<{
     }, 0);
 
     byKey.set(key, {
-      key,
+      key: `${cable} · ${size}`,
       cable,
       size,
       entryDate: toIsoDateString(row.date),

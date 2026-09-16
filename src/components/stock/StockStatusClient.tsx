@@ -57,7 +57,6 @@ const ALL_CABLES = "All cables";
 const ALL_SIZES = "All sizes";
 
 const CABLE_TYPES = QUAD_SIGNAL_STOCK_CABLES.filter((c) => c !== "Other");
-const CABLE_TYPE_OPTIONS = [ALL_CABLES, ...CABLE_TYPES];
 
 type DisplayCard = {
   key: string;
@@ -65,6 +64,16 @@ type DisplayCard = {
   size: string;
   block: CableStockStatusBlock | null;
 };
+
+function isCatalogCable(cable: string): boolean {
+  return (CABLE_TYPES as readonly string[]).includes(cable);
+}
+
+function catalogSizesForCable(cable: string): string[] {
+  return getQuadSignalCableSizes(
+    isCatalogCable(cable) ? cable : "Other",
+  ).filter((s) => s !== "Other");
+}
 
 export function StockStatusClient({
   date,
@@ -90,32 +99,59 @@ export function StockStatusClient({
   const [cableType, setCableType] = useState(ALL_CABLES);
   const [cableSize, setCableSize] = useState(ALL_SIZES);
 
-  const activeCable = CABLE_TYPE_OPTIONS.includes(cableType)
+  /** Custom cable names saved via form "Other" (not in catalog). */
+  const extraCablesFromData = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of cableBlocks) {
+      const cable = b.cable.trim();
+      if (cable && !isCatalogCable(cable)) set.add(cable);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cableBlocks]);
+
+  const cableTypeOptions = useMemo(
+    () => [ALL_CABLES, ...CABLE_TYPES, ...extraCablesFromData],
+    [extraCablesFromData],
+  );
+
+  const activeCable = cableTypeOptions.includes(cableType)
     ? cableType
     : ALL_CABLES;
   const showAllCables = activeCable === ALL_CABLES;
 
   const cablesInView = useMemo(
-    () => (showAllCables ? [...CABLE_TYPES] : [activeCable]),
-    [showAllCables, activeCable],
+    () =>
+      showAllCables
+        ? [...CABLE_TYPES, ...extraCablesFromData]
+        : [activeCable],
+    [showAllCables, activeCable, extraCablesFromData],
   );
 
   const catalogSizes = useMemo(() => {
     if (showAllCables) {
       const set = new Set<string>();
       for (const cable of CABLE_TYPES) {
-        for (const s of getQuadSignalCableSizes(cable)) {
-          if (s !== "Other") set.add(s);
-        }
+        for (const s of catalogSizesForCable(cable)) set.add(s);
       }
       return Array.from(set);
     }
-    return getQuadSignalCableSizes(activeCable).filter((s) => s !== "Other");
+    return catalogSizesForCable(activeCable);
   }, [showAllCables, activeCable]);
 
+  /** Custom sizes saved via form "Other" for the cables in view. */
+  const extraSizesFromData = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of cableBlocks) {
+      if (!showAllCables && b.cable !== activeCable) continue;
+      const known = new Set(catalogSizesForCable(b.cable));
+      if (b.size && !known.has(b.size)) set.add(b.size);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [cableBlocks, showAllCables, activeCable]);
+
   const sizeOptions = useMemo(
-    () => [ALL_SIZES, ...catalogSizes],
-    [catalogSizes],
+    () => [ALL_SIZES, ...catalogSizes, ...extraSizesFromData],
+    [catalogSizes, extraSizesFromData],
   );
 
   const blocksByKey = useMemo(() => {
@@ -128,11 +164,14 @@ export function StockStatusClient({
 
   const displayCards = useMemo((): DisplayCard[] => {
     const cards: DisplayCard[] = [];
+    const seen = new Set<string>();
+
     for (const cable of cablesInView) {
-      const sizes = getQuadSignalCableSizes(cable).filter((s) => s !== "Other");
+      const sizes = catalogSizesForCable(cable);
       for (const size of sizes) {
         if (cableSize !== ALL_SIZES && size !== cableSize) continue;
         const key = `${cable} · ${size}`;
+        seen.add(key);
         cards.push({
           key,
           cable,
@@ -142,8 +181,24 @@ export function StockStatusClient({
       }
     }
 
+    // Entries saved with size/cable "Other" use the typed custom name —
+    // include those so they appear on Stock (catalog loop alone misses them).
+    for (const b of cableBlocks) {
+      const key = `${b.cable} · ${b.size}`;
+      if (seen.has(key)) continue;
+      if (!showAllCables && b.cable !== activeCable) continue;
+      if (cableSize !== ALL_SIZES && b.size !== cableSize) continue;
+      seen.add(key);
+      cards.push({
+        key,
+        cable: b.cable,
+        size: b.size,
+        block: b,
+      });
+    }
+
     // Filled data first, then empty. Within each group: Signalling → next cables,
-    // then catalog size order.
+    // then catalog size order (custom sizes after catalog).
     cards.sort((a, b) => {
       const aHas = a.block ? 0 : 1;
       const bHas = b.block ? 0 : 1;
@@ -158,13 +213,49 @@ export function StockStatusClient({
       const aCableOrd = aCable === -1 ? 999 : aCable;
       const bCableOrd = bCable === -1 ? 999 : bCable;
       if (aCableOrd !== bCableOrd) return aCableOrd - bCableOrd;
+      if (a.cable !== b.cable) return a.cable.localeCompare(b.cable);
 
-      const sizes = getQuadSignalCableSizes(a.cable);
-      return sizes.indexOf(a.size) - sizes.indexOf(b.size);
+      const sizes = catalogSizesForCable(a.cable);
+      const aIdx = sizes.indexOf(a.size);
+      const bIdx = sizes.indexOf(b.size);
+      const aOrd = aIdx === -1 ? 9999 : aIdx;
+      const bOrd = bIdx === -1 ? 9999 : bIdx;
+      if (aOrd !== bOrd) return aOrd - bOrd;
+      return a.size.localeCompare(b.size);
     });
 
     return cards;
-  }, [cablesInView, cableSize, blocksByKey]);
+  }, [
+    cablesInView,
+    cableSize,
+    blocksByKey,
+    cableBlocks,
+    showAllCables,
+    activeCable,
+  ]);
+
+  const rawTotals = useMemo(() => {
+    let qty = 0;
+    let value = 0;
+    let hasQty = false;
+    let hasValue = false;
+    for (const row of rawRows) {
+      if (!row.hasData) continue;
+      if (row.qty != null && Number.isFinite(row.qty)) {
+        qty += row.qty;
+        hasQty = true;
+      }
+      if (row.value != null && Number.isFinite(row.value)) {
+        value += row.value;
+        hasValue = true;
+      }
+    }
+    return {
+      qty: hasQty ? Math.round(qty * 10000) / 10000 : null,
+      value: hasValue ? Math.round(value * 10000) / 10000 : null,
+      hasAny: hasQty || hasValue,
+    };
+  }, [rawRows]);
 
   const showInsulationCard =
     showAllCables || isSignallingCableName(activeCable);
@@ -296,6 +387,24 @@ export function StockStatusClient({
                   </tr>
                 ))}
               </tbody>
+              {rawTotals.hasAny ? (
+                <tfoot>
+                  <tr className="stock-rm-table__total">
+                    <td />
+                    <td>Total</td>
+                    <td>
+                      {rawTotals.qty != null ? formatNum(rawTotals.qty) : "—"}
+                    </td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>
+                      {rawTotals.value != null
+                        ? formatNum(rawTotals.value)
+                        : "—"}
+                    </td>
+                  </tr>
+                </tfoot>
+              ) : null}
             </table>
           </div>
         </div>
@@ -307,7 +416,7 @@ export function StockStatusClient({
               <SelectMenu
                 id="stock-cable-type"
                 value={activeCable}
-                options={CABLE_TYPE_OPTIONS}
+                options={cableTypeOptions}
                 required
                 onChange={(next) => {
                   setCableType(next);

@@ -511,6 +511,31 @@ export function parseQuadSignalStockNotes(notes: string | null | undefined): {
   return { meta: null, userNotes: raw };
 }
 
+/**
+ * Collapse near-duplicate "Other" size spellings
+ * (e.g. "100 Pair x 0.5mm Armoured" ≈ "100P x 0.5 Armoured").
+ */
+export function normalizeQuadSignalCableSizeKey(size: string): string {
+  return String(size ?? "")
+    .toLowerCase()
+    .replace(/×/g, "x")
+    .replace(/pair/g, "p")
+    .replace(/armou?red/g, "arm")
+    .replace(/un-?arm(?:ou?red)?/g, "unarm")
+    .replace(/unamoured/g, "unarm")
+    .replace(/mm/g, "")
+    .replace(/[^a-z0-9.]/g, "")
+    .replace(/\.+/g, ".");
+}
+
+/** Cable + normalized size — used to dedupe Other re-entries. */
+export function quadSignalCableSizeDedupeKey(
+  cable: string,
+  size: string,
+): string {
+  return `${cable.trim()}::${normalizeQuadSignalCableSizeKey(size)}`;
+}
+
 /** Closing balances from a stock notes meta (v2 closing, else v1 processes). */
 export function quadSignalClosingFromMeta(
   meta: QuadSignalStockMeta | null | undefined,

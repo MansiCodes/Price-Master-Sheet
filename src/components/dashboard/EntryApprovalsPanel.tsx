@@ -62,6 +62,9 @@ export function EntryApprovalsPanel({
 
   return (
     <section className="mis-panel" style={{ marginTop: "0.85rem", padding: "1.25rem" }}>
+      <h2 className="section-label" style={{ marginBottom: "1rem" }}>
+        Approvals
+      </h2>
       <div
         style={{
           display: "flex",
