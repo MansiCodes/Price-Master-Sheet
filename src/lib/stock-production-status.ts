@@ -26,6 +26,7 @@ export type CableStockStatusBlock = {
   callPutup: string;
   putupDate: string;
   partyName: string;
+  dispatchParty: string;
   dispatchPending: number;
   userNotes: string;
 };
@@ -102,9 +103,14 @@ export function formatCallPutupLine(
 }
 
 export function formatDispatchLine(
-  block: Pick<CableStockStatusBlock, "partyName" | "dispatchPending">,
+  block: Pick<
+    CableStockStatusBlock,
+    "partyName" | "dispatchParty" | "dispatchPending"
+  >,
 ): string | null {
-  const partyName = String(block.partyName ?? "").trim();
+  const partyName = String(
+    block.dispatchParty?.trim() || block.partyName?.trim() || "",
+  ).trim();
   const qtyRaw = Number(block.dispatchPending);
   const qty = Number.isFinite(qtyRaw) ? Math.max(0, qtyRaw) : 0;
   if (!partyName && qty <= 0) return null;
@@ -194,6 +200,7 @@ export function buildCableStockStatus(rows: Array<{
     const callPutup = String(meta.callPutup ?? "").trim();
     const putupDate = String(meta.putupDate ?? "").trim();
     const partyName = String(meta.partyName ?? "").trim();
+    const dispatchParty = String(meta.dispatchParty ?? "").trim();
     const dispatchRaw = Number(meta.dispatchPending);
     const dispatchPending =
       Number.isFinite(dispatchRaw) && dispatchRaw > 0 ? dispatchRaw : 0;
@@ -232,6 +239,7 @@ export function buildCableStockStatus(rows: Array<{
       callPutup,
       putupDate,
       partyName,
+      dispatchParty,
       dispatchPending: Math.round(dispatchPending * 1000) / 1000,
       userNotes: String(userNotes ?? "").trim(),
     });

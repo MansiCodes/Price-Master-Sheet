@@ -514,7 +514,7 @@ export async function buildPnlImportTemplate(
         "   • Qty / Unit / Rate / Value = same as form (Value = Qty × Rate if Rate blank and Value filled).",
       ]);
       guide.addRow([
-        "   • Cable: fill today's Production in process columns (Conductor/Insulation/Laying, …). Opening/closing calculated in app. Sales km, Drum length, Call putup, Put up date, Party name, Dispatch pending optional.",
+        "   • Cable: fill today's Production in process columns (Conductor/Insulation/Laying, …). Opening/closing calculated in app. Drum length, Call putup, Put up date, Party name, Dispatch pending, Dispatch party optional.",
       ]);
       guide.addRow([
         `   • Raw materials: ${QUAD_SIGNAL_STOCK_RAW_MATERIALS.filter((x) => x !== "Other").slice(0, 10).join(" · ")}…`,

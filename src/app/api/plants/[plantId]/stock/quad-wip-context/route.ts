@@ -137,6 +137,7 @@ export async function GET(
             existingMeta.dispatchPending != null
               ? String(existingMeta.dispatchPending)
               : "",
+          dispatchParty: existingMeta.dispatchParty ?? "",
         }
       : null;
 

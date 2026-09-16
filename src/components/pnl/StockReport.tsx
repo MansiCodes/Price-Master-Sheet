@@ -123,6 +123,7 @@ export function StockReport({
                 cableMeta?.dispatchPending != null
                   ? String(cableMeta.dispatchPending)
                   : "",
+              dispatchParty: cableMeta?.dispatchParty ?? "",
             },
             collectStockPhotoUrls(r),
           );
@@ -490,21 +491,10 @@ export function StockReport({
       },
     },
     {
-      key: "salesKm",
-      label: "Sales km",
+      key: "callPutup",
+      label: "Call putup qty",
       align: "right",
       compact: true,
-      render: (r) => {
-        const { meta } = parseQuadSignalStockNotes(r.notes);
-        if (meta?.kind !== "cable") return "—";
-        if (meta.salesKm == null) return "—";
-        return `${meta.salesKm}`;
-      },
-    },
-    {
-      key: "callPutup",
-      label: "Call putup",
-      wrap: true,
       render: (r) => {
         const { meta } = parseQuadSignalStockNotes(r.notes);
         if (meta?.kind !== "cable") return "—";
@@ -526,7 +516,7 @@ export function StockReport({
     },
     {
       key: "partyName",
-      label: "Party name",
+      label: "Call putup party",
       wrap: true,
       render: (r) => {
         const { meta } = parseQuadSignalStockNotes(r.notes);
@@ -536,7 +526,7 @@ export function StockReport({
     },
     {
       key: "dispatchPending",
-      label: "Dispatch pending",
+      label: "Dispatch qty",
       align: "right",
       compact: true,
       render: (r) => {
@@ -547,11 +537,25 @@ export function StockReport({
       },
     },
     {
+      key: "dispatchParty",
+      label: "Dispatch party",
+      wrap: true,
+      render: (r) => {
+        const { meta } = parseQuadSignalStockNotes(r.notes);
+        if (meta?.kind !== "cable") return "—";
+        return (
+          meta.dispatchParty?.trim() ||
+          meta.partyName?.trim() ||
+          "—"
+        );
+      },
+    },
+    {
       key: "qty",
       label: "Qty",
       align: "right",
       compact: true,
-      render: (r) => `${Number(r.quantity)} ${r.unit}`,
+      render: (r) => `${Number(r.quantity)}`,
     },
     {
       key: "rate",
@@ -699,14 +703,15 @@ export function StockReport({
           { name: "rate", label: "Rate", type: "number", required: false },
           ...(isQuadSignal && quadKind === "cable"
             ? ([
-                { name: "callPutup", label: "Call putup" },
+                { name: "callPutup", label: "Call putup qty" },
                 { name: "putupDate", label: "Put up date", type: "date" },
-                { name: "partyName", label: "Party name" },
+                { name: "partyName", label: "Call putup party" },
                 {
                   name: "dispatchPending",
-                  label: "Dispatch pending",
+                  label: "Dispatch qty",
                   type: "number",
                 },
+                { name: "dispatchParty", label: "Dispatch party" },
               ] satisfies EditField[])
             : []),
           { name: "notes", label: "Notes", type: "textarea" },
@@ -732,6 +737,7 @@ export function StockReport({
               const callPutup = crud.values.callPutup?.trim() ?? "";
               const putupDate = crud.values.putupDate?.trim() ?? "";
               const partyName = crud.values.partyName?.trim() ?? "";
+              const dispatchParty = crud.values.dispatchParty?.trim() ?? "";
               const dispatchRaw = crud.values.dispatchPending?.trim() ?? "";
               if (callPutup) nextMeta.callPutup = callPutup;
               else delete nextMeta.callPutup;
@@ -739,6 +745,8 @@ export function StockReport({
               else delete nextMeta.putupDate;
               if (partyName) nextMeta.partyName = partyName;
               else delete nextMeta.partyName;
+              if (dispatchParty) nextMeta.dispatchParty = dispatchParty;
+              else delete nextMeta.dispatchParty;
               if (dispatchRaw !== "") {
                 const n = Number(dispatchRaw);
                 if (Number.isFinite(n) && n >= 0) nextMeta.dispatchPending = n;

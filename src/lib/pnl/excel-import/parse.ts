@@ -85,6 +85,7 @@ export type ParsedStockRow = {
   qsPutupDate?: string | null;
   qsPartyName?: string | null;
   qsDispatchPending?: number;
+  qsDispatchParty?: string | null;
 };
 
 export type ExpenseTarget = "petty" | "electricity" | "rent" | "far";
@@ -274,8 +275,9 @@ const STOCK_ALIASES: Record<string, string[]> = {
   drumLength: ["drum length", "coil length", "drum / coil length"],
   callPutup: ["call putup", "call put-up"],
   putupDate: ["put up date", "putup date", "put-up date"],
-  partyName: ["party name", "party", "customer name"],
-  dispatchPending: ["dispatch pending", "pending dispatch"],
+  partyName: ["party name", "party", "customer name", "call putup party"],
+  dispatchPending: ["dispatch pending", "pending dispatch", "dispatch qty"],
+  dispatchParty: ["dispatch party", "dispatch party name"],
   notes: ["notes", "remarks", "remark"],
 };
 
@@ -1046,6 +1048,11 @@ export async function parsePnlWorkbook(
                     qsKind === "cable"
                       ? num(getCell(sheet, r, header.map, "dispatchPending")) ??
                         undefined
+                      : undefined,
+                  qsDispatchParty:
+                    qsKind === "cable"
+                      ? str(getCell(sheet, r, header.map, "dispatchParty")) ||
+                        null
                       : undefined,
                 }
               : {}),

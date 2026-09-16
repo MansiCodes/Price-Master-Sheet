@@ -380,6 +380,7 @@ export function StockStatusClient({
               const dispatchLine = block
                 ? formatDispatchLine({
                     partyName: block.partyName ?? "",
+                    dispatchParty: block.dispatchParty ?? "",
                     dispatchPending: block.dispatchPending ?? 0,
                   })
                 : null;
@@ -416,11 +417,6 @@ export function StockStatusClient({
                         <ul className="stock-status-card__procs stock-status-card__procs--after-total">
                           <li>{dispatchLine}</li>
                         </ul>
-                      ) : null}
-                      {block.salesKm > 0 ? (
-                        <p className="stock-status-card__meta">
-                          Sales — {block.salesKm}km
-                        </p>
                       ) : null}
                       {block.userNotes ? (
                         <p className="stock-status-card__notes">

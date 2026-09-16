@@ -443,8 +443,10 @@ export type QuadSignalStockMeta = {
   callPutup?: string;
   /** Put-up date (per cable/size entry). */
   putupDate?: string;
-  /** Party / customer name for this stock line. */
+  /** Party for call put-up (legacy field name kept for older rows). */
   partyName?: string;
+  /** Party for dispatch pending (falls back to partyName when absent). */
+  dispatchParty?: string;
   /** Dispatch pending qty (km). */
   dispatchPending?: number;
   calcSnapshot?: {

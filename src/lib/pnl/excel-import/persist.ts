@@ -468,6 +468,9 @@ export async function persistPnlImport(opts: {
           ...(row.qsDispatchPending != null
             ? { dispatchPending: row.qsDispatchPending }
             : {}),
+          ...(row.qsDispatchParty?.trim()
+            ? { dispatchParty: row.qsDispatchParty.trim() }
+            : {}),
           calcSnapshot: {
             ...wip.calcSnapshot,
             drumLabel: drumLabel || undefined,

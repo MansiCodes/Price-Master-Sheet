@@ -592,6 +592,7 @@ export function TodayHub({
   const [stockPutupDate, setStockPutupDate] = useState("");
   const [stockPartyName, setStockPartyName] = useState("");
   const [stockDispatchPending, setStockDispatchPending] = useState("");
+  const [stockDispatchParty, setStockDispatchParty] = useState("");
   const [stockLengthOptions, setStockLengthOptions] = useState<
     Array<{ label: string; lengthFactor: number }>
   >([]);
@@ -695,6 +696,7 @@ export function TodayHub({
       setStockPutupDate("");
       setStockPartyName("");
       setStockDispatchPending("");
+      setStockDispatchParty("");
       setStockLengthOptions([]);
       setStockLengthFactor(null);
       setStockInsulationExtras([]);
@@ -734,6 +736,7 @@ export function TodayHub({
             putupDate: string;
             partyName: string;
             dispatchPending: string;
+            dispatchParty: string;
           } | null;
         }>;
       })
@@ -773,6 +776,7 @@ export function TodayHub({
         setStockPutupDate(meta?.putupDate ?? "");
         setStockPartyName(meta?.partyName ?? "");
         setStockDispatchPending(meta?.dispatchPending ?? "");
+        setStockDispatchParty(meta?.dispatchParty ?? "");
       })
       .catch((err) => {
         if (ac.signal.aborted) return;
@@ -785,6 +789,7 @@ export function TodayHub({
         setStockPutupDate("");
         setStockPartyName("");
         setStockDispatchPending("");
+        setStockDispatchParty("");
       });
 
     return () => ac.abort();
@@ -1185,6 +1190,7 @@ export function TodayHub({
     setStockPutupDate("");
     setStockPartyName("");
     setStockDispatchPending("");
+    setStockDispatchParty("");
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -1778,6 +1784,9 @@ export function TodayHub({
                   : {}),
                 ...(stockPartyName.trim()
                   ? { partyName: stockPartyName.trim() }
+                  : {}),
+                ...(stockDispatchParty.trim()
+                  ? { dispatchParty: stockDispatchParty.trim() }
                   : {}),
                 ...(dispatchPending != null
                   ? { dispatchPending }
@@ -3525,90 +3534,82 @@ export function TodayHub({
                                 </div>
                               );
                             })()}
-                            <div className="qs-wip__sales">
-                              <div className="form-grid two qs-wip__sales-row">
+                            <div className="qs-wip__box">
+                              <div className="qs-wip__box-head">
+                                <h4 className="qs-wip__box-title">
+                                  Call put up
+                                </h4>
+                              </div>
+                              <div className="form-grid three">
                                 <div className="field">
-                                  <label>Sales km</label>
+                                  <label htmlFor="st-call-putup">Qty</label>
                                   <input
-                                    readOnly
-                                    value={`${stockWipSalesKm} km`}
-                                    aria-label="Sales km from Sales ledger"
+                                    id="st-call-putup"
+                                    value={stockCallPutup}
+                                    onChange={(e) =>
+                                      setStockCallPutup(e.target.value)
+                                    }
+                                    placeholder="0"
                                   />
                                 </div>
                                 <div className="field">
-                                  <label htmlFor="st-unit">Unit</label>
-                                  <SelectMenu
-                                    id="st-unit"
-                                    value={
-                                      stockUnitOptions.includes(stockUnit)
-                                        ? stockUnit
-                                        : stockCatalog.defaultUnit
+                                  <label htmlFor="st-putup-date">Date</label>
+                                  <input
+                                    id="st-putup-date"
+                                    type="date"
+                                    max={todayLocalISO()}
+                                    value={stockPutupDate}
+                                    onChange={(e) =>
+                                      setStockPutupDate(e.target.value)
                                     }
-                                    options={stockUnitOptions}
-                                    required
-                                    onChange={setStockUnit}
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="st-party-name">
+                                    Party name
+                                  </label>
+                                  <input
+                                    id="st-party-name"
+                                    value={stockPartyName}
+                                    onChange={(e) =>
+                                      setStockPartyName(e.target.value)
+                                    }
+                                    placeholder="Party name"
                                   />
                                 </div>
                               </div>
-                              {stockWipSalesLines.length > 0 ? (
-                                <ul className="qs-wip__sales-list">
-                                  {stockWipSalesLines.map((s) => (
-                                    <li key={s.id}>
-                                      {s.billNumber || "—"} · {s.customerName} ·{" "}
-                                      {s.itemDescription} · {s.quantity}{" "}
-                                      {s.unit}
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : null}
                             </div>
-                            <div className="form-grid two">
-                              <div className="field">
-                                <label htmlFor="st-call-putup">Call putup</label>
-                                <input
-                                  id="st-call-putup"
-                                  value={stockCallPutup}
-                                  onChange={(e) =>
-                                    setStockCallPutup(e.target.value)
-                                  }
-                                  placeholder="Call putup"
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="st-putup-date">
-                                  Put up date
-                                </label>
-                                <input
-                                  id="st-putup-date"
-                                  type="date"
-                                  max={todayLocalISO()}
-                                  value={stockPutupDate}
-                                  onChange={(e) =>
-                                    setStockPutupDate(e.target.value)
-                                  }
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="st-party-name">Party name</label>
-                                <input
-                                  id="st-party-name"
-                                  value={stockPartyName}
-                                  onChange={(e) =>
-                                    setStockPartyName(e.target.value)
-                                  }
-                                  placeholder="Party name"
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="st-dispatch-pending">
+                            <div className="qs-wip__box">
+                              <div className="qs-wip__box-head">
+                                <h4 className="qs-wip__box-title">
                                   Dispatch pending
-                                </label>
-                                <DecimalInput
-                                  id="st-dispatch-pending"
-                                  value={stockDispatchPending}
-                                  onChange={setStockDispatchPending}
-                                  placeholder="0"
-                                />
+                                </h4>
+                              </div>
+                              <div className="form-grid two">
+                                <div className="field">
+                                  <label htmlFor="st-dispatch-pending">
+                                    Qty
+                                  </label>
+                                  <DecimalInput
+                                    id="st-dispatch-pending"
+                                    value={stockDispatchPending}
+                                    onChange={setStockDispatchPending}
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="st-dispatch-party">
+                                    Party name
+                                  </label>
+                                  <input
+                                    id="st-dispatch-party"
+                                    value={stockDispatchParty}
+                                    onChange={(e) =>
+                                      setStockDispatchParty(e.target.value)
+                                    }
+                                    placeholder="Party name"
+                                  />
+                                </div>
                               </div>
                             </div>
                             {stockWipCalc?.warnings?.length ? (
@@ -3616,25 +3617,6 @@ export function TodayHub({
                                 {stockWipCalc.warnings.join(" ")}
                               </div>
                             ) : null}
-                            <div className="form-grid two">
-                              <div className="field">
-                                <label htmlFor="st-rate">Rate</label>
-                                <DecimalInput
-                                  id="st-rate"
-                                  value={stockRate}
-                                  onChange={setStockRate}
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div className="field">
-                                <label htmlFor="st-qty-fin">Qty</label>
-                                <DecimalInput
-                                  id="st-qty-fin"
-                                  value={stockQty}
-                                  onChange={setStockQty}
-                                />
-                              </div>
-                            </div>
                           </div>
                         ) : null}
                       </>
