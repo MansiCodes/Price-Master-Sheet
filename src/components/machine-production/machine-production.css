@@ -1113,6 +1113,30 @@
   max-width: 20rem;
 }
 
+.mp-inline-form--machine:not(.mp-cable-panel) {
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__field {
+  flex: 1 1 auto;
+  max-width: none;
+  min-width: 0;
+}
+
+.mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
+
+.mp-btn-label--short {
+  display: none;
+}
+
+.mp-btn-label--full {
+  display: inline;
+}
+
 .mp-inline-form__field input {
   min-height: 2.75rem;
   padding: 0.7rem 1.05rem;
@@ -2249,7 +2273,7 @@ span.mp-disabled-hint {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  /* Machines: Name + Add on one row */
+  /* Machines: Name (full width) + Add on one row */
   .mp-inline-form--machine:not(.mp-cable-panel) {
     flex-wrap: nowrap;
     align-items: flex-end;
@@ -2270,12 +2294,21 @@ span.mp-disabled-hint {
 
   .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions {
     flex: 0 0 auto;
+    margin-left: 0;
     white-space: nowrap;
   }
 
   .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions .btn {
     padding-inline: 0.85rem;
     min-width: 0;
+  }
+
+  .mp-btn-label--full {
+    display: none;
+  }
+
+  .mp-btn-label--short {
+    display: inline;
   }
 
   /* Process form: name row, then machines + button */

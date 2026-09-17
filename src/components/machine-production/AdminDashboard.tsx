@@ -1650,11 +1650,18 @@ export function AdminDashboard() {
                 </Button>
               ) : null}
               <Button type="submit" disabled={machineSaving}>
-                {machineSaving
-                  ? "Saving…"
-                  : editingId
-                    ? "Save"
-                    : "Add"}
+                {machineSaving ? (
+                  "Saving…"
+                ) : editingId ? (
+                  "Save"
+                ) : (
+                  <>
+                    <span className="mp-btn-label mp-btn-label--full">
+                      Add machine
+                    </span>
+                    <span className="mp-btn-label mp-btn-label--short">Add</span>
+                  </>
+                )}
               </Button>
             </div>
           </form>
