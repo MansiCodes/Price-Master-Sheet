@@ -1654,7 +1654,7 @@ export function AdminDashboard() {
                   ? "Saving…"
                   : editingId
                     ? "Save"
-                    : "Add machine"}
+                    : "Add"}
               </Button>
             </div>
           </form>
@@ -1786,8 +1786,8 @@ export function AdminDashboard() {
                   {processSaving
                     ? "Saving…"
                     : editingProcessId
-                      ? "Save process"
-                      : "Add process"}
+                      ? "Save"
+                      : "Add"}
                 </Button>
               </div>
             </div>

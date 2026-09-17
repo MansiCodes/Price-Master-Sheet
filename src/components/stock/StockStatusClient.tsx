@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SelectMenu } from "@/components/ui/SelectMenu";
+import { Pagination } from "@/components/ui/Pagination";
 import { todayDateString } from "@/lib/dates";
 import {
   getQuadSignalCableSizes,
@@ -20,6 +21,8 @@ import {
 } from "@/lib/stock-production-status";
 import "@/components/ui/date-filter.css";
 import "./stock-status.css";
+
+const DEFAULT_PAGE_SIZE = 10;
 
 function formatDisplayDate(iso: string): string {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
@@ -98,6 +101,8 @@ export function StockStatusClient({
 
   const [cableType, setCableType] = useState(ALL_CABLES);
   const [cableSize, setCableSize] = useState(ALL_SIZES);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   /** Custom cable names saved via form "Other" (not in catalog). */
   const extraCablesFromData = useMemo(() => {
@@ -234,6 +239,27 @@ export function StockStatusClient({
     activeCable,
   ]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [tab, date, activeCable, cableSize, pageSize]);
+
+  const pagedCards = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return displayCards.slice(start, start + pageSize);
+  }, [displayCards, page, pageSize]);
+
+  const pagedRawRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rawRows.slice(start, start + pageSize);
+  }, [rawRows, page, pageSize]);
+
+  const listTotal = tab === "raw" ? rawRows.length : displayCards.length;
+
+  function changePageSize(next: number) {
+    setPage(1);
+    setPageSize(next);
+  }
+
   const rawTotals = useMemo(() => {
     let qty = 0;
     let value = 0;
@@ -361,12 +387,12 @@ export function StockStatusClient({
                 </tr>
               </thead>
               <tbody>
-                {rawRows.map((row, idx) => (
+                {pagedRawRows.map((row, idx) => (
                   <tr
                     key={row.item}
                     className={row.hasData ? undefined : "is-empty"}
                   >
-                    <td>{idx + 1}</td>
+                    <td>{(page - 1) * pageSize + idx + 1}</td>
                     <td>{row.item}</td>
                     <td>
                       {row.hasData && row.qty != null
@@ -407,6 +433,13 @@ export function StockStatusClient({
               ) : null}
             </table>
           </div>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={listTotal}
+            onPageChange={setPage}
+            onPageSizeChange={changePageSize}
+          />
         </div>
       ) : (
         <div className="stock-status-report">
@@ -474,7 +507,7 @@ export function StockStatusClient({
               </li>
             ) : null}
 
-            {displayCards.map((card, idx) => {
+            {pagedCards.map((card, idx) => {
               const block = card.block;
               const putupLine = block
                 ? formatCallPutupLine({
@@ -499,7 +532,9 @@ export function StockStatusClient({
                   className={`stock-status-card${block ? "" : " is-empty"}`}
                 >
                   <h3 className="stock-status-card__size">
-                    <span className="stock-status-card__sno">({idx + 1})</span>{" "}
+                    <span className="stock-status-card__sno">
+                      ({(page - 1) * pageSize + idx + 1})
+                    </span>{" "}
                     <span className="stock-status-card__name">{card.size}</span>
                     {showAllCables ? (
                       <span className="stock-status-card__cable">
@@ -540,6 +575,13 @@ export function StockStatusClient({
               );
             })}
           </ol>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={listTotal}
+            onPageChange={setPage}
+            onPageSizeChange={changePageSize}
+          />
         </div>
       )}
     </div>

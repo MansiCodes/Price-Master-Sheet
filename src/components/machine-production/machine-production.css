@@ -4,6 +4,9 @@
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .mp-home a.today-check {
@@ -1034,8 +1037,17 @@
 }
 
 .mp-admin-machines--full {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.mp-admin-machines--full > * {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .mp-admin-machines--stacked .mp-machine-form {
@@ -1268,10 +1280,12 @@
 
 .mp-table-wrap--full {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .mp-table--admin {
-  width: max-content;
+  width: 100%;
   min-width: 36rem;
   table-layout: auto;
 }
@@ -1279,23 +1293,25 @@
 .mp-table--admin th:nth-child(1),
 .mp-table--admin td:nth-child(1) {
   min-width: 7.5rem;
+  width: 18%;
 }
 
 .mp-table--admin th:nth-child(2),
 .mp-table--admin td:nth-child(2) {
   min-width: 12rem;
+  width: auto;
 }
 
 .mp-table--admin th:nth-child(3),
 .mp-table--admin td:nth-child(3) {
   min-width: 5.5rem;
-  width: 5.5rem;
+  width: 7rem;
 }
 
 .mp-table--admin th:nth-child(4),
 .mp-table--admin td:nth-child(4) {
   min-width: 6.5rem;
-  width: 6.5rem;
+  width: 7.5rem;
 }
 
 .mp-table--processes {
@@ -1305,29 +1321,31 @@
 .mp-table--processes th:nth-child(1),
 .mp-table--processes td:nth-child(1) {
   min-width: 7.5rem;
-  width: 7.5rem;
+  width: 8rem;
 }
 
 .mp-table--processes th:nth-child(2),
 .mp-table--processes td:nth-child(2) {
   min-width: 14rem;
+  width: auto;
 }
 
 .mp-table--processes th:nth-child(3),
 .mp-table--processes td:nth-child(3) {
   min-width: 10rem;
+  width: 12%;
 }
 
 .mp-table--processes th:nth-child(4),
 .mp-table--processes td:nth-child(4) {
   min-width: 5.5rem;
-  width: 5.5rem;
+  width: 7rem;
 }
 
 .mp-table--processes th:nth-child(5),
 .mp-table--processes td:nth-child(5) {
   min-width: 6.5rem;
-  width: 6.5rem;
+  width: 7.5rem;
 }
 
 .mp-process-form {
@@ -2231,10 +2249,13 @@ span.mp-disabled-hint {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  /* Machines: Name + Add machine on one row */
+  /* Machines: Name + Add on one row */
   .mp-inline-form--machine:not(.mp-cable-panel) {
     flex-wrap: nowrap;
     align-items: flex-end;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__title {
@@ -2250,6 +2271,11 @@ span.mp-disabled-hint {
   .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions {
     flex: 0 0 auto;
     white-space: nowrap;
+  }
+
+  .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions .btn {
+    padding-inline: 0.85rem;
+    min-width: 0;
   }
 
   /* Process form: name row, then machines + button */
