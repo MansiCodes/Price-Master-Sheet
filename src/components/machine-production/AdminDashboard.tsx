@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
@@ -15,8 +15,16 @@ import { Pagination } from "@/components/ui/Pagination";
 import { DEFAULT_REPORT_PAGE_SIZE } from "@/components/pnl/usePaginatedReport";
 import { MachineMultiSelect } from "@/components/machine-production/MachineMultiSelect";
 import { deleteJson, patchJson, postJson } from "@/lib/client-forms";
-import { todayIstYmd, DAY_SLOT_HOURS, NIGHT_SLOT_HOURS, slotWindowLabel } from "@/lib/machine-production/slots";
+import {
+  addDaysYmd,
+  todayIstYmd,
+  DAY_SLOT_HOURS,
+  NIGHT_SLOT_HOURS,
+  slotWindowLabel,
+} from "@/lib/machine-production/slots";
+import { formatDayMonthYear } from "@/lib/dates";
 import "@/components/pnl/pnl-reports.css";
+import "@/components/machine-production/machine-production.css";
 
 type MachineRow = {
   id: string;
@@ -113,13 +121,17 @@ type Filters = {
   machineId: string;
 };
 
-const EMPTY_FILTERS: Filters = {
-  dateFrom: "",
-  dateTo: "",
-  shift: "",
-  slotStartHour: "",
-  machineId: "",
-};
+/** Rolling 2-day window: yesterday → today (IST). */
+function defaultRecordFilters(): Filters {
+  const today = todayIstYmd();
+  return {
+    dateFrom: addDaysYmd(today, -1),
+    dateTo: today,
+    shift: "",
+    slotStartHour: "",
+    machineId: "",
+  };
+}
 
 const ENTRY_EDIT_FIELDS: EditField[] = [
   { name: "currentProcess", label: "Process", required: true },
@@ -144,15 +156,14 @@ export function AdminDashboard() {
   const [tab, setTab] = useState<
     "records" | "machines" | "processes" | "cable"
   >("records");
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [filters, setFilters] = useState<Filters>(defaultRecordFilters);
   const [entries, setEntries] = useState<EntryRow[]>([]);
   const [machineDayWise, setMachineDayWise] = useState<MachineDayRow[]>([]);
   const [expandedMachineDays, setExpandedMachineDays] = useState<
     Record<string, boolean>
   >({});
   const [entriesPage, setEntriesPage] = useState(1);
-  const [entriesPageSize, setEntriesPageSize] = useState(DEFAULT_REPORT_PAGE_SIZE);
+  const [entriesPageSize, setEntriesPageSize] = useState(50);
   const [entriesTotal, setEntriesTotal] = useState(0);
   const [dayWise, setDayWise] = useState<DayWiseRow[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -378,7 +389,7 @@ export function AdminDashboard() {
   const loadEntries = useCallback(
     async (opts?: { page?: number; pageSize?: number; filters?: Filters }) => {
       setLoading(true);
-      const activeFilters = opts?.filters ?? appliedFilters;
+      const activeFilters = opts?.filters ?? filters;
       const page = opts?.page ?? entriesPage;
       const pageSize = opts?.pageSize ?? entriesPageSize;
       const sp = new URLSearchParams();
@@ -436,7 +447,7 @@ export function AdminDashboard() {
         setLoading(false);
       }
     },
-    [appliedFilters, entriesPage, entriesPageSize],
+    [filters, entriesPage, entriesPageSize],
   );
 
   useEffect(() => {
@@ -453,7 +464,7 @@ export function AdminDashboard() {
       void loadAllProcesses();
       void loadCableTypes();
     }
-  }, [tab, appliedFilters, entriesPage, entriesPageSize, loadEntries, loadCableTypes, loadAllProcesses]);
+  }, [tab, filters, entriesPage, entriesPageSize, loadEntries, loadCableTypes, loadAllProcesses]);
 
   useEffect(() => {
     if (tab !== "cable") return;
@@ -970,13 +981,13 @@ export function AdminDashboard() {
     }
     try {
       const sp = new URLSearchParams();
-      if (appliedFilters.dateFrom) sp.set("dateFrom", appliedFilters.dateFrom);
-      if (appliedFilters.dateTo) sp.set("dateTo", appliedFilters.dateTo);
-      if (appliedFilters.shift) sp.set("shift", appliedFilters.shift);
-      if (appliedFilters.slotStartHour) {
-        sp.set("slotStartHour", appliedFilters.slotStartHour);
+      if (filters.dateFrom) sp.set("dateFrom", filters.dateFrom);
+      if (filters.dateTo) sp.set("dateTo", filters.dateTo);
+      if (filters.shift) sp.set("shift", filters.shift);
+      if (filters.slotStartHour) {
+        sp.set("slotStartHour", filters.slotStartHour);
       }
-      if (appliedFilters.machineId) sp.set("machineId", appliedFilters.machineId);
+      if (filters.machineId) sp.set("machineId", filters.machineId);
       sp.set("page", "1");
       sp.set("pageSize", String(entriesTotal));
 
@@ -1004,8 +1015,8 @@ export function AdminDashboard() {
         "@/lib/machine-production/records-pdf"
       );
       const { blob, filename } = buildMachineProductionRecordsPdf({
-        dateFrom: appliedFilters.dateFrom,
-        dateTo: appliedFilters.dateTo,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
         plannedTotal: json.summary?.plannedProduction ?? 0,
         actualTotal: json.summary?.actualProduction ?? 0,
         dayWise: json.dayWise ?? dayWise,
@@ -1017,6 +1028,24 @@ export function AdminDashboard() {
           plannedProduction: m.plannedProduction,
           actualProduction: m.actualProduction,
           efficiencyPct: m.efficiencyPct,
+          slots: (m.slots ?? []).map((e) => ({
+            entryDate: e.entryDate,
+            machineName: e.machine?.name ?? m.machineName,
+            machineCode: e.machine?.code ?? m.machineCode,
+            shiftLabel: e.shiftLabel,
+            slotLabel: e.slotLabel,
+            operatorName: e.operatorName?.trim() || "—",
+            currentProcess: e.currentProcess || "—",
+            cableType: e.cableType,
+            cableSize: e.cableSize,
+            plannedProduction: e.plannedProduction,
+            actualProduction: e.actualProduction,
+            efficiencyPct: e.efficiencyPct,
+            status: e.status,
+            operators: e.operators,
+            helpers: e.helpers,
+            totalManpower: e.totalManpower,
+          })),
         })),
         entries: allEntries.map((e) => ({
           entryDate: e.entryDate,
@@ -1032,6 +1061,9 @@ export function AdminDashboard() {
           actualProduction: e.actualProduction,
           efficiencyPct: e.efficiencyPct,
           status: e.status,
+          operators: e.operators,
+          helpers: e.helpers,
+          totalManpower: e.totalManpower,
         })),
       });
       const url = URL.createObjectURL(blob);
@@ -1083,6 +1115,31 @@ export function AdminDashboard() {
     ],
     [machines],
   );
+
+  const recordsByDate = useMemo(() => {
+    const map = new Map<string, MachineDayRow[]>();
+    for (const row of machineDayWise) {
+      const list = map.get(row.date) ?? [];
+      list.push(row);
+      map.set(row.date, list);
+    }
+    return [...map.entries()].sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
+  }, [machineDayWise]);
+
+  const todayYmd = todayIstYmd();
+  const isDefaultDateRange =
+    filters.dateFrom === addDaysYmd(todayYmd, -1) &&
+    filters.dateTo === todayYmd;
+  const filtersDirty =
+    !isDefaultDateRange ||
+    Boolean(filters.shift || filters.slotStartHour || filters.machineId);
+
+  function patchFilters(
+    next: Filters | ((prev: Filters) => Filters),
+  ) {
+    setFilters(next);
+    setEntriesPage(1);
+  }
 
   return (
     <div className="mp-root">
@@ -1176,125 +1233,136 @@ export function AdminDashboard() {
 
       {tab === "records" ? (
         <>
-          <div className="mp-filters">
-            <label>
+          <div className="mp-filters mp-filters--records">
+            <label htmlFor="mp-filter-machine" className="mp-filter-field mp-filter-field--machine">
+              Machine
+              <SelectMenu
+                id="mp-filter-machine"
+                value={filters.machineId}
+                items={machineItems}
+                placeholder="All"
+                searchable
+                searchPlaceholder="Search machines…"
+                onChange={(value) =>
+                  patchFilters((f) => ({ ...f, machineId: value }))
+                }
+              />
+            </label>
+            <label className="mp-filter-field mp-filter-field--from">
               From
               <input
                 type="date"
                 value={filters.dateFrom}
+                max={filters.dateTo || todayYmd}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateFrom: e.target.value }))
+                  patchFilters((f) => ({ ...f, dateFrom: e.target.value }))
                 }
               />
             </label>
-            <label>
+            <label className="mp-filter-field mp-filter-field--to">
               To
               <input
                 type="date"
                 value={filters.dateTo}
+                min={filters.dateFrom || undefined}
+                max={todayYmd}
                 onChange={(e) =>
-                  setFilters((f) => ({ ...f, dateTo: e.target.value }))
+                  patchFilters((f) => ({ ...f, dateTo: e.target.value }))
                 }
               />
             </label>
-            <div className="mp-filters__triad">
-              <label htmlFor="mp-filter-shift">
-                Shift
-                <SelectMenu
-                  id="mp-filter-shift"
-                  value={filters.shift}
-                  items={shiftItems}
-                  placeholder="All"
-                  onChange={(value) =>
-                    setFilters((f) => {
-                      const nextHours =
-                        value === "DAY"
-                          ? DAY_SLOT_HOURS
-                          : value === "NIGHT"
-                            ? NIGHT_SLOT_HOURS
-                            : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
-                      const slotOk =
-                        !f.slotStartHour ||
-                        (nextHours as readonly number[]).includes(
-                          Number(f.slotStartHour),
-                        );
-                      return {
-                        ...f,
-                        shift: value,
-                        slotStartHour: slotOk ? f.slotStartHour : "",
-                      };
-                    })
-                  }
-                />
-              </label>
-              <label htmlFor="mp-filter-slot">
-                Slot
-                <SelectMenu
-                  id="mp-filter-slot"
-                  value={filters.slotStartHour}
-                  items={slotItems}
-                  placeholder="All"
-                  onChange={(value) =>
-                    setFilters((f) => ({ ...f, slotStartHour: value }))
-                  }
-                />
-              </label>
-              <label htmlFor="mp-filter-machine">
-                Machine
-                <SelectMenu
-                  id="mp-filter-machine"
-                  value={filters.machineId}
-                  items={machineItems}
-                  placeholder="All"
-                  searchable
-                  searchPlaceholder="Search machines…"
-                  onChange={(value) =>
-                    setFilters((f) => ({ ...f, machineId: value }))
-                  }
-                />
-              </label>
-            </div>
-            <label className="mp-filters__apply">
-              <span className="mp-filters__apply-spacer" aria-hidden="true">
-                &nbsp;
-              </span>
-              <div className="mp-filters__apply-actions">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setAppliedFilters(filters);
-                    setEntriesPage(1);
-                  }}
-                >
-                  Apply
-                </Button>
-                {(filters.dateFrom ||
-                filters.dateTo ||
-                filters.shift ||
-                filters.slotStartHour ||
-                filters.machineId) ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setFilters(EMPTY_FILTERS);
-                      setAppliedFilters(EMPTY_FILTERS);
-                      setEntriesPage(1);
-                    }}
-                  >
-                    Clear
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={loading || entriesTotal === 0}
-                  onClick={() => void downloadRecordsPdf()}
-                >
-                  Download PDF
-                </Button>
-              </div>
+            <label htmlFor="mp-filter-shift" className="mp-filter-field mp-filter-field--shift">
+              Shift
+              <SelectMenu
+                id="mp-filter-shift"
+                value={filters.shift}
+                items={shiftItems}
+                placeholder="All"
+                onChange={(value) =>
+                  patchFilters((f) => {
+                    const nextHours =
+                      value === "DAY"
+                        ? DAY_SLOT_HOURS
+                        : value === "NIGHT"
+                          ? NIGHT_SLOT_HOURS
+                          : [...DAY_SLOT_HOURS, ...NIGHT_SLOT_HOURS];
+                    const slotOk =
+                      !f.slotStartHour ||
+                      (nextHours as readonly number[]).includes(
+                        Number(f.slotStartHour),
+                      );
+                    return {
+                      ...f,
+                      shift: value,
+                      slotStartHour: slotOk ? f.slotStartHour : "",
+                    };
+                  })
+                }
+              />
             </label>
+            <label htmlFor="mp-filter-slot" className="mp-filter-field mp-filter-field--slot">
+              Slot
+              <SelectMenu
+                id="mp-filter-slot"
+                value={filters.slotStartHour}
+                items={slotItems}
+                placeholder="All"
+                onChange={(value) =>
+                  patchFilters((f) => ({ ...f, slotStartHour: value }))
+                }
+              />
+            </label>
+            <div className="mp-filters__icon-actions">
+              {filtersDirty ? (
+                <button
+                  type="button"
+                  className="mp-filters__icon-btn"
+                  title="Reset filters"
+                  aria-label="Reset filters"
+                  onClick={() => patchFilters(defaultRecordFilters())}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                    <path d="M3 3v5h5" />
+                  </svg>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="mp-filters__icon-btn"
+                title="PDF"
+                aria-label="PDF"
+                disabled={loading || entriesTotal === 0}
+                onClick={() => void downloadRecordsPdf()}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                >
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="12" y1="18" x2="12" y2="12" />
+                  <polyline points="9 15 12 18 15 15" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {loading ? (
@@ -1305,151 +1373,235 @@ export function AdminDashboard() {
             />
           ) : (
             <>
-              {dayWise.length > 0 ? (
-                <div className="mp-daywise">
-                  <div className="mp-table-wrap">
-                    <table className="mp-table mp-table--daywise">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Entries</th>
-                          <th>Planned</th>
-                          <th>Actual</th>
-                          <th>Avg Eff %</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dayWise.map((d) => (
-                          <tr key={d.date}>
-                            <td>{d.date}</td>
-                            <td>{d.entries}</td>
-                            <td>{d.plannedProduction}</td>
-                            <td>{d.actualProduction}</td>
-                            <td>{d.averageEfficiency}</td>
-                          </tr>
-                        ))}
-                        {summary ? (
-                          <tr className="mp-table__row mp-table__row--total">
-                            <td>All days</td>
-                            <td>{summary.total}</td>
-                            <td>{summary.plannedProduction ?? 0}</td>
-                            <td>{summary.actualProduction}</td>
-                            <td>{summary.averageEfficiency}</td>
-                          </tr>
-                        ) : null}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="mp-table-wrap">
-                <table className="mp-table mp-table--wide">
-                  <thead>
-                    <tr>
-                      <th className="mp-table__expand-col" aria-label="Expand" />
-                      <th>Date</th>
-                      <th>Machine</th>
-                      <th>Slots</th>
-                      <th>Planned</th>
-                      <th>Actual</th>
-                      <th>Eff %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {machineDayWise.map((row) => {
-                      const key = `${row.date}|${row.machineId}`;
-                      const open = Boolean(expandedMachineDays[key]);
-                      return (
-                        <Fragment key={key}>
-                          <tr
-                            className="mp-table__row mp-table__row--machine-day"
-                            onClick={() =>
-                              setExpandedMachineDays((prev) => ({
-                                ...prev,
-                                [key]: !prev[key],
-                              }))
-                            }
-                          >
-                            <td className="mp-table__expand-col">
-                              <span
-                                className={`mp-expand-chevron${open ? " mp-expand-chevron--open" : ""}`}
-                                aria-hidden
+              {recordsByDate.length === 0 ? (
+                <p className="mp-muted mp-records-empty">
+                  No records for these filters.
+                </p>
+              ) : (
+                <div className="mp-records-days">
+                  {recordsByDate.map(([date, rows]) => {
+                    const isToday = date === todayYmd;
+                    const isYesterday = date === addDaysYmd(todayYmd, -1);
+                    const dayLabel = isToday
+                      ? "Today"
+                      : isYesterday
+                        ? "Yesterday"
+                        : formatDayMonthYear(date);
+                    return (
+                      <section key={date} className="mp-records-day">
+                        <header className="mp-records-day__head">
+                          <h2 className="mp-records-day__title">
+                            {dayLabel}
+                            <span className="mp-records-day__date">
+                              {formatDayMonthYear(date)}
+                            </span>
+                          </h2>
+                          <span className="mp-records-day__count">
+                            {rows.length} machine
+                            {rows.length === 1 ? "" : "s"}
+                          </span>
+                        </header>
+                        <ol className="mp-records-grid">
+                          {rows.map((row) => {
+                            const cardKey = `${row.date}|${row.machineId}`;
+                            const open = Boolean(expandedMachineDays[cardKey]);
+                            return (
+                              <li
+                                key={cardKey}
+                                className={`mp-records-card${open ? " is-open" : ""}`}
                               >
-                                ▸
-                              </span>
-                            </td>
-                            <td>{row.date}</td>
-                            <td>
-                              {row.machineName}
-                              <div className="mp-muted">{row.machineCode}</div>
-                            </td>
-                            <td>{row.entries}</td>
-                            <td>{row.plannedProduction}</td>
-                            <td>{row.actualProduction}</td>
-                            <td>{row.efficiencyPct}</td>
-                          </tr>
-                          {open
-                            ? (row.slots ?? []).map((e) => (
-                                <tr
-                                  key={`${key}-${e.id}`}
-                                  className="mp-table__row mp-table__row--slot"
-                                  onClick={() => setSelected(e)}
+                                <button
+                                  type="button"
+                                  className="mp-records-card__toggle"
+                                  aria-expanded={open}
+                                  onClick={() =>
+                                    setExpandedMachineDays((prev) => ({
+                                      ...prev,
+                                      [cardKey]: !prev[cardKey],
+                                    }))
+                                  }
                                 >
-                                  <td />
-                                  <td colSpan={2}>
-                                    <span className="mp-muted">
-                                      {e.shiftLabel} · {e.slotLabel}
-                                    </span>
-                                    <div>
-                                      {e.operatorName?.trim() || "—"}
-                                      {" · "}
-                                      {e.currentProcess || "—"}
-                                    </div>
-                                    <div className="mp-muted">
-                                      {e.cableType} · {e.cableSize}
-                                    </div>
-                                  </td>
-                                  <td>
-                                    <span className="mp-status mp-status--ok">
-                                      {e.status}
-                                    </span>
-                                  </td>
-                                  <td>{e.plannedProduction}</td>
-                                  <td>{e.actualProduction}</td>
-                                  <td
-                                    className="mp-table__actions"
-                                    onClick={(ev) => ev.stopPropagation()}
+                                  <span className="mp-records-card__toggle-main">
+                                    <h3 className="mp-records-card__title">
+                                      <span className="mp-records-card__name">
+                                        {row.machineName}
+                                      </span>
+                                      {row.machineCode ? (
+                                        <span className="mp-records-card__code">
+                                          {row.machineCode}
+                                        </span>
+                                      ) : null}
+                                    </h3>
+                                    {!open ? (
+                                      <p className="mp-records-card__totals">
+                                        <span className="mp-records-val">
+                                          {row.entries}
+                                        </span>{" "}
+                                        slot
+                                        {row.entries === 1 ? "" : "s"} · Planned{" "}
+                                        <span className="mp-records-val">
+                                          {row.plannedProduction}
+                                        </span>{" "}
+                                        · Actual{" "}
+                                        <span className="mp-records-val">
+                                          {row.actualProduction}
+                                        </span>{" "}
+                                        · Eff{" "}
+                                        <span className="mp-records-val">
+                                          {row.efficiencyPct}%
+                                        </span>
+                                      </p>
+                                    ) : null}
+                                  </span>
+                                  <span
+                                    className={`mp-expand-chevron${open ? " mp-expand-chevron--open" : ""}`}
+                                    aria-hidden
                                   >
-                                    <div className="mp-slot-actions">
-                                      <span>{e.efficiencyPct}</span>
-                                      <ReportRowActions
-                                        onEdit={() => openEntryEdit(e)}
-                                        onDelete={() =>
-                                          setPendingDelete({
-                                            kind: "entry",
-                                            id: e.id,
-                                          })
-                                        }
-                                      />
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))
-                            : null}
-                        </Fragment>
-                      );
-                    })}
-                    {machineDayWise.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="mp-muted">
-                          No records for these filters.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
+                                    ▸
+                                  </span>
+                                </button>
+                                {open ? (
+                                  <>
+                                    <ul className="mp-records-card__slots">
+                                      {(row.slots ?? []).map((e) => (
+                                        <li
+                                          key={e.id}
+                                          className="mp-records-slot"
+                                        >
+                                          <button
+                                            type="button"
+                                            className="mp-records-slot__main"
+                                            onClick={() => setSelected(e)}
+                                          >
+                                            <span className="mp-records-slot__when">
+                                              {e.shiftLabel} · {e.slotLabel}
+                                            </span>
+                                            <span className="mp-records-slot__line">
+                                              {e.operatorName?.trim() || "—"} ·{" "}
+                                              {e.currentProcess || "—"}
+                                            </span>
+                                            <span className="mp-records-slot__line mp-muted">
+                                              {e.cableType} · {e.cableSize}
+                                            </span>
+                                            <span className="mp-records-slot__metrics">
+                                              Planned{" "}
+                                              <span className="mp-records-val">
+                                                {e.plannedProduction}
+                                              </span>{" "}
+                                              · Actual{" "}
+                                              <span className="mp-records-val">
+                                                {e.actualProduction}
+                                              </span>{" "}
+                                              · Eff{" "}
+                                              <span className="mp-records-val">
+                                                {e.efficiencyPct}%
+                                              </span>
+                                            </span>
+                                            <span className="mp-records-slot__metrics">
+                                              Ops{" "}
+                                              <span className="mp-records-val">
+                                                {e.operators}
+                                              </span>{" "}
+                                              · Helpers{" "}
+                                              <span className="mp-records-val">
+                                                {e.helpers}
+                                              </span>{" "}
+                                              · Manpower{" "}
+                                              <span className="mp-records-val">
+                                                {e.totalManpower}
+                                              </span>
+                                            </span>
+                                          </button>
+                                          <div className="mp-records-slot__actions">
+                                            <span
+                                              className={`mp-status mp-status--${
+                                                e.status === "COMPLETED"
+                                                  ? "ok"
+                                                  : e.status === "OVERDUE"
+                                                    ? "overdue"
+                                                    : "pending"
+                                              }`}
+                                            >
+                                              {e.status}
+                                            </span>
+                                            <ReportRowActions
+                                              onEdit={() => openEntryEdit(e)}
+                                              onDelete={() =>
+                                                setPendingDelete({
+                                                  kind: "entry",
+                                                  id: e.id,
+                                                })
+                                              }
+                                            />
+                                          </div>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                    {(() => {
+                                      const slots = row.slots ?? [];
+                                      const ops = slots.reduce(
+                                        (s, e) => s + (e.operators || 0),
+                                        0,
+                                      );
+                                      const helpers = slots.reduce(
+                                        (s, e) => s + (e.helpers || 0),
+                                        0,
+                                      );
+                                      const manpower = slots.reduce(
+                                        (s, e) => s + (e.totalManpower || 0),
+                                        0,
+                                      );
+                                      return (
+                                        <div className="mp-records-card__footer">
+                                          <span className="mp-records-card__footer-label">
+                                            Total
+                                          </span>
+                                          <span>
+                                            Slots{" "}
+                                            <span className="mp-records-val">
+                                              {row.entries}
+                                            </span>{" "}
+                                            · Planned{" "}
+                                            <span className="mp-records-val">
+                                              {row.plannedProduction}
+                                            </span>{" "}
+                                            · Actual{" "}
+                                            <span className="mp-records-val">
+                                              {row.actualProduction}
+                                            </span>{" "}
+                                            · Eff{" "}
+                                            <span className="mp-records-val">
+                                              {row.efficiencyPct}%
+                                            </span>
+                                          </span>
+                                          <span>
+                                            Ops{" "}
+                                            <span className="mp-records-val">
+                                              {ops}
+                                            </span>{" "}
+                                            · Helpers{" "}
+                                            <span className="mp-records-val">
+                                              {helpers}
+                                            </span>{" "}
+                                            · Manpower{" "}
+                                            <span className="mp-records-val">
+                                              {manpower}
+                                            </span>
+                                          </span>
+                                        </div>
+                                      );
+                                    })()}
+                                  </>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
               <Pagination
                 page={entriesPage}
                 pageSize={entriesPageSize}
@@ -1472,9 +1624,9 @@ export function AdminDashboard() {
               void saveMachine();
             }}
           >
-            <h2 className="mp-inline-form__title">
-              {editingId ? "Edit machine" : "Add machine"}
-            </h2>
+            {editingId ? (
+              <h2 className="mp-inline-form__title">Edit machine</h2>
+            ) : null}
             <label className="mp-inline-form__field">
               Name
               <input
@@ -1596,12 +1748,9 @@ export function AdminDashboard() {
               void saveProcess();
             }}
           >
-            <h2 className="mp-inline-form__title">
-              {editingProcessId ? "Edit process" : "Add process"}
-            </h2>
-            <p className="mp-muted mp-inline-form__hint">
-              Supervisors pick a process first, then a machine inside it.
-            </p>
+            {editingProcessId ? (
+              <h2 className="mp-inline-form__title">Edit process</h2>
+            ) : null}
             <div className="mp-inline-form__row mp-inline-form__row--actions">
               <label className="mp-inline-form__field mp-inline-form__field--name">
                 Process name
@@ -1756,11 +1905,7 @@ export function AdminDashboard() {
         <div className="mp-cable-admin">
           <div className="mp-inline-form mp-inline-form--cable-scope">
             <h2 className="mp-inline-form__title">Process &amp; machine</h2>
-            <p className="mp-muted mp-inline-form__hint">
-              Cable type and size lists are linked to this process + machine.
-              Supervisors only see these options when filling that form.
-            </p>
-            <div className="mp-inline-form__row">
+            <div className="mp-inline-form__row mp-inline-form__row--cable-scope">
               <label className="mp-inline-form__field" htmlFor="cable-process">
                 Process
                 <SelectMenu
@@ -2108,29 +2253,77 @@ export function AdminDashboard() {
             <div className="mp-detail__head">
               <h2>Production detail</h2>
               <div className="mp-detail__head-actions">
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
+                  className="mp-detail__icon-btn"
+                  title="Edit"
+                  aria-label="Edit"
                   onClick={() => openEntryEdit(selected)}
                 >
-                  Edit
-                </Button>
-                <Button
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </button>
+                <button
                   type="button"
-                  variant="ghost"
+                  className="mp-detail__icon-btn mp-detail__icon-btn--danger"
+                  title="Delete"
+                  aria-label="Delete"
                   onClick={() =>
                     setPendingDelete({ kind: "entry", id: selected.id })
                   }
                 >
-                  Delete
-                </Button>
-                <Button
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </button>
+                <button
                   type="button"
-                  variant="ghost"
+                  className="mp-detail__icon-btn"
+                  title="Close"
+                  aria-label="Close"
                   onClick={() => setSelected(null)}
                 >
-                  Close
-                </Button>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
               </div>
             </div>
             <dl className="mp-detail__grid">

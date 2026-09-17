@@ -191,6 +191,14 @@
   border-color: color-mix(in srgb, var(--teal) 22%, transparent);
 }
 
+.mp-count--metric .mp-count__value {
+  color: var(--teal, #0d9488);
+}
+
+.mp-counts__metrics {
+  display: contents;
+}
+
 .mp-shift-tabs--admin {
   display: flex;
   flex-wrap: wrap;
@@ -211,8 +219,97 @@
   }
 
   .mp-admin-top .mp-counts--admin {
-    justify-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 0.35rem;
     width: 100%;
+  }
+
+  /* Total · Completed · Pending · Overdue — label then value stacked */
+  .mp-counts--admin .mp-count:nth-child(1),
+  .mp-counts--admin .mp-count:nth-child(2),
+  .mp-counts--admin .mp-count:nth-child(3),
+  .mp-counts--admin .mp-count:nth-child(4) {
+    grid-column: span 3;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0.35rem 0.3rem;
+    border-radius: 0.85rem;
+    box-sizing: border-box;
+    font-size: 0.68rem;
+    overflow: hidden;
+  }
+
+  .mp-counts--admin .mp-count:nth-child(1) .mp-count__label,
+  .mp-counts--admin .mp-count:nth-child(2) .mp-count__label,
+  .mp-counts--admin .mp-count:nth-child(3) .mp-count__label,
+  .mp-counts--admin .mp-count:nth-child(4) .mp-count__label {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    font-size: 0.62rem;
+    letter-spacing: -0.01em;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mp-counts--admin .mp-count:nth-child(1) .mp-count__value,
+  .mp-counts--admin .mp-count:nth-child(2) .mp-count__value,
+  .mp-counts--admin .mp-count:nth-child(3) .mp-count__value,
+  .mp-counts--admin .mp-count:nth-child(4) .mp-count__value {
+    flex: 0 0 auto;
+    width: 100%;
+    font-size: 0.8rem;
+    text-align: center;
+  }
+
+  /* Planned · Actual · Eff — label then value stacked */
+  .mp-counts--admin .mp-count:nth-child(5),
+  .mp-counts--admin .mp-count:nth-child(6),
+  .mp-counts--admin .mp-count:nth-child(7) {
+    grid-column: span 4;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.1rem;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.85rem;
+    box-sizing: border-box;
+    font-size: 0.72rem;
+  }
+
+  .mp-counts--admin .mp-count__label {
+    flex: 0 0 auto;
+  }
+
+  .mp-counts--admin .mp-count:nth-child(5) .mp-count__label,
+  .mp-counts--admin .mp-count:nth-child(6) .mp-count__label,
+  .mp-counts--admin .mp-count:nth-child(7) .mp-count__label {
+    width: 100%;
+  }
+
+  .mp-counts--admin .mp-count:nth-child(5) .mp-count__value,
+  .mp-counts--admin .mp-count:nth-child(6) .mp-count__value,
+  .mp-counts--admin .mp-count:nth-child(7) .mp-count__value {
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .mp-shift-tabs--admin {
@@ -666,6 +763,51 @@
   align-items: end;
 }
 
+.mp-filters--records .mp-filters__triad {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 2 1 0;
+}
+
+.mp-filters--records .mp-filter-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mp-filters__icon-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  padding-bottom: 0.05rem;
+  min-height: 2.55rem;
+}
+
+.mp-filters__icon-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--fg, var(--ink)) 12%, transparent);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--fg-muted, var(--stone));
+  cursor: pointer;
+}
+
+.mp-filters__icon-btn:hover:not(:disabled) {
+  border-color: var(--teal, #0d9488);
+  color: var(--teal, #0d9488);
+  background: color-mix(in srgb, var(--teal, #0d9488) 8%, #fff);
+}
+
+.mp-filters__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .mp-filters label,
 .mp-machine-form label {
   display: flex;
@@ -734,6 +876,42 @@
   .mp-filters__apply {
     grid-column: 1 / -1;
   }
+
+  /* Mobile records: Machine|Slot|PDF, From|To|Shift */
+  .mp-filters--records {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      "machine slot pdf"
+      "from to shift";
+  }
+
+  .mp-filters--records .mp-filter-field--machine {
+    grid-area: machine;
+  }
+
+  .mp-filters--records .mp-filter-field--slot {
+    grid-area: slot;
+  }
+
+  .mp-filters--records .mp-filters__icon-actions {
+    grid-area: pdf;
+    align-self: end;
+    justify-content: flex-end;
+    min-height: unset;
+    width: auto;
+  }
+
+  .mp-filters--records .mp-filter-field--from {
+    grid-area: from;
+  }
+
+  .mp-filters--records .mp-filter-field--to {
+    grid-area: to;
+  }
+
+  .mp-filters--records .mp-filter-field--shift {
+    grid-area: shift;
+  }
 }
 
 @media (max-width: 760px) {
@@ -743,7 +921,7 @@
 
   .mp-filters__triad {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mp-filters__apply {
@@ -756,6 +934,13 @@
 
   .mp-filters__apply-spacer {
     display: none;
+  }
+
+  .mp-filters--records {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 2.35rem;
+    grid-template-areas:
+      "machine slot pdf"
+      "from to shift";
   }
 }
 
@@ -1086,49 +1271,63 @@
 }
 
 .mp-table--admin {
-  width: 100%;
-  min-width: 0;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 36rem;
+  table-layout: auto;
 }
 
 .mp-table--admin th:nth-child(1),
 .mp-table--admin td:nth-child(1) {
-  width: 22%;
+  min-width: 7.5rem;
 }
 
 .mp-table--admin th:nth-child(2),
 .mp-table--admin td:nth-child(2) {
-  width: auto;
+  min-width: 12rem;
 }
 
 .mp-table--admin th:nth-child(3),
 .mp-table--admin td:nth-child(3) {
-  width: 7rem;
+  min-width: 5.5rem;
+  width: 5.5rem;
 }
 
 .mp-table--admin th:nth-child(4),
 .mp-table--admin td:nth-child(4) {
-  width: 7rem;
+  min-width: 6.5rem;
+  width: 6.5rem;
+}
+
+.mp-table--processes {
+  min-width: 52rem;
 }
 
 .mp-table--processes th:nth-child(1),
 .mp-table--processes td:nth-child(1) {
-  width: 8rem;
+  min-width: 7.5rem;
+  width: 7.5rem;
+}
+
+.mp-table--processes th:nth-child(2),
+.mp-table--processes td:nth-child(2) {
+  min-width: 14rem;
 }
 
 .mp-table--processes th:nth-child(3),
 .mp-table--processes td:nth-child(3) {
-  width: 7rem;
+  min-width: 10rem;
 }
 
 .mp-table--processes th:nth-child(4),
 .mp-table--processes td:nth-child(4) {
-  width: 7rem;
+  min-width: 5.5rem;
+  width: 5.5rem;
 }
 
 .mp-table--processes th:nth-child(5),
 .mp-table--processes td:nth-child(5) {
-  width: 7rem;
+  min-width: 6.5rem;
+  width: 6.5rem;
 }
 
 .mp-process-form {
@@ -1272,9 +1471,37 @@
 
 .mp-detail__head-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.mp-detail__icon-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--fg, var(--ink)) 12%, transparent);
+  border-radius: 0.55rem;
+  background: #fff;
+  color: var(--fg-muted, var(--stone));
+  cursor: pointer;
+}
+
+.mp-detail__icon-btn:hover {
+  border-color: var(--teal, #0d9488);
+  color: var(--teal, #0d9488);
+  background: color-mix(in srgb, var(--teal, #0d9488) 8%, #fff);
+}
+
+.mp-detail__icon-btn--danger:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, #fff);
 }
 
 .mp-detail__head h2 {
@@ -1762,4 +1989,308 @@ span.mp-disabled-hint {
 .mp-inline-form__actions .mp-disabled-hint[data-hint]::after {
   left: 50%;
   bottom: calc(100% + 0.45rem);
+}
+
+/* ── Admin production records: stock-style machine cards ─────────── */
+
+.mp-records-empty {
+  margin: 0.5rem 0 0;
+  padding: 1.25rem 1rem;
+  border: 1px dashed color-mix(in srgb, var(--fg) 16%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--fg) 2%, #fff);
+  text-align: center;
+}
+
+.mp-records-days {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.mp-records-day__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.65rem;
+}
+
+.mp-records-day__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--fg, var(--ink));
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.mp-records-day__date {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg-muted, var(--stone));
+}
+
+.mp-records-day__count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg-muted, var(--stone));
+  white-space: nowrap;
+}
+
+.mp-records-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.mp-records-card {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+}
+
+.mp-records-card.is-open {
+  border-color: color-mix(in srgb, var(--teal, #0d9488) 35%, transparent);
+}
+
+.mp-records-card__toggle {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.mp-records-card__toggle-main {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mp-records-card__toggle .mp-expand-chevron {
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--fg-muted, var(--stone));
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--fg) 5%, #fff);
+}
+
+.mp-records-card__title {
+  margin: 0 0 0.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 0.65rem;
+  font-size: 0.98rem;
+}
+
+.mp-records-card__name {
+  font-weight: 700;
+  color: var(--fg, var(--ink));
+}
+
+.mp-records-card__code {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--fg-muted, var(--stone));
+}
+
+.mp-records-card__totals {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--fg-muted, var(--stone));
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-records-val {
+  color: var(--teal, #0d9488);
+  font-weight: 700;
+}
+
+.mp-records-card__slots {
+  margin: 0.7rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mp-records-card__footer {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--teal, #0d9488) 28%, transparent);
+  background: color-mix(in srgb, var(--teal, #0d9488) 7%, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg, var(--ink));
+}
+
+.mp-records-card__footer-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal, #0d9488);
+}
+
+.mp-records-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem 0.65rem;
+  align-items: start;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--fg) 3%, #fff);
+  border: 1px solid color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.mp-records-slot__main {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.mp-records-slot__main:hover .mp-records-slot__when {
+  color: var(--teal, #0d9488);
+}
+
+.mp-records-slot__when {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--fg, var(--ink));
+}
+
+.mp-records-slot__line {
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.mp-records-slot__metrics {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted, var(--stone));
+}
+
+.mp-records-slot__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+@media (max-width: 760px) {
+  .mp-records-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mp-filters--records .mp-filters__triad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Machines: Name + Add machine on one row */
+  .mp-inline-form--machine:not(.mp-cable-panel) {
+    flex-wrap: nowrap;
+    align-items: flex-end;
+  }
+
+  .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__title {
+    flex: 1 1 100%;
+  }
+
+  .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__field {
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .mp-inline-form--machine:not(.mp-cable-panel) .mp-inline-form__actions {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Process form: name row, then machines + button */
+  .mp-inline-form--process .mp-inline-form__row--actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name"
+      "machines actions";
+    align-items: end;
+    gap: 0.65rem 0.75rem;
+  }
+
+  .mp-inline-form--process .mp-inline-form__field--name {
+    grid-area: name;
+    max-width: none;
+    flex: none;
+  }
+
+  .mp-inline-form--process .mp-inline-form__field--machines {
+    grid-area: machines;
+    min-width: 0;
+    flex: none;
+  }
+
+  .mp-inline-form--process .mp-inline-form__actions {
+    grid-area: actions;
+    margin-left: 0;
+    align-self: end;
+  }
+
+  /* Cable: process + machine as two compact rows */
+  .mp-inline-form__row--cable-scope {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+
+  .mp-inline-form--cable-scope .mp-inline-form__field {
+    flex: none;
+    max-width: none;
+    width: 100%;
+  }
 }
