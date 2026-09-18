@@ -15,7 +15,7 @@ function buildOrdersByKeyMap(
     cable: string;
     size: string;
     partyName: string;
-    qty: any;
+    qty: unknown;
     deliveryPeriod: string | null;
   }>,
 ): Record<string, StockOrderBySize> {
@@ -42,7 +42,7 @@ function buildOrdersByKeyMap(
   return map;
 }
 
-export async function GET(req: NextRequest, ctx: RouteContext) {
+export async function GET(_req: NextRequest, ctx: RouteContext) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
-  const dbOrders = await prisma.plantStockOrder.findMany({
+  const dbOrders = await (prisma as any).plantStockOrder.findMany({
     where: { plantId },
     orderBy: { createdAt: "asc" },
   });
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       for (const p of item.parties) {
         const partyNameClean = p.partyName.trim();
         if (!partyNameClean) continue;
-        await prisma.plantStockOrder.upsert({
+        await (prisma as any).plantStockOrder.upsert({
           where: {
             plantId_cable_size_partyName: {
               plantId,
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
       }
     }
 
-    const dbOrders = await prisma.plantStockOrder.findMany({
+    const dbOrders = await (prisma as any).plantStockOrder.findMany({
       where: { plantId },
       orderBy: { createdAt: "asc" },
     });
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
   }
 }
 
-export async function DELETE(req: NextRequest, ctx: RouteContext) {
+export async function DELETE(_req: NextRequest, ctx: RouteContext) {
   const session = await requireSession();
   if ("error" in session) return session.error;
 
@@ -154,10 +154,11 @@ export async function DELETE(req: NextRequest, ctx: RouteContext) {
   const denied = await requirePlantAccess(session.user.id, plantId);
   if (denied) return denied;
 
-  await prisma.plantStockOrder.deleteMany({
+  await (prisma as any).plantStockOrder.deleteMany({
     where: { plantId },
   });
 
   return NextResponse.json({ success: true });
 }
+
 
