@@ -170,6 +170,8 @@ export function StockStatusClient({
   const ordersStorageKey = `stock-orders-excel:v2:${plantId}`;
 
   useEffect(() => {
+    let ignore = false;
+    // Hydrate local cache first for fast display
     try {
       const raw = window.localStorage.getItem(ordersStorageKey);
       if (raw) {
@@ -185,8 +187,27 @@ export function StockStatusClient({
     } catch {
       // ignore bad cache
     }
-    setOrdersHydrated(true);
-  }, [ordersStorageKey]);
+
+    // Always fetch latest persisted orders from database so all devices/users are in sync
+    fetch(`/api/plants/${plantId}/stock/orders-excel`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then(
+        (data: { byKey?: Record<string, StockOrderBySize> } | null) => {
+          if (ignore || !data?.byKey) return;
+          if (Object.keys(data.byKey).length > 0) {
+            setOrdersByKey(data.byKey);
+          }
+        },
+      )
+      .catch(() => {})
+      .finally(() => {
+        if (!ignore) setOrdersHydrated(true);
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, [plantId, ordersStorageKey]);
 
   useEffect(() => {
     if (!ordersHydrated) return;
@@ -451,6 +472,7 @@ export function StockStatusClient({
   function clearOrders() {
     setOrdersByKey(null);
     setOrdersFileName(null);
+    fetch(`/api/plants/${plantId}/stock/orders-excel`, { method: "DELETE" }).catch(() => {});
   }
 
   const hasOrders = Boolean(ordersByKey && Object.keys(ordersByKey).length > 0);

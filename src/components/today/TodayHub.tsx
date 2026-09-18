@@ -860,9 +860,6 @@ export function TodayHub({
         coreCount: number;
         lengthFactor: number;
       }> = [];
-      // Insulation pool is only adjusted on the first Signalling entry of the
-      // day (opening editable) or via explicit extra-size rows — not again
-      // when filling the next size's Laying.
       if (stockOpeningEditable || stockInsulationExtras.length > 0) {
         sizeRows.push({
           size: resolvedQuadSizeName,

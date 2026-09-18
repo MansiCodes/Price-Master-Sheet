@@ -118,6 +118,7 @@ model Plant {
   creditScoreAwards CreditScoreAward[]
   pnlOverrides      PlantPnlOverride[]
   contacts          PlantContact[]
+  stockOrders       PlantStockOrder[]
 }
 
 model PlantPnlOverride {
@@ -709,5 +710,22 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+model PlantStockOrder {
+  id             String   @id @default(cuid())
+  plantId        String
+  cable          String
+  size           String
+  partyName      String
+  qty            Decimal  @db.Decimal(18, 4)
+  deliveryPeriod String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  plant Plant @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@unique([plantId, cable, size, partyName])
+  @@index([plantId])
 }
 
