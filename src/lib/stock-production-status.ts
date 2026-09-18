@@ -62,6 +62,18 @@ function fmtKm(n: number): string {
   return Number.isInteger(r) ? String(r) : String(r);
 }
 
+export type FormattedStatusItem = {
+  label: string;
+  value: string;
+};
+
+export function formatProcessStatusItem(line: StockProcessLine): FormattedStatusItem {
+  return {
+    label: `${line.shortName}:`,
+    value: `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`,
+  };
+}
+
 export function formatProcessStatusLine(line: StockProcessLine): string {
   return `${line.shortName}: ${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
 }
@@ -84,23 +96,54 @@ function isOuterProcess(name: string): boolean {
   return n === "outer sheath" || n === "outer";
 }
 
-export function formatCallPutupLine(
+export function formatCallPutupItem(
   block: Pick<
     CableStockStatusBlock,
     "putupKm" | "callPutup" | "putupDate" | "partyName"
   >,
-): string | null {
+): FormattedStatusItem | null {
   const putupKm = Number(block.putupKm) || 0;
   const callPutup = String(block.callPutup ?? "").trim();
   const putupDate = String(block.putupDate ?? "").trim();
   const partyName = String(block.partyName ?? "").trim();
   if (!putupKm && !callPutup && !putupDate && !partyName) return null;
 
-  const kmPart =
-    putupKm > 0 ? `${fmtKm(putupKm)}km` : callPutup || "—";
+  const kmPart = putupKm > 0 ? `${fmtKm(putupKm)}km` : callPutup || "—";
   const datePart = putupDate ? ` dated ${putupDate}` : "";
   const partyPart = partyName ? ` (${partyName})` : "";
-  return `Call putup: ${kmPart}${datePart}${partyPart}`;
+  return {
+    label: "Call putup:",
+    value: `${kmPart}${datePart}${partyPart}`,
+  };
+}
+
+export function formatCallPutupLine(
+  block: Pick<
+    CableStockStatusBlock,
+    "putupKm" | "callPutup" | "putupDate" | "partyName"
+  >,
+): string | null {
+  const item = formatCallPutupItem(block);
+  return item ? `${item.label} ${item.value}` : null;
+}
+
+export function formatDispatchItem(
+  block: Pick<
+    CableStockStatusBlock,
+    "partyName" | "dispatchParty" | "dispatchPending"
+  >,
+): FormattedStatusItem | null {
+  const partyName = String(
+    block.dispatchParty?.trim() || block.partyName?.trim() || "",
+  ).trim();
+  const qtyRaw = Number(block.dispatchPending);
+  const qty = Number.isFinite(qtyRaw) ? Math.max(0, qtyRaw) : 0;
+  if (!partyName && qty <= 0) return null;
+  const party = partyName || "—";
+  return {
+    label: "Dispatch:",
+    value: `${party} — ${fmtKm(qty)}km`,
+  };
 }
 
 export function formatDispatchLine(
@@ -109,20 +152,24 @@ export function formatDispatchLine(
     "partyName" | "dispatchParty" | "dispatchPending"
   >,
 ): string | null {
-  const partyName = String(
-    block.dispatchParty?.trim() || block.partyName?.trim() || "",
-  ).trim();
-  const qtyRaw = Number(block.dispatchPending);
-  const qty = Number.isFinite(qtyRaw) ? Math.max(0, qtyRaw) : 0;
-  if (!partyName && qty <= 0) return null;
-  const party = partyName || "—";
-  return `Dispatch: ${party} — ${fmtKm(qty)}km`;
+  const item = formatDispatchItem(block);
+  return item ? `${item.label} ${item.value}` : null;
+}
+
+export function formatSharedInsulationItem(
+  status: SharedInsulationStatus,
+): FormattedStatusItem {
+  return {
+    label: "Insul:",
+    value: `${fmtKm(status.closing)}km(${fmtKm(status.production)}km)`,
+  };
 }
 
 export function formatSharedInsulationLine(
   status: SharedInsulationStatus,
 ): string {
-  return `Insul: ${fmtKm(status.closing)}km(${fmtKm(status.production)}km)`;
+  const item = formatSharedInsulationItem(status);
+  return `${item.label} ${item.value}`;
 }
 
 /**

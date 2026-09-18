@@ -21,6 +21,9 @@ const COGS_PURCHASE_TYPES: PurchaseType[] = [
   PurchaseType.RAW_MATERIAL,
   PurchaseType.PACKING,
   PurchaseType.CONSUMABLE,
+  PurchaseType.OTHERS,
+  PurchaseType.CAPITAL_GOOD,
+  PurchaseType.ASSET,
 ];
 
 const INCOME_TAX_RATE = 0.25;
@@ -32,7 +35,7 @@ import { buildApprovedEntryWhere } from "@/lib/entry-approval";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 
 async function getApprovedFilter(plantIds: string[], approvedOnly?: boolean, from?: Date, to?: Date) {
-  if (!approvedOnly) return {};
+  if (!approvedOnly) return { rejectedByHead: false };
 
   return {
     ...plantIdFilter(plantIds),
@@ -71,27 +74,8 @@ async function openingStockFromLastSnapshot(
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
-  const latest = await prisma.stockEntry.findFirst({
-    where: {
-      ...plantIdFilter(plantIds),
-      date: { lte: before },
-      notes: { startsWith: "Closing stock" },
-      ...approvedFilter,
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { date: true },
-  });
-  if (!latest) return 0;
-  const agg = await prisma.stockEntry.aggregate({
-    where: {
-      ...plantIdFilter(plantIds),
-      date: latest.date,
-      notes: { startsWith: "Closing stock" },
-      ...approvedFilter,
-    },
-    _sum: { closingValue: true },
-  });
-  return toNumber(agg._sum.closingValue);
+  const dayBefore = addUtcDays(before, -1);
+  return stockValueAsOf(plantIds, dayBefore, approvedOnly, approvedFilter);
 }
 
 /** Sum explicit closing-stock snapshot rows (matches Excel Stock & Rent SUM(I5:I21)). */
@@ -101,28 +85,7 @@ async function pvcClosingStockSnapshot(
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
-  const latest = await prisma.stockEntry.findFirst({
-    where: {
-      ...plantIdFilter(plantIds),
-      date: { lte: asOf },
-      notes: { startsWith: "Closing stock" },
-      ...approvedFilter,
-    },
-    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { date: true },
-  });
-  if (!latest) return stockValueAsOf(plantIds, asOf, approvedOnly, approvedFilter);
-
-  const agg = await prisma.stockEntry.aggregate({
-    where: {
-      ...plantIdFilter(plantIds),
-      date: latest.date,
-      notes: { startsWith: "Closing stock" },
-      ...approvedFilter,
-    },
-    _sum: { closingValue: true },
-  });
-  return toNumber(agg._sum.closingValue);
+  return stockValueAsOf(plantIds, asOf, approvedOnly, approvedFilter);
 }
 
 async function buildPvcDynamic(
@@ -234,16 +197,15 @@ async function buildPvcDynamic(
   const stockFromAtclPurchases = round2(
     atclPurchaseRows.reduce((sum, row) => sum + toNumber(row.basicValue), 0),
   );
-  const stockFromAtclLegacy = round2(toNumber(stockInwardAgg._sum.closingValue));
-  const stockFromAtcl =
-    stockFromAtclPurchases > 0 ? stockFromAtclPurchases : stockFromAtclLegacy;
+  const stockFromAtcl = stockFromAtclPurchases;
   const totalPurchases = round2(purchasesRaw + stockFromAtcl);
   const openingStock = round2(openingStockRaw);
-  // Auto-calculate: Closing Stock = Opening Stock (last snapshot) + Purchases − Sales
   const closingStockSnapshot = round2(closingStockRaw);
-  const closingStock = openingStock > 0
-    ? round2(openingStock + totalPurchases - salesRevenue)
-    : closingStockSnapshot;
+  const closingStock = closingStockSnapshot > 0
+    ? closingStockSnapshot
+    : (openingStock > 0 || totalPurchases > 0 || salesRevenue > 0)
+      ? Math.max(0, round2(openingStock + totalPurchases - salesRevenue))
+      : (stockFromAtclPurchases > 0 ? closingStockSnapshot : 0);
 
   const electricityRentAmount = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
@@ -277,12 +239,8 @@ async function buildPvcDynamic(
   const rent =
     rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
-  // Excel Purchase!H156 = SUM(H5:H154)*G156/1000 — prefer manual Unloading of MT expense entries
-  const totalPurchaseQtyKgs = purchaseRows.reduce(
-    (sum, row) => sum + toNumber(row.quantity),
-    0,
-  );
-  const unloadingFromEntries = round2(
+  // Unloading expense: only use actual logged unloading expense entries (no auto-calculated rate estimate when unentered)
+  const unloadingExpense = round2(
     pettyEntries
       .filter(
         (r) =>
@@ -291,11 +249,6 @@ async function buildPvcDynamic(
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
-  const unloadingFromPurchases = round4(
-    (totalPurchaseQtyKgs * PVC_UNLOADING_RATE_PER_MT) / 1000,
-  );
-  const unloadingExpense =
-    unloadingFromEntries > 0 ? unloadingFromEntries : unloadingFromPurchases;
 
   const pettyCashRows = pettyEntries.filter(
     (r) => r.entryType === PettyCashKind.PETTY_CASH,
@@ -487,38 +440,33 @@ function line(
   return { label, amount, ratio, kind };
 }
 
-/** Latest closing stock value per item as of a given date (inclusive). */
+/** Latest closing stock value as of a given date (inclusive). */
 async function stockValueAsOf(
   plantIds: string[],
   asOf: Date,
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
-  const entries = await prisma.stockEntry.findMany({
+  const latest = await prisma.stockEntry.findFirst({
     where: {
       ...plantIdFilter(plantIds),
       date: { lte: asOf },
       ...approvedFilter,
     },
-    orderBy: [{ itemName: "asc" }, { date: "desc" }, { createdAt: "desc" }],
-    select: {
-      itemName: true,
-      closingValue: true,
-    },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    select: { date: true },
   });
+  if (!latest) return 0;
 
-  const latestByItem = new Map<string, number>();
-  for (const entry of entries) {
-    if (!latestByItem.has(entry.itemName)) {
-      latestByItem.set(entry.itemName, toNumber(entry.closingValue));
-    }
-  }
-
-  let total = 0;
-  for (const value of latestByItem.values()) {
-    total += value;
-  }
-  return total;
+  const agg = await prisma.stockEntry.aggregate({
+    where: {
+      ...plantIdFilter(plantIds),
+      date: latest.date,
+      ...approvedFilter,
+    },
+    _sum: { closingValue: true },
+  });
+  return toNumber(agg._sum.closingValue);
 }
 
 export async function calculatePlantPnl(
@@ -860,10 +808,12 @@ async function buildCat6Dynamic(
           _sum: { closingValue: true },
         });
   const closingStockFallback = round2(toNumber(closingStockAgg._sum.closingValue));
-  // Auto-calculate: Closing Stock = Opening Stock (last snapshot) + Purchases − Sales
-  const closingStock = openingStockSnap > 0
-    ? round2(openingStock + purchases - salesRevenue)
-    : closingStockFallback;
+  const closingStockLogged = await stockValueAsOf(plantIds, to, approvedOnly, globalApprovedFilter);
+  const closingStock = closingStockLogged > 0
+    ? round2(closingStockLogged)
+    : openingStockSnap > 0
+      ? Math.max(0, round2(openingStock + purchases - salesRevenue))
+      : closingStockFallback;
   const pettyCash = round2(
     pettyEntries.reduce((sum, row) => {
       if (row.entryType !== "PETTY_CASH") return sum;
@@ -1123,17 +1073,17 @@ async function buildDynamic(
       0,
     ),
   );
-  const stockFromAtclLegacy = round2(toNumber(stockInwardAgg._sum.closingValue));
-  const stockFromAtcl =
-    stockFromAtclPurchases > 0 ? stockFromAtclPurchases : stockFromAtclLegacy;
+  const stockFromAtcl = stockFromAtclPurchases;
   const totalPurchases = round2(purchases + stockFromAtcl);
   const openingStockSnap = round2(openingStockManualRaw);
   // Opening stock = last closing snapshot before period; fallback to legacy stockValueAsOf
-  const openingStock = openingStockSnap > 0 ? openingStockSnap : round2(openingStockRaw);
-  // Auto-calculate: Closing Stock = Opening Stock + Purchases − Sales
-  const closingStock = openingStockSnap > 0
-    ? round2(openingStock + totalPurchases - salesRevenue)
-    : round2(closingStockRaw);
+  const openingStock = openingStockSnap > 0 ? openingStockSnap : (totalPurchases > 0 || salesRevenue > 0 ? round2(openingStockRaw) : 0);
+  const closingStockSnap = round2(closingStockRaw);
+  const closingStock = closingStockSnap > 0
+    ? closingStockSnap
+    : (openingStock > 0 || totalPurchases > 0 || salesRevenue > 0)
+      ? Math.max(0, round2(openingStock + totalPurchases - salesRevenue))
+      : (stockFromAtclPurchases > 0 ? closingStockSnap : 0);
   const electricityRentAmount = round2(
     electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
   );
@@ -1170,9 +1120,8 @@ async function buildDynamic(
   const electricity = electricityRentAmount > 0 ? electricityRentAmount : electricityFromPettyCash;
   const rent = rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
-  // Unloading: prefer manual "Unloading of MT" expense entries; else purchase qty × ₹70/MT
-  const totalPurchaseQtyKgs = round2(toNumber(purchaseQtyAgg._sum.quantity));
-  const unloadingFromEntries = round2(
+  // Unloading: only use actual logged unloading expense entries (no auto-calculated rate estimate when unentered)
+  const unloadingExpense = round2(
     pettyEntries
       .filter(
         (r) =>
@@ -1181,11 +1130,6 @@ async function buildDynamic(
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
-  const unloadingFromPurchases = round2(
-    (totalPurchaseQtyKgs / 1000) * PVC_UNLOADING_RATE_PER_MT,
-  );
-  const unloadingExpense =
-    unloadingFromEntries > 0 ? unloadingFromEntries : unloadingFromPurchases;
 
   const isUpcast = plantCode?.toUpperCase() === "UPCAST";
 

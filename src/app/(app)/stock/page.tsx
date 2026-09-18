@@ -122,6 +122,7 @@ export default async function StockPage({
 
   return (
     <StockStatusClient
+      plantId={selectedPlantId}
       date={date}
       tab={tab}
       cableBlocks={cableBlocks}

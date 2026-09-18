@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { todayDateString } from "@/lib/dates";
@@ -11,14 +12,18 @@ import {
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
-  formatCallPutupLine,
-  formatDispatchLine,
-  formatProcessStatusLine,
-  formatSharedInsulationLine,
+  formatCallPutupItem,
+  formatDispatchItem,
+  formatProcessStatusItem,
+  formatSharedInsulationItem,
   type CableStockStatusBlock,
   type RawMaterialStockRow,
   type SharedInsulationStatus,
 } from "@/lib/stock-production-status";
+import {
+  lookupStockOrder,
+  type StockOrderBySize,
+} from "@/lib/stock/order-excel-types";
 import "@/components/ui/date-filter.css";
 import "./stock-status.css";
 
@@ -30,11 +35,59 @@ function formatDisplayDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
+/** Clean cached Excel delivery text (e.g. strip "Comm :") and format for display. */
+function formatDeliveryDisplay(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  let s = raw
+    .replace(/^(comm(ercial)?|del(ivery)?(\s*period)?|due)\s*[:\-–]\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!s) return "—";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return formatDisplayDate(s);
+  const embedded = s.match(/(\d{1,2})[./\-](\d{1,2})[./\-](\d{2,4})/);
+  if (embedded) {
+    const day = embedded[1].padStart(2, "0");
+    const month = embedded[2].padStart(2, "0");
+    let year = Number(embedded[3]);
+    if (year < 100) year += 2000;
+    return `${day}/${month}/${year}`;
+  }
+  return s;
+}
+
 function formatNum(n: number): string {
   if (!Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("en-IN", {
-    maximumFractionDigits: 4,
-  }).format(n);
+  // No grouping commas — keep qty values clean in the card
+  const rounded = Math.round(n * 10000) / 10000;
+  return String(rounded);
+}
+
+function getPartyInHandKm(
+  partyName: string,
+  block?: CableStockStatusBlock | null,
+): number {
+  if (!block || !block.putupKm || block.putupKm <= 0) return 0;
+  const target = (block.partyName ?? "").trim().toLowerCase();
+  const party = (partyName ?? "").trim().toLowerCase();
+
+  if (target) {
+    const cleanTarget = target.replace(/[^a-z0-9]/g, "");
+    const cleanParty = party.replace(/[^a-z0-9]/g, "");
+    if (
+      cleanParty.length > 0 &&
+      cleanTarget.length > 0 &&
+      (cleanParty.includes(cleanTarget) || cleanTarget.includes(cleanParty))
+    ) {
+      return block.putupKm;
+    }
+    const words = target.split(/\s+/).filter((w) => w.length > 1);
+    if (words.length > 0 && words.every((w) => party.includes(w))) {
+      return block.putupKm;
+    }
+    return 0;
+  }
+
+  return 0;
 }
 
 function CalendarIcon() {
@@ -79,12 +132,14 @@ function catalogSizesForCable(cable: string): string[] {
 }
 
 export function StockStatusClient({
+  plantId,
   date,
   tab,
   cableBlocks,
   sharedInsulation,
   rawRows,
 }: {
+  plantId: string;
   date: string;
   tab: "cable" | "raw";
   cableBlocks: CableStockStatusBlock[];
@@ -95,6 +150,7 @@ export function StockStatusClient({
   const today = todayDateString();
   const isToday = date === today;
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const ordersFileRef = useRef<HTMLInputElement>(null);
   const emptyLabel = isToday
     ? "No data for today"
     : `No data for ${formatDisplayDate(date)}`;
@@ -103,6 +159,50 @@ export function StockStatusClient({
   const [cableSize, setCableSize] = useState(ALL_SIZES);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [ordersByKey, setOrdersByKey] = useState<Record<
+    string,
+    StockOrderBySize
+  > | null>(null);
+  const [ordersFileName, setOrdersFileName] = useState<string | null>(null);
+  const [ordersUploading, setOrdersUploading] = useState(false);
+  const [ordersHydrated, setOrdersHydrated] = useState(false);
+
+  const ordersStorageKey = `stock-orders-excel:v2:${plantId}`;
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(ordersStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as {
+          byKey?: Record<string, StockOrderBySize>;
+          fileName?: string | null;
+        };
+        if (parsed.byKey && typeof parsed.byKey === "object") {
+          setOrdersByKey(parsed.byKey);
+          setOrdersFileName(parsed.fileName ?? null);
+        }
+      }
+    } catch {
+      // ignore bad cache
+    }
+    setOrdersHydrated(true);
+  }, [ordersStorageKey]);
+
+  useEffect(() => {
+    if (!ordersHydrated) return;
+    try {
+      if (!ordersByKey) {
+        window.localStorage.removeItem(ordersStorageKey);
+        return;
+      }
+      window.localStorage.setItem(
+        ordersStorageKey,
+        JSON.stringify({ byKey: ordersByKey, fileName: ordersFileName }),
+      );
+    } catch {
+      // quota / private mode
+    }
+  }, [ordersByKey, ordersFileName, ordersHydrated, ordersStorageKey]);
 
   /** Custom cable names saved via form "Other" (not in catalog). */
   const extraCablesFromData = useMemo(() => {
@@ -312,8 +412,51 @@ export function StockStatusClient({
     }
   }
 
+  async function onOrdersExcelSelected(file: File | null) {
+    if (!file) return;
+    setOrdersUploading(true);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const res = await fetch(
+        `/api/plants/${plantId}/stock/orders-excel`,
+        { method: "POST", body },
+      );
+      const json = (await res.json()) as {
+        error?: string;
+        byKey?: Record<string, StockOrderBySize>;
+        matchedRows?: number;
+        unmatchedSizes?: string[];
+        fileName?: string;
+      };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Upload failed");
+      }
+      setOrdersByKey(json.byKey ?? {});
+      setOrdersFileName(json.fileName ?? file.name);
+      const unmatched = json.unmatchedSizes?.length ?? 0;
+      toast.success(
+        unmatched > 0
+          ? `Matched ${json.matchedRows ?? 0} row(s); ${unmatched} size(s) not mapped`
+          : `Matched ${json.matchedRows ?? 0} order row(s)`,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setOrdersUploading(false);
+      if (ordersFileRef.current) ordersFileRef.current.value = "";
+    }
+  }
+
+  function clearOrders() {
+    setOrdersByKey(null);
+    setOrdersFileName(null);
+  }
+
+  const hasOrders = Boolean(ordersByKey && Object.keys(ordersByKey).length > 0);
+
   return (
-    <div className="stock-status-page">
+    <div className={`stock-status-page${hasOrders ? " has-orders" : ""}`}>
       <div className="stock-status-toolbar">
         <div className="stock-status-tabs" role="tablist">
           <button
@@ -336,36 +479,70 @@ export function StockStatusClient({
           </button>
         </div>
 
-        <div className="stock-status-toolbar__date" aria-label="Stock date">
-          <span
-            className={`stock-status-today-pill${isToday ? " is-today" : ""}`}
-          >
-            {isToday ? "Today" : formatDisplayDate(date)}
-          </span>
-          <button
-            type="button"
-            className="stock-status-cal-btn"
-            aria-label="Choose stock date"
-            onClick={openCalendar}
-          >
-            <CalendarIcon />
-          </button>
-          <div className="pnl-date-filter stock-status-date-full">
-            <div className="pnl-date-filter__field">
-              <label htmlFor="stock-date" className="sr-only">
-                Calendar
-              </label>
-              <div className="pnl-date-filter__input-wrap">
-                <input
-                  ref={dateInputRef}
-                  id="stock-date"
-                  type="date"
-                  value={date}
-                  max={today}
-                  onChange={(e) => setDate(e.target.value)}
-                  onClick={openCalendar}
-                  aria-label="Choose stock date"
-                />
+        <div className="stock-status-toolbar__actions">
+          {tab === "cable" ? (
+            <div className="stock-orders-upload">
+              <input
+                ref={ordersFileRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="sr-only"
+                onChange={(e) =>
+                  void onOrdersExcelSelected(e.target.files?.[0] ?? null)
+                }
+              />
+              <button
+                type="button"
+                className="stock-orders-upload__btn"
+                disabled={ordersUploading}
+                onClick={() => ordersFileRef.current?.click()}
+              >
+                {ordersUploading ? "Reading…" : "Upload orders Excel"}
+              </button>
+              {ordersFileName ? (
+                <button
+                  type="button"
+                  className="stock-orders-upload__clear"
+                  onClick={clearOrders}
+                  title={ordersFileName}
+                >
+                  Clear orders
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="stock-status-toolbar__date" aria-label="Stock date">
+            <span
+              className={`stock-status-today-pill${isToday ? " is-today" : ""}`}
+            >
+              {isToday ? "Today" : formatDisplayDate(date)}
+            </span>
+            <button
+              type="button"
+              className="stock-status-cal-btn"
+              aria-label="Choose stock date"
+              onClick={openCalendar}
+            >
+              <CalendarIcon />
+            </button>
+            <div className="pnl-date-filter stock-status-date-full">
+              <div className="pnl-date-filter__field">
+                <label htmlFor="stock-date" className="sr-only">
+                  Calendar
+                </label>
+                <div className="pnl-date-filter__input-wrap">
+                  <input
+                    ref={dateInputRef}
+                    id="stock-date"
+                    type="date"
+                    value={date}
+                    max={today}
+                    onChange={(e) => setDate(e.target.value)}
+                    onClick={openCalendar}
+                    aria-label="Choose stock date"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -488,9 +665,15 @@ export function StockStatusClient({
                 {sharedInsulation ? (
                   <>
                     <ul className="stock-status-card__procs">
-                      <li>
-                        {formatSharedInsulationLine(sharedInsulation)}
-                      </li>
+                      {(() => {
+                        const item = formatSharedInsulationItem(sharedInsulation);
+                        return (
+                          <li>
+                            <span className="stock-proc-label">{item.label}</span>{" "}
+                            <span className="stock-proc-val">{item.value}</span>
+                          </li>
+                        );
+                      })()}
                     </ul>
                     {sharedInsulation.consumed > 0 ? (
                       <p className="stock-status-card__meta">
@@ -509,8 +692,9 @@ export function StockStatusClient({
 
             {pagedCards.map((card, idx) => {
               const block = card.block;
-              const putupLine = block
-                ? formatCallPutupLine({
+              const order = lookupStockOrder(ordersByKey, card.cable, card.size);
+              const putupItem = block
+                ? formatCallPutupItem({
                     putupKm: block.putupKm ?? 0,
                     callPutup: block.callPutup ?? "",
                     putupDate: block.putupDate
@@ -519,58 +703,231 @@ export function StockStatusClient({
                     partyName: block.partyName ?? "",
                   })
                 : null;
-              const dispatchLine = block
-                ? formatDispatchLine({
+              const dispatchItem = block
+                ? formatDispatchItem({
                     partyName: block.partyName ?? "",
                     dispatchParty: block.dispatchParty ?? "",
                     dispatchPending: block.dispatchPending ?? 0,
                   })
                 : null;
+              const stockTotal = block?.totalKm ?? 0;
+              const orderQty = order?.totalQty ?? 0;
+              const availableTotal =
+                Math.round((stockTotal - orderQty) * 10000) / 10000;
+              const partyLines = order
+                ? order.parties.filter(
+                    (p) => p.partyName.trim() && p.partyName.trim() !== "—",
+                  )
+                : [];
+              const deliveryDates = order
+                ? [
+                    ...new Set(
+                      order.parties
+                        .map((p) => p.deliveryPeriod)
+                        .filter((d): d is string => Boolean(d)),
+                    ),
+                  ]
+                : [];
+
               return (
                 <li
                   key={card.key}
-                  className={`stock-status-card${block ? "" : " is-empty"}`}
+                  className={`stock-status-card${block ? "" : " is-empty"}${
+                    order ? " has-order" : ""
+                  }`}
                 >
-                  <h3 className="stock-status-card__size">
-                    <span className="stock-status-card__sno">
-                      ({(page - 1) * pageSize + idx + 1})
-                    </span>{" "}
-                    <span className="stock-status-card__name">{card.size}</span>
-                    {showAllCables ? (
-                      <span className="stock-status-card__cable">
-                        {" "}
-                        · {card.cable}
-                      </span>
-                    ) : null}
-                  </h3>
+                  <p className="stock-status-card__cable-top">{card.cable}</p>
+                  <div className="stock-status-card__body">
+                    <div className="stock-status-card__stock">
+                      <h3 className="stock-status-card__size">
+                        <span className="stock-status-card__sno">
+                          ({(page - 1) * pageSize + idx + 1})
+                        </span>{" "}
+                        <span className="stock-status-card__name">
+                          {card.size}
+                        </span>
+                      </h3>
+                      {block ? (
+                        <>
+                          <ul className="stock-status-card__procs">
+                            {block.processes.map((p) => {
+                              const item = formatProcessStatusItem(p);
+                              return (
+                                <li key={p.name}>
+                                  <span className="stock-proc-label">
+                                    {item.label}
+                                  </span>{" "}
+                                  <span className="stock-proc-val">
+                                    {item.value}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                            {putupItem ? (
+                              <li key="call-putup">
+                                <span className="stock-proc-label">
+                                  {putupItem.label}
+                                </span>{" "}
+                                <span className="stock-proc-val">
+                                  {putupItem.value}
+                                </span>
+                              </li>
+                            ) : null}
+                          </ul>
+                          <p className="stock-status-card__total">
+                            <span className="stock-status-card__total-label">
+                              Total
+                            </span>
+                            <span
+                              className="stock-status-card__dash"
+                              aria-hidden
+                            >
+                              {" "}
+                              —{" "}
+                            </span>
+                            <span className="stock-status-card__total-value">
+                              {formatNum(stockTotal)}km
+                            </span>
+                          </p>
+                          {dispatchItem ? (
+                            <ul className="stock-status-card__procs stock-status-card__procs--after-total">
+                              <li>
+                                <span className="stock-proc-label">
+                                  {dispatchItem.label}
+                                </span>{" "}
+                                <span className="stock-proc-val">
+                                  {dispatchItem.value}
+                                </span>
+                              </li>
+                            </ul>
+                          ) : null}
+                          {block.userNotes ? (
+                            <p className="stock-status-card__notes">
+                              {block.userNotes}
+                            </p>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="stock-status-card__empty">{emptyLabel}</p>
+                      )}
+                    </div>
 
-                  {block ? (
-                    <>
-                      <ul className="stock-status-card__procs">
-                        {block.processes.map((p) => (
-                          <li key={p.name}>{formatProcessStatusLine(p)}</li>
-                        ))}
-                        {putupLine ? (
-                          <li key="call-putup">{putupLine}</li>
+                    {order ? (
+                      <div
+                        className="stock-status-card__orders"
+                        aria-label="Orders in hand"
+                      >
+                        <div className="stock-status-card__orders-header">
+                          <div className="stock-status-card__orders-summary">
+                            <span className="stock-status-card__orders-title">
+                              Order in hand
+                            </span>
+                            <span className="stock-status-card__dash" aria-hidden>
+                              {" "}
+                              —{" "}
+                            </span>
+                            <span className="stock-status-card__orders-qty">
+                              <strong>{formatNum(order.totalQty)}</strong> km
+                            </span>
+                          </div>
+                          <div className="stock-status-card__orders-avail">
+                            <span className="stock-status-card__avail-label">
+                              Available
+                            </span>
+                            <span className="stock-status-card__dash" aria-hidden>
+                              {" "}
+                              —{" "}
+                            </span>
+                            <span
+                              className={`stock-status-card__avail-value${
+                                availableTotal < 0 ? " is-short" : ""
+                              }`}
+                            >
+                              {formatNum(availableTotal)} km
+                            </span>
+                          </div>
+                        </div>
+
+                        {partyLines.length > 0 ? (
+                          <div className="stock-status-card__party-table-wrapper">
+                            <table className="stock-status-card__party-table">
+                              <thead>
+                                <tr>
+                                  <th scope="col" className="col-party">
+                                    Party name
+                                  </th>
+                                  <th scope="col" className="col-qty">
+                                    Qty
+                                  </th>
+                                  <th scope="col" className="col-inhand">
+                                    In hand
+                                  </th>
+                                  <th scope="col" className="col-delivery">
+                                    DEL. P.
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {partyLines.map((p, i) => {
+                                  const inHandKm = getPartyInHandKm(
+                                    p.partyName,
+                                    block,
+                                  );
+                                  return (
+                                    <tr
+                                      key={`${p.partyName}-${
+                                        p.deliveryPeriod ?? ""
+                                      }-${i}`}
+                                    >
+                                      <td className="col-party">
+                                        {p.partyName}
+                                      </td>
+                                      <td className="col-qty">
+                                        <strong>{formatNum(p.qty)}</strong> km
+                                      </td>
+                                      <td className="col-inhand">
+                                        {inHandKm > 0 ? (
+                                          <>
+                                            <strong>
+                                              {formatNum(inHandKm)}
+                                            </strong>{" "}
+                                            km
+                                          </>
+                                        ) : (
+                                          "—"
+                                        )}
+                                      </td>
+                                      <td className="col-delivery">
+                                        {formatDeliveryDisplay(
+                                          p.deliveryPeriod,
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         ) : null}
-                      </ul>
-                      <p className="stock-status-card__total">
-                        Total — {block.totalKm}km
-                      </p>
-                      {dispatchLine ? (
-                        <ul className="stock-status-card__procs stock-status-card__procs--after-total">
-                          <li>{dispatchLine}</li>
-                        </ul>
-                      ) : null}
-                      {block.userNotes ? (
-                        <p className="stock-status-card__notes">
-                          {block.userNotes}
-                        </p>
-                      ) : null}
-                    </>
-                  ) : (
-                    <p className="stock-status-card__empty">{emptyLabel}</p>
-                  )}
+
+                        {deliveryDates.length > 0 &&
+                        partyLines.every((p) => !p.deliveryPeriod) ? (
+                          <p className="stock-status-card__orders-delivery">
+                            <span className="stock-status-card__orders-label">
+                              DEL. P.
+                            </span>
+                            <span className="stock-status-card__dash" aria-hidden>
+                              {" "}
+                              —{" "}
+                            </span>
+                            {deliveryDates
+                              .map((d) => formatDeliveryDisplay(d))
+                              .join(", ")}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

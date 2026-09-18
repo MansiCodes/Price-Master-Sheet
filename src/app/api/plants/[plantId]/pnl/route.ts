@@ -46,8 +46,7 @@ export async function GET(
         parseDateOnly(toStr),
         {
           ...(ownEntriesOnly ? { enteredById: session.user.id } : {}),
-          // Super Admin P&L uses approved entries only; plant managers see all plant data.
-          approvedOnly: usesSuperAdminPnlScope(session.user.globalRole),
+          approvedOnly: false,
         },
       ),
       prisma.plant.findUnique({

@@ -53,18 +53,43 @@ export function PnlReportTab({
     void load();
   }, [load]);
 
+  const hasData =
+    pnl &&
+    (pnl.salesRevenue > 0 ||
+      pnl.purchases > 0 ||
+      pnl.openingStock > 0 ||
+      pnl.closingStock > 0 ||
+      pnl.pettyCash > 0 ||
+      pnl.electricity > 0 ||
+      pnl.rent > 0 ||
+      pnl.manpower > 0 ||
+      pnl.grossProfit !== 0 ||
+      pnl.netProfit !== 0);
+
   return (
     <div>
       {error ? <div className="alert alert--error">{error}</div> : null}
       {loading ? (
         <PnlStatementSkeleton />
-      ) : pnl ? (
+      ) : hasData ? (
         <PnlStatement
           plantCode={plantCode}
           trading={pnl.trading}
           indirect={pnl.indirect}
         />
-      ) : null}
+      ) : (
+        <div
+          className="stock-status-card"
+          style={{
+            padding: "2.5rem 1rem",
+            textAlign: "center",
+            color: "#6b7280",
+            fontWeight: 500,
+          }}
+        >
+          No records in this date range.
+        </div>
+      )}
     </div>
   );
 }
