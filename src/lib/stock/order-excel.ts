@@ -16,7 +16,9 @@ import {
   QUAD_SIGNAL_STOCK_CABLES,
 } from "@/lib/plant-catalogs";
 import {
+  lookupStockOrder,
   orderKey,
+  toSizeMatchKey,
   type ParseStockOrdersResult,
   type StockOrderBySize,
   type StockOrderPartyLine,
@@ -27,34 +29,7 @@ export type {
   StockOrderBySize,
   StockOrderPartyLine,
 } from "@/lib/stock/order-excel-types";
-export { lookupStockOrder, orderKey } from "@/lib/stock/order-excel-types";
-
-/**
- * Compact size key: digits + first letter of unit words.
- * "12 Core x 2.5 sqmm" / "12C X 2.5" → "12c2.5"
- * "6Q X 0.9 MM" / "6 Quad x 0.9mm" → "6q0.9"
- */
-export function toSizeMatchKey(raw: string): string {
-  let s = raw.toLowerCase().trim();
-  if (!s) return "";
-  s = s.replace(/\([^)]*\)/g, " ");
-  s = s.replace(
-    /\b(lszh|xlpe|outer|sheath|dia\.?|hold|grey|gray|yellow|black|green|red|clr|colour|color)\b/gi,
-    " ",
-  );
-  s = s.replace(/\bcores?\b/g, "c");
-  s = s.replace(/\bquads?\b/g, "q");
-  s = s.replace(/\bpairs?\b/g, "p");
-  s = s.replace(/sq\.?\s*m\.?m\.?/g, "");
-  s = s.replace(/mm2/g, "");
-  // digit+mm has no \b between them — strip mm after numbers too
-  s = s.replace(/mm\b/g, "");
-  s = s.replace(/\bx\b/g, " ");
-  s = s.replace(/\batc\b/g, "atc");
-  s = s.replace(/\babc\b/g, "abc");
-  s = s.replace(/[^a-z0-9./]/g, "");
-  return s;
-}
+export { lookupStockOrder, orderKey, toSizeMatchKey } from "@/lib/stock/order-excel-types";
 
 function allCatalogSizes(): Array<{ cable: string; size: string; key: string }> {
   const out: Array<{ cable: string; size: string; key: string }> = [];
@@ -83,26 +58,32 @@ export function matchCableAndSize(
     return signalling ?? exact[0]!;
   }
 
-  // Short excel keys (e.g. "6c", "6q") → catalog that starts with key
+  // Prefix / start-with hits
   const prefixHits = CATALOG.filter(
-    (c) => c.key.startsWith(key) || key.startsWith(c.key),
+    (c) => c.key === key || c.key.startsWith(key) || key.startsWith(c.key),
   );
-  if (prefixHits.length === 0) {
-    // contains either way
-    const soft = CATALOG.filter(
-      (c) => c.key.includes(key) || key.includes(c.key),
-    );
-    if (soft.length === 0) return null;
+  if (prefixHits.length > 0) {
+    prefixHits.sort((a, b) => b.key.length - a.key.length);
+    const bestLen = prefixHits[0]!.key.length;
+    const best = prefixHits.filter((c) => c.key.length === bestLen);
+    const signalling = best.find((c) => c.cable === "Signalling Cable");
+    return signalling ?? best[0]!;
+  }
+
+  const soft = CATALOG.filter(
+    (c) => c.key.includes(key) || key.includes(c.key),
+  );
+  if (soft.length > 0) {
     const signalling = soft.find((c) => c.cable === "Signalling Cable");
     return signalling ?? soft[0]!;
   }
 
-  // Prefer longest catalog key among prefix hits (more specific)
-  prefixHits.sort((a, b) => b.key.length - a.key.length);
-  const bestLen = prefixHits[0]!.key.length;
-  const best = prefixHits.filter((c) => c.key.length === bestLen);
-  const signalling = best.find((c) => c.cable === "Signalling Cable");
-  return signalling ?? best[0]!;
+  // Preserve variant sizes (e.g. 12 Core x 1.5 sqmm LSZH) as their own size
+  const cleaned = excelSize
+    .replace(/\s+/g, " ")
+    .replace(/(\d+)\s*c\b/gi, "$1 Core")
+    .trim();
+  return { cable: "Signalling Cable", size: cleaned };
 }
 
 /** Convert qty to km using UOM (MTRS/MTR → /1000, KM unchanged). */

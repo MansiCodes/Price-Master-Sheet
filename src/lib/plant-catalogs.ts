@@ -449,6 +449,15 @@ export type QuadSignalStockMeta = {
   dispatchParty?: string;
   /** Dispatch pending qty (km). */
   dispatchPending?: number;
+  callPutupItems?: Array<{
+    qty: number | string;
+    date?: string;
+    partyName?: string;
+  }>;
+  dispatchPendingItems?: Array<{
+    qty: number | string;
+    partyName?: string;
+  }>;
   calcSnapshot?: {
     coreCount: number;
     lengthFactor: number;

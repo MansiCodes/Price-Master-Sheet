@@ -275,6 +275,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.45rem;
   border: 1px solid var(--border-strong);
   background: #fff;
   color: var(--stone);
@@ -286,6 +287,25 @@ textarea {
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.dash-header__logout-icon {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .dash-header__logout-text {
+    display: none !important;
+  }
+  .dash-header__logout {
+    padding: 0 !important;
+    border-radius: 50% !important;
+    width: 2.2rem !important;
+    height: 2.2rem !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
 }
 
 .dash-header__logout:hover,
@@ -846,10 +866,7 @@ textarea {
     padding-left: max(0.7rem, calc(env(safe-area-inset-left) + 0.4rem));
   }
 
-  .dash-header__logout {
-    padding: 0 0.5rem;
-    font-size: 0.7rem;
-  }
+
 
   .dash-header__date {
     padding: 0 0.4rem;
@@ -866,10 +883,7 @@ textarea {
     letter-spacing: -0.02em;
   }
 
-  .dash-header__logout {
-    padding: 0 0.45rem;
-    font-size: 0.7rem;
-  }
+
 }
 
 /* ---------- Mobile off-canvas nav ----------

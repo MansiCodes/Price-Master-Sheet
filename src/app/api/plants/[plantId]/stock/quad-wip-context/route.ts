@@ -124,8 +124,18 @@ export async function GET(
     orderBy: { updatedAt: "desc" },
     select: { notes: true },
   });
+  const latestStock = existingStock
+    ? existingStock
+    : await prisma.stockEntry.findFirst({
+        where: {
+          ...pScope,
+          itemName,
+        },
+        orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
+        select: { notes: true },
+      });
   const { meta: existingMeta } = parseQuadSignalStockNotes(
-    existingStock?.notes,
+    latestStock?.notes,
   );
   const stockMeta =
     existingMeta?.kind === "cable"
@@ -138,6 +148,8 @@ export async function GET(
               ? String(existingMeta.dispatchPending)
               : "",
           dispatchParty: existingMeta.dispatchParty ?? "",
+          callPutupItems: existingMeta.callPutupItems ?? [],
+          dispatchPendingItems: existingMeta.dispatchPendingItems ?? [],
         }
       : null;
 

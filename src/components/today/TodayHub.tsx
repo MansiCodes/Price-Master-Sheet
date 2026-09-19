@@ -592,6 +592,12 @@ export function TodayHub({
   const [stockPartyName, setStockPartyName] = useState("");
   const [stockDispatchPending, setStockDispatchPending] = useState("");
   const [stockDispatchParty, setStockDispatchParty] = useState("");
+  const [stockCallPutupItems, setStockCallPutupItems] = useState<
+    Array<{ qty: string; date: string; partyName: string }>
+  >([{ qty: "", date: "", partyName: "" }]);
+  const [stockDispatchPendingItems, setStockDispatchPendingItems] = useState<
+    Array<{ qty: string; partyName: string }>
+  >([{ qty: "", partyName: "" }]);
   const [stockLengthOptions, setStockLengthOptions] = useState<
     Array<{ label: string; lengthFactor: number }>
   >([]);
@@ -628,11 +634,27 @@ export function TodayHub({
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
 
   const quadCableSizeOptions = useMemo(() => {
-    const sizes = getQuadSignalCableSizes(
-      stockCable === "Other" ? "Other" : stockCable,
-    );
-    return [...sizes];
-  }, [stockCable]);
+    const cableKey = stockCable === "Other" ? "Other" : stockCable;
+    const defaultSizes = getQuadSignalCableSizes(cableKey);
+
+    const customSizes: string[] = [];
+    const prefix = `${cableKey} · `;
+    for (const item of customStockItems) {
+      if (item.startsWith(prefix)) {
+        const customSize = item.slice(prefix.length).trim();
+        if (
+          customSize &&
+          !defaultSizes.includes(customSize as (typeof defaultSizes)[number]) &&
+          !customSizes.includes(customSize)
+        ) {
+          customSizes.push(customSize);
+        }
+      }
+    }
+
+    const withoutOther = defaultSizes.filter((s) => s !== "Other");
+    return [...withoutOther, ...customSizes, "Other"];
+  }, [stockCable, customStockItems]);
 
   const quadCableProcessFields = useMemo(() => {
     if (!isQuad || stockKind !== "cable") return [] as string[];
@@ -649,11 +671,8 @@ export function TodayHub({
 
   useEffect(() => {
     if (!isQuad || stockKind !== "cable") return;
-    const sizes = getQuadSignalCableSizes(
-      stockCable === "Other" ? "Other" : stockCable,
-    );
-    if (!sizes.includes(stockCableSize as (typeof sizes)[number])) {
-      setStockCableSize(sizes[0] ?? "Other");
+    if (!quadCableSizeOptions.includes(stockCableSize)) {
+      setStockCableSize(quadCableSizeOptions[0] ?? "Other");
       setStockCableSizeOther("");
     }
     setStockProcessQtys({});
@@ -708,6 +727,8 @@ export function TodayHub({
       setStockPartyName("");
       setStockDispatchPending("");
       setStockDispatchParty("");
+      setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+      setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
       setStockLengthOptions([]);
       setStockLengthFactor(null);
       setStockInsulationExtras([]);
@@ -749,6 +770,8 @@ export function TodayHub({
             partyName: string;
             dispatchPending: string;
             dispatchParty: string;
+            callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
+            dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
           } | null;
         }>;
       })
@@ -790,6 +813,47 @@ export function TodayHub({
         setStockPartyName(meta?.partyName ?? "");
         setStockDispatchPending(meta?.dispatchPending ?? "");
         setStockDispatchParty(meta?.dispatchParty ?? "");
+
+        const rawPutups = meta?.callPutupItems;
+        if (Array.isArray(rawPutups) && rawPutups.length > 0) {
+          setStockCallPutupItems(
+            rawPutups.map((p) => ({
+              qty: p.qty != null ? String(p.qty) : "",
+              date: p.date ?? "",
+              partyName: p.partyName ?? "",
+            })),
+          );
+        } else if (meta?.callPutup || meta?.putupDate || meta?.partyName) {
+          setStockCallPutupItems([
+            {
+              qty: meta.callPutup ?? "",
+              date: meta.putupDate ?? "",
+              partyName: meta.partyName ?? "",
+            },
+          ]);
+        } else {
+          setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+        }
+
+        const rawDispatches = meta?.dispatchPendingItems;
+        if (Array.isArray(rawDispatches) && rawDispatches.length > 0) {
+          setStockDispatchPendingItems(
+            rawDispatches.map((d) => ({
+              qty: d.qty != null ? String(d.qty) : "",
+              partyName: d.partyName ?? "",
+            })),
+          );
+        } else if (meta?.dispatchPending || meta?.dispatchParty) {
+          setStockDispatchPendingItems([
+            {
+              qty: meta.dispatchPending ?? "",
+              partyName: meta.dispatchParty ?? "",
+            },
+          ]);
+        } else {
+          setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
+        }
+
         setStockWipContextLoading(false);
       })
       .catch((err) => {
@@ -804,6 +868,8 @@ export function TodayHub({
         setStockPartyName("");
         setStockDispatchPending("");
         setStockDispatchParty("");
+        setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+        setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
         setStockWipContextLoading(false);
       });
 
@@ -1209,6 +1275,8 @@ export function TodayHub({
     setStockPartyName("");
     setStockDispatchPending("");
     setStockDispatchParty("");
+    setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+    setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
     setStockItem(
       isQuad
         ? QUAD_SIGNAL_STOCK_RAW_MATERIALS[0]
@@ -1792,19 +1860,61 @@ export function TodayHub({
                 closing: wip.byProcess,
                 processes: wip.byProcess,
                 salesKm: stockWipSalesKm,
-                ...(stockCallPutup.trim()
+                ...(stockCallPutupItems
+                  .map((item) => ({
+                    qty: item.qty.trim() ? Number(item.qty.trim()) || item.qty.trim() : 0,
+                    date: item.date.trim() || undefined,
+                    partyName: item.partyName.trim() || undefined,
+                  }))
+                  .filter((item) => Boolean(item.qty) || Boolean(item.date) || Boolean(item.partyName)).length > 0
+                  ? {
+                      callPutupItems: stockCallPutupItems
+                        .map((item) => ({
+                          qty: item.qty.trim() ? Number(item.qty.trim()) || item.qty.trim() : 0,
+                          date: item.date.trim() || undefined,
+                          partyName: item.partyName.trim() || undefined,
+                        }))
+                        .filter((item) => Boolean(item.qty) || Boolean(item.date) || Boolean(item.partyName)),
+                    }
+                  : {}),
+                ...(stockDispatchPendingItems
+                  .map((item) => ({
+                    qty: item.qty.trim() ? Number(item.qty.trim()) || item.qty.trim() : 0,
+                    partyName: item.partyName.trim() || undefined,
+                  }))
+                  .filter((item) => Boolean(item.qty) || Boolean(item.partyName)).length > 0
+                  ? {
+                      dispatchPendingItems: stockDispatchPendingItems
+                        .map((item) => ({
+                          qty: item.qty.trim() ? Number(item.qty.trim()) || item.qty.trim() : 0,
+                          partyName: item.partyName.trim() || undefined,
+                        }))
+                        .filter((item) => Boolean(item.qty) || Boolean(item.partyName)),
+                    }
+                  : {}),
+                ...(stockCallPutupItems[0]?.qty?.trim()
+                  ? { callPutup: stockCallPutupItems[0].qty.trim() }
+                  : stockCallPutup.trim()
                   ? { callPutup: stockCallPutup.trim() }
                   : {}),
-                ...(stockPutupDate.trim()
+                ...(stockCallPutupItems[0]?.date?.trim()
+                  ? { putupDate: stockCallPutupItems[0].date.trim() }
+                  : stockPutupDate.trim()
                   ? { putupDate: stockPutupDate.trim() }
                   : {}),
-                ...(stockPartyName.trim()
+                ...(stockCallPutupItems[0]?.partyName?.trim()
+                  ? { partyName: stockCallPutupItems[0].partyName.trim() }
+                  : stockPartyName.trim()
                   ? { partyName: stockPartyName.trim() }
                   : {}),
-                ...(stockDispatchParty.trim()
+                ...(stockDispatchPendingItems[0]?.partyName?.trim()
+                  ? { dispatchParty: stockDispatchPendingItems[0].partyName.trim() }
+                  : stockDispatchParty.trim()
                   ? { dispatchParty: stockDispatchParty.trim() }
                   : {}),
-                ...(dispatchPending != null
+                ...(stockDispatchPendingItems[0]?.qty?.trim()
+                  ? { dispatchPending: Number(stockDispatchPendingItems[0].qty.trim()) || undefined }
+                  : dispatchPending != null
                   ? { dispatchPending }
                   : {}),
                 calcSnapshot: {
@@ -2211,7 +2321,13 @@ export function TodayHub({
         rememberCustomOption(setCustomUnits, l.unit);
       }
     } else if (kind === "stock") {
-      if (!(isQuad && stockKind === "cable")) {
+      if (isQuad && stockKind === "cable") {
+        const cableKey = stockCable === "Other" ? stockCableOther.trim() : stockCable.trim();
+        const sizeKey = stockCableSize === "Other" ? stockCableSizeOther.trim() : stockCableSize.trim();
+        if (cableKey && sizeKey) {
+          rememberCustomOption(setCustomStockItems, `${cableKey} · ${sizeKey}`);
+        }
+      } else {
         rememberCustomOption(setCustomStockItems, resolvedStockItemName);
       }
       rememberCustomOption(setCustomUnits, stockUnit);
@@ -3546,82 +3662,287 @@ export function TodayHub({
                               );
                             })()}
                             <div className="qs-wip__box">
-                              <div className="qs-wip__box-head">
-                                <h4 className="qs-wip__box-title">
+                              <div
+                                className="qs-wip__box-head"
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: "12px",
+                                }}
+                              >
+                                <h4 className="qs-wip__box-title" style={{ margin: 0 }}>
                                   Call put up
                                 </h4>
+                                <button
+                                  type="button"
+                                  className="btn btn--sm btn--outline"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                    fontSize: "1rem",
+                                    borderRadius: "6px",
+                                    border: "1.5px solid #0d9488",
+                                    color: "#0d9488",
+                                    background: "#f0fdf4",
+                                    width: "28px",
+                                    height: "28px",
+                                    padding: 0,
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() =>
+                                    setStockCallPutupItems((prev) => [
+                                      ...prev,
+                                      { qty: "", date: "", partyName: "" },
+                                    ])
+                                  }
+                                  title="Add Call put up"
+                                >
+                                  +
+                                </button>
                               </div>
-                              <div className="form-grid three">
-                                <div className="field">
-                                  <label htmlFor="st-call-putup">Qty</label>
-                                  <input
-                                    id="st-call-putup"
-                                    value={stockCallPutup}
-                                    onChange={(e) =>
-                                      setStockCallPutup(e.target.value)
-                                    }
-                                    placeholder="0"
-                                  />
+                              {stockCallPutupItems.map((item, idx) => (
+                                <div
+                                  key={`call-putup-${idx}`}
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns:
+                                      stockCallPutupItems.length > 1
+                                        ? "1fr 1.4fr 2.5fr 36px"
+                                        : "1fr 1.4fr 2.5fr",
+                                    gap: "10px",
+                                    alignItems: "flex-end",
+                                    marginBottom:
+                                      idx < stockCallPutupItems.length - 1
+                                        ? "12px"
+                                        : 0,
+                                  }}
+                                >
+                                  <div className="field">
+                                    <label htmlFor={`st-call-putup-${idx}`}>Qty</label>
+                                    <input
+                                      id={`st-call-putup-${idx}`}
+                                      value={item.qty}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setStockCallPutupItems((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = { ...next[idx], qty: val };
+                                          return next;
+                                        });
+                                        if (idx === 0) setStockCallPutup(val);
+                                      }}
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="field">
+                                    <label htmlFor={`st-putup-date-${idx}`}>Date</label>
+                                    <input
+                                      id={`st-putup-date-${idx}`}
+                                      type="date"
+                                      max={todayLocalISO()}
+                                      value={item.date}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setStockCallPutupItems((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = { ...next[idx], date: val };
+                                          return next;
+                                        });
+                                        if (idx === 0) setStockPutupDate(val);
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="field">
+                                    <label
+                                      htmlFor={`st-party-name-${idx}`}
+                                      style={{ whiteSpace: "nowrap" }}
+                                    >
+                                      Party name
+                                    </label>
+                                    <input
+                                      id={`st-party-name-${idx}`}
+                                      value={item.partyName}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setStockCallPutupItems((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = {
+                                            ...next[idx],
+                                            partyName: val,
+                                          };
+                                          return next;
+                                        });
+                                        if (idx === 0) setStockPartyName(val);
+                                      }}
+                                      placeholder="Party name"
+                                    />
+                                  </div>
+                                  {stockCallPutupItems.length > 1 ? (
+                                    <div style={{ display: "flex", justifyContent: "center" }}>
+                                      {idx > 0 ? (
+                                        <button
+                                          type="button"
+                                          className="btn btn--sm btn--danger"
+                                          style={{
+                                            height: "38px",
+                                            width: "36px",
+                                            padding: 0,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                          onClick={() =>
+                                            setStockCallPutupItems((prev) =>
+                                              prev.filter((_, i) => i !== idx),
+                                            )
+                                          }
+                                          title="Remove Call put up"
+                                        >
+                                          ✕
+                                        </button>
+                                      ) : (
+                                        <div style={{ width: "36px", height: "38px" }} />
+                                      )}
+                                    </div>
+                                  ) : null}
                                 </div>
-                                <div className="field">
-                                  <label htmlFor="st-putup-date">Date</label>
-                                  <input
-                                    id="st-putup-date"
-                                    type="date"
-                                    max={todayLocalISO()}
-                                    value={stockPutupDate}
-                                    onChange={(e) =>
-                                      setStockPutupDate(e.target.value)
-                                    }
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor="st-party-name">
-                                    Party name
-                                  </label>
-                                  <input
-                                    id="st-party-name"
-                                    value={stockPartyName}
-                                    onChange={(e) =>
-                                      setStockPartyName(e.target.value)
-                                    }
-                                    placeholder="Party name"
-                                  />
-                                </div>
-                              </div>
+                              ))}
                             </div>
                             <div className="qs-wip__box">
-                              <div className="qs-wip__box-head">
-                                <h4 className="qs-wip__box-title">
+                              <div
+                                className="qs-wip__box-head"
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: "12px",
+                                }}
+                              >
+                                <h4 className="qs-wip__box-title" style={{ margin: 0 }}>
                                   Dispatch pending
                                 </h4>
+                                <button
+                                  type="button"
+                                  className="btn btn--sm btn--outline"
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: 700,
+                                    fontSize: "1rem",
+                                    borderRadius: "6px",
+                                    border: "1.5px solid #0d9488",
+                                    color: "#0d9488",
+                                    background: "#f0fdf4",
+                                    width: "28px",
+                                    height: "28px",
+                                    padding: 0,
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={() =>
+                                    setStockDispatchPendingItems((prev) => [
+                                      ...prev,
+                                      { qty: "", partyName: "" },
+                                    ])
+                                  }
+                                  title="Add Dispatch pending"
+                                >
+                                  +
+                                </button>
                               </div>
-                              <div className="form-grid two">
-                                <div className="field">
-                                  <label htmlFor="st-dispatch-pending">
-                                    Qty
-                                  </label>
-                                  <DecimalInput
-                                    id="st-dispatch-pending"
-                                    value={stockDispatchPending}
-                                    onChange={setStockDispatchPending}
-                                    placeholder="0"
-                                  />
+                                {stockDispatchPendingItems.map((item, idx) => (
+                                  <div
+                                    key={`dispatch-${idx}`}
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        stockDispatchPendingItems.length > 1
+                                          ? "1fr 3.9fr 36px"
+                                          : "1fr 3.9fr",
+                                    gap: "10px",
+                                    alignItems: "flex-end",
+                                    marginBottom:
+                                      idx < stockDispatchPendingItems.length - 1
+                                        ? "12px"
+                                        : 0,
+                                  }}
+                                >
+                                  <div className="field">
+                                    <label htmlFor={`st-dispatch-pending-${idx}`}>
+                                      Qty
+                                    </label>
+                                    <DecimalInput
+                                      id={`st-dispatch-pending-${idx}`}
+                                      value={item.qty}
+                                      onChange={(val) => {
+                                        setStockDispatchPendingItems((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = { ...next[idx], qty: val };
+                                          return next;
+                                        });
+                                        if (idx === 0) setStockDispatchPending(val);
+                                      }}
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="field">
+                                    <label
+                                      htmlFor={`st-dispatch-party-${idx}`}
+                                      style={{ whiteSpace: "nowrap" }}
+                                    >
+                                      Party name
+                                    </label>
+                                    <input
+                                      id={`st-dispatch-party-${idx}`}
+                                      value={item.partyName}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        setStockDispatchPendingItems((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = {
+                                            ...next[idx],
+                                            partyName: val,
+                                          };
+                                          return next;
+                                        });
+                                        if (idx === 0) setStockDispatchParty(val);
+                                      }}
+                                      placeholder="Party name"
+                                    />
+                                  </div>
+                                  <div style={{ display: "flex", justifyContent: "center" }}>
+                                    {idx > 0 ? (
+                                      <button
+                                        type="button"
+                                        className="btn btn--sm btn--danger"
+                                        style={{
+                                          height: "38px",
+                                          width: "36px",
+                                          padding: 0,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                        }}
+                                        onClick={() =>
+                                          setStockDispatchPendingItems((prev) =>
+                                            prev.filter((_, i) => i !== idx),
+                                          )
+                                        }
+                                        title="Remove Dispatch pending"
+                                      >
+                                        ✕
+                                      </button>
+                                    ) : (
+                                      <div style={{ width: "36px", height: "38px" }} />
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="field">
-                                  <label htmlFor="st-dispatch-party">
-                                    Party name
-                                  </label>
-                                  <input
-                                    id="st-dispatch-party"
-                                    value={stockDispatchParty}
-                                    onChange={(e) =>
-                                      setStockDispatchParty(e.target.value)
-                                    }
-                                    placeholder="Party name"
-                                  />
-                                </div>
-                              </div>
+                              ))}
                             </div>
                             {stockWipCalc?.warnings?.length ? (
                               <div className="alert alert--error">
@@ -3815,14 +4136,33 @@ export function TodayHub({
                         }}
                         placeholder="0"
                       />
-                      {stockTotalValue != null ? (
-                        <p className="cost-hint stock-total-value">
-                          Total value{" "}
-                          <span className="cost-hint__amount">
-                            {formatINR(stockTotalValue)}
-                          </span>
-                        </p>
-                      ) : null}
+                    </div>
+                  ) : null}
+                  {stockTotalValue != null ? (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        alignItems: "center",
+                        paddingRight: "0.75rem",
+                        marginTop: "0.35rem",
+                      }}
+                    >
+                      <p
+                        className="cost-hint stock-total-value"
+                        style={{
+                          margin: 0,
+                          fontWeight: 700,
+                          fontSize: "0.92rem",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Total value{" "}
+                        <span className="cost-hint__amount" style={{ fontSize: "1rem" }}>
+                          {formatINR(stockTotalValue)}
+                        </span>
+                      </p>
                     </div>
                   ) : null}
                 </div>

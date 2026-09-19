@@ -20,6 +20,7 @@ export const QUAD_STOCK_SHEET_HEADERS = [
   "Party name",
   "Dispatch pending",
   "Dispatch party",
+  "Balance",
   "Conductor",
   "Insulation",
   "Single Quad",

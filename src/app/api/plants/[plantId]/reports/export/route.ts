@@ -20,6 +20,7 @@ import { getPlantDisplayName } from "@/lib/plant-segments";
 import {
   parseQuadSignalStockNotes,
 } from "@/lib/plant-catalogs";
+import { parsePutupKm } from "@/lib/stock-production-status";
 import {
   QUAD_STOCK_PROCESS_HEADERS,
   QUAD_STOCK_SHEET_HEADERS,
@@ -395,6 +396,9 @@ export async function GET(
         });
       });
     } else if (isQuad) {
+      const dbStockOrders = await (prisma as any).plantStockOrder.findMany({
+        where: pScope,
+      });
       // Same headers as import template / Today Entry / P&L Stock.
       const widthByHeader: Record<string, number> = {
         Date: 12,
@@ -412,6 +416,7 @@ export async function GET(
         "Party name": 22,
         "Dispatch pending": 14,
         "Dispatch party": 22,
+        Balance: 14,
         Notes: 28,
       };
       sheet.columns = QUAD_STOCK_SHEET_HEADERS.map((header) => ({
@@ -433,6 +438,8 @@ export async function GET(
         let partyName = "";
         let dispatchPending: number | "" = "";
         let dispatchParty = "";
+        let balanceVal: number | "" = "";
+
         if (meta?.kind === "cable") {
           type = "Cable";
           item = meta.cable || r.itemName;
@@ -450,6 +457,29 @@ export async function GET(
           partyName = meta.partyName ?? "";
           if (meta.dispatchPending != null) dispatchPending = meta.dispatchPending;
           dispatchParty = meta.dispatchParty ?? "";
+
+          const putupKmTotal = Array.isArray(meta.callPutupItems) && meta.callPutupItems.length > 0
+            ? meta.callPutupItems.reduce((s, i) => s + (Number(i.qty) || 0), 0)
+            : parsePutupKm(meta.callPutup);
+
+          const stockTotal = Object.entries(production).reduce((s, [name, val]) => {
+            const n = name.trim().toLowerCase();
+            if (n === "insulation" || n === "single quad") return s;
+            return s + (Number(val) || 0);
+          }, 0);
+
+          const matchedOrders = dbStockOrders.filter(
+            (o: any) =>
+              o.cable?.trim().toLowerCase() === item.trim().toLowerCase() &&
+              o.size?.trim().toLowerCase() === size.trim().toLowerCase(),
+          );
+          const orderQty = matchedOrders.reduce(
+            (s: number, o: any) => s + (Number(o.qty) || 0),
+            0,
+          );
+          if (orderQty > 0 || putupKmTotal > 0 || stockTotal > 0) {
+            balanceVal = Math.round((orderQty - putupKmTotal - stockTotal) * 1000) / 1000;
+          }
         } else if (meta?.kind === "raw") {
           type = "Raw Material";
           item = r.itemName;
@@ -474,6 +504,7 @@ export async function GET(
           "Party name": partyName,
           "Dispatch pending": dispatchPending,
           "Dispatch party": dispatchParty,
+          Balance: balanceVal,
           Notes: userNotes,
           ...processVals,
         });

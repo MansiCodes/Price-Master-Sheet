@@ -13,7 +13,9 @@ import {
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
   formatCallPutupItem,
+  formatCallPutupItemsList,
   formatDispatchItem,
+  formatDispatchItemsList,
   formatProcessStatusItem,
   formatSharedInsulationItem,
   type CableStockStatusBlock,
@@ -66,13 +68,32 @@ function getPartyInHandKm(
   partyName: string,
   block?: CableStockStatusBlock | null,
 ): number {
-  if (!block || !block.putupKm || block.putupKm <= 0) return 0;
-  const target = (block.partyName ?? "").trim().toLowerCase();
+  if (!block) return 0;
   const party = (partyName ?? "").trim().toLowerCase();
+  const cleanParty = party.replace(/[^a-z0-9]/g, "");
+  if (!cleanParty) return 0;
 
+  if (Array.isArray(block.callPutupItems) && block.callPutupItems.length > 0) {
+    let sum = 0;
+    for (const item of block.callPutupItems) {
+      const target = String(item.partyName ?? "").trim().toLowerCase();
+      const cleanTarget = target.replace(/[^a-z0-9]/g, "");
+      const q = Number(item.qty);
+      const qty = Number.isFinite(q) && q > 0 ? q : 0;
+      if (
+        cleanTarget.length > 0 &&
+        (cleanParty.includes(cleanTarget) || cleanTarget.includes(cleanParty))
+      ) {
+        sum += qty;
+      }
+    }
+    if (sum > 0) return sum;
+  }
+
+  if (!block.putupKm || block.putupKm <= 0) return 0;
+  const target = (block.partyName ?? "").trim().toLowerCase();
   if (target) {
     const cleanTarget = target.replace(/[^a-z0-9]/g, "");
-    const cleanParty = party.replace(/[^a-z0-9]/g, "");
     if (
       cleanParty.length > 0 &&
       cleanTarget.length > 0 &&
@@ -84,7 +105,6 @@ function getPartyInHandKm(
     if (words.length > 0 && words.every((w) => party.includes(w))) {
       return block.putupKm;
     }
-    return 0;
   }
 
   return 0;
@@ -106,6 +126,28 @@ function CalendarIcon() {
       <rect x="3" y="4" width="18" height="18" rx="2" />
       <path d="M16 2v4M8 2v4M3 10h18" />
     </svg>
+  );
+}
+
+function getProcessIcon(name: string) {
+  const n = name.trim().toLowerCase();
+  if (n.includes("lay")) {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a10 10 0 0 0-7.07 17.07l1.41-1.41A8 8 0 1 1 12 20v2a10 10 0 0 0 0-20z"/></svg>
+    );
+  }
+  if (n.includes("inner")) {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+    );
+  }
+  if (n.includes("dst") || n.includes("screen") || n.includes("armour")) {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    );
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
   );
 }
 
@@ -166,6 +208,7 @@ export function StockStatusClient({
   const [ordersFileName, setOrdersFileName] = useState<string | null>(null);
   const [ordersUploading, setOrdersUploading] = useState(false);
   const [ordersHydrated, setOrdersHydrated] = useState(false);
+  const [rmSearchQuery, setRmSearchQuery] = useState("");
 
   const ordersStorageKey = `stock-orders-excel:v2:${plantId}`;
 
@@ -369,12 +412,18 @@ export function StockStatusClient({
     return displayCards.slice(start, start + pageSize);
   }, [displayCards, page, pageSize]);
 
+  const filteredRawRows = useMemo(() => {
+    if (!rmSearchQuery.trim()) return rawRows;
+    const q = rmSearchQuery.trim().toLowerCase();
+    return rawRows.filter((r) => r.item.toLowerCase().includes(q));
+  }, [rawRows, rmSearchQuery]);
+
   const pagedRawRows = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return rawRows.slice(start, start + pageSize);
-  }, [rawRows, page, pageSize]);
+    return filteredRawRows.slice(start, start + pageSize);
+  }, [filteredRawRows, page, pageSize]);
 
-  const listTotal = tab === "raw" ? rawRows.length : displayCards.length;
+  const listTotal = tab === "raw" ? filteredRawRows.length : displayCards.length;
 
   function changePageSize(next: number) {
     setPage(1);
@@ -480,59 +529,27 @@ export function StockStatusClient({
   return (
     <div className={`stock-status-page${hasOrders ? " has-orders" : ""}`}>
       <div className="stock-status-toolbar">
-        <div className="stock-status-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "cable"}
-            className={`stock-status-tabs__btn${tab === "cable" ? " is-active" : ""}`}
-            onClick={() => setTab("cable")}
-          >
-            Cable
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "raw"}
-            className={`stock-status-tabs__btn${tab === "raw" ? " is-active" : ""}`}
-            onClick={() => setTab("raw")}
-          >
-            Raw Materials
-          </button>
-        </div>
-
-        <div className="stock-status-toolbar__actions">
-          {tab === "cable" ? (
-            <div className="stock-orders-upload">
-              <input
-                ref={ordersFileRef}
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className="sr-only"
-                onChange={(e) =>
-                  void onOrdersExcelSelected(e.target.files?.[0] ?? null)
-                }
-              />
-              <button
-                type="button"
-                className="stock-orders-upload__btn"
-                disabled={ordersUploading}
-                onClick={() => ordersFileRef.current?.click()}
-              >
-                {ordersUploading ? "Reading…" : "Upload orders Excel"}
-              </button>
-              {ordersFileName ? (
-                <button
-                  type="button"
-                  className="stock-orders-upload__clear"
-                  onClick={clearOrders}
-                  title={ordersFileName}
-                >
-                  Clear orders
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+        <div className="stock-status-toolbar__top-row">
+          <div className="stock-status-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "cable"}
+              className={`stock-status-tabs__btn${tab === "cable" ? " is-active" : ""}`}
+              onClick={() => setTab("cable")}
+            >
+              Cable
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "raw"}
+              className={`stock-status-tabs__btn${tab === "raw" ? " is-active" : ""}`}
+              onClick={() => setTab("raw")}
+            >
+              Raw Materials
+            </button>
+          </div>
 
           <div className="stock-status-toolbar__date" aria-label="Stock date">
             <span
@@ -568,77 +585,171 @@ export function StockStatusClient({
               </div>
             </div>
           </div>
+
+          {tab === "cable" ? (
+            <div className="stock-orders-upload">
+              <input
+                ref={ordersFileRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                className="sr-only"
+                onChange={(e) =>
+                  void onOrdersExcelSelected(e.target.files?.[0] ?? null)
+                }
+              />
+              <button
+                type="button"
+                className="stock-orders-upload__btn"
+                disabled={ordersUploading}
+                onClick={() => ordersFileRef.current?.click()}
+              >
+                {ordersUploading ? "Reading…" : "Upload"}
+              </button>
+              {ordersFileName ? (
+                <button
+                  type="button"
+                  className="stock-orders-upload__clear"
+                  onClick={clearOrders}
+                  title={ordersFileName}
+                >
+                  Clear
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
       {tab === "raw" ? (
-        <div className="stock-status-report">
-          <div className="stock-rm-table-wrap">
-            <table className="stock-rm-table">
-              <thead>
-                <tr>
-                  <th scope="col">S. No.</th>
-                  <th scope="col">Item</th>
-                  <th scope="col">Qty</th>
-                  <th scope="col">Unit</th>
-                  <th scope="col">Rate</th>
-                  <th scope="col">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pagedRawRows.map((row, idx) => (
-                  <tr
-                    key={row.item}
-                    className={row.hasData ? undefined : "is-empty"}
-                  >
-                    <td>{(page - 1) * pageSize + idx + 1}</td>
-                    <td>{row.item}</td>
-                    <td>
-                      {row.hasData && row.qty != null
-                        ? formatNum(row.qty)
-                        : "—"}
-                    </td>
-                    <td>{row.hasData ? row.unit || "—" : "—"}</td>
-                    <td>
-                      {row.hasData && row.rate != null
-                        ? formatNum(row.rate)
-                        : "—"}
-                    </td>
-                    <td>
-                      {row.hasData && row.value != null
-                        ? formatNum(row.value)
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              {rawTotals.hasAny ? (
-                <tfoot>
-                  <tr className="stock-rm-table__total">
-                    <td />
-                    <td>Total</td>
-                    <td>
-                      {rawTotals.qty != null ? formatNum(rawTotals.qty) : "—"}
-                    </td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>
-                      {rawTotals.value != null
-                        ? formatNum(rawTotals.value)
-                        : "—"}
-                    </td>
-                  </tr>
-                </tfoot>
-              ) : null}
-            </table>
+        <div className="stock-status-report rm-report-view">
+
+          {/* Top 3 Summary Stat Cards */}
+          <div className="rm-summary-grid">
+            <div className="rm-stat-card">
+              <span className="rm-stat-card__label">Total Items</span>
+              <div className="rm-stat-card__body">
+                <div className="rm-stat-card__icon rm-stat-card__icon--teal">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </div>
+                <span className="rm-stat-card__val">
+                  {filteredRawRows.filter(r => r.hasData).length || filteredRawRows.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="rm-stat-card">
+              <span className="rm-stat-card__label">Total Quantity</span>
+              <div className="rm-stat-card__body">
+                <div className="rm-stat-card__icon rm-stat-card__icon--blue">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <span className="rm-stat-card__val">
+                  {formatNum(rawTotals.qty ?? 0)} <span className="rm-stat-card__unit">KGS</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="rm-stat-card">
+              <span className="rm-stat-card__label">Total Inventory Value</span>
+              <div className="rm-stat-card__body">
+                <div className="rm-stat-card__icon rm-stat-card__icon--green">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 3h12M6 8h12M6 13l8.5 8M6 13h3a4.5 4.5 0 0 0 0-9" />
+                  </svg>
+                </div>
+                <span className="rm-stat-card__val">
+                  {formatNum(rawTotals.value ?? 0)}
+                </span>
+              </div>
+            </div>
           </div>
-          <Pagination
-            page={page}
-            pageSize={pageSize}
-            total={listTotal}
-            onPageChange={setPage}
-            onPageSizeChange={changePageSize}
-          />
+
+          {/* Raw Materials List Table Container */}
+          <div className="rm-card-container">
+            <div className="rm-card-header">
+              <h3 className="rm-card-title">Raw Materials List</h3>
+              <div className="rm-card-search">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input
+                  type="text"
+                  placeholder="Search item…"
+                  value={rmSearchQuery}
+                  onChange={(e) => {
+                    setRmSearchQuery(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="stock-rm-table-wrap">
+              <table className="stock-rm-table stock-rm-table--zebra">
+                <thead>
+                  <tr>
+                    <th scope="col" className="text-center">S. NO.</th>
+                    <th scope="col">ITEM</th>
+                    <th scope="col" className="text-right">QTY</th>
+                    <th scope="col" className="text-center">UNIT</th>
+                    <th scope="col" className="text-right">RATE</th>
+                    <th scope="col" className="text-right">VALUE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedRawRows.map((row, idx) => (
+                    <tr
+                      key={row.item}
+                      className={row.hasData ? undefined : "is-empty"}
+                    >
+                      <td className="text-center">{(page - 1) * pageSize + idx + 1}</td>
+                      <td className="font-semibold">{row.item}</td>
+                      <td className="text-right font-medium">
+                        {row.hasData && row.qty != null
+                          ? formatNum(row.qty)
+                          : "—"}
+                      </td>
+                      <td className="text-center">{row.hasData ? row.unit || "KGS" : "—"}</td>
+                      <td className="text-right">
+                        {row.hasData && row.rate != null
+                          ? formatNum(row.rate)
+                          : "—"}
+                      </td>
+                      <td className="text-right font-semibold">
+                        {row.hasData && row.value != null
+                          ? formatNum(row.value)
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {rawTotals.hasAny ? (
+                  <tfoot>
+                    <tr className="stock-rm-table__total">
+                      <td />
+                      <td>Total</td>
+                      <td className="text-right">
+                        {rawTotals.qty != null ? formatNum(rawTotals.qty) : "—"}
+                      </td>
+                      <td className="text-center">—</td>
+                      <td className="text-right">—</td>
+                      <td className="text-right">
+                        {rawTotals.value != null
+                          ? formatNum(rawTotals.value)
+                          : "—"}
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+            </div>
+
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={listTotal}
+              onPageChange={setPage}
+              onPageSizeChange={changePageSize}
+            />
+          </div>
         </div>
       ) : (
         <div className="stock-status-report">
@@ -670,47 +781,51 @@ export function StockStatusClient({
             </div>
           </div>
 
-          <ol className="stock-status-grid">
-            {showInsulationCard ? (
-              <li
-                className={`stock-status-card stock-status-card--insulation${
-                  sharedInsulation ? "" : " is-empty"
-                }`}
-              >
-                <h3 className="stock-status-card__size">
-                  Insulation
-                  <span className="stock-status-card__cable">
-                    {" "}
-                    · Signalling Cable
-                  </span>
-                </h3>
-                {sharedInsulation ? (
-                  <>
-                    <ul className="stock-status-card__procs">
-                      {(() => {
-                        const item = formatSharedInsulationItem(sharedInsulation);
-                        return (
-                          <li>
-                            <span className="stock-proc-label">{item.label}</span>{" "}
-                            <span className="stock-proc-val">{item.value}</span>
-                          </li>
-                        );
-                      })()}
-                    </ul>
-                    {sharedInsulation.consumed > 0 ? (
-                      <p className="stock-status-card__meta">
-                        Consumed — {sharedInsulation.consumed}km
-                      </p>
-                    ) : null}
-                    <p className="stock-status-card__total">
-                      Closing — {sharedInsulation.closing}km
-                    </p>
-                  </>
-                ) : (
-                  <p className="stock-status-card__empty">{emptyLabel}</p>
-                )}
-              </li>
-            ) : null}
+          {(() => {
+            const totalOrderInHandKm = ordersByKey
+              ? Object.values(ordersByKey).reduce(
+                  (sum, order) => sum + (order?.totalQty ?? 0),
+                  0,
+                )
+              : 0;
+            const activeOrdersCount = ordersByKey
+              ? Object.keys(ordersByKey).length
+              : 0;
+            const totalFinishedStockKm = cableBlocks.reduce(
+              (sum, b) => sum + (b.totalKm ?? 0),
+              0,
+            );
+            const totalPendingDispatchKm = cableBlocks.reduce(
+              (sum, b) => sum + (b.dispatchPending ?? 0),
+              0,
+            );
+            const totalInsulationKm = sharedInsulation?.closing ?? 0;
+            const totalLengthBoth =
+              Math.round((totalFinishedStockKm + totalInsulationKm) * 100) / 100;
+
+            return (
+              <>
+                <ol className="stock-status-grid">
+                  {showInsulationCard ? (
+                    <li className="stock-status-card stock-status-card--insulation-hero">
+                      <div className="insul-hero__left">
+                        <div className="insul-hero__img">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        </div>
+                        <div className="insul-hero__details">
+                          <h3 className="insul-hero__title">
+                            {activeCable === ALL_CABLES ? "Signalling Cable" : activeCable} <span className="insul-hero__bullet">&bull;</span> Insulation
+                          </h3>
+                          <p className="insul-hero__meta">
+                            Insul: <strong>{formatNum(sharedInsulation?.closing ?? 0)}km ({formatNum(sharedInsulation?.consumed ?? 0)}km)</strong>
+                          </p>
+                          <p className="insul-hero__closing">
+                            Closing &mdash; <strong>{formatNum(sharedInsulation?.closing ?? 0)}km</strong>
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ) : null}
 
             {pagedCards.map((card, idx) => {
               const block = card.block;
@@ -734,8 +849,9 @@ export function StockStatusClient({
                 : null;
               const stockTotal = block?.totalKm ?? 0;
               const orderQty = order?.totalQty ?? 0;
-              const availableTotal =
-                Math.round((stockTotal - orderQty) * 10000) / 10000;
+              const putupKm = block?.putupKm ?? 0;
+              const balanceTotal =
+                Math.round((orderQty - putupKm - stockTotal) * 10000) / 10000;
               const partyLines = order
                 ? order.parties.filter(
                     (p) => p.partyName.trim() && p.partyName.trim() !== "—",
@@ -758,72 +874,71 @@ export function StockStatusClient({
                     order ? " has-order" : ""
                   }`}
                 >
-                  <p className="stock-status-card__cable-top">{card.cable}</p>
+                  <div className="stock-status-card__header">
+                    <div className="stock-status-card__title-group">
+                      <span className="stock-status-card__icon-tile">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                      </span>
+                      <h3 className="stock-status-card__cable-name">
+                        {card.cable} <span className="stock-status-card__index">({(page - 1) * pageSize + idx + 1})</span>
+                      </h3>
+                    </div>
+                    <span className="stock-status-card__size-pill">
+                      {card.size}
+                    </span>
+                  </div>
+
                   <div className="stock-status-card__body">
                     <div className="stock-status-card__stock">
-                      <h3 className="stock-status-card__size">
-                        <span className="stock-status-card__sno">
-                          ({(page - 1) * pageSize + idx + 1})
-                        </span>{" "}
-                        <span className="stock-status-card__name">
-                          {card.size}
-                        </span>
-                      </h3>
                       {block ? (
                         <>
-                          <ul className="stock-status-card__procs">
+                          <div className="stock-proc-grid">
                             {block.processes.map((p) => {
                               const item = formatProcessStatusItem(p);
                               return (
-                                <li key={p.name}>
-                                  <span className="stock-proc-label">
-                                    {item.label}
-                                  </span>{" "}
-                                  <span className="stock-proc-val">
-                                    {item.value}
-                                  </span>
-                                </li>
+                                <div key={p.name} className="stock-proc-chip">
+                                  <div className="stock-proc-chip__head">
+                                    <span className="stock-proc-chip__icon">{getProcessIcon(p.name)}</span>
+                                    <span className="stock-proc-chip__label">{p.name}</span>
+                                  </div>
+                                  <span className="stock-proc-chip__val">{item.value}</span>
+                                </div>
                               );
                             })}
-                            {putupItem ? (
-                              <li key="call-putup">
-                                <span className="stock-proc-label">
-                                  {putupItem.label}
-                                </span>{" "}
-                                <span className="stock-proc-val">
-                                  {putupItem.value}
-                                </span>
-                              </li>
-                            ) : null}
-                          </ul>
-                          <p className="stock-status-card__total">
-                            <span className="stock-status-card__total-label">
-                              Total
-                            </span>
-                            <span
-                              className="stock-status-card__dash"
-                              aria-hidden
-                            >
-                              {" "}
-                              —{" "}
-                            </span>
-                            <span className="stock-status-card__total-value">
-                              {formatNum(stockTotal)}km
-                            </span>
-                          </p>
-                          {dispatchItem ? (
-                            <ul className="stock-status-card__procs stock-status-card__procs--after-total">
-                              <li>
-                                <span className="stock-proc-label">
-                                  {dispatchItem.label}
-                                </span>{" "}
-                                <span className="stock-proc-val">
-                                  {dispatchItem.value}
-                                </span>
-                              </li>
-                            </ul>
+                          </div>
+
+                          {block && formatCallPutupItemsList(block).length > 0 ? (
+                            <div className="stock-call-putup-line">
+                              <span className="stock-call-putup-icon"><CalendarIcon /></span>
+                              <span className="stock-call-putup-text">
+                                {formatCallPutupItemsList(block)
+                                  .map((p) => `${p.label} ${p.value}`)
+                                  .join(" | ")}
+                              </span>
+                            </div>
                           ) : null}
-                          {block.userNotes ? (
+
+                          <div className="stock-total-row">
+                            <div className="stock-total-group">
+                              <span className="stock-total-label">Total</span>
+                              <span className="stock-total-value">{formatNum(stockTotal)} km</span>
+                            </div>
+                            {block && formatDispatchItemsList(block).length > 0 ? (
+                              <div className="stock-dispatch-group">
+                                <span className="stock-dispatch-text">
+                                  {formatDispatchItemsList(block)
+                                    .map((d) => `${d.label} ${d.value}`)
+                                    .join(" | ")}
+                                </span>
+                                <span className="stock-pending-badge">Pending Dispatch</span>
+                              </div>
+                            ) : (
+                              <span className="stock-closing-date">Closing stock as on {block.entryDate}</span>
+                            )}
+                          </div>
+
+                          {block.userNotes &&
+                          !/^closing stock as on/i.test(block.userNotes.trim()) ? (
                             <p className="stock-status-card__notes">
                               {block.userNotes}
                             </p>
@@ -842,7 +957,7 @@ export function StockStatusClient({
                         <div className="stock-status-card__orders-header">
                           <div className="stock-status-card__orders-summary">
                             <span className="stock-status-card__orders-title">
-                              Order in hand
+                              ORDER IN HAND
                             </span>
                             <span className="stock-status-card__dash" aria-hidden>
                               {" "}
@@ -854,7 +969,7 @@ export function StockStatusClient({
                           </div>
                           <div className="stock-status-card__orders-avail">
                             <span className="stock-status-card__avail-label">
-                              Available
+                              Balance
                             </span>
                             <span className="stock-status-card__dash" aria-hidden>
                               {" "}
@@ -862,10 +977,10 @@ export function StockStatusClient({
                             </span>
                             <span
                               className={`stock-status-card__avail-value${
-                                availableTotal < 0 ? " is-short" : ""
+                                balanceTotal > 0 ? " is-short" : ""
                               }`}
                             >
-                              {formatNum(availableTotal)} km
+                              {formatNum(balanceTotal)} km
                             </span>
                           </div>
                         </div>
@@ -876,16 +991,19 @@ export function StockStatusClient({
                               <thead>
                                 <tr>
                                   <th scope="col" className="col-party">
-                                    Party name
+                                    PARTY NAME
                                   </th>
                                   <th scope="col" className="col-qty">
-                                    Qty
+                                    QTY
                                   </th>
                                   <th scope="col" className="col-inhand">
-                                    In hand
+                                    DONE
+                                  </th>
+                                  <th scope="col" className="col-balance">
+                                    BALANCE
                                   </th>
                                   <th scope="col" className="col-delivery">
-                                    DEL. P.
+                                    D.P.
                                   </th>
                                 </tr>
                               </thead>
@@ -895,6 +1013,11 @@ export function StockStatusClient({
                                     p.partyName,
                                     block,
                                   );
+                                  const partyBalance = Math.max(
+                                    0,
+                                    Math.round((p.qty - inHandKm) * 10000) /
+                                      10000,
+                                  );
                                   return (
                                     <tr
                                       key={`${p.partyName}-${
@@ -902,7 +1025,7 @@ export function StockStatusClient({
                                       }-${i}`}
                                     >
                                       <td className="col-party">
-                                        {p.partyName}
+                                        <span className="party-dot">&bull;</span> {p.partyName}
                                       </td>
                                       <td className="col-qty">
                                         <strong>{formatNum(p.qty)}</strong> km
@@ -918,6 +1041,12 @@ export function StockStatusClient({
                                         ) : (
                                           "—"
                                         )}
+                                      </td>
+                                      <td className="col-balance">
+                                        <strong>
+                                          {formatNum(partyBalance)}
+                                        </strong>{" "}
+                                        km
                                       </td>
                                       <td className="col-delivery">
                                         {formatDeliveryDisplay(
@@ -936,7 +1065,7 @@ export function StockStatusClient({
                         partyLines.every((p) => !p.deliveryPeriod) ? (
                           <p className="stock-status-card__orders-delivery">
                             <span className="stock-status-card__orders-label">
-                              DEL. P.
+                              D.P.
                             </span>
                             <span className="stock-status-card__dash" aria-hidden>
                               {" "}
@@ -954,6 +1083,7 @@ export function StockStatusClient({
               );
             })}
           </ol>
+
           <Pagination
             page={page}
             pageSize={pageSize}
@@ -961,6 +1091,11 @@ export function StockStatusClient({
             onPageChange={setPage}
             onPageSizeChange={changePageSize}
           />
+
+
+        </>
+      );
+    })()}
         </div>
       )}
     </div>
