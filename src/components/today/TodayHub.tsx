@@ -860,14 +860,6 @@ export function TodayHub({
         coreCount: number;
         lengthFactor: number;
       }> = [];
-      if (stockOpeningEditable || stockInsulationExtras.length > 0) {
-        sizeRows.push({
-          size: resolvedQuadSizeName,
-          layingProduced: production.Laying ?? 0,
-          coreCount: variant.coreCount,
-          lengthFactor,
-        });
-      }
       for (const extra of stockInsulationExtras) {
         const sizeName =
           extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
@@ -1675,14 +1667,6 @@ export function TodayHub({
               coreCount: number;
               lengthFactor: number;
             }> = [];
-            if (stockOpeningEditable || stockInsulationExtras.length > 0) {
-              sizeRows.push({
-                size: resolvedSize,
-                layingProduced: processes.Laying ?? 0,
-                coreCount: variant.coreCount,
-                lengthFactor,
-              });
-            }
             for (const extra of stockInsulationExtras) {
               const sizeName =
                 extra.size === "Other"
