@@ -45,22 +45,49 @@ function allCatalogSizes(): Array<{ cable: string; size: string; key: string }> 
 
 const CATALOG = allCatalogSizes();
 
+const KNOWN_VARIANTS = ["lszh", "xlpe", "zhfr", "frls", "fr", "armoured", "armored", "unarmoured", "unarmored"];
+
+function getVariantTokens(key: string): string[] {
+  return KNOWN_VARIANTS.filter((v) => key.includes(v));
+}
+
 export function matchCableAndSize(
   excelSize: string,
 ): { cable: string; size: string } | null {
   const key = toSizeMatchKey(excelSize);
   if (!key || key.length < 2) return null;
 
-  const exact = CATALOG.filter((c) => c.key === key);
+  const excelVariants = getVariantTokens(key);
+
+  const filterByVariantMatch = (candidates: typeof CATALOG) => {
+    if (excelVariants.length === 0) return candidates;
+    return candidates.filter((c) => {
+      const candVariants = getVariantTokens(c.key);
+      return excelVariants.every((v) => candVariants.includes(v));
+    });
+  };
+
+  const exact = filterByVariantMatch(CATALOG.filter((c) => c.key === key));
   if (exact.length === 1) return exact[0]!;
   if (exact.length > 1) {
     const signalling = exact.find((c) => c.cable === "Signalling Cable");
     return signalling ?? exact[0]!;
   }
 
-  // Prefix / start-with hits
-  const prefixHits = CATALOG.filter(
-    (c) => c.key === key || c.key.startsWith(key) || key.startsWith(c.key),
+  const isPrefixMatch = (candKey: string) => {
+    if (key === candKey) return true;
+    if (candKey.startsWith(key)) return true;
+    if (key.startsWith(candKey)) {
+      const nextChar = key[candKey.length];
+      if (nextChar && /\d/.test(nextChar)) return false;
+      return true;
+    }
+    return false;
+  };
+
+  // Prefix / start-with hits (must also match variant requirements)
+  const prefixHits = filterByVariantMatch(
+    CATALOG.filter((c) => isPrefixMatch(c.key)),
   );
   if (prefixHits.length > 0) {
     prefixHits.sort((a, b) => b.key.length - a.key.length);
@@ -70,20 +97,26 @@ export function matchCableAndSize(
     return signalling ?? best[0]!;
   }
 
-  const soft = CATALOG.filter(
-    (c) => c.key.includes(key) || key.includes(c.key),
-  );
-  if (soft.length > 0) {
-    const signalling = soft.find((c) => c.cable === "Signalling Cable");
-    return signalling ?? soft[0]!;
-  }
-
   // Preserve variant sizes (e.g. 12 Core x 1.5 sqmm LSZH) as their own size
-  const cleaned = excelSize
+  let cleaned = excelSize
     .replace(/\s+/g, " ")
+    .replace(/\b(outer|sheath)\b/gi, "")
     .replace(/(\d+)\s*c\b/gi, "$1 Core")
+    .replace(/\b(\d+)\s*q\b/gi, "$1 Quad")
+    .replace(/\b(\d+)\s*p\b/gi, "$1 Pair")
+    .replace(/\blzsh\b/gi, "LSZH")
     .trim();
-  return { cable: "Signalling Cable", size: cleaned };
+  cleaned = cleaned.replace(/\s+/g, " ");
+
+  // Determine cable category for unlisted sizes
+  let cable = "Signalling Cable";
+  const l = cleaned.toLowerCase();
+  if (l.includes("quad") || l.includes("q ")) cable = "Quad Cable";
+  else if (l.includes("pair") || l.includes("p ")) cable = "PIJF Cable";
+  else if (l.includes("fire") || l.includes("fs")) cable = "Fire Survival Cable";
+  else if (l.includes("power")) cable = "Power Cable";
+
+  return { cable, size: cleaned };
 }
 
 /** Convert qty to km using UOM (MTRS/MTR → /1000, KM unchanged). */

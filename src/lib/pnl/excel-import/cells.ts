@@ -1,10 +1,19 @@
 /** Shared Excel cell helpers for P&L workbook import. */
 import type ExcelJS from "exceljs";
 
+function safeCellText(cell: ExcelJS.Cell): string | null {
+  try {
+    const t = cell.text;
+    return typeof t === "string" && t.trim() ? t.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function cellVal(cell: ExcelJS.Cell | undefined): unknown {
   if (!cell) return null;
   const v = cell.value as unknown;
-  if (v == null) return cell.text ? cell.text.trim() : null;
+  if (v == null) return safeCellText(cell);
   if (typeof v === "object" && v !== null) {
     if ("result" in (v as object)) {
       const r = (v as { result?: unknown }).result;
@@ -22,7 +31,8 @@ export function cellVal(cell: ExcelJS.Cell | undefined): unknown {
       const r = (v as { result?: unknown }).result;
       if (r !== undefined && r !== null) return r;
     }
-    if (cell.text) return cell.text.trim();
+    const txt = safeCellText(cell);
+    if (txt) return txt;
   }
   return v;
 }

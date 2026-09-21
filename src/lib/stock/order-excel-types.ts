@@ -34,6 +34,7 @@ export function toSizeMatchKey(raw: string): string {
   let s = raw.toLowerCase().trim();
   if (!s) return "";
   s = s.replace(/\([^)]*\)/g, " ");
+  s = s.replace(/\blzsh\b/gi, "lszh");
   s = s.replace(
     /\b(outer|sheath|dia\.?|hold|grey|gray|yellow|black|green|red|clr|colour|color)\b/gi,
     " ",

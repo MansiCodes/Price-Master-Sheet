@@ -9,6 +9,7 @@ import { todayDateString } from "@/lib/dates";
 import {
   getQuadSignalCableSizes,
   QUAD_SIGNAL_STOCK_CABLES,
+  quadSignalCableSizeDedupeKey,
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
@@ -24,6 +25,7 @@ import {
 } from "@/lib/stock-production-status";
 import {
   lookupStockOrder,
+  toSizeMatchKey,
   type StockOrderBySize,
 } from "@/lib/stock/order-excel-types";
 import "@/components/ui/date-filter.css";
@@ -73,41 +75,48 @@ function getPartyInHandKm(
   const cleanParty = party.replace(/[^a-z0-9]/g, "");
   if (!cleanParty) return 0;
 
-  if (Array.isArray(block.callPutupItems) && block.callPutupItems.length > 0) {
-    let sum = 0;
-    for (const item of block.callPutupItems) {
-      const target = String(item.partyName ?? "").trim().toLowerCase();
-      const cleanTarget = target.replace(/[^a-z0-9]/g, "");
-      const q = Number(item.qty);
-      const qty = Number.isFinite(q) && q > 0 ? q : 0;
-      if (
-        cleanTarget.length > 0 &&
-        (cleanParty.includes(cleanTarget) || cleanTarget.includes(cleanParty))
-      ) {
-        sum += qty;
-      }
-    }
-    if (sum > 0) return sum;
-  }
-
-  if (!block.putupKm || block.putupKm <= 0) return 0;
-  const target = (block.partyName ?? "").trim().toLowerCase();
-  if (target) {
+  function matchesParty(targetName: string): boolean {
+    const target = (targetName ?? "").trim().toLowerCase();
     const cleanTarget = target.replace(/[^a-z0-9]/g, "");
-    if (
-      cleanParty.length > 0 &&
-      cleanTarget.length > 0 &&
-      (cleanParty.includes(cleanTarget) || cleanTarget.includes(cleanParty))
-    ) {
-      return block.putupKm;
+    if (!cleanTarget) return false;
+    if (cleanParty.includes(cleanTarget) || cleanTarget.includes(cleanParty)) {
+      return true;
     }
     const words = target.split(/\s+/).filter((w) => w.length > 1);
-    if (words.length > 0 && words.every((w) => party.includes(w))) {
-      return block.putupKm;
+    return words.length > 0 && words.every((w) => party.includes(w));
+  }
+
+  let putupSum = 0;
+  if (Array.isArray(block.callPutupItems) && block.callPutupItems.length > 0) {
+    for (const item of block.callPutupItems) {
+      const q = Number(item.qty);
+      const qty = Number.isFinite(q) && q > 0 ? q : 0;
+      if (qty > 0 && matchesParty(item.partyName ?? "")) {
+        putupSum += qty;
+      }
+    }
+  } else if (block.putupKm && block.putupKm > 0) {
+    if (matchesParty(block.partyName ?? "")) {
+      putupSum = block.putupKm;
     }
   }
 
-  return 0;
+  let dispatchSum = 0;
+  if (Array.isArray(block.dispatchPendingItems) && block.dispatchPendingItems.length > 0) {
+    for (const item of block.dispatchPendingItems) {
+      const q = Number(item.qty);
+      const qty = Number.isFinite(q) && q > 0 ? q : 0;
+      if (qty > 0 && matchesParty(item.dispatchParty ?? "")) {
+        dispatchSum += qty;
+      }
+    }
+  } else if (block.dispatchPending && block.dispatchPending > 0) {
+    if (matchesParty(block.dispatchParty || block.partyName || "")) {
+      dispatchSum = block.dispatchPending;
+    }
+  }
+
+  return Math.round((putupSum + dispatchSum) * 10000) / 10000;
 }
 
 function CalendarIcon() {
@@ -307,7 +316,7 @@ export function StockStatusClient({
     return catalogSizesForCable(activeCable);
   }, [showAllCables, activeCable]);
 
-  /** Custom sizes saved via form "Other" for the cables in view. */
+  /** Custom sizes saved via form "Other" or uploaded in Excel Orders. */
   const extraSizesFromData = useMemo(() => {
     const set = new Set<string>();
     for (const b of cableBlocks) {
@@ -315,8 +324,16 @@ export function StockStatusClient({
       const known = new Set(catalogSizesForCable(b.cable));
       if (b.size && !known.has(b.size)) set.add(b.size);
     }
+    if (ordersByKey) {
+      for (const order of Object.values(ordersByKey)) {
+        const cable = order.cable || "Signalling Cable";
+        if (!showAllCables && cable !== activeCable) continue;
+        const known = new Set(catalogSizesForCable(cable));
+        if (order.size && !known.has(order.size)) set.add(order.size);
+      }
+    }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [cableBlocks, showAllCables, activeCable]);
+  }, [cableBlocks, ordersByKey, showAllCables, activeCable]);
 
   const sizeOptions = useMemo(
     () => [ALL_SIZES, ...catalogSizes, ...extraSizesFromData],
@@ -326,7 +343,10 @@ export function StockStatusClient({
   const blocksByKey = useMemo(() => {
     const map = new Map<string, CableStockStatusBlock>();
     for (const b of cableBlocks) {
-      map.set(`${b.cable} · ${b.size}`, b);
+      const key = quadSignalCableSizeDedupeKey(b.cable, b.size);
+      if (!map.has(key)) {
+        map.set(key, b);
+      }
     }
     return map;
   }, [cableBlocks]);
@@ -338,39 +358,58 @@ export function StockStatusClient({
     for (const cable of cablesInView) {
       const sizes = catalogSizesForCable(cable);
       for (const size of sizes) {
-        if (cableSize !== ALL_SIZES && size !== cableSize) continue;
-        const key = `${cable} · ${size}`;
-        seen.add(key);
+        if (cableSize !== ALL_SIZES && toSizeMatchKey(size) !== toSizeMatchKey(cableSize)) continue;
+        const dedupeKey = quadSignalCableSizeDedupeKey(cable, size);
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
         cards.push({
-          key,
+          key: `${cable} · ${size}`,
           cable,
           size,
-          block: blocksByKey.get(key) ?? null,
+          block: blocksByKey.get(dedupeKey) ?? null,
         });
       }
     }
 
-    // Entries saved with size/cable "Other" use the typed custom name —
-    // include those so they appear on Stock (catalog loop alone misses them).
+    // Entries saved with custom sizes/variants (e.g. 12 Core x 1.5sqmm LSZH)
     for (const b of cableBlocks) {
-      const key = `${b.cable} · ${b.size}`;
-      if (seen.has(key)) continue;
+      const dedupeKey = quadSignalCableSizeDedupeKey(b.cable, b.size);
+      if (seen.has(dedupeKey)) continue;
       if (!showAllCables && b.cable !== activeCable) continue;
-      if (cableSize !== ALL_SIZES && b.size !== cableSize) continue;
-      seen.add(key);
+      if (cableSize !== ALL_SIZES && toSizeMatchKey(b.size) !== toSizeMatchKey(cableSize)) continue;
+      seen.add(dedupeKey);
       cards.push({
-        key,
+        key: `${b.cable} · ${b.size}`,
         cable: b.cable,
         size: b.size,
         block: b,
       });
     }
 
-    // Filled data first, then empty. Within each group: Signalling → next cables,
-    // then catalog size order (custom sizes after catalog).
+    // Dynamic sizes from Excel Orders (creates cards if not in catalog/stock)
+    if (ordersByKey) {
+      for (const order of Object.values(ordersByKey)) {
+        const cable = order.cable || "Signalling Cable";
+        const size = order.size;
+        if (!size) continue;
+        const dedupeKey = quadSignalCableSizeDedupeKey(cable, size);
+        if (seen.has(dedupeKey)) continue;
+        if (!showAllCables && cable !== activeCable) continue;
+        if (cableSize !== ALL_SIZES && toSizeMatchKey(size) !== toSizeMatchKey(cableSize)) continue;
+        seen.add(dedupeKey);
+        cards.push({
+          key: `${cable} · ${size}`,
+          cable,
+          size,
+          block: blocksByKey.get(dedupeKey) ?? null,
+        });
+      }
+    }
+
+    // Filled data / orders first, then empty.
     cards.sort((a, b) => {
-      const aHas = a.block ? 0 : 1;
-      const bHas = b.block ? 0 : 1;
+      const aHas = a.block || lookupStockOrder(ordersByKey, a.cable, a.size) ? 0 : 1;
+      const bHas = b.block || lookupStockOrder(ordersByKey, b.cable, b.size) ? 0 : 1;
       if (aHas !== bHas) return aHas - bHas;
 
       const aCable = CABLE_TYPES.indexOf(
@@ -399,6 +438,7 @@ export function StockStatusClient({
     cableSize,
     blocksByKey,
     cableBlocks,
+    ordersByKey,
     showAllCables,
     activeCable,
   ]);
@@ -850,8 +890,10 @@ export function StockStatusClient({
               const stockTotal = block?.totalKm ?? 0;
               const orderQty = order?.totalQty ?? 0;
               const putupKm = block?.putupKm ?? 0;
+              const dispatchPending = block?.dispatchPending ?? 0;
+              const totalDoneKm = putupKm + dispatchPending;
               const balanceTotal =
-                Math.round((orderQty - putupKm - stockTotal) * 10000) / 10000;
+                Math.round((orderQty - totalDoneKm - stockTotal) * 10000) / 10000;
               const partyLines = order
                 ? order.parties.filter(
                     (p) => p.partyName.trim() && p.partyName.trim() !== "—",

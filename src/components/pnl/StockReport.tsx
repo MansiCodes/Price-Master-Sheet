@@ -18,6 +18,8 @@ import {
   encodeQuadSignalStockNotes,
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
+  encodeUpcastStockNotes,
+  parseUpcastStockNotes,
   stockEntryTypeLabel,
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
@@ -102,6 +104,7 @@ export function StockReport({
       <ReportRowActions
         onEdit={() => {
           const { meta, userNotes } = parseQuadSignalStockNotes(r.notes);
+          const { meta: upcastMeta, userNotes: upcastUserNotes } = parseUpcastStockNotes(r.notes);
           const cableMeta = meta?.kind === "cable" ? meta : null;
           crud.openEdit(
             r,
@@ -109,14 +112,19 @@ export function StockReport({
               date: toYmd(r.date),
               category: r.category ?? "",
               itemName: r.itemName ?? "",
+              upcastOpening: upcastMeta ? String(upcastMeta.opening) : "",
+              upcastIncoming: upcastMeta ? String(upcastMeta.incoming) : "",
+              upcastOutward: upcastMeta ? String(upcastMeta.outward) : "",
               quantity: String(r.quantity ?? ""),
               unit: r.unit ?? "",
               rate: String(r.rate ?? ""),
               value: String(r.closingValue ?? ""),
               notes:
-                isQuadSignal && quadKind === "cable"
-                  ? userNotes
-                  : (r.notes ?? ""),
+                isUpcast
+                  ? upcastUserNotes
+                  : isQuadSignal && quadKind === "cable"
+                    ? userNotes
+                    : (r.notes ?? ""),
               callPutup: cableMeta?.callPutup ?? "",
               putupDate: cableMeta?.putupDate ?? "",
               partyName: cableMeta?.partyName ?? "",
@@ -241,6 +249,37 @@ export function StockReport({
           },
         ] satisfies ReportColumn<StockRow>[])),
     { key: "item", label: "Item", render: (r) => r.itemName },
+    ...(isUpcast
+      ? ([
+          {
+            key: "opening",
+            label: "Opening Stock",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              return meta ? `${formatQty(meta.opening)} ${r.unit || "KGS"}` : "—";
+            },
+          },
+          {
+            key: "incoming",
+            label: "Incoming Stock",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              return meta ? `${formatQty(meta.incoming)} ${r.unit || "KGS"}` : "—";
+            },
+          },
+          {
+            key: "outward",
+            label: "Outward Stock",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              return meta ? `${formatQty(meta.outward)} ${r.unit || "KGS"}` : "—";
+            },
+          },
+        ] satisfies ReportColumn<StockRow>[])
+      : []),
     {
       key: "qty",
       label: isUpcast ? "Closing Stock" : "Qty",
@@ -682,46 +721,73 @@ export function StockReport({
       <EntryEditDrawer
         open={Boolean(crud.editing)}
         title="Edit stock"
-        fields={[
-          { name: "date", label: "Date", type: "date", required: true },
-          ...(isPvc
-            ? ([
-                {
-                  name: "category",
-                  label: "Stock (RM/FG)",
-                  required: true,
-                },
-              ] satisfies EditField[])
-            : []),
-          {
-            name: "itemName",
-            label: isPvc ? "Particulars" : "Item Name",
-            required: true,
-          },
-          {
-            name: "quantity",
-            label: isPvc || isUpcast ? "Closing Stock" : "QTY",
-            type: "number",
-            required: true,
-          },
-          { name: "unit", label: "Unit", required: true },
-          { name: "rate", label: "Rate", type: "number", required: false },
-          ...(isQuadSignal && quadKind === "cable"
-            ? ([
-                { name: "callPutup", label: "Call putup qty" },
-                { name: "putupDate", label: "Put up date", type: "date" },
-                { name: "partyName", label: "Call putup party" },
-                {
-                  name: "dispatchPending",
-                  label: "Dispatch qty",
-                  type: "number",
-                },
-                { name: "dispatchParty", label: "Dispatch party" },
-              ] satisfies EditField[])
-            : []),
-          { name: "notes", label: "Notes", type: "textarea" },
-        ]}
-        values={crud.values}
+        fields={
+          [
+            { name: "date", label: "Date", type: "date", required: true },
+            ...(isPvc
+              ? [
+                  {
+                    name: "category",
+                    label: "Stock (RM/FG)",
+                    required: true,
+                  },
+                ]
+              : []),
+            {
+              name: "itemName",
+              label: isPvc ? "Particulars" : "Item Name",
+              required: true,
+            },
+            ...(isUpcast
+              ? [
+                  { name: "upcastOpening", label: "Opening Stock", type: "number" },
+                  { name: "upcastIncoming", label: "Incoming Stock", type: "number" },
+                  { name: "upcastOutward", label: "Outward Stock", type: "number" },
+                  {
+                    name: "quantity",
+                    label: "Calculated Closing Stock",
+                    type: "number",
+                    readOnly: true,
+                  },
+                ]
+              : [
+                  {
+                    name: "quantity",
+                    label: isPvc ? "Closing Stock" : "QTY",
+                    type: "number",
+                    required: true,
+                  },
+                ]),
+            { name: "unit", label: "Unit", required: true },
+            { name: "rate", label: "Rate", type: "number", required: false },
+            ...(isQuadSignal && quadKind === "cable"
+              ? [
+                  { name: "callPutup", label: "Call putup qty" },
+                  { name: "putupDate", label: "Put up date", type: "date" },
+                  { name: "partyName", label: "Call putup party" },
+                  {
+                    name: "dispatchPending",
+                    label: "Dispatch qty",
+                    type: "number",
+                  },
+                  { name: "dispatchParty", label: "Dispatch party" },
+                ]
+              : []),
+            { name: "notes", label: "Notes", type: "textarea" },
+          ] as EditField[]
+        }
+        values={
+          isUpcast
+            ? {
+                ...crud.values,
+                quantity: String(
+                  (Number(crud.values.upcastOpening) || 0) +
+                    (Number(crud.values.upcastIncoming) || 0) -
+                    (Number(crud.values.upcastOutward) || 0)
+                ),
+              }
+            : crud.values
+        }
         saving={crud.saving}
         error={crud.error}
         onChange={crud.setField}
@@ -732,10 +798,24 @@ export function StockReport({
           label: "Upload stock images (optional)",
         }}
         onSave={() => {
-          const qty = Number(crud.values.quantity) || 0;
-          const rate = Number(crud.values.rate) || 0;
+          let qty = Number(crud.values.quantity) || 0;
           let notes: string | null = crud.values.notes || null;
-          if (isQuadSignal && quadKind === "cable" && crud.editing) {
+
+          if (isUpcast) {
+            const openingNum = Number(crud.values.upcastOpening) || 0;
+            const incomingNum = Number(crud.values.upcastIncoming) || 0;
+            const outwardNum = Number(crud.values.upcastOutward) || 0;
+            qty = openingNum + incomingNum - outwardNum;
+            notes = encodeUpcastStockNotes(
+              {
+                opening: openingNum,
+                incoming: incomingNum,
+                outward: outwardNum,
+                closing: qty,
+              },
+              crud.values.notes?.trim() || null
+            );
+          } else if (isQuadSignal && quadKind === "cable" && crud.editing) {
             const { meta } = parseQuadSignalStockNotes(crud.editing.notes);
             if (meta?.kind === "cable") {
               const nextMeta: QuadSignalStockMeta = { ...meta };
@@ -765,6 +845,8 @@ export function StockReport({
               );
             }
           }
+
+          const rate = Number(crud.values.rate) || 0;
           void crud.save({
             date: crud.values.date,
             ...(isPvc ? { category: crud.values.category || null } : {}),

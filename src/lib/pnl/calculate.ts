@@ -447,26 +447,34 @@ async function stockValueAsOf(
   approvedOnly?: boolean,
   approvedFilter?: any,
 ): Promise<number> {
-  const latest = await prisma.stockEntry.findFirst({
+  const entries = await prisma.stockEntry.findMany({
     where: {
       ...plantIdFilter(plantIds),
       date: { lte: asOf },
       ...approvedFilter,
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    select: { date: true },
-  });
-  if (!latest) return 0;
-
-  const agg = await prisma.stockEntry.aggregate({
-    where: {
-      ...plantIdFilter(plantIds),
-      date: latest.date,
-      ...approvedFilter,
+    select: {
+      itemName: true,
+      closingValue: true,
     },
-    _sum: { closingValue: true },
   });
-  return toNumber(agg._sum.closingValue);
+
+  if (entries.length === 0) return 0;
+
+  const latestMap = new Map<string, number>();
+  for (const entry of entries) {
+    const key = entry.itemName.trim().toLowerCase();
+    if (!latestMap.has(key)) {
+      latestMap.set(key, toNumber(entry.closingValue));
+    }
+  }
+
+  let total = 0;
+  for (const val of latestMap.values()) {
+    total += val;
+  }
+  return round2(total);
 }
 
 export async function calculatePlantPnl(

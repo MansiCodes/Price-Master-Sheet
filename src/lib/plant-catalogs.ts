@@ -520,21 +520,14 @@ export function parseQuadSignalStockNotes(notes: string | null | undefined): {
   return { meta: null, userNotes: raw };
 }
 
+import { toSizeMatchKey } from "@/lib/stock/order-excel-types";
+
 /**
- * Collapse near-duplicate "Other" size spellings
- * (e.g. "100 Pair x 0.5mm Armoured" ≈ "100P x 0.5 Armoured").
+ * Collapse near-duplicate size spellings & spacing variations
+ * (e.g. "12 Core x 1.5 sqmm LZSH" ≈ "12 Core x 1.5sqmm LSZH").
  */
 export function normalizeQuadSignalCableSizeKey(size: string): string {
-  return String(size ?? "")
-    .toLowerCase()
-    .replace(/×/g, "x")
-    .replace(/pair/g, "p")
-    .replace(/armou?red/g, "arm")
-    .replace(/un-?arm(?:ou?red)?/g, "unarm")
-    .replace(/unamoured/g, "unarm")
-    .replace(/mm/g, "")
-    .replace(/[^a-z0-9.]/g, "")
-    .replace(/\.+/g, ".");
+  return toSizeMatchKey(size);
 }
 
 /** Cable + normalized size — used to dedupe Other re-entries. */
@@ -667,6 +660,47 @@ export const PVC_STOCK_ENTRY_TYPES = [
 
 export type PvcStockEntryType = (typeof PVC_STOCK_ENTRY_TYPES)[number]["value"];
 
+export type UpcastStockMeta = {
+  opening: number;
+  incoming: number;
+  outward: number;
+  closing: number;
+};
+
+const UPCAST_STOCK_PREFIX = "UPCASTSTOCK:";
+
+export function encodeUpcastStockNotes(
+  meta: UpcastStockMeta,
+  userNotes?: string | null,
+): string {
+  const payload = `${UPCAST_STOCK_PREFIX}${JSON.stringify(meta)}`;
+  const extra = userNotes?.trim();
+  return extra ? `${payload}\n${extra}` : payload;
+}
+
+export function parseUpcastStockNotes(notes: string | null | undefined): {
+  meta: UpcastStockMeta | null;
+  userNotes: string;
+} {
+  const raw = notes?.trim() ?? "";
+  if (!raw.startsWith(UPCAST_STOCK_PREFIX)) {
+    return { meta: null, userNotes: raw };
+  }
+  const rest = raw.slice(UPCAST_STOCK_PREFIX.length);
+  const nl = rest.indexOf("\n");
+  const jsonPart = nl >= 0 ? rest.slice(0, nl) : rest;
+  const userNotes = nl >= 0 ? rest.slice(nl + 1).trim() : "";
+  try {
+    const meta = JSON.parse(jsonPart) as UpcastStockMeta;
+    if (meta && typeof meta.opening === "number" && typeof meta.closing === "number") {
+      return { meta, userNotes };
+    }
+  } catch {
+    /* ignore */
+  }
+  return { meta: null, userNotes: raw };
+}
+
 /** Upcast stock entries are closing snapshots (same P&L notes as PVC). */
 export const UPCAST_STOCK_ENTRY_TYPES = [
   { value: "closing", label: "Closing stock" },
@@ -688,7 +722,8 @@ export function upcastStockEntryNotes(
 /** Label for Stock report / approvals from notes tag. */
 export function stockEntryTypeLabel(notes?: string | null): string {
   const n = notes?.trim() ?? "";
-  if (n.startsWith(STOCK_CLOSING_NOTE_PREFIX)) return "Closing stock";
+  if (n.startsWith(STOCK_CLOSING_NOTE_PREFIX) || n.startsWith(UPCAST_STOCK_PREFIX))
+    return "Closing stock";
   if (n.startsWith("Issued quantity")) return "Issued quantity";
   return "—";
 }
@@ -747,13 +782,16 @@ export function getStockCatalog(plantCode: string): {
   if (plantCode.toUpperCase() === "UPCAST") {
     return {
       particulars: [
+        "Copper Scrap / Burr",
+        "Copper Cathode",
+        "CC Copper Rod 8 mm",
+        "1.6mm Wire",
+        "Fine Wire",
+        "Super Fine Wire",
         "DORI",
         "STRIP",
         "RASSA",
         "PIPE",
-        "Copper Cathode",
-        "Copper Scrap / Burr",
-        "CC Copper Rod 8 mm",
         "Other",
       ],
       defaultUnit: "KGS",

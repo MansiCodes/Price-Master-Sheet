@@ -44,6 +44,8 @@ import {
   QUAD_SIGNAL_STOCK_RAW_MATERIALS,
   pvcStockEntryNotes,
   type PvcStockEntryType,
+  encodeUpcastStockNotes,
+  parseUpcastStockNotes,
 } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-layout";
 import {
@@ -632,6 +634,25 @@ export function TodayHub({
   const [stockNotes, setStockNotes] = useState("");
   const [stockType, setStockType] = useState<PvcStockEntryType>("closing");
   const [stockPhotos, setStockPhotos] = useState<string[]>([]);
+
+  // Upcast Stock inputs (Opening + Incoming - Outward = Closing)
+  const [upcastOpeningQty, setUpcastOpeningQty] = useState("");
+  const [upcastIncomingQty, setUpcastIncomingQty] = useState("");
+  const [upcastOutwardQty, setUpcastOutwardQty] = useState("");
+
+  const upcastCalculatedClosing = useMemo(() => {
+    if (!isUpcast) return 0;
+    const o = Number(upcastOpeningQty) || 0;
+    const i = Number(upcastIncomingQty) || 0;
+    const w = Number(upcastOutwardQty) || 0;
+    return Math.max(0, o + i - w);
+  }, [isUpcast, upcastOpeningQty, upcastIncomingQty, upcastOutwardQty]);
+
+  useEffect(() => {
+    if (isUpcast && kind === "stock") {
+      setStockQty(String(upcastCalculatedClosing));
+    }
+  }, [isUpcast, kind, upcastCalculatedClosing]);
 
   const quadCableSizeOptions = useMemo(() => {
     const cableKey = stockCable === "Other" ? "Other" : stockCable;
@@ -1972,9 +1993,19 @@ export function TodayHub({
         quantity: issuedQty,
         rate: closingRate,
         value: closingValue,
-        notes: isPvc || isUpcast
-          ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
-          : stockNotes.trim() || `Closing stock as on ${entryDate}`,
+        notes: isUpcast
+          ? encodeUpcastStockNotes(
+              {
+                opening: Number(upcastOpeningQty) || 0,
+                incoming: Number(upcastIncomingQty) || 0,
+                outward: Number(upcastOutwardQty) || 0,
+                closing: issuedQty,
+              },
+              stockNotes,
+            )
+          : isPvc
+            ? pvcStockEntryNotes(stockType, entryDate, stockNotes)
+            : stockNotes.trim() || `Closing stock as on ${entryDate}`,
         photoUrls: stockPhotos,
       });
       }
@@ -4076,28 +4107,101 @@ export function TodayHub({
                       : "form-grid three"
                   }
                 >
-                  <div className="field">
-                    <label htmlFor="st-qty">
-                      {usesStockLedger ? "Closing Stock" : "Quantity"}
-                    </label>
-                    <DecimalInput
-                      id="st-qty"
-                      required
-                      value={stockQty}
-                      onChange={(next) => {
-                        setStockQty(next);
-                        const qty = Number(next);
-                        const rate = Number(stockRate);
-                        if (
-                          usesStockLedger &&
-                          Number.isFinite(qty) &&
-                          Number.isFinite(rate)
-                        ) {
-                          setStockValue((qty * rate).toFixed(2));
-                        }
-                      }}
-                    />
-                  </div>
+                  {isUpcast ? (
+                    <div className="field field--wide" style={{ gridColumn: "1 / -1", background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
+                      <div className="form-grid three" style={{ marginBottom: "10px" }}>
+                        <div className="field">
+                          <label htmlFor="upcast-open">Opening Stock (KGS)</label>
+                          <DecimalInput
+                            id="upcast-open"
+                            value={upcastOpeningQty}
+                            onChange={(next) => {
+                              setUpcastOpeningQty(next);
+                              const o = Number(next) || 0;
+                              const i = Number(upcastIncomingQty) || 0;
+                              const w = Number(upcastOutwardQty) || 0;
+                              const c = Math.max(0, o + i - w);
+                              setStockQty(String(c));
+                              const rate = Number(stockRate);
+                              if (Number.isFinite(rate)) {
+                                setStockValue((c * rate).toFixed(2));
+                              }
+                            }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="upcast-in">Incoming Stock (KGS)</label>
+                          <DecimalInput
+                            id="upcast-in"
+                            value={upcastIncomingQty}
+                            onChange={(next) => {
+                              setUpcastIncomingQty(next);
+                              const o = Number(upcastOpeningQty) || 0;
+                              const i = Number(next) || 0;
+                              const w = Number(upcastOutwardQty) || 0;
+                              const c = Math.max(0, o + i - w);
+                              setStockQty(String(c));
+                              const rate = Number(stockRate);
+                              if (Number.isFinite(rate)) {
+                                setStockValue((c * rate).toFixed(2));
+                              }
+                            }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="field">
+                          <label htmlFor="upcast-out">Outward / Issued Stock (KGS)</label>
+                          <DecimalInput
+                            id="upcast-out"
+                            value={upcastOutwardQty}
+                            onChange={(next) => {
+                              setUpcastOutwardQty(next);
+                              const o = Number(upcastOpeningQty) || 0;
+                              const i = Number(upcastIncomingQty) || 0;
+                              const w = Number(next) || 0;
+                              const c = Math.max(0, o + i - w);
+                              setStockQty(String(c));
+                              const rate = Number(stockRate);
+                              if (Number.isFinite(rate)) {
+                                setStockValue((c * rate).toFixed(2));
+                              }
+                            }}
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid #e2e8f0", fontSize: "0.88rem", fontWeight: 600, color: "#0f766e" }}>
+                        <span>Closing Stock = Opening ({upcastOpeningQty || 0}) + Incoming ({upcastIncomingQty || 0}) − Outward ({upcastOutwardQty || 0})</span>
+                        <span style={{ fontSize: "1rem", fontWeight: 700, color: "#0d9488" }}>
+                          = {upcastCalculatedClosing.toLocaleString("en-IN", { maximumFractionDigits: 3 })} KGS
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="field">
+                      <label htmlFor="st-qty">
+                        {usesStockLedger ? "Closing Stock" : "Quantity"}
+                      </label>
+                      <DecimalInput
+                        id="st-qty"
+                        required
+                        value={stockQty}
+                        onChange={(next) => {
+                          setStockQty(next);
+                          const qty = Number(next);
+                          const rate = Number(stockRate);
+                          if (
+                            usesStockLedger &&
+                            Number.isFinite(qty) &&
+                            Number.isFinite(rate)
+                          ) {
+                            setStockValue((qty * rate).toFixed(2));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="field">
                     <label htmlFor="st-unit">Unit</label>
                     {usesStockLedger || isCat6 || isConductor || isQuad ? (

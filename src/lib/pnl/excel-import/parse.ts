@@ -203,7 +203,8 @@ const PURCHASE_ALIASES: Record<string, string[]> = {
     "debit qty",
     "debit quantity",
     "debitquantity",
-    "debit",
+    "debit nos",
+    "debit qty nos",
   ],
   rate: ["rate", "price"],
   gstPercent: ["gst percent", "gst %", "gstpct"],
@@ -846,7 +847,7 @@ export async function parsePnlWorkbook(
         );
         const debitRaw = num(getCell(sheet, r, header.map, "debitQuantity"));
         const debitQuantity =
-          debitRaw != null && debitRaw > 0 ? Math.min(debitRaw, qty) : 0;
+          debitRaw != null && debitRaw > 0 && debitRaw <= qty ? debitRaw : 0;
         result.purchases.push({
           row: r,
           date: ymd(dateRaw),
