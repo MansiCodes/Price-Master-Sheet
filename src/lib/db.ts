@@ -2,10 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-// Allow self-signed / AWS RDS certificates in serverless environment
-if (process.env.NODE_ENV === "production" || process.env.DATABASE_URL?.includes("rds.amazonaws.com")) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
+
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

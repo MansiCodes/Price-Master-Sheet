@@ -799,7 +799,15 @@ export async function parsePnlWorkbook(
         const vendor = str(getCell(sheet, r, header.map, "vendor"));
         const item = str(getCell(sheet, r, header.map, "item"));
         const qtyRawCell = getCell(sheet, r, header.map, "quantity");
-        const qtyNum = num(qtyRawCell);
+        let qtyNum = num(qtyRawCell);
+        let unitRaw = str(getCell(sheet, r, header.map, "unit"));
+        if ((qtyNum == null || qtyNum === 0) && unitRaw) {
+          const unitAsQty = num(unitRaw);
+          if (unitAsQty != null && unitAsQty > 0) {
+            qtyNum = unitAsQty;
+            unitRaw = "";
+          }
+        }
         const qty = qtyNum != null && qtyNum >= 0 ? qtyNum : 0;
         const rate = num(getCell(sheet, r, header.map, "rate")) ?? 0;
         if (!vendor && !item) continue;
@@ -813,7 +821,6 @@ export async function parsePnlWorkbook(
           ) ?? todayUtc();
         if (!item && !vendor) continue;
 
-        let unitRaw = str(getCell(sheet, r, header.map, "unit"));
         if (!unitRaw && qtyRawCell != null) {
           const uMatch = String(qtyRawCell).match(/[a-zA-Z]+/);
           if (uMatch) unitRaw = uMatch[0];

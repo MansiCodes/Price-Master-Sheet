@@ -3,6 +3,7 @@ import { parseDateOnly, todayDateString } from "@/lib/dates";
 import { refreshDailyStatusForDate } from "@/lib/daily-status";
 import { getShiftApprovalStartDate } from "@/lib/shift-approval-policy";
 import { calculatePlantPnl } from "@/lib/pnl/calculate";
+import { resolveReportPlantIds } from "@/lib/plant-merge";
 import {
   bucketDateForPeriod,
   formatPeriodLabel,
@@ -209,12 +210,17 @@ export async function getDashboardMetrics(
 
   if (plantIds.length === 0) return empty;
 
+  const expandedPlantIds = (
+    await Promise.all(plantIds.map((id) => resolveReportPlantIds(id)))
+  ).flat();
+  const reportPlantIds = [...new Set(expandedPlantIds)];
+
   const approvalStart = getShiftApprovalStartDate();
 
   const approvedStatuses = options.approvedOnly
     ? await prisma.dailyEntryStatus.findMany({
         where: {
-          plantId: { in: plantIds },
+          plantId: { in: reportPlantIds },
           date: {
             gte: approvalStart > statusRangeStart ? approvalStart : statusRangeStart,
             lte: todayDate,
@@ -243,7 +249,7 @@ export async function getDashboardMetrics(
       })()
     : {};
 
-  const plantFilter = { plantId: { in: plantIds } };
+  const plantFilter = { plantId: { in: reportPlantIds } };
   const entryFilter = {
     ...plantFilter,
     ...(options.enteredById ? { enteredById: options.enteredById } : {}),
@@ -403,7 +409,7 @@ export async function getDashboardMetrics(
     // Electricity is stored by calendar month (1st of month).
     prisma.electricityRent.findMany({
       where: {
-        plantId: { in: plantIds },
+        plantId: { in: reportPlantIds },
         month: {
           gte: new Date(
             Date.UTC(

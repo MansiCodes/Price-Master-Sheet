@@ -305,16 +305,34 @@ textarea {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    color: #dc2626 !important;
+  }
+  .dash-header__logout .dash-header__logout-icon {
+    stroke: #dc2626 !important;
   }
 }
 
 .dash-header__logout:hover,
 .dash-header__logout:active,
-.dash-header__logout:focus-visible {
-  background: var(--coral-soft);
-  color: var(--coral-ink);
-  border-color: var(--coral);
+.dash-header__logout:focus,
+.dash-header__logout:focus-within,
+.dash-header__logout:focus-visible,
+.dash-header__logout-form:hover .dash-header__logout,
+.dash-header__logout-form:active .dash-header__logout {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  border-color: #ef4444 !important;
   outline: none;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25) !important;
+}
+
+.dash-header__logout:hover .dash-header__logout-icon,
+.dash-header__logout:active .dash-header__logout-icon,
+.dash-header__logout:focus-visible .dash-header__logout-icon,
+.dash-header__logout-form:hover .dash-header__logout-icon,
+.dash-header__logout-form:active .dash-header__logout-icon {
+  stroke: #dc2626 !important;
 }
 
 .lang-switch {
@@ -790,10 +808,14 @@ textarea {
 
   .dash-header__logout:hover,
   .dash-header__logout:active,
-  .dash-header__logout:focus-visible {
-    background: var(--coral-soft);
-    color: var(--coral-ink);
-    border-color: var(--coral);
+  .dash-header__logout:focus,
+  .dash-header__logout:focus-within,
+  .dash-header__logout:focus-visible,
+  .dash-header__logout-form:hover .dash-header__logout,
+  .dash-header__logout-form:active .dash-header__logout {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+    border-color: #ef4444 !important;
   }
 
   .dash-header__user-info {
