@@ -730,16 +730,10 @@ export async function parsePnlWorkbook(
           if (salesValue != null && rate != null && rate > 0) {
             qty = salesValue / rate;
           } else if (salesValue != null && salesValue > 0) {
-            // Last resort: treat sales value as qty 1 @ that rate
             qty = 1;
             rate = rate ?? salesValue;
           } else {
-            result.skipped.push({
-              sheet: sheet.name,
-              row: r,
-              reason: "Missing quantity",
-            });
-            continue;
+            qty = 0;
           }
         }
         if ((rate == null || rate === 0) && salesValue != null && qty > 0) {
@@ -803,7 +797,9 @@ export async function parsePnlWorkbook(
       for (let r = header.row + 1; r <= sheet.rowCount; r++) {
         const vendor = str(getCell(sheet, r, header.map, "vendor"));
         const item = str(getCell(sheet, r, header.map, "item"));
-        const qty = num(getCell(sheet, r, header.map, "quantity"));
+        const qtyRawCell = getCell(sheet, r, header.map, "quantity");
+        const qtyNum = num(qtyRawCell);
+        const qty = qtyNum != null && qtyNum >= 0 ? qtyNum : 0;
         const rate = num(getCell(sheet, r, header.map, "rate")) ?? 0;
         if (!vendor && !item) continue;
         if (/\bTOTAL\b/i.test(vendor + item)) break;
@@ -815,21 +811,26 @@ export async function parsePnlWorkbook(
             sheetDate,
           ) ?? todayUtc();
         if (!item && !vendor) continue;
-        if (!(qty != null && qty > 0)) {
-          result.skipped.push({
-            sheet: sheet.name,
-            row: r,
-            reason: "Missing quantity",
-          });
-          continue;
+
+        let unitRaw = str(getCell(sheet, r, header.map, "unit"));
+        if (!unitRaw && qtyRawCell != null) {
+          const uMatch = String(qtyRawCell).match(/[a-zA-Z]+/);
+          if (uMatch) unitRaw = uMatch[0];
         }
+        const plantCodeUpper = opts?.plantCode?.toUpperCase();
+        const unit =
+          unitRaw ||
+          (plantCodeUpper === "QUAD" || plantCodeUpper === "SIGNALLING" || plantCodeUpper === "QUADSIGNAL"
+            ? "KGS"
+            : "kg");
+
         const gstRaw = num(getCell(sheet, r, header.map, "gstPercent"));
         let gstPercent = 18;
         if (gstRaw != null) {
           gstPercent = gstRaw > 100 ? 18 : gstRaw;
         }
         if (
-          opts?.plantCode?.toUpperCase() === "CAT6" &&
+          plantCodeUpper === "CAT6" &&
           header.map.gstPercent == null
         ) {
           gstPercent = 0;
@@ -856,7 +857,7 @@ export async function parsePnlWorkbook(
           billNumber: str(getCell(sheet, r, header.map, "billNumber")) || null,
           billDate: billDate ? ymd(billDate) : null,
           itemDescription: item || vendor || "Purchase item",
-          unit: str(getCell(sheet, r, header.map, "unit")) || "kg",
+          unit,
           quantity: qty,
           debitQuantity,
           rate,
@@ -947,15 +948,8 @@ export async function parsePnlWorkbook(
             }
           }
 
-          if (!dateRaw || (!(qty != null && qty > 0) && !hasProduction)) {
-            if (!(qty != null && qty > 0) && !hasProduction) continue;
-            result.skipped.push({
-              sheet: sheet.name,
-              row: r,
-              reason: "Missing date, item, or quantity",
-            });
-            continue;
-          }
+          const resolvedDate = dateRaw ?? todayUtc();
+          const finalQty = qty != null && qty >= 0 ? qty : 0;
           if ((rate == null || rate === 0) && value != null && (qty ?? 0) > 0) {
             rate = value / (qty as number);
           }
@@ -978,14 +972,8 @@ export async function parsePnlWorkbook(
             qsKind =
               looksRaw && !looksCable ? "raw" : looksCable ? "cable" : "raw";
           }
-
           if (qsKind === "cable" && !size) {
-            result.skipped.push({
-              sheet: sheet.name,
-              row: r,
-              reason: "Cable stock requires Size",
-            });
-            continue;
+            qsKind = "raw";
           }
 
           const salesKm = num(getCell(sheet, r, header.map, "salesKm"));
@@ -998,7 +986,7 @@ export async function parsePnlWorkbook(
 
           result.stock.push({
             row: r,
-            date: ymd(dateRaw),
+            date: ymd(resolvedDate),
             shift: parseShift(getCell(sheet, r, header.map, "shift")),
             itemName,
             category: parseStockCategory(
@@ -1006,7 +994,7 @@ export async function parsePnlWorkbook(
                 (qsKind === "cable" ? "FG" : "RM"),
             ),
             unit,
-            quantity: qty != null && qty > 0 ? qty : 0,
+            quantity: finalQty,
             rate,
             notes: str(getCell(sheet, r, header.map, "notes")) || null,
             ...(qsKind
@@ -1094,20 +1082,14 @@ export async function parsePnlWorkbook(
           if (!headRaw && !description && amount === 0 && !cost) continue;
           if (/\bTOTAL\b/i.test(headRaw + description)) break;
           const dateRaw = asUtcDate(getCell(sheet, r, header.map, "date"));
-          if (!dateRaw || !headRaw) {
-            result.skipped.push({
-              sheet: sheet.name,
-              row: r,
-              reason: "Missing date or expense head",
-            });
-            continue;
-          }
-          const expenseHead = resolveExpenseHead(headRaw, opts?.plantCode);
+          const dateFinal = dateRaw ?? todayUtc();
+          const headFinal = headRaw || description || "General Expense";
+          const expenseHead = resolveExpenseHead(headFinal, opts?.plantCode);
           const target = resolveExpenseTarget(expenseHead);
           const natureRaw = str(getCell(sheet, r, header.map, "nature"));
           result.expenses.push({
             row: r,
-            date: ymd(dateRaw),
+            date: ymd(dateFinal),
             shift: parseShift(getCell(sheet, r, header.map, "shift")),
             target,
             expenseHead,
@@ -1279,23 +1261,16 @@ export async function parsePnlWorkbook(
             billDate,
             findSheetFallbackDate(sheet),
           );
-          if (!dateRaw || !description) {
-            if (!description) continue;
-            result.skipped.push({
-              sheet: sheet.name,
-              row: r,
-              reason: "Missing date or asset description",
-            });
-            continue;
-          }
+          const dateFinal = dateRaw ?? todayUtc();
+          const descFinal = description || vendor || "Fixed Asset";
           result.expenses.push({
             row: r,
-            date: ymd(dateRaw),
+            date: ymd(dateFinal),
             shift: ManpowerShift.DAY,
             target: "far",
             expenseHead: "FAR",
             nature: null,
-            description,
+            description: descFinal,
             payMode: "Bank",
             amount: 0,
             contractorSalary: 0,

@@ -4,22 +4,25 @@ import type ExcelJS from "exceljs";
 export function cellVal(cell: ExcelJS.Cell | undefined): unknown {
   if (!cell) return null;
   const v = cell.value as unknown;
-  if (v == null) return null;
-  if (typeof v === "object" && v !== null && "result" in (v as object)) {
-    const r = (v as { result?: unknown }).result;
-    if (r === undefined) return null;
-    return r;
-  }
-  if (typeof v === "object" && v !== null && "richText" in (v as object)) {
-    return (v as { richText: { text: string }[] }).richText
-      .map((t) => t.text)
-      .join("");
-  }
-  if (typeof v === "object" && v !== null && "text" in (v as object)) {
-    return (v as { text: string }).text;
-  }
-  if (typeof v === "object" && v !== null && "formula" in (v as object)) {
-    return (v as { result?: unknown }).result ?? null;
+  if (v == null) return cell.text ? cell.text.trim() : null;
+  if (typeof v === "object" && v !== null) {
+    if ("result" in (v as object)) {
+      const r = (v as { result?: unknown }).result;
+      if (r !== undefined && r !== null) return r;
+    }
+    if ("richText" in (v as object)) {
+      return (v as { richText: { text: string }[] }).richText
+        .map((t) => t.text)
+        .join("");
+    }
+    if ("text" in (v as object)) {
+      return (v as { text: string }).text;
+    }
+    if ("formula" in (v as object)) {
+      const r = (v as { result?: unknown }).result;
+      if (r !== undefined && r !== null) return r;
+    }
+    if (cell.text) return cell.text.trim();
   }
   return v;
 }
@@ -29,10 +32,11 @@ export function num(v: unknown): number | null {
   if (typeof v === "number" && Number.isFinite(v)) return v;
   const s = String(v)
     .replace(/,/g, "")
-    .replace(/[^\d.\-]/g, "")
     .trim();
-  if (!s || s === "-" || s === "." || s === "-.") return null;
-  const n = Number(s);
+  if (!s) return null;
+  const match = s.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const n = Number(match[0]);
   return Number.isFinite(n) ? n : null;
 }
 
