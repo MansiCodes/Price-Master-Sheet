@@ -30,6 +30,11 @@ const ENTITY_LABEL: Record<string, string> = {
   Asset: "Asset",
   Plant: "Plant",
   PlantContact: "Contact",
+  ProductionProcess: "Process",
+  Machine: "Machine",
+  MachineProductionEntry: "MP Record",
+  ProcessMachineCableType: "Cable Type",
+  ProcessMachineCableSize: "Cable Size",
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -48,6 +53,7 @@ export function auditActionLabel(field: string | null): string {
   if (!field) return "—";
   if (field === "create") return "Created";
   if (field === "update") return "Updated";
+  if (field === "delete") return "Deleted";
   return field;
 }
 
@@ -86,6 +92,14 @@ function summarizeObject(obj: Record<string, unknown>): string {
   if (obj.email) parts.push(String(obj.email));
   if (obj.globalRole) parts.push(niceRole(obj.globalRole));
   if (obj.name && !obj.email) parts.push(String(obj.name));
+  if (obj.code) parts.push(`Code: ${obj.code}`);
+  if (obj.currentProcess) parts.push(`Process: ${obj.currentProcess}`);
+  if (obj.cableType) parts.push(`Type: ${obj.cableType}`);
+  if (obj.cableSize) parts.push(`Size: ${obj.cableSize}`);
+  if (obj.operatorName) parts.push(`Op: ${obj.operatorName}`);
+  if (obj.plannedProduction != null || obj.actualProduction != null) {
+    parts.push(`Plan: ${obj.plannedProduction ?? "—"} / Act: ${obj.actualProduction ?? "—"}`);
+  }
   if (obj.vendorName) parts.push(String(obj.vendorName));
   if (obj.customerName) parts.push(String(obj.customerName));
   if (obj.itemDescription) parts.push(String(obj.itemDescription));

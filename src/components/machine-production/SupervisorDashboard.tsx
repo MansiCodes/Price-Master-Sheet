@@ -198,6 +198,7 @@ export function SupervisorDashboard() {
 
   const [shift, setShift] = useState<ShiftFilter>("ALL");
   const [processId, setProcessId] = useState<string | null>(processFromUrl);
+  const [searchQuery, setSearchQuery] = useState("");
   const [data, setData] = useState<DashboardPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -267,33 +268,35 @@ export function SupervisorDashboard() {
       ) : null}
 
       <div className="mp-toolbar">
-        <div
-          className="mp-shift-tabs mp-shift-tabs--shifts"
-          role="tablist"
-          aria-label="Shift"
-        >
-          {SHIFT_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={shift === tab.id}
-              aria-label={
-                tab.sublabel ? `${tab.label} (${tab.sublabel})` : tab.label
-              }
-              className={
-                shift === tab.id
-                  ? "mp-shift-tab mp-shift-tab--active"
-                  : "mp-shift-tab"
-              }
-              onClick={() => setShift(tab.id)}
-            >
-              <span className="mp-shift-tab__label">{tab.label}</span>
-              {tab.sublabel ? (
-                <span className="mp-shift-tab__sub">{tab.sublabel}</span>
-              ) : null}
-            </button>
-          ))}
+        <div className="mp-toolbar__left">
+          <div
+            className="mp-shift-tabs mp-shift-tabs--shifts"
+            role="tablist"
+            aria-label="Shift"
+          >
+            {SHIFT_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={shift === tab.id}
+                aria-label={
+                  tab.sublabel ? `${tab.label} (${tab.sublabel})` : tab.label
+                }
+                className={
+                  shift === tab.id
+                    ? "mp-shift-tab mp-shift-tab--active"
+                    : "mp-shift-tab"
+                }
+                onClick={() => setShift(tab.id)}
+              >
+                <span className="mp-shift-tab__label">{tab.label}</span>
+                {tab.sublabel ? (
+                  <span className="mp-shift-tab__sub">{tab.sublabel}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
         </div>
 
         {viewSlot ? (
@@ -330,6 +333,41 @@ export function SupervisorDashboard() {
           <span className="mp-count mp-count--overdue">
             Overdue {data.counts.overdue}
           </span>
+
+          <div className="mp-search-box">
+            <svg
+              className="mp-search-icon"
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              className="mp-search-input"
+              placeholder="Search process or machine..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                className="mp-search-clear"
+                onClick={() => setSearchQuery("")}
+                title="Clear search"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -344,46 +382,55 @@ export function SupervisorDashboard() {
 
       {!loading && data?.level === "processes" ? (
         <div className="mp-machine-grid mp-machine-grid--processes">
-          {data.processes.length === 0 ? (
-            <p className="mp-muted">
-              No processes yet. Ask an Admin to add processes and assign
-              machines to them.
-            </p>
-          ) : (
-            data.processes.map((p) => {
-              const imageSrc = resolveProcessImage(p.name);
-              return (
-              <button
-                key={p.id}
-                type="button"
-                className={`mp-machine-card mp-machine-card--process ${cardStatusClass(p.status)}`}
-                onClick={() => selectProcess(p.id)}
-              >
-                {imageSrc ? (
-                  <div className="mp-machine-card__media">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageSrc} alt="" />
-                  </div>
-                ) : null}
-                <div className="mp-machine-card__body">
-                  <div className="mp-machine-card__top">
-                    <span className="mp-machine-card__code">PROCESS</span>
-                    <span className={`mp-status ${statusClass(p.status)}`}>
-                      {p.status}
-                    </span>
-                  </div>
-                  <h2 className="mp-machine-card__name">{p.name}</h2>
-                  <p className="mp-machine-card__meta">
-                    {p.completed} of {p.machineCount} submitted
-                    {p.overdue > 0 ? ` · ${p.overdue} overdue` : ""}
-                  </p>
-                  <p className="mp-machine-card__cta">View machines →</p>
-                </div>
-              </button>
-              );
-            })
-          )}
-        </div>
+            {data.processes.filter((p) =>
+              searchQuery.trim() === "" ||
+              p.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+            ).length === 0 ? (
+              <p className="mp-muted">
+                {searchQuery.trim()
+                  ? `No process found matching "${searchQuery}".`
+                  : "No processes yet. Ask an Admin to add processes and assign machines to them."}
+              </p>
+            ) : (
+              data.processes
+                .filter((p) =>
+                  searchQuery.trim() === "" ||
+                  p.name.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+                )
+                .map((p) => {
+                  const imageSrc = resolveProcessImage(p.name);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`mp-machine-card mp-machine-card--process ${cardStatusClass(p.status)}`}
+                      onClick={() => selectProcess(p.id)}
+                    >
+                      {imageSrc ? (
+                        <div className="mp-machine-card__media">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={imageSrc} alt="" />
+                        </div>
+                      ) : null}
+                      <div className="mp-machine-card__body">
+                        <div className="mp-machine-card__top">
+                          <span className="mp-machine-card__code">PROCESS</span>
+                          <span className={`mp-status ${statusClass(p.status)}`}>
+                            {p.status}
+                          </span>
+                        </div>
+                        <h2 className="mp-machine-card__name">{p.name}</h2>
+                        <p className="mp-machine-card__meta">
+                          {p.completed} of {p.machineCount} submitted
+                          {p.overdue > 0 ? ` · ${p.overdue} overdue` : ""}
+                        </p>
+                        <p className="mp-machine-card__cta">View machines →</p>
+                      </div>
+                    </button>
+                  );
+                })
+            )}
+          </div>
       ) : null}
 
       {!loading && data?.level === "machines" ? (

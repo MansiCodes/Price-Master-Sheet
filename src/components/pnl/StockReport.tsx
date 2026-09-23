@@ -115,6 +115,13 @@ export function StockReport({
               upcastOpening: upcastMeta ? String(upcastMeta.opening) : "",
               upcastIncoming: upcastMeta ? String(upcastMeta.incoming) : "",
               upcastOutward: upcastMeta ? String(upcastMeta.outward) : "",
+              upcastTotalScrapWeight: upcastMeta?.totalScrapWeight != null ? String(upcastMeta.totalScrapWeight) : "",
+              upcastPettyQty: upcastMeta?.pettyQty != null ? String(upcastMeta.pettyQty) : "",
+              upcastWeightPerPetty: upcastMeta?.weightPerPetty != null ? String(upcastMeta.weightPerPetty) : "",
+              upcastBurningLossWeight: upcastMeta?.burningLossWeight != null ? String(upcastMeta.burningLossWeight) : "",
+              upcastRod8mmWeight: upcastMeta?.rod8mmWeight != null ? String(upcastMeta.rod8mmWeight) : "",
+              upcastWire8mmTo1_6mmWeight: upcastMeta?.wire8mmTo1_6mmWeight != null ? String(upcastMeta.wire8mmTo1_6mmWeight) : "",
+              upcastWire1_6mmWeight: upcastMeta?.wire1_6mmWeight != null ? String(upcastMeta.wire1_6mmWeight) : "",
               quantity: String(r.quantity ?? ""),
               unit: r.unit ?? "",
               rate: String(r.rate ?? ""),
@@ -276,6 +283,71 @@ export function StockReport({
             render: (r: StockRow) => {
               const { meta } = parseUpcastStockNotes(r.notes);
               return meta ? `${formatQty(meta.outward)} ${r.unit || "KGS"}` : "—";
+            },
+          },
+          {
+            key: "scrapSorting",
+            label: "Scrap & Sorting",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              if (!meta || meta.totalScrapWeight == null) return "—";
+              return (
+                <div style={{ textAlign: "right", fontSize: "0.8rem", lineHeight: "1.2" }}>
+                  <div>Scrap: {formatQty(meta.totalScrapWeight)} kg</div>
+                  {meta.pettyQty != null && meta.weightPerPetty != null && (
+                    <div style={{ color: "#64748b" }}>
+                      Petty: {meta.pettyQty} × {meta.weightPerPetty} = {meta.totalPettyWeight ?? (meta.pettyQty * meta.weightPerPetty)} kg
+                    </div>
+                  )}
+                  {meta.sortingLossWeight != null && meta.sortingLossWeight > 0 && (
+                    <div style={{ color: "#0f766e", fontWeight: 600 }}>
+                      Sort Loss: {formatQty(meta.sortingLossWeight)} kg
+                    </div>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: "burningStage",
+            label: "Burning Stage",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              if (!meta || (meta.burningLossWeight == null && meta.weightAfterBurning == null)) return "—";
+              return (
+                <div style={{ textAlign: "right", fontSize: "0.8rem", lineHeight: "1.2" }}>
+                  {meta.burningLossWeight != null && (
+                    <div style={{ color: "#0d9488" }}>Burn Loss: {formatQty(meta.burningLossWeight)} kg</div>
+                  )}
+                  {meta.weightAfterBurning != null && (
+                    <div style={{ fontWeight: 600, color: "#0f766e" }}>After Burn: {formatQty(meta.weightAfterBurning)} kg</div>
+                  )}
+                </div>
+              );
+            },
+          },
+          {
+            key: "outputBreakdown",
+            label: "Production Output",
+            align: "right",
+            render: (r: StockRow) => {
+              const { meta } = parseUpcastStockNotes(r.notes);
+              if (!meta || meta.totalOutputWeight == null) return "—";
+              return (
+                <div style={{ textAlign: "right", fontSize: "0.8rem", lineHeight: "1.2" }}>
+                  {meta.rod8mmWeight != null && meta.rod8mmWeight > 0 && <div>8mm: {formatQty(meta.rod8mmWeight)} kg</div>}
+                  {meta.wire8mmTo1_6mmWeight != null && meta.wire8mmTo1_6mmWeight > 0 && <div>8→1.6mm: {formatQty(meta.wire8mmTo1_6mmWeight)} kg</div>}
+                  {meta.wire1_6mmWeight != null && meta.wire1_6mmWeight > 0 && <div>1.6mm: {formatQty(meta.wire1_6mmWeight)} kg</div>}
+                  <div style={{ fontWeight: 700, borderTop: "1px solid #ccfbf1", marginTop: "2px", paddingTop: "2px" }}>
+                    Total: {formatQty(meta.totalOutputWeight)} kg
+                  </div>
+                  {meta.castingLossWeight != null && meta.castingLossWeight > 0 && (
+                    <div style={{ color: "#0f766e" }}>Cast Loss: {formatQty(meta.castingLossWeight)} kg</div>
+                  )}
+                </div>
+              );
             },
           },
         ] satisfies ReportColumn<StockRow>[])
@@ -740,12 +812,19 @@ export function StockReport({
             },
             ...(isUpcast
               ? [
-                  { name: "upcastOpening", label: "Opening Stock", type: "number" },
-                  { name: "upcastIncoming", label: "Incoming Stock", type: "number" },
-                  { name: "upcastOutward", label: "Outward Stock", type: "number" },
+                  { name: "upcastOpening", label: "Opening Stock (kg)", type: "number" },
+                  { name: "upcastIncoming", label: "Incoming Stock (kg)", type: "number" },
+                  { name: "upcastOutward", label: "Outward Stock (kg)", type: "number" },
+                  { name: "upcastTotalScrapWeight", label: "Total Scrap Weight (kg)", type: "number" },
+                  { name: "upcastPettyQty", label: "Petty Qty", type: "number" },
+                  { name: "upcastWeightPerPetty", label: "Weight per Petty (kg)", type: "number" },
+                  { name: "upcastBurningLossWeight", label: "Burning Loss Weight (kg)", type: "number" },
+                  { name: "upcastRod8mmWeight", label: "8mm Rod Weight (kg)", type: "number" },
+                  { name: "upcastWire8mmTo1_6mmWeight", label: "8mm to 1.6mm Wire Weight (kg)", type: "number" },
+                  { name: "upcastWire1_6mmWeight", label: "1.6mm Wire Weight (kg)", type: "number" },
                   {
                     name: "quantity",
-                    label: "Calculated Closing Stock",
+                    label: "Calculated Closing Stock (kg)",
                     type: "number",
                     readOnly: true,
                   },
@@ -806,12 +885,44 @@ export function StockReport({
             const incomingNum = Number(crud.values.upcastIncoming) || 0;
             const outwardNum = Number(crud.values.upcastOutward) || 0;
             qty = openingNum + incomingNum - outwardNum;
+
+            const totalScrapWeight = crud.values.upcastTotalScrapWeight !== "" && crud.values.upcastTotalScrapWeight != null ? Number(crud.values.upcastTotalScrapWeight) || 0 : undefined;
+            const pettyQty = crud.values.upcastPettyQty !== "" && crud.values.upcastPettyQty != null ? Number(crud.values.upcastPettyQty) || 0 : undefined;
+            const weightPerPetty = crud.values.upcastWeightPerPetty !== "" && crud.values.upcastWeightPerPetty != null ? Number(crud.values.upcastWeightPerPetty) || 0 : undefined;
+            const totalPettyWeight = pettyQty != null && weightPerPetty != null ? pettyQty * weightPerPetty : undefined;
+            const sortingLossWeight = totalScrapWeight != null && totalPettyWeight != null ? totalScrapWeight - totalPettyWeight : undefined;
+
+            const burningLossWeight = crud.values.upcastBurningLossWeight !== "" && crud.values.upcastBurningLossWeight != null ? Number(crud.values.upcastBurningLossWeight) || 0 : undefined;
+            const weightAfterBurning = totalPettyWeight != null && burningLossWeight != null ? totalPettyWeight - burningLossWeight : undefined;
+
+            const rod8mmWeight = crud.values.upcastRod8mmWeight !== "" && crud.values.upcastRod8mmWeight != null ? Number(crud.values.upcastRod8mmWeight) || 0 : undefined;
+            const wire8mmTo1_6mmWeight = crud.values.upcastWire8mmTo1_6mmWeight !== "" && crud.values.upcastWire8mmTo1_6mmWeight != null ? Number(crud.values.upcastWire8mmTo1_6mmWeight) || 0 : undefined;
+            const wire1_6mmWeight = crud.values.upcastWire1_6mmWeight !== "" && crud.values.upcastWire1_6mmWeight != null ? Number(crud.values.upcastWire1_6mmWeight) || 0 : undefined;
+
+            let totalOutputWeight: number | undefined = undefined;
+            if (rod8mmWeight != null || wire8mmTo1_6mmWeight != null || wire1_6mmWeight != null) {
+              totalOutputWeight = (rod8mmWeight || 0) + (wire8mmTo1_6mmWeight || 0) + (wire1_6mmWeight || 0);
+            }
+            const castingLossWeight = weightAfterBurning != null && totalOutputWeight != null ? weightAfterBurning - totalOutputWeight : undefined;
+
             notes = encodeUpcastStockNotes(
               {
                 opening: openingNum,
                 incoming: incomingNum,
                 outward: outwardNum,
                 closing: qty,
+                totalScrapWeight,
+                pettyQty,
+                weightPerPetty,
+                totalPettyWeight,
+                sortingLossWeight,
+                burningLossWeight,
+                weightAfterBurning,
+                rod8mmWeight,
+                wire8mmTo1_6mmWeight,
+                wire1_6mmWeight,
+                totalOutputWeight,
+                castingLossWeight,
               },
               crud.values.notes?.trim() || null
             );

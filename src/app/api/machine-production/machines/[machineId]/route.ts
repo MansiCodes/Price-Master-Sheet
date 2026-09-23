@@ -5,6 +5,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
 const patchSchema = z.object({
@@ -43,6 +44,25 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
         ? { isActive: parsed.data.isActive }
         : {}),
     },
+  });
+
+  await safeWriteAuditLog({
+    entityType: "Machine",
+    entityId: machineId,
+    field: "update",
+    oldValue: {
+      name: existing.name,
+      code: existing.code,
+      description: existing.description,
+      isActive: existing.isActive,
+    },
+    newValue: {
+      name: machine.name,
+      code: machine.code,
+      description: machine.description,
+      isActive: machine.isActive,
+    },
+    actorId: session.user.id,
   });
 
   return NextResponse.json({
@@ -85,5 +105,20 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
   }
 
   await prisma.machine.delete({ where: { id: machineId } });
+
+  await safeWriteAuditLog({
+    entityType: "Machine",
+    entityId: machineId,
+    field: "delete",
+    oldValue: {
+      id: existing.id,
+      name: existing.name,
+      code: existing.code,
+      description: existing.description,
+      isActive: existing.isActive,
+    },
+    actorId: session.user.id,
+  });
+
   return NextResponse.json({ ok: true });
 }

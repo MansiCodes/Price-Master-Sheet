@@ -873,8 +873,11 @@
 }
 .qs-wip__table th {
   text-align: left;
-  font-weight: 600;
-  background: #fff;
+  font-weight: 650;
+  background: var(--teal-soft, #d8f3ef);
+  color: var(--teal-ink, #0e5a54);
+  white-space: nowrap;
+  padding: 0.5rem 0.55rem;
 }
 .qs-wip__num {
   text-align: right;

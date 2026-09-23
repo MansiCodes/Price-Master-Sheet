@@ -7,6 +7,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -133,6 +134,20 @@ export async function POST(request: Request) {
       },
     },
     include: { machines: true },
+  });
+
+  await safeWriteAuditLog({
+    entityType: "ProductionProcess",
+    entityId: process.id,
+    field: "create",
+    newValue: {
+      name: process.name,
+      sortOrder: process.sortOrder,
+      isActive: process.isActive,
+      machineCount: process.machines.length,
+      machineIds,
+    },
+    actorId: session.user.id,
   });
 
   return NextResponse.json({

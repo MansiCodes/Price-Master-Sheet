@@ -51,7 +51,9 @@ import { isCat6Plant, isQuadSignalPlant, mapCat6PettyNature } from "@/lib/plant-
 import {
   calculateQuadSignalWip,
   calculateSharedSignallingInsulation,
+  getQuadFactorFromSize,
   insulationConsumedFromLaying,
+  isQuadCableName,
   isSignallingCableName,
   lengthValueToFactor,
   INSULATION_LENGTH_UNIT_ITEMS,
@@ -619,6 +621,10 @@ export function TodayHub({
       layingProduced: string;
     }>
   >([]);
+  /** Quad Cable only: extra production values for Single Quad. */
+  const [stockSingleQuadExtraProds, setStockSingleQuadExtraProds] = useState<
+    string[]
+  >([]);
   const [stockItem, setStockItem] = useState<string>(
     DEFAULT_PURCHASE_GOODS[0],
   );
@@ -640,6 +646,15 @@ export function TodayHub({
   const [upcastIncomingQty, setUpcastIncomingQty] = useState("");
   const [upcastOutwardQty, setUpcastOutwardQty] = useState("");
 
+  // Upcast Scrap & Wire Process inputs (Scrap -> Petty Sorting -> Burning -> Rod & Wire Breakdown)
+  const [upcastTotalScrapWeight, setUpcastTotalScrapWeight] = useState("");
+  const [upcastPettyQty, setUpcastPettyQty] = useState("");
+  const [upcastWeightPerPetty, setUpcastWeightPerPetty] = useState("");
+  const [upcastBurningLossWeight, setUpcastBurningLossWeight] = useState("");
+  const [upcastRod8mmWeight, setUpcastRod8mmWeight] = useState("");
+  const [upcastWire8mmTo1_6mmWeight, setUpcastWire8mmTo1_6mmWeight] = useState("");
+  const [upcastWire1_6mmWeight, setUpcastWire1_6mmWeight] = useState("");
+
   const upcastCalculatedClosing = useMemo(() => {
     if (!isUpcast) return 0;
     const o = Number(upcastOpeningQty) || 0;
@@ -647,6 +662,40 @@ export function TodayHub({
     const w = Number(upcastOutwardQty) || 0;
     return Math.max(0, o + i - w);
   }, [isUpcast, upcastOpeningQty, upcastIncomingQty, upcastOutwardQty]);
+
+  const upcastTotalPettyWeight = useMemo(() => {
+    if (!isUpcast) return 0;
+    const qty = Number(upcastPettyQty) || 0;
+    const unitW = Number(upcastWeightPerPetty) || 0;
+    return qty * unitW;
+  }, [isUpcast, upcastPettyQty, upcastWeightPerPetty]);
+
+  const upcastSortingLossWeight = useMemo(() => {
+    if (!isUpcast) return 0;
+    const tot = Number(upcastTotalScrapWeight) || 0;
+    if (!tot || !upcastTotalPettyWeight) return 0;
+    return Math.max(0, tot - upcastTotalPettyWeight);
+  }, [isUpcast, upcastTotalScrapWeight, upcastTotalPettyWeight]);
+
+  const upcastWeightAfterBurning = useMemo(() => {
+    if (!isUpcast) return 0;
+    const burnLoss = Number(upcastBurningLossWeight) || 0;
+    return Math.max(0, upcastTotalPettyWeight - burnLoss);
+  }, [isUpcast, upcastTotalPettyWeight, upcastBurningLossWeight]);
+
+  const upcastTotalOutputWeight = useMemo(() => {
+    if (!isUpcast) return 0;
+    const r8 = Number(upcastRod8mmWeight) || 0;
+    const w8to16 = Number(upcastWire8mmTo1_6mmWeight) || 0;
+    const w16 = Number(upcastWire1_6mmWeight) || 0;
+    return r8 + w8to16 + w16;
+  }, [isUpcast, upcastRod8mmWeight, upcastWire8mmTo1_6mmWeight, upcastWire1_6mmWeight]);
+
+  const upcastCastingLossWeight = useMemo(() => {
+    if (!isUpcast) return 0;
+    if (!upcastWeightAfterBurning || !upcastTotalOutputWeight) return 0;
+    return Math.max(0, upcastWeightAfterBurning - upcastTotalOutputWeight);
+  }, [isUpcast, upcastWeightAfterBurning, upcastTotalOutputWeight]);
 
   useEffect(() => {
     if (isUpcast && kind === "stock") {
@@ -698,6 +747,7 @@ export function TodayHub({
     }
     setStockProcessQtys({});
     setStockInsulationExtras([]);
+    setStockSingleQuadExtraProds([]);
     setStockWipOpening({});
     setStockOpeningEditable(false);
   }, [isQuad, stockKind, stockCable]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -713,6 +763,11 @@ export function TodayHub({
     isQuad &&
     stockKind === "cable" &&
     isSignallingCableName(resolvedQuadCableName || stockCable);
+
+  const isQuadCableStock =
+    isQuad &&
+    stockKind === "cable" &&
+    isQuadCableName(resolvedQuadCableName || stockCable);
 
   useEffect(() => {
     if (!isSignallingStock) return;
@@ -914,7 +969,7 @@ export function TodayHub({
     if (stockWipContextLoading) return null;
     const variant = resolveQuadSignalVariant(resolvedQuadSizeName);
     if (!variant) return null;
-    const production: Record<string, number> = {};
+    let production: Record<string, number> = {};
     for (const name of quadCableProcessFields) {
       const raw = stockProcessQtys[name]?.trim() ?? "";
       if (raw === "") {
@@ -940,6 +995,7 @@ export function TodayHub({
         : variant.lengthFactor;
 
     let insulationConsumedOverride: number | undefined;
+    let singleQuadConsumedOverride: number | undefined;
     if (isSignallingCableName(resolvedQuadCableName)) {
       const sizeRows: Array<{
         size: string;
@@ -978,6 +1034,34 @@ export function TodayHub({
         // Locked shared pool: do not re-deduct from this size's Laying.
         insulationConsumedOverride = 0;
       }
+    } else if (isQuadCableName(resolvedQuadCableName)) {
+      const sqPrimaryRaw = stockProcessQtys["Single Quad"]?.trim() ?? "";
+      const sqPrimary =
+        sqPrimaryRaw === "" || sqPrimaryRaw === "." ? 0 : Number(sqPrimaryRaw);
+      const sqPrimaryVal = Number.isFinite(sqPrimary) && sqPrimary >= 0 ? sqPrimary : 0;
+      const sqExtraSum = stockSingleQuadExtraProds.reduce((sum, v) => {
+        const raw = v.trim();
+        if (raw === "" || raw === ".") return sum;
+        const n = Number(raw);
+        return sum + (Number.isFinite(n) && n >= 0 ? n : 0);
+      }, 0);
+      const totalSingleQuadProd = sqPrimaryVal + sqExtraSum;
+
+      production = {
+        ...production,
+        "Single Quad": totalSingleQuadProd,
+      };
+
+      // Insulation consumed by Single Quad = total Single Quad Prod * 4
+      insulationConsumedOverride = totalSingleQuadProd * 4;
+
+      // Single Quad consumed by Laying = Laying Prod * quadFactor
+      const layingRaw = stockProcessQtys["Laying"]?.trim() ?? "";
+      const layingVal =
+        layingRaw === "" || layingRaw === "." ? 0 : Number(layingRaw);
+      const layingProduced = Number.isFinite(layingVal) && layingVal >= 0 ? layingVal : 0;
+      const quadFactor = getQuadFactorFromSize(resolvedQuadSizeName);
+      singleQuadConsumedOverride = layingProduced * quadFactor;
     }
 
     return calculateQuadSignalWip({
@@ -988,12 +1072,15 @@ export function TodayHub({
       coreCount: variant.coreCount,
       lengthFactor,
       insulationConsumedOverride,
+      singleQuadConsumedOverride,
+      sizeName: resolvedQuadSizeName,
     });
   }, [
     isQuad,
     stockKind,
     quadCableProcessFields,
     stockProcessQtys,
+    stockSingleQuadExtraProds,
     stockWipOpening,
     stockWipSalesKm,
     resolvedQuadCableName,
@@ -1735,6 +1822,7 @@ export function TodayHub({
               ?.label ?? variant.drumLabel;
 
           let insulationConsumedOverride: number | undefined;
+          let singleQuadConsumedOverride: number | undefined;
           let sharedInsulationMeta:
             | {
                 consumed: number;
@@ -1832,6 +1920,21 @@ export function TodayHub({
             } else {
               insulationConsumedOverride = 0;
             }
+          } else if (isQuadCableName(resolvedCable)) {
+            const sqExtraSum = stockSingleQuadExtraProds.reduce((sum, v) => {
+              const raw = v.trim();
+              if (raw === "" || raw === ".") return sum;
+              const n = Number(raw);
+              if (!Number.isFinite(n) || n < 0) return sum;
+              return sum + n;
+            }, 0);
+            const totalSingleQuadProd = (processes["Single Quad"] ?? 0) + sqExtraSum;
+            processes["Single Quad"] = totalSingleQuadProd;
+
+            insulationConsumedOverride = totalSingleQuadProd * 4;
+            const layingProd = processes["Laying"] ?? 0;
+            const quadFactor = getQuadFactorFromSize(resolvedSize);
+            singleQuadConsumedOverride = layingProd * quadFactor;
           }
 
           const wip = calculateQuadSignalWip({
@@ -1842,6 +1945,8 @@ export function TodayHub({
             coreCount: variant.coreCount,
             lengthFactor,
             insulationConsumedOverride,
+            singleQuadConsumedOverride,
+            sizeName: resolvedSize,
           });
           if (wip.warnings.length > 0) {
             fail(wip.warnings[0] ?? "WIP validation failed.");
@@ -2000,6 +2105,18 @@ export function TodayHub({
                 incoming: Number(upcastIncomingQty) || 0,
                 outward: Number(upcastOutwardQty) || 0,
                 closing: issuedQty,
+                totalScrapWeight: Number(upcastTotalScrapWeight) || 0,
+                pettyQty: Number(upcastPettyQty) || 0,
+                weightPerPetty: Number(upcastWeightPerPetty) || 0,
+                totalPettyWeight: upcastTotalPettyWeight,
+                sortingLossWeight: upcastSortingLossWeight,
+                burningLossWeight: Number(upcastBurningLossWeight) || 0,
+                weightAfterBurning: upcastWeightAfterBurning,
+                rod8mmWeight: Number(upcastRod8mmWeight) || 0,
+                wire8mmTo1_6mmWeight: Number(upcastWire8mmTo1_6mmWeight) || 0,
+                wire1_6mmWeight: Number(upcastWire1_6mmWeight) || 0,
+                totalOutputWeight: upcastTotalOutputWeight,
+                castingLossWeight: upcastCastingLossWeight,
               },
               stockNotes,
             )
@@ -3671,6 +3788,327 @@ export function TodayHub({
                                 );
                               }
 
+                              if (isQuadCableStock) {
+                                const singleQuadStage = stockWipCalc?.stages.find(
+                                  (s) => s.process.toLowerCase() === "single quad",
+                                );
+                                const quadFactor = getQuadFactorFromSize(resolvedQuadSizeName);
+                                const quadOtherProcesses = quadCableProcessFields.filter(
+                                  (p) =>
+                                    p.toLowerCase() !== "insulation" &&
+                                    p.toLowerCase() !== "single quad",
+                                );
+                                const sqPrimaryRaw = stockProcessQtys["Single Quad"]?.trim() ?? "";
+                                const sqPrimary =
+                                  sqPrimaryRaw === "" || sqPrimaryRaw === "." ? 0 : Number(sqPrimaryRaw);
+                                const sqPrimaryVal = Number.isFinite(sqPrimary) && sqPrimary >= 0 ? sqPrimary : 0;
+                                const sqExtraSum = stockSingleQuadExtraProds.reduce((sum, v) => {
+                                  const raw = v.trim();
+                                  if (raw === "" || raw === ".") return sum;
+                                  const n = Number(raw);
+                                  return sum + (Number.isFinite(n) && n >= 0 ? n : 0);
+                                }, 0);
+                                const totalSingleQuadProd = sqPrimaryVal + sqExtraSum;
+
+                                return (
+                                  <>
+                                    {/* Box 1: Insulation */}
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Insulation
+                                        </h4>
+                                      </div>
+                                      <p className="qs-wip__box-note">
+                                        {stockWipContextLoading
+                                          ? "Loading opening from stock…"
+                                          : "Insulation pool for Quad cable. Outbound is consumed by Single Quad production (×4)."}
+                                      </p>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {renderProcessRow("Insulation", {
+                                              hideProcessLabel: true,
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+
+                                    {/* Box 2: Single Quad */}
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Single Quad
+                                        </h4>
+                                        <button
+                                          type="button"
+                                          className="qs-wip__ins-add"
+                                          aria-label="Add production value for Single Quad"
+                                          title="Add production value"
+                                          onClick={() =>
+                                            setStockSingleQuadExtraProds((prev) => [
+                                              ...prev,
+                                              "",
+                                            ])
+                                          }
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                      <p className="qs-wip__box-note">
+                                        {stockWipContextLoading
+                                          ? "Loading opening from stock…"
+                                          : `Single Quad calculation. Outbound is calculated from Laying × ${quadFactor} (${resolvedQuadSizeName || "selected size"}).`}
+                                      </p>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <tr>
+                                              <td className="qs-wip__num">
+                                                {stockOpeningEditable ? (
+                                                  <DecimalInput
+                                                    id="st-open-Single Quad"
+                                                    value={stockWipOpening["Single Quad"] ?? ""}
+                                                    onChange={(next) =>
+                                                      setStockWipOpening((prev) => ({
+                                                        ...prev,
+                                                        "Single Quad": next,
+                                                      }))
+                                                    }
+                                                    placeholder="0"
+                                                  />
+                                                ) : (
+                                                  stockWipCalc?.stages.find((s) => s.process.toLowerCase() === "single quad")?.opening ?? 0
+                                                )}
+                                              </td>
+                                              <td>
+                                                <DecimalInput
+                                                  id="st-proc-Single Quad"
+                                                  value={stockProcessQtys["Single Quad"] ?? ""}
+                                                  onChange={(next) =>
+                                                    setStockProcessQtys((prev) => ({
+                                                      ...prev,
+                                                      "Single Quad": next,
+                                                    }))
+                                                  }
+                                                  placeholder="0"
+                                                />
+                                              </td>
+                                              <td className="qs-wip__num qs-wip__calc">
+                                                {singleQuadStage != null
+                                                  ? `→ Laying × ${quadFactor} (${singleQuadStage.outbound})`
+                                                  : "—"}
+                                              </td>
+                                              <td className="qs-wip__num qs-wip__calc">
+                                                {singleQuadStage != null
+                                                  ? String(singleQuadStage.closing)
+                                                  : "—"}
+                                              </td>
+                                            </tr>
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      {stockSingleQuadExtraProds.length > 0 ? (
+                                        <div
+                                          style={{
+                                            marginTop: "12px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: "8px",
+                                            padding: "10px",
+                                            background: "var(--surface-subtle, #f8fafc)",
+                                            borderRadius: "6px",
+                                            border: "1px solid var(--border-subtle, #e2e8f0)",
+                                          }}
+                                        >
+                                          <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-muted, #64748b)" }}>
+                                            Additional Single Quad Production Inputs:
+                                          </div>
+                                          {stockSingleQuadExtraProds.map((val, idx) => (
+                                            <div
+                                              key={idx}
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "10px",
+                                              }}
+                                            >
+                                              <span style={{ fontSize: "12px", minWidth: "100px", fontWeight: 500 }}>
+                                                Production {idx + 2}:
+                                              </span>
+                                              <div style={{ width: "120px" }}>
+                                                <DecimalInput
+                                                  value={val}
+                                                  onChange={(next) =>
+                                                    setStockSingleQuadExtraProds((prev) =>
+                                                      prev.map((v, i) => (i === idx ? next : v)),
+                                                    )
+                                                  }
+                                                  placeholder="0"
+                                                />
+                                              </div>
+                                              <button
+                                                type="button"
+                                                className="qs-wip__ins-remove"
+                                                title="Remove input"
+                                                onClick={() =>
+                                                  setStockSingleQuadExtraProds((prev) =>
+                                                    prev.filter((_, i) => i !== idx),
+                                                  )
+                                                }
+                                              >
+                                                <svg
+                                                  viewBox="0 0 16 16"
+                                                  width="10"
+                                                  height="10"
+                                                  aria-hidden
+                                                >
+                                                  <path
+                                                    d="M4 4l8 8M12 4l-8 8"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                  />
+                                                </svg>
+                                              </button>
+                                            </div>
+                                          ))}
+                                          <div style={{ fontSize: "13px", fontWeight: 600, marginTop: "4px", color: "var(--text, #0f172a)" }}>
+                                            Total Single Quad Production:{" "}
+                                            <span className="qs-wip__calc" style={{ fontWeight: 700 }}>
+                                              {totalSingleQuadProd} km
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    {/* Size Selection & Drum length selector */}
+                                    <div className="qs-wip__size-for-chain">
+                                      <div className="form-grid two">
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size">
+                                            Size
+                                          </label>
+                                          <SelectMenu
+                                            id="st-cable-size"
+                                            value={stockCableSize}
+                                            options={quadCableSizeOptions}
+                                            required
+                                            onChange={(next) => {
+                                              setStockCableSize(next);
+                                              if (next !== "Other")
+                                                setStockCableSizeOther("");
+                                            }}
+                                          />
+                                        </div>
+                                        {stockLengthOptions.length > 0 ? (
+                                          <div className="field qs-wip__drum">
+                                            <label htmlFor="st-drum-len">
+                                              Drum / coil length
+                                            </label>
+                                            <SelectMenu
+                                              id="st-drum-len"
+                                              value={
+                                                stockLengthOptions.find(
+                                                  (o) =>
+                                                    o.lengthFactor ===
+                                                    stockLengthFactor,
+                                                )?.label ??
+                                                stockLengthOptions[0]?.label ??
+                                                ""
+                                              }
+                                              options={stockLengthOptions.map(
+                                                (o) => o.label,
+                                              )}
+                                              required
+                                              onChange={(next) => {
+                                                const opt =
+                                                  stockLengthOptions.find(
+                                                    (o) => o.label === next,
+                                                  );
+                                                if (opt)
+                                                  setStockLengthFactor(
+                                                    opt.lengthFactor,
+                                                  );
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="field" aria-hidden />
+                                        )}
+                                      </div>
+                                      {stockCableSize === "Other" ? (
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size-other">
+                                            Other size{" "}
+                                            <span style={{ color: "red" }}>
+                                              *
+                                            </span>
+                                          </label>
+                                          <input
+                                            id="st-cable-size-other"
+                                            required
+                                            placeholder="Enter size"
+                                            value={stockCableSizeOther}
+                                            onChange={(e) =>
+                                              setStockCableSizeOther(
+                                                e.target.value,
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    {/* Box 3: Laying → Outer Sheath */}
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Laying → Outer Sheath
+                                        </h4>
+                                      </div>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Process</th>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out / Sales</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {quadOtherProcesses.map((proc) =>
+                                              renderProcessRow(proc),
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              }
+
                               return (
                                 <div className="qs-wip__table-wrap">
                                   <table className="qs-wip__table">
@@ -3946,32 +4384,34 @@ export function TodayHub({
                                       placeholder="Party name"
                                     />
                                   </div>
-                                  <div style={{ display: "flex", justifyContent: "center" }}>
-                                    {idx > 0 ? (
-                                      <button
-                                        type="button"
-                                        className="btn btn--sm btn--danger"
-                                        style={{
-                                          height: "38px",
-                                          width: "36px",
-                                          padding: 0,
-                                          display: "flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                        }}
-                                        onClick={() =>
-                                          setStockDispatchPendingItems((prev) =>
-                                            prev.filter((_, i) => i !== idx),
-                                          )
-                                        }
-                                        title="Remove Dispatch pending"
-                                      >
-                                        ✕
-                                      </button>
-                                    ) : (
-                                      <div style={{ width: "36px", height: "38px" }} />
-                                    )}
-                                  </div>
+                                  {stockDispatchPendingItems.length > 1 ? (
+                                    <div style={{ display: "flex", justifyContent: "center" }}>
+                                      {idx > 0 ? (
+                                        <button
+                                          type="button"
+                                          className="btn btn--sm btn--danger"
+                                          style={{
+                                            height: "38px",
+                                            width: "36px",
+                                            padding: 0,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                          }}
+                                          onClick={() =>
+                                            setStockDispatchPendingItems((prev) =>
+                                              prev.filter((_, i) => i !== idx),
+                                            )
+                                          }
+                                          title="Remove Dispatch pending"
+                                        >
+                                          ✕
+                                        </button>
+                                      ) : (
+                                        <div style={{ width: "36px", height: "38px" }} />
+                                      )}
+                                    </div>
+                                  ) : null}
                                 </div>
                               ))}
                             </div>
@@ -4108,74 +4548,180 @@ export function TodayHub({
                   }
                 >
                   {isUpcast ? (
-                    <div className="field field--wide" style={{ gridColumn: "1 / -1", background: "#f8fafc", padding: "14px", borderRadius: "8px", border: "1px solid #cbd5e1" }}>
-                      <div className="form-grid three" style={{ marginBottom: "10px" }}>
-                        <div className="field">
-                          <label htmlFor="upcast-open">Opening Stock (KGS)</label>
-                          <DecimalInput
-                            id="upcast-open"
-                            value={upcastOpeningQty}
-                            onChange={(next) => {
-                              setUpcastOpeningQty(next);
-                              const o = Number(next) || 0;
-                              const i = Number(upcastIncomingQty) || 0;
-                              const w = Number(upcastOutwardQty) || 0;
-                              const c = Math.max(0, o + i - w);
-                              setStockQty(String(c));
-                              const rate = Number(stockRate);
-                              if (Number.isFinite(rate)) {
-                                setStockValue((c * rate).toFixed(2));
-                              }
-                            }}
-                            placeholder="0"
-                          />
+                    <div className="field field--wide" style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      {/* 1. Stock Ledger: Opening + Incoming - Outward = Closing */}
+                      <div style={{ background: "#f0fdfa", padding: "14px", borderRadius: "8px", border: "1px solid #ccfbf1" }}>
+                        <h4 style={{ margin: "0 0 10px 0", fontSize: "0.88rem", fontWeight: 700, color: "#0f766e" }}>
+                          1. Upcast Stock Balance
+                        </h4>
+                        <div className="form-grid three" style={{ marginBottom: "10px" }}>
+                          <div className="field">
+                            <label htmlFor="upcast-open">Opening Stock (KGS)</label>
+                            <DecimalInput
+                              id="upcast-open"
+                              value={upcastOpeningQty}
+                              onChange={(next) => {
+                                setUpcastOpeningQty(next);
+                                const o = Number(next) || 0;
+                                const i = Number(upcastIncomingQty) || 0;
+                                const w = Number(upcastOutwardQty) || 0;
+                                const c = Math.max(0, o + i - w);
+                                setStockQty(String(c));
+                                const rate = Number(stockRate);
+                                if (Number.isFinite(rate)) {
+                                  setStockValue((c * rate).toFixed(2));
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-in">Incoming Stock (KGS)</label>
+                            <DecimalInput
+                              id="upcast-in"
+                              value={upcastIncomingQty}
+                              onChange={(next) => {
+                                setUpcastIncomingQty(next);
+                                const o = Number(upcastOpeningQty) || 0;
+                                const i = Number(next) || 0;
+                                const w = Number(upcastOutwardQty) || 0;
+                                const c = Math.max(0, o + i - w);
+                                setStockQty(String(c));
+                                const rate = Number(stockRate);
+                                if (Number.isFinite(rate)) {
+                                  setStockValue((c * rate).toFixed(2));
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-out">Outward / Issued Stock (KGS)</label>
+                            <DecimalInput
+                              id="upcast-out"
+                              value={upcastOutwardQty}
+                              onChange={(next) => {
+                                setUpcastOutwardQty(next);
+                                const o = Number(upcastOpeningQty) || 0;
+                                const i = Number(upcastIncomingQty) || 0;
+                                const w = Number(next) || 0;
+                                const c = Math.max(0, o + i - w);
+                                setStockQty(String(c));
+                                const rate = Number(stockRate);
+                                if (Number.isFinite(rate)) {
+                                  setStockValue((c * rate).toFixed(2));
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                          </div>
                         </div>
-                        <div className="field">
-                          <label htmlFor="upcast-in">Incoming Stock (KGS)</label>
-                          <DecimalInput
-                            id="upcast-in"
-                            value={upcastIncomingQty}
-                            onChange={(next) => {
-                              setUpcastIncomingQty(next);
-                              const o = Number(upcastOpeningQty) || 0;
-                              const i = Number(next) || 0;
-                              const w = Number(upcastOutwardQty) || 0;
-                              const c = Math.max(0, o + i - w);
-                              setStockQty(String(c));
-                              const rate = Number(stockRate);
-                              if (Number.isFinite(rate)) {
-                                setStockValue((c * rate).toFixed(2));
-                              }
-                            }}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="field">
-                          <label htmlFor="upcast-out">Outward / Issued Stock (KGS)</label>
-                          <DecimalInput
-                            id="upcast-out"
-                            value={upcastOutwardQty}
-                            onChange={(next) => {
-                              setUpcastOutwardQty(next);
-                              const o = Number(upcastOpeningQty) || 0;
-                              const i = Number(upcastIncomingQty) || 0;
-                              const w = Number(next) || 0;
-                              const c = Math.max(0, o + i - w);
-                              setStockQty(String(c));
-                              const rate = Number(stockRate);
-                              if (Number.isFinite(rate)) {
-                                setStockValue((c * rate).toFixed(2));
-                              }
-                            }}
-                            placeholder="0"
-                          />
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid #ccfbf1", fontSize: "0.85rem", fontWeight: 600, color: "#0f766e" }}>
+                          <span>Closing Stock = Opening ({upcastOpeningQty || 0}) + Incoming ({upcastIncomingQty || 0}) − Outward ({upcastOutwardQty || 0})</span>
+                          <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#0d9488" }}>
+                            = {upcastCalculatedClosing.toLocaleString("en-IN", { maximumFractionDigits: 3 })} KGS
+                          </span>
                         </div>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", borderTop: "1px solid #e2e8f0", fontSize: "0.88rem", fontWeight: 600, color: "#0f766e" }}>
-                        <span>Closing Stock = Opening ({upcastOpeningQty || 0}) + Incoming ({upcastIncomingQty || 0}) − Outward ({upcastOutwardQty || 0})</span>
-                        <span style={{ fontSize: "1rem", fontWeight: 700, color: "#0d9488" }}>
-                          = {upcastCalculatedClosing.toLocaleString("en-IN", { maximumFractionDigits: 3 })} KGS
-                        </span>
+
+                      {/* 2. Scrap Sorting & Burning Stage */}
+                      <div style={{ background: "#f0fdfa", padding: "14px", borderRadius: "8px", border: "1px solid #99f6e4" }}>
+                        <h4 style={{ margin: "0 0 10px 0", fontSize: "0.88rem", fontWeight: 700, color: "#0d9488" }}>
+                          2. Scrap Sorting & Burning Stage
+                        </h4>
+                        <div className="form-grid four" style={{ gap: "10px" }}>
+                          <div className="field">
+                            <label htmlFor="upcast-tot-scrap">Total Raw Scrap Wt (KGS)</label>
+                            <DecimalInput
+                              id="upcast-tot-scrap"
+                              value={upcastTotalScrapWeight}
+                              onChange={setUpcastTotalScrapWeight}
+                              placeholder="e.g. 9000"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-petty-qty">Petty Qty (Bundles)</label>
+                            <DecimalInput
+                              id="upcast-petty-qty"
+                              value={upcastPettyQty}
+                              onChange={setUpcastPettyQty}
+                              placeholder="e.g. 5"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-petty-unit-wt">Weight per Petty (KGS)</label>
+                            <DecimalInput
+                              id="upcast-petty-unit-wt"
+                              value={upcastWeightPerPetty}
+                              onChange={setUpcastWeightPerPetty}
+                              placeholder="e.g. 1799"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-burn-loss">Burning Loss Wt (KGS)</label>
+                            <DecimalInput
+                              id="upcast-burn-loss"
+                              value={upcastBurningLossWeight}
+                              onChange={setUpcastBurningLossWeight}
+                              placeholder="e.g. 20"
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", marginTop: "10px", borderTop: "1px solid #ccfbf1", fontSize: "0.82rem", color: "#115e59" }}>
+                          <span>
+                            Total Petty Wt = {upcastPettyQty || 0} petty × {upcastWeightPerPetty || 0} kg = <strong>{upcastTotalPettyWeight.toLocaleString("en-IN")} KGS</strong>
+                          </span>
+                          <span style={{ background: "#ccfbf1", color: "#0f766e", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                            Sorting Loss = {upcastTotalScrapWeight || 0} − {upcastTotalPettyWeight} = <strong>{upcastSortingLossWeight.toLocaleString("en-IN")} KGS</strong> (Auto-calculated)
+                          </span>
+                          <span>
+                            Available for Casting = <strong>{upcastWeightAfterBurning.toLocaleString("en-IN")} KGS</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 3. Production Output Breakdown (Rod & Wire 3 sizes) */}
+                      <div style={{ background: "#f0fdfa", padding: "14px", borderRadius: "8px", border: "1px solid #5eead4" }}>
+                        <h4 style={{ margin: "0 0 10px 0", fontSize: "0.88rem", fontWeight: 700, color: "#115e59" }}>
+                          3. Upcast Production Output Breakdown
+                        </h4>
+                        <div className="form-grid three" style={{ gap: "10px" }}>
+                          <div className="field">
+                            <label htmlFor="upcast-rod-8mm">CC Copper Rod 8mm Wt (KGS)</label>
+                            <DecimalInput
+                              id="upcast-rod-8mm"
+                              value={upcastRod8mmWeight}
+                              onChange={setUpcastRod8mmWeight}
+                              placeholder="e.g. 3000"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-wire-8to16">8mm to 1.6mm Wire Wt (KGS)</label>
+                            <DecimalInput
+                              id="upcast-wire-8to16"
+                              value={upcastWire8mmTo1_6mmWeight}
+                              onChange={setUpcastWire8mmTo1_6mmWeight}
+                              placeholder="e.g. 4000"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="upcast-wire-16">Final 1.6mm Wire Wt (KGS)</label>
+                            <DecimalInput
+                              id="upcast-wire-16"
+                              value={upcastWire1_6mmWeight}
+                              onChange={setUpcastWire1_6mmWeight}
+                              placeholder="e.g. 1970"
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "space-between", alignItems: "center", paddingTop: "8px", marginTop: "10px", borderTop: "1px solid #ccfbf1", fontSize: "0.82rem", color: "#0f766e" }}>
+                          <span>
+                            Total Production Output = <strong>{upcastTotalOutputWeight.toLocaleString("en-IN")} KGS</strong>
+                          </span>
+                          <span style={{ background: "#ccfbf1", color: "#115e59", padding: "2px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                            Unaccounted Casting Loss = {upcastWeightAfterBurning} − {upcastTotalOutputWeight} = <strong>{upcastCastingLossWeight.toLocaleString("en-IN")} KGS</strong>
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ) : (

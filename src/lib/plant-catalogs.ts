@@ -665,6 +665,18 @@ export type UpcastStockMeta = {
   incoming: number;
   outward: number;
   closing: number;
+  totalScrapWeight?: number;
+  pettyQty?: number;
+  weightPerPetty?: number;
+  totalPettyWeight?: number;
+  sortingLossWeight?: number;
+  burningLossWeight?: number;
+  weightAfterBurning?: number;
+  rod8mmWeight?: number;
+  wire8mmTo1_6mmWeight?: number;
+  wire1_6mmWeight?: number;
+  totalOutputWeight?: number;
+  castingLossWeight?: number;
 };
 
 const UPCAST_STOCK_PREFIX = "UPCASTSTOCK:";

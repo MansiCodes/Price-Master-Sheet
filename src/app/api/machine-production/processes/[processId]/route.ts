@@ -5,6 +5,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 
 const patchSchema = z.object({
@@ -31,6 +32,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 
   const existing = await prisma.productionProcess.findUnique({
     where: { id: processId },
+    include: { machines: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Process not found" }, { status: 404 });
@@ -97,6 +99,27 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     });
   });
 
+  await safeWriteAuditLog({
+    entityType: "ProductionProcess",
+    entityId: processId,
+    field: "update",
+    oldValue: {
+      name: existing.name,
+      sortOrder: existing.sortOrder,
+      isActive: existing.isActive,
+      machineCount: existing.machines.length,
+      machineIds: existing.machines.map((m) => m.machineId),
+    },
+    newValue: {
+      name: process.name,
+      sortOrder: process.sortOrder,
+      isActive: process.isActive,
+      machineCount: process.machines.length,
+      machineIds: process.machines.map((m) => m.machineId),
+    },
+    actorId: session.user.id,
+  });
+
   return NextResponse.json({
     ok: true,
     process: {
@@ -120,11 +143,27 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
   const { processId } = await ctx.params;
   const existing = await prisma.productionProcess.findUnique({
     where: { id: processId },
+    include: { machines: true },
   });
   if (!existing) {
     return NextResponse.json({ error: "Process not found" }, { status: 404 });
   }
 
   await prisma.productionProcess.delete({ where: { id: processId } });
+
+  await safeWriteAuditLog({
+    entityType: "ProductionProcess",
+    entityId: processId,
+    field: "delete",
+    oldValue: {
+      id: existing.id,
+      name: existing.name,
+      sortOrder: existing.sortOrder,
+      isActive: existing.isActive,
+      machineCount: existing.machines.length,
+    },
+    actorId: session.user.id,
+  });
+
   return NextResponse.json({ ok: true });
 }

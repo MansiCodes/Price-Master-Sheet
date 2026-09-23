@@ -121,12 +121,10 @@ type Filters = {
   machineId: string;
 };
 
-/** Rolling 2-day window: yesterday → today (IST). */
 function defaultRecordFilters(): Filters {
-  const today = todayIstYmd();
   return {
-    dateFrom: addDaysYmd(today, -1),
-    dateTo: today,
+    dateFrom: "",
+    dateTo: "",
     shift: "",
     slotStartHour: "",
     machineId: "",
@@ -1128,7 +1126,7 @@ export function AdminDashboard() {
 
   const todayYmd = todayIstYmd();
   const isDefaultDateRange =
-    filters.dateFrom === addDaysYmd(todayYmd, -1) &&
+    filters.dateFrom === addDaysYmd(todayYmd, -7) &&
     filters.dateTo === todayYmd;
   const filtersDirty =
     !isDefaultDateRange ||
@@ -1252,6 +1250,7 @@ export function AdminDashboard() {
               From
               <input
                 type="date"
+                className="mp-date-pill"
                 value={filters.dateFrom}
                 max={filters.dateTo || todayYmd}
                 onChange={(e) =>
@@ -1263,6 +1262,7 @@ export function AdminDashboard() {
               To
               <input
                 type="date"
+                className="mp-date-pill"
                 value={filters.dateTo}
                 min={filters.dateFrom || undefined}
                 max={todayYmd}

@@ -7,6 +7,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { isAllowedMediaUrl } from "@/lib/cloudinary";
 import { prisma } from "@/lib/db";
 import { canAdminMachineProduction } from "@/lib/rbac";
@@ -431,6 +432,24 @@ export async function POST(request: Request) {
       machine: { select: { id: true, name: true, code: true } },
       supervisor: { select: { id: true, name: true, email: true } },
     },
+  });
+
+  await safeWriteAuditLog({
+    entityType: "MachineProductionEntry",
+    entityId: entry.id,
+    field: "create",
+    newValue: {
+      currentProcess: entry.currentProcess,
+      machine: entry.machine?.name,
+      cableType: entry.cableType,
+      cableSize: entry.cableSize,
+      plannedProduction: Number(entry.plannedProduction),
+      actualProduction: Number(entry.actualProduction),
+      operatorName: entry.operatorName,
+      shift: entry.shift,
+      entryDate,
+    },
+    actorId: session.user.id,
   });
 
   return NextResponse.json({

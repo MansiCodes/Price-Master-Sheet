@@ -6,6 +6,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { isAllowedMediaUrl } from "@/lib/cloudinary";
 import { prisma } from "@/lib/db";
 import { efficiencyPct } from "@/lib/machine-production/slots";
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
 
   const existing = await prisma.machineProductionEntry.findUnique({
     where: { id: entryId },
+    include: { machine: { select: { name: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "Entry not found" }, { status: 404 });
@@ -119,6 +121,31 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     },
   });
 
+  await safeWriteAuditLog({
+    entityType: "MachineProductionEntry",
+    entityId: entryId,
+    field: "update",
+    oldValue: {
+      currentProcess: existing.currentProcess,
+      machine: existing.machine?.name,
+      cableType: existing.cableType,
+      cableSize: existing.cableSize,
+      plannedProduction: Number(existing.plannedProduction),
+      actualProduction: Number(existing.actualProduction),
+      operatorName: existing.operatorName,
+    },
+    newValue: {
+      currentProcess: entry.currentProcess,
+      machine: existing.machine?.name,
+      cableType: entry.cableType,
+      cableSize: entry.cableSize,
+      plannedProduction: Number(entry.plannedProduction),
+      actualProduction: Number(entry.actualProduction),
+      operatorName: entry.operatorName,
+    },
+    actorId: session.user.id,
+  });
+
   return NextResponse.json({
     ok: true,
     entry: {
@@ -147,9 +174,32 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
   if (denied) return denied;
 
   const { entryId } = await ctx.params;
+  const existing = await prisma.machineProductionEntry.findUnique({
+    where: { id: entryId },
+    include: { machine: { select: { name: true } } },
+  });
 
   try {
     await prisma.machineProductionEntry.delete({ where: { id: entryId } });
+    if (existing) {
+      await safeWriteAuditLog({
+        entityType: "MachineProductionEntry",
+        entityId: entryId,
+        field: "delete",
+        oldValue: {
+          id: existing.id,
+          currentProcess: existing.currentProcess,
+          machine: existing.machine?.name,
+          cableType: existing.cableType,
+          cableSize: existing.cableSize,
+          plannedProduction: Number(existing.plannedProduction),
+          actualProduction: Number(existing.actualProduction),
+          operatorName: existing.operatorName,
+          entryDate: existing.entryDate.toISOString().slice(0, 10),
+        },
+        actorId: session.user.id,
+      });
+    }
   } catch (err) {
     if (
       err instanceof Prisma.PrismaClientKnownRequestError &&
