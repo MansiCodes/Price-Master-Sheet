@@ -10,6 +10,7 @@ import {
   type PrismaClient,
 } from "@prisma/client";
 import { isBackdated, parseDateOnly } from "@/lib/dates";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { syncDailyExpenseMarker } from "@/lib/daily-expense-marker";
@@ -21,6 +22,8 @@ import {
 import {
   expenseSourceKey,
   farSourceKey,
+  invoiceNumberMatchWhere,
+  preferFullerInvoice,
   purchaseSourceKey,
   saleSourceKey,
   stockSourceKey,
@@ -130,32 +133,63 @@ export async function persistPnlImport(opts: {
     seenKeys.add(sourceKey);
 
     const day = parseDateOnly(row.date);
+    const billRaw = row.billNumber?.trim() ?? "";
+    const invoiceWhere = invoiceNumberMatchWhere(billRaw);
+
     const existing = await prisma.sale.findFirst({
       where: {
         ...pScope,
         OR: [
           { sourceKey },
           { id: sourceKey },
-          {
+          ...invoiceWhere.map((w) => ({
+            ...w,
             date: day,
-            customerName: row.customerName,
-            itemDescription: row.itemDescription,
             quantity: row.quantity,
             rate: row.rate,
-            ...(row.billNumber ? { billNumber: row.billNumber } : {}),
+          })),
+          {
+            date: day,
+            itemDescription: row.itemDescription,
+            quantity: row.quantity,
           },
         ],
       },
-      select: { id: true },
+      select: { id: true, billNumber: true },
     });
+
+    const salesValue = round2(row.quantity * row.rate);
+
     if (existing) {
-      markDuplicate("Sales", row.row, "Already uploaded");
+      const nextBill = preferFullerInvoice(existing.billNumber, billRaw);
+      if (nextBill && nextBill !== (existing.billNumber ?? "").trim()) {
+        await prisma.sale.update({
+          where: { id: existing.id },
+          data: {
+            billNumber: nextBill,
+            billDate: row.billDate ? parseDateOnly(row.billDate) : undefined,
+            customerName: row.customerName,
+            rate: row.rate,
+            salesValue,
+            excelUploadedAt: uploadedAt,
+          },
+        });
+        await safeWriteAuditLog({
+          entityType: "Sale",
+          entityId: existing.id,
+          field: "excel_import_update",
+          oldValue: { billNumber: existing.billNumber },
+          newValue: { billNumber: nextBill, excelUploadedAt: uploadedAt },
+          actorId: enteredById,
+          plantId: writePlantId,
+        });
+      }
+      markDuplicate("Sales", row.row, "Already uploaded / merged with existing record");
       continue;
     }
 
-    const salesValue = round2(row.quantity * row.rate);
     const approval = approvalFor(role, row.date);
-    await prisma.sale.create({
+    const createdSale = await prisma.sale.create({
       data: {
         id: sourceKey,
         sourceKey,
@@ -182,6 +216,22 @@ export async function persistPnlImport(opts: {
         ...approval,
       },
     });
+
+    await safeWriteAuditLog({
+      entityType: "Sale",
+      entityId: createdSale.id,
+      field: "excel_import_create",
+      newValue: {
+        billNumber: createdSale.billNumber,
+        customerName: createdSale.customerName,
+        itemDescription: createdSale.itemDescription,
+        quantity: String(createdSale.quantity),
+        salesValue: String(createdSale.salesValue),
+      },
+      actorId: enteredById,
+      plantId: writePlantId,
+    });
+
     summary.sales += 1;
     daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
   }

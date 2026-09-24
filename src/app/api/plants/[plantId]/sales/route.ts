@@ -25,6 +25,10 @@ import {
   resolveCanonicalWritePlantId,
   resolveReportPlantIds,
 } from "@/lib/plant-merge";
+import {
+  invoiceNumberMatchWhere,
+  preferFullerInvoice,
+} from "@/lib/pnl/excel-import/dedupe";
 
 const saleHeaderFields = {
   date: z.string().regex(dateOnlyRegex),
@@ -66,6 +70,30 @@ const saleBatchSchema = z.object({
 });
 
 type RouteContext = { params: Promise<{ plantId: string }> };
+
+async function findMatchingSale(opts: {
+  plantIds: string[];
+  date: Date;
+  billNumber: string | null | undefined;
+  quantity: number;
+  rate: number;
+}) {
+  const billRaw = opts.billNumber?.trim() ?? "";
+  const invoiceWhere = invoiceNumberMatchWhere(billRaw);
+  if (invoiceWhere.length === 0) return null;
+  return prisma.sale.findFirst({
+    where: {
+      ...plantIdFilter(opts.plantIds),
+      OR: invoiceWhere.map((w) => ({
+        ...w,
+        date: opts.date,
+        quantity: opts.quantity,
+        rate: opts.rate,
+      })),
+    },
+    select: { id: true, billNumber: true },
+  });
+}
 
 export async function GET(
   request: NextRequest,
@@ -192,40 +220,72 @@ export async function POST(
         : {}),
     };
 
-    const sales = await prisma.$transaction(
-      data.items.map((item) => {
+    const plantIds = await resolveReportPlantIds(plantId);
+
+    const sales = await prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const item of data.items) {
         const salesValue = round2(item.quantity * item.rate);
-        return prisma.sale.create({
-          data: {
-            plantId: writePlantId,
-            date: day,
-            shift: data.shift,
-            type: data.type,
-            typeOther:
-              data.type === SaleType.OTHERS
-                ? data.typeOther?.trim() || null
-                : null,
-            customerName: data.customerName,
-            billNumber: data.billNumber ?? null,
-            billDate: data.billDate ? parseDateOnly(data.billDate) : null,
-            notes: data.notes?.trim() || null,
-            itemDescription: item.itemDescription,
-            unit: item.unit,
-            quantity: item.quantity,
-            rate: item.rate,
-            salesValue,
-            inMeter: item.inMeter ?? null,
-            qtyMtr: item.qtyMtr ?? null,
-            meterUnit: item.meterUnit?.trim() || null,
-            billPhotoUrl: photos.billPhotoUrl,
-            billPhotoUrls: photos.billPhotoUrls,
-            enteredById: session.user.id,
-            isBackdated: backdated,
-            ...approvalFields,
-          },
+        const existing = await findMatchingSale({
+          plantIds,
+          date: day,
+          billNumber: data.billNumber,
+          quantity: item.quantity,
+          rate: item.rate,
         });
-      }),
-    );
+        if (existing) {
+          const nextBill = preferFullerInvoice(
+            existing.billNumber,
+            data.billNumber,
+          );
+          if (nextBill && nextBill !== (existing.billNumber ?? "").trim()) {
+            created.push(
+              await tx.sale.update({
+                where: { id: existing.id },
+                data: { billNumber: nextBill },
+              }),
+            );
+          } else {
+            created.push(
+              await tx.sale.findUniqueOrThrow({ where: { id: existing.id } }),
+            );
+          }
+          continue;
+        }
+        created.push(
+          await tx.sale.create({
+            data: {
+              plantId: writePlantId,
+              date: day,
+              shift: data.shift,
+              type: data.type,
+              typeOther:
+                data.type === SaleType.OTHERS
+                  ? data.typeOther?.trim() || null
+                  : null,
+              customerName: data.customerName,
+              billNumber: data.billNumber ?? null,
+              billDate: data.billDate ? parseDateOnly(data.billDate) : null,
+              notes: data.notes?.trim() || null,
+              itemDescription: item.itemDescription,
+              unit: item.unit,
+              quantity: item.quantity,
+              rate: item.rate,
+              salesValue,
+              inMeter: item.inMeter ?? null,
+              qtyMtr: item.qtyMtr ?? null,
+              meterUnit: item.meterUnit?.trim() || null,
+              billPhotoUrl: photos.billPhotoUrl,
+              billPhotoUrls: photos.billPhotoUrls,
+              enteredById: session.user.id,
+              isBackdated: backdated,
+              ...approvalFields,
+            },
+          }),
+        );
+      }
+      return created;
+    });
 
     await writeAuditLog({
       entityType: "Sale",
@@ -257,6 +317,28 @@ export async function POST(
   const salesValue = round2(data.quantity * data.rate);
   const backdated = isBackdated(data.date);
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
+  const day = parseDateOnly(data.date);
+  const plantIds = await resolveReportPlantIds(plantId);
+
+  const existing = await findMatchingSale({
+    plantIds,
+    date: day,
+    billNumber: data.billNumber,
+    quantity: data.quantity,
+    rate: data.rate,
+  });
+  if (existing) {
+    const nextBill = preferFullerInvoice(existing.billNumber, data.billNumber);
+    const sale =
+      nextBill && nextBill !== (existing.billNumber ?? "").trim()
+        ? await prisma.sale.update({
+            where: { id: existing.id },
+            data: { billNumber: nextBill },
+          })
+        : await prisma.sale.findUniqueOrThrow({ where: { id: existing.id } });
+    return NextResponse.json({ sale, merged: true });
+  }
+
   const approval = entryApprovalCreateData(session.user.globalRole, data.date);
   const approvalFields = {
     ...approval,
@@ -266,7 +348,7 @@ export async function POST(
   const sale = await prisma.sale.create({
     data: {
       plantId: writePlantId,
-      date: parseDateOnly(data.date),
+      date: day,
       shift: data.shift,
       type: data.type,
       typeOther:

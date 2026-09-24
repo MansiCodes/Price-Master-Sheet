@@ -110,11 +110,10 @@ export function matchCableAndSize(
 
   // Determine cable category for unlisted sizes
   let cable = "Signalling Cable";
-  const l = cleaned.toLowerCase();
-  if (l.includes("quad") || l.includes("q ")) cable = "Quad Cable";
-  else if (l.includes("pair") || l.includes("p ")) cable = "PIJF Cable";
-  else if (l.includes("fire") || l.includes("fs")) cable = "Fire Survival Cable";
-  else if (l.includes("power")) cable = "Power Cable";
+  if (/\bquads?\b|\b\d+\s*q\b/i.test(cleaned)) cable = "Quad Cable";
+  else if (/\bpairs?\b|\b\d+\s*p\b/i.test(cleaned)) cable = "PIJF Cable";
+  else if (/\bfire\b|\bfs\b/i.test(cleaned)) cable = "Fire Survival Cable";
+  else if (/\bpower\b/i.test(cleaned)) cable = "Power Cable";
 
   return { cable, size: cleaned };
 }

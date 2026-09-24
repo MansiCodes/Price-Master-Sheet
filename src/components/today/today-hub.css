@@ -1051,3 +1051,35 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
+
+.qs-wip__table input,
+.qs-wip__table td input,
+.qs-wip__table-wrap input,
+.qs-wip__table .select-menu__trigger,
+.qs-wip__table td .select-menu__trigger {
+  border-radius: 999px !important;
+  padding: 0.45rem 0.85rem !important;
+  text-align: center;
+  height: 38px !important;
+  min-height: 38px !important;
+  box-sizing: border-box !important;
+  vertical-align: middle !important;
+  border: 1px solid var(--border-strong, #b2c4be) !important;
+  font-size: 0.88rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.qs-wip__table .select-menu__trigger {
+  text-align: left;
+}
+
+.qs-wip__table th,
+.qs-wip__table td {
+  vertical-align: middle !important;
+}
+
+.qs-wip__num {
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+

@@ -11,7 +11,11 @@ import {
   QUAD_SIGNAL_STOCK_CABLES,
   quadSignalCableSizeDedupeKey,
 } from "@/lib/plant-catalogs";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import {
+  isQuadCableName,
+  isSignallingCableName,
+  normalizeCableName,
+} from "@/lib/quad-signal-wip";
 import {
   formatCallPutupItem,
   formatCallPutupItemsList,
@@ -375,12 +379,12 @@ export function StockStatusClient({
     for (const b of cableBlocks) {
       const dedupeKey = quadSignalCableSizeDedupeKey(b.cable, b.size);
       if (seen.has(dedupeKey)) continue;
-      if (!showAllCables && b.cable !== activeCable) continue;
+      if (!showAllCables && normalizeCableName(b.cable) !== normalizeCableName(activeCable)) continue;
       if (cableSize !== ALL_SIZES && toSizeMatchKey(b.size) !== toSizeMatchKey(cableSize)) continue;
       seen.add(dedupeKey);
       cards.push({
-        key: `${b.cable} · ${b.size}`,
-        cable: b.cable,
+        key: `${normalizeCableName(b.cable)} · ${b.size}`,
+        cable: normalizeCableName(b.cable),
         size: b.size,
         block: b,
       });
@@ -389,12 +393,13 @@ export function StockStatusClient({
     // Dynamic sizes from Excel Orders (creates cards if not in catalog/stock)
     if (ordersByKey) {
       for (const order of Object.values(ordersByKey)) {
-        const cable = order.cable || "Signalling Cable";
+        const rawCable = order.cable || "Signalling Cable";
+        const cable = normalizeCableName(rawCable);
         const size = order.size;
         if (!size) continue;
         const dedupeKey = quadSignalCableSizeDedupeKey(cable, size);
         if (seen.has(dedupeKey)) continue;
-        if (!showAllCables && cable !== activeCable) continue;
+        if (!showAllCables && cable !== normalizeCableName(activeCable)) continue;
         if (cableSize !== ALL_SIZES && toSizeMatchKey(size) !== toSizeMatchKey(cableSize)) continue;
         seen.add(dedupeKey);
         cards.push({

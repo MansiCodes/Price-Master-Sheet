@@ -1003,43 +1003,9 @@ export function TodayHub({
     let insulationConsumedOverride: number | undefined;
     let singleQuadConsumedOverride: number | undefined;
     if (isSignallingCableName(resolvedQuadCableName)) {
-      const sizeRows: Array<{
-        size: string;
-        layingProduced: number;
-        coreCount: number;
-        lengthFactor: number;
-      }> = [];
-      for (const extra of stockInsulationExtras) {
-        const sizeName =
-          extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
-        if (!sizeName) continue;
-        const ev = resolveQuadSignalVariant(sizeName);
-        if (!ev) continue;
-        const lf = lengthValueToFactor(extra.lengthValue, extra.lengthUnit);
-        if (lf == null) continue;
-        const layRaw = extra.layingProduced.trim();
-        const lay =
-          layRaw === "" || layRaw === "."
-            ? 0
-            : Number(layRaw);
-        sizeRows.push({
-          size: sizeName,
-          layingProduced: Number.isFinite(lay) && lay >= 0 ? lay : 0,
-          coreCount: ev.coreCount,
-          lengthFactor: lf,
-        });
-      }
-      if (sizeRows.length > 0) {
-        const shared = calculateSharedSignallingInsulation({
-          opening: opening.Insulation ?? 0,
-          production: production.Insulation ?? 0,
-          sizes: sizeRows,
-        });
-        insulationConsumedOverride = shared.consumed;
-      } else {
-        // Locked shared pool: do not re-deduct from this size's Laying.
-        insulationConsumedOverride = 0;
-      }
+      // Primary Insulation Out/Closing follows this size's Laying only.
+      // Extra size rows are independent and must not change the first box.
+      insulationConsumedOverride = undefined;
     } else if (isQuadCableName(resolvedQuadCableName)) {
       const sqPrimaryRaw = stockProcessQtys["Single Quad"]?.trim() ?? "";
       const sqPrimary =
@@ -1885,12 +1851,9 @@ export function TodayHub({
             | undefined;
 
           if (isSignallingCableName(resolvedCable)) {
-            const sizeRows: Array<{
-              size: string;
-              layingProduced: number;
-              coreCount: number;
-              lengthFactor: number;
-            }> = [];
+            // Primary Insulation uses this size's Laying only. Extra rows
+            // must not change the first Insulation closing.
+            insulationConsumedOverride = undefined;
             for (const extra of stockInsulationExtras) {
               const sizeName =
                 extra.size === "Other"
@@ -1908,9 +1871,7 @@ export function TodayHub({
               }
               const ev = resolveQuadSignalVariant(sizeName);
               if (!ev) {
-                fail(
-                  `Could not resolve core count for ${sizeName}.`,
-                );
+                fail(`Could not resolve core count for ${sizeName}.`);
                 return;
               }
               const lf = lengthValueToFactor(
@@ -1939,33 +1900,6 @@ export function TodayHub({
                 );
                 return;
               }
-              sizeRows.push({
-                size: sizeName,
-                layingProduced: lay,
-                coreCount: ev.coreCount,
-                lengthFactor: lf,
-              });
-            }
-            const shared = calculateSharedSignallingInsulation({
-              opening: openingQty.Insulation ?? 0,
-              production: processes.Insulation ?? 0,
-              sizes: sizeRows,
-            });
-            // Only update the shared Insulation pool when this entry is meant
-            // to adjust it (first editable entry or extra-size rows).
-            if (sizeRows.length > 0) {
-              insulationConsumedOverride = shared.consumed;
-              sharedInsulationMeta = {
-                consumed: shared.consumed,
-                closing: shared.closing,
-                contributions: shared.contributions,
-              };
-              if (shared.warnings.length > 0) {
-                fail(shared.warnings[0] ?? "Insulation validation failed.");
-                return;
-              }
-            } else {
-              insulationConsumedOverride = 0;
             }
           } else if (isQuadCableName(resolvedCable)) {
             const sqExtraSum = stockSingleQuadExtras.reduce((sum, extra) => {
@@ -3366,28 +3300,17 @@ export function TodayHub({
                                       )}
                                     </td>
                                                                          <td>
-                                       {isQuadCableStock && proc.toLowerCase() === "laying" ? (
-                                         <div className="qs-wip__calc-sub" style={{ textAlign: "right", paddingRight: "4px" }}>
-                                           <span className="qs-wip__calc" style={{ fontWeight: 600, color: "var(--teal-800, #0e5a54)" }}>
-                                             {stage?.production ?? 0}
-                                           </span>
-                                           <span style={{ fontSize: "10px", color: "#666", display: "block", fontWeight: "normal" }}>
-                                             (from Single Quad above)
-                                           </span>
-                                         </div>
-                                       ) : (
-                                         <DecimalInput
-                                           id={`st-proc-${proc}`}
-                                           value={stockProcessQtys[proc] ?? ""}
-                                           onChange={(next) =>
-                                             setStockProcessQtys((prev) => ({
-                                               ...prev,
-                                               [proc]: next,
-                                             }))
-                                           }
-                                           placeholder="0"
-                                         />
-                                       )}
+                                       <DecimalInput
+                                         id={`st-proc-${proc}`}
+                                         value={stockProcessQtys[proc] ?? ""}
+                                         onChange={(next) =>
+                                           setStockProcessQtys((prev) => ({
+                                             ...prev,
+                                             [proc]: next,
+                                           }))
+                                         }
+                                         placeholder="0"
+                                       />
                                      </td>
                                     <td className="qs-wip__num qs-wip__calc">
                                       {outLabel}
@@ -3476,10 +3399,6 @@ export function TodayHub({
                               };
 
                               if (isSignallingStock) {
-                                const insStage = stockWipCalc?.stages.find(
-                                  (s) =>
-                                    s.process.toLowerCase() === "insulation",
-                                );
                                 return (
                                   <>
                                     <div className="qs-wip__box">
@@ -3790,31 +3709,115 @@ export function TodayHub({
                                               );
                                             },
                                           )}
-                                          {stockWipCalc != null ? (
-                                            <div className="qs-wip__ins-extras-foot">
-                                              Total insulation out:{" "}
-                                              <span className="qs-wip__calc">
-                                                {
-                                                  stockWipCalc.insulationConsumed
-                                                }
-                                              </span>
-                                              {insStage != null ? (
-                                                <>
-                                                  {" "}
-                                                  · Closing{" "}
-                                                  <span className="qs-wip__calc">
-                                                    {insStage.closing}
-                                                  </span>
-                                                </>
-                                              ) : null}
-                                            </div>
-                                          ) : null}
                                         </div>
                                       ) : null}
-                                     </div>
-                                   </>
-                                 );
-                               }
+                                    </div>
+
+                                    <div className="qs-wip__size-for-chain">
+                                      <div className="form-grid two">
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size">
+                                            Size
+                                          </label>
+                                          <SelectMenu
+                                            id="st-cable-size"
+                                            value={stockCableSize}
+                                            options={quadCableSizeOptions}
+                                            required
+                                            onChange={(next) => {
+                                              setStockCableSize(next);
+                                              if (next !== "Other")
+                                                setStockCableSizeOther("");
+                                            }}
+                                          />
+                                        </div>
+                                        {stockLengthOptions.length > 0 ? (
+                                          <div className="field qs-wip__drum">
+                                            <label htmlFor="st-drum-len">
+                                              Drum / coil length
+                                            </label>
+                                            <SelectMenu
+                                              id="st-drum-len"
+                                              value={
+                                                stockLengthOptions.find(
+                                                  (o) =>
+                                                    o.lengthFactor ===
+                                                    stockLengthFactor,
+                                                )?.label ??
+                                                stockLengthOptions[0]?.label ??
+                                                ""
+                                              }
+                                              options={stockLengthOptions.map(
+                                                (o) => o.label,
+                                              )}
+                                              required
+                                              onChange={(next) => {
+                                                const opt =
+                                                  stockLengthOptions.find(
+                                                    (o) => o.label === next,
+                                                  );
+                                                if (opt)
+                                                  setStockLengthFactor(
+                                                    opt.lengthFactor,
+                                                  );
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="field" aria-hidden />
+                                        )}
+                                      </div>
+                                      {stockCableSize === "Other" ? (
+                                        <div className="field">
+                                          <label htmlFor="st-cable-size-other">
+                                            Other size{" "}
+                                            <span style={{ color: "red" }}>
+                                              *
+                                            </span>
+                                          </label>
+                                          <input
+                                            id="st-cable-size-other"
+                                            required
+                                            placeholder="Enter size"
+                                            value={stockCableSizeOther}
+                                            onChange={(e) =>
+                                              setStockCableSizeOther(
+                                                e.target.value,
+                                              )
+                                            }
+                                          />
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="qs-wip__box">
+                                      <div className="qs-wip__box-head">
+                                        <h4 className="qs-wip__box-title">
+                                          Laying → Outer Sheath
+                                        </h4>
+                                      </div>
+                                      <div className="qs-wip__table-wrap">
+                                        <table className="qs-wip__table">
+                                          <thead>
+                                            <tr>
+                                              <th>Process</th>
+                                              <th>Opening</th>
+                                              <th>Production</th>
+                                              <th>Out / Sales</th>
+                                              <th>Closing</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {otherProcesses.map((proc) =>
+                                              renderProcessRow(proc),
+                                            )}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              }
 
                                if (isQuadCableStock) {
                                   const insStage = stockWipCalc?.stages.find(
@@ -3826,7 +3829,8 @@ export function TodayHub({
                                   const quadOtherProcesses = quadCableProcessFields.filter(
                                     (p) =>
                                       p.toLowerCase() !== "insulation" &&
-                                      p.toLowerCase() !== "single quad",
+                                      p.toLowerCase() !== "single quad" &&
+                                      p.toLowerCase() !== "laying",
                                   );
 
                                   const primaryQuadFactor = getQuadFactorFromSize(resolvedQuadSizeName);
@@ -3871,11 +3875,7 @@ export function TodayHub({
                                             +
                                           </button>
                                         </div>
-                                        <p className="qs-wip__box-note">
-                                          {stockWipContextLoading
-                                            ? "Loading opening from stock…"
-                                            : "Shared insulation pool for Quad cable. Outbound is consumed by Single Quad production (×4). Use + to add extra sizes."}
-                                        </p>
+
                                         <div className="qs-wip__table-wrap">
                                           <table className="qs-wip__table">
                                             <thead>
@@ -4126,11 +4126,7 @@ export function TodayHub({
                                             +
                                           </button>
                                         </div>
-                                        <p className="qs-wip__box-note">
-                                          {stockWipContextLoading
-                                            ? "Loading opening from stock…"
-                                            : `Single Quad calculation. Each quad size line has its own Laying input. Outbound is calculated as Laying × Factor (6 for 6 Quad, 4 for 4 Quad).`}
-                                        </p>
+
                                         <div className="qs-wip__table-wrap">
                                           <table className="qs-wip__table">
                                             <thead>
@@ -4139,16 +4135,40 @@ export function TodayHub({
                                                 <th>Opening</th>
                                                 <th>Single Quad Prod</th>
                                                 <th>Laying</th>
-                                                <th>Out (Laying × Factor)</th>
+                                                <th>
+                                                  Out
+                                                  <span style={{ display: "block", fontSize: "10px", fontWeight: "normal" }}>
+                                                    (Laying × Factor)
+                                                  </span>
+                                                </th>
                                                 <th>Closing</th>
                                                 <th style={{ width: "32px" }}></th>
                                               </tr>
                                             </thead>
                                             <tbody>
                                               <tr>
-                                                <td style={{ fontWeight: 600, color: "var(--teal-800, #0e5a54)" }}>
-                                                  {resolvedQuadSizeName || "Primary Size"}
-                                                  <span style={{ display: "block", fontSize: "10px", color: "#666", fontWeight: "normal" }}>
+                                                <td style={{ minWidth: "140px" }}>
+                                                  <SelectMenu
+                                                    id="st-cable-size"
+                                                    value={stockCableSize}
+                                                    options={quadCableSizeOptions}
+                                                    required
+                                                    onChange={(next) => {
+                                                      setStockCableSize(next);
+                                                      if (next !== "Other") setStockCableSizeOther("");
+                                                    }}
+                                                  />
+                                                  {stockCableSize === "Other" ? (
+                                                    <input
+                                                      id="st-cable-size-other"
+                                                      required
+                                                      placeholder="Enter size"
+                                                      style={{ marginTop: "4px" }}
+                                                      value={stockCableSizeOther}
+                                                      onChange={(e) => setStockCableSizeOther(e.target.value)}
+                                                    />
+                                                  ) : null}
+                                                  <span style={{ display: "block", fontSize: "10px", color: "#666", fontWeight: "normal", marginTop: "2px" }}>
                                                     (Factor: {primaryQuadFactor})
                                                   </span>
                                                 </td>
@@ -4360,87 +4380,10 @@ export function TodayHub({
                                         ) : null}
                                       </div>
 
-                                      <div className="qs-wip__size-for-chain">
-                                       <div className="form-grid two">
-                                         <div className="field">
-                                           <label htmlFor="st-cable-size">
-                                             Size
-                                           </label>
-                                           <SelectMenu
-                                             id="st-cable-size"
-                                             value={stockCableSize}
-                                             options={quadCableSizeOptions}
-                                             required
-                                             onChange={(next) => {
-                                               setStockCableSize(next);
-                                               if (next !== "Other")
-                                                 setStockCableSizeOther("");
-                                             }}
-                                           />
-                                         </div>
-                                         {stockLengthOptions.length > 0 ? (
-                                           <div className="field qs-wip__drum">
-                                             <label htmlFor="st-drum-len">
-                                               Drum / coil length
-                                             </label>
-                                             <SelectMenu
-                                               id="st-drum-len"
-                                               value={
-                                                 stockLengthOptions.find(
-                                                   (o) =>
-                                                     o.lengthFactor ===
-                                                     stockLengthFactor,
-                                                 )?.label ??
-                                                 stockLengthOptions[0]?.label ??
-                                                 ""
-                                               }
-                                               options={stockLengthOptions.map(
-                                                 (o) => o.label,
-                                               )}
-                                               required
-                                               onChange={(next) => {
-                                                 const opt =
-                                                   stockLengthOptions.find(
-                                                     (o) => o.label === next,
-                                                   );
-                                                 if (opt)
-                                                   setStockLengthFactor(
-                                                     opt.lengthFactor,
-                                                   );
-                                               }}
-                                             />
-                                           </div>
-                                         ) : (
-                                           <div className="field" aria-hidden />
-                                         )}
-                                       </div>
-                                       {stockCableSize === "Other" ? (
-                                         <div className="field">
-                                           <label htmlFor="st-cable-size-other">
-                                             Other size{" "}
-                                             <span style={{ color: "red" }}>
-                                               *
-                                             </span>
-                                           </label>
-                                           <input
-                                             id="st-cable-size-other"
-                                             required
-                                             placeholder="Enter size"
-                                             value={stockCableSizeOther}
-                                             onChange={(e) =>
-                                               setStockCableSizeOther(
-                                                 e.target.value,
-                                               )
-                                             }
-                                           />
-                                         </div>
-                                       ) : null}
-                                     </div>
-
-                                     <div className="qs-wip__box">
+                                      <div className="qs-wip__box">
                                        <div className="qs-wip__box-head">
                                          <h4 className="qs-wip__box-title">
-                                           Laying → Outer Sheath
+                                           Inner → Outer Sheath
                                          </h4>
                                        </div>
                                        <div className="qs-wip__table-wrap">

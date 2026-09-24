@@ -363,11 +363,29 @@ export function calculateSharedSignallingInsulation(params: {
 }
 
 export function isSignallingCableName(cable: string): boolean {
-  return cable.trim().toLowerCase() === "signalling cable";
+  const c = cable.trim().toLowerCase();
+  return (
+    c === "signalling cable" ||
+    c === "signalling" ||
+    c.includes("signalling cable") ||
+    c.includes("signal cable")
+  );
 }
 
 export function isQuadCableName(cable: string): boolean {
-  return cable.trim().toLowerCase() === "quad cable";
+  const c = cable.trim().toLowerCase();
+  return (
+    c === "quad cable" ||
+    c === "quad" ||
+    c.includes("quad cable") ||
+    c.includes("railway quad")
+  );
+}
+
+export function normalizeCableName(cable: string): string {
+  if (isQuadCableName(cable)) return "Quad Cable";
+  if (isSignallingCableName(cable)) return "Signalling Cable";
+  return cable.trim();
 }
 
 export function getQuadFactorFromSize(size: string): number {

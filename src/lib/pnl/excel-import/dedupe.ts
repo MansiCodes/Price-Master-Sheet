@@ -14,6 +14,54 @@ function normPart(value: unknown): string {
     .replace(/\s+/g, " ");
 }
 
+/** Last numeric token of an invoice: "263" and "NF/UK/26-27/263" are the same. */
+export function invoiceNumberKey(raw: string | null | undefined): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const m = s.match(/(\d+)\s*$/);
+  if (!m) return s.toLowerCase();
+  const digits = m[1]!;
+  const stripped = digits.replace(/^0+/, "");
+  return stripped || digits;
+}
+
+/** Prisma filters that treat short and full invoice numbers as the same. */
+export function invoiceNumberMatchWhere(billRaw: string): Array<{
+  billNumber: string | { endsWith: string };
+}> {
+  const raw = billRaw.trim();
+  if (!raw) return [];
+  const tail = invoiceNumberKey(raw);
+  const out: Array<{ billNumber: string | { endsWith: string } }> = [
+    { billNumber: raw },
+  ];
+  if (tail && tail !== raw) {
+    out.push({ billNumber: tail });
+    out.push({ billNumber: { endsWith: `/${tail}` } });
+    out.push({ billNumber: { endsWith: `-${tail}` } });
+  } else if (tail) {
+    out.push({ billNumber: { endsWith: `/${tail}` } });
+    out.push({ billNumber: { endsWith: `-${tail}` } });
+  }
+  return out;
+}
+
+/** Prefer the full invoice (NF/UK/26-27/263) over a short tail (263). */
+export function preferFullerInvoice(
+  current: string | null | undefined,
+  incoming: string | null | undefined,
+): string {
+  const a = String(current ?? "").trim();
+  const b = String(incoming ?? "").trim();
+  if (!b) return a;
+  if (!a) return b;
+  const aShort = /^\d+$/.test(a);
+  const bShort = /^\d+$/.test(b);
+  if (aShort && !bShort) return b;
+  if (!aShort && bShort) return a;
+  return b.length >= a.length ? b : a;
+}
+
 /** Short stable hash of normalized field parts. */
 export function contentFingerprint(parts: unknown[]): string {
   const payload = parts.map(normPart).join("|");
@@ -40,7 +88,7 @@ export function saleSourceKey(
     familyKey,
     row.date,
     row.customerName,
-    row.billNumber,
+    invoiceNumberKey(row.billNumber),
     row.itemDescription,
     row.quantity,
     row.rate,

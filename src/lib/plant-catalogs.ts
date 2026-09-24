@@ -530,12 +530,15 @@ export function normalizeQuadSignalCableSizeKey(size: string): string {
   return toSizeMatchKey(size);
 }
 
+import { normalizeCableName } from "@/lib/quad-signal-wip";
+
 /** Cable + normalized size — used to dedupe Other re-entries. */
 export function quadSignalCableSizeDedupeKey(
   cable: string,
   size: string,
 ): string {
-  return `${cable.trim()}::${normalizeQuadSignalCableSizeKey(size)}`;
+  const normCable = normalizeCableName(cable);
+  return `${normCable}::${normalizeQuadSignalCableSizeKey(size)}`;
 }
 
 /** Closing balances from a stock notes meta (v2 closing, else v1 processes). */

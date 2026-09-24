@@ -125,30 +125,7 @@ function recomputeCableNotesWithOpening(
   }
 
   let insulationConsumedOverride: number | undefined;
-  let sharedInsulation = meta.sharedInsulation;
-
-  if (
-    isSignallingCableName(cable) &&
-    Array.isArray(meta.sharedInsulation?.contributions) &&
-    meta.sharedInsulation!.contributions.length > 0
-  ) {
-    const shared = calculateSharedSignallingInsulation({
-      opening: opening[INSULATION_KEY] ?? 0,
-      production: production[INSULATION_KEY] ?? 0,
-      sizes: meta.sharedInsulation!.contributions.map((c) => ({
-        size: c.size,
-        layingProduced: c.layingProduced,
-        coreCount: c.coreCount,
-        lengthFactor: c.lengthFactor,
-      })),
-    });
-    insulationConsumedOverride = shared.consumed;
-    sharedInsulation = {
-      consumed: shared.consumed,
-      closing: shared.closing,
-      contributions: shared.contributions,
-    };
-  }
+  const sharedInsulation = meta.sharedInsulation;
 
   const wip = calculateQuadSignalWip({
     processes,
