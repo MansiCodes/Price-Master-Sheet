@@ -38,6 +38,9 @@ Thumbs.db
 .vscode/
 *.code-workspace
 
+# Cursor AI rules / skills (local only — do not push)
+.cursor/
+
 # Coverage
 coverage/
 .nyc_output/

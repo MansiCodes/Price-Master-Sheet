@@ -269,6 +269,74 @@ export function mapSheetRowsToRates(
   return rates;
 }
 
+function normalizeHouseWireName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/as per is\s*694[:\s]*2010/gi, "")
+    .replace(/flexible cable/gi, "")
+    .replace(/house wire/gi, "")
+    .replace(/[^a-z0-9.]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * House Wire tab is block-based. Pull “TOTAL PRICES PER METER” for each size title.
+ */
+export function mapHouseWirePerMeter(
+  rows: SheetRow[] | undefined | null,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  if (!rows?.length) return out;
+  let currentName = "";
+
+  for (const row of rows) {
+    const cells = (row || []).map((cell) => trimCell(cell));
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i] ?? "";
+      if (
+        /core/i.test(cell) &&
+        /sq\.?\s*mm/i.test(cell) &&
+        cell.length >= 8 &&
+        cell.length < 140
+      ) {
+        currentName = cell.replace(/\s+/g, " ").trim();
+      }
+      if (!currentName || !/total prices per meter/i.test(cell)) continue;
+      for (let j = i + 1; j < cells.length; j += 1) {
+        const raw = (cells[j] ?? "").replace(/[^0-9.\-]/g, "");
+        const n = Number.parseFloat(raw);
+        if (Number.isFinite(n) && n > 0) {
+          out.set(normalizeHouseWireName(currentName), n);
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+export function overlayHouseWirePerMeter(
+  rates: CableRate[],
+  perMeterByName: Map<string, number>,
+): CableRate[] {
+  if (perMeterByName.size === 0) return rates;
+  return rates.map((row) => {
+    const key = normalizeHouseWireName(row.name);
+    let hit = perMeterByName.get(key);
+    if (hit == null) {
+      for (const [k, v] of perMeterByName) {
+        if (key.includes(k) || k.includes(key)) {
+          hit = v;
+          break;
+        }
+      }
+    }
+    if (hit == null || hit <= 0) return row;
+    return { ...row, rmCostingPerMtr: hit };
+  });
+}
+
 export function assertSheetStructure(
   rows: SheetRow[] | undefined | null,
 ): void {

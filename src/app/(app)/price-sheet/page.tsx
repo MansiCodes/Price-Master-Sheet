@@ -190,7 +190,7 @@ export default function PriceSheetPage() {
     selectionMode && selectedRows.length > 0
       ? `Share (${selectedRows.length})`
       : "Share";
-  const tableColSpan = selectionMode ? 8 : 7;
+  const tableColSpan = selectionMode ? 9 : 8;
 
   const fetchRates = useCallback(async () => {
     const response = await fetch("/api/rates");
@@ -290,6 +290,7 @@ export default function PriceSheetPage() {
       "S NO.",
       "NAME OF CABLE",
       "RM Costing (Per Box=305Mtr)",
+      "Price per meter",
       "P=10%",
       "P=12%",
       "P=15%",
@@ -302,6 +303,7 @@ export default function PriceSheetPage() {
           csvEscape(row.sNo ?? ""),
           csvEscape(row.name),
           csvEscape(row.rmCostingPerBox),
+          csvEscape(row.rmCostingPerMtr),
           csvEscape(row.p10),
           csvEscape(row.p12),
           csvEscape(row.p15),
@@ -451,6 +453,7 @@ export default function PriceSheetPage() {
                     <th className="ps-col-sno">S NO.</th>
                     <th className="ps-col-name">NAME OF CABLE</th>
                     <th className="ps-col-price ps-col-rm">RM Costing (Per Box=305Mtr)</th>
+                    <th className="ps-col-price">Price / meter</th>
                     <th className="ps-col-price">P=10%</th>
                     <th className="ps-col-price">P=12%</th>
                     <th className="ps-col-price">P=15%</th>
@@ -464,6 +467,7 @@ export default function PriceSheetPage() {
                           {selectionMode ? <td><span className="ps-skeleton ps-sk-sno" /></td> : null}
                           <td><span className="ps-skeleton ps-sk-sno" /></td>
                           <td><span className="ps-skeleton ps-sk-name" /></td>
+                          <td><span className="ps-skeleton ps-sk-price" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
                           <td><span className="ps-skeleton ps-sk-price" /></td>
@@ -496,6 +500,9 @@ export default function PriceSheetPage() {
                             <td className="ps-name" title={row.name}>{row.name}</td>
                             <td className="ps-price ps-price-primary">
                               {formatPrice(row.rmCostingPerBox)}
+                            </td>
+                            <td className="ps-price">
+                              {formatPrice(row.rmCostingPerMtr)}
                             </td>
                             <td className="ps-price">{formatPrice(row.p10)}</td>
                             <td className="ps-price">{formatPrice(row.p12)}</td>
@@ -564,6 +571,10 @@ export default function PriceSheetPage() {
                         <div className="ps-price-chip is-primary">
                           <span>Per Box</span>
                           <strong>{formatPrice(row.rmCostingPerBox)}</strong>
+                        </div>
+                        <div className="ps-price-chip">
+                          <span>Per meter</span>
+                          <strong>{formatPrice(row.rmCostingPerMtr)}</strong>
                         </div>
                         <div className="ps-price-chip">
                           <span>P=10%</span>

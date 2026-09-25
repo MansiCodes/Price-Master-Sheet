@@ -23,6 +23,7 @@ import {
   formatDispatchItemsList,
   formatProcessStatusItem,
   formatSharedInsulationItem,
+  outerClosingAfterPutup,
   type CableStockStatusBlock,
   type RawMaterialStockRow,
   type SharedInsulationStatus,
@@ -192,6 +193,7 @@ export function StockStatusClient({
   tab,
   cableBlocks,
   sharedInsulation,
+  quadInsulation = null,
   rawRows,
 }: {
   plantId: string;
@@ -199,6 +201,7 @@ export function StockStatusClient({
   tab: "cable" | "raw";
   cableBlocks: CableStockStatusBlock[];
   sharedInsulation: SharedInsulationStatus | null;
+  quadInsulation?: SharedInsulationStatus | null;
   rawRows: RawMaterialStockRow[];
 }) {
   const router = useRouter();
@@ -324,8 +327,14 @@ export function StockStatusClient({
   const extraSizesFromData = useMemo(() => {
     const set = new Set<string>();
     for (const b of cableBlocks) {
-      if (!showAllCables && b.cable !== activeCable) continue;
-      const known = new Set(catalogSizesForCable(b.cable));
+      if (
+        !showAllCables &&
+        normalizeCableName(b.cable) !== normalizeCableName(activeCable)
+      )
+        continue;
+      const known = new Set(
+        catalogSizesForCable(normalizeCableName(b.cable)),
+      );
       if (b.size && !known.has(b.size)) set.add(b.size);
     }
     if (ordersByKey) {
@@ -498,8 +507,9 @@ export function StockStatusClient({
     };
   }, [rawRows]);
 
-  const showInsulationCard =
+  const showSignallingInsulation =
     showAllCables || isSignallingCableName(activeCable);
+  const showQuadInsulation = showAllCables || isQuadCableName(activeCable);
 
   function setDate(next: string) {
     if (!next || next > today) return;
@@ -844,28 +854,58 @@ export function StockStatusClient({
               (sum, b) => sum + (b.dispatchPending ?? 0),
               0,
             );
-            const totalInsulationKm = sharedInsulation?.closing ?? 0;
+            const totalInsulationKm =
+              (showSignallingInsulation ? (sharedInsulation?.closing ?? 0) : 0) +
+              (showQuadInsulation ? (quadInsulation?.closing ?? 0) : 0);
             const totalLengthBoth =
               Math.round((totalFinishedStockKm + totalInsulationKm) * 100) / 100;
 
             return (
               <>
                 <ol className="stock-status-grid">
-                  {showInsulationCard ? (
-                    <li className="stock-status-card stock-status-card--insulation-hero">
+                  {showSignallingInsulation ? (
+                    <li
+                      className={`stock-status-card stock-status-card--insulation-hero${
+                        showQuadInsulation ? "" : " is-full"
+                      }`}
+                    >
                       <div className="insul-hero__left">
                         <div className="insul-hero__img">
                           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                         </div>
                         <div className="insul-hero__details">
                           <h3 className="insul-hero__title">
-                            {activeCable === ALL_CABLES ? "Signalling Cable" : activeCable} <span className="insul-hero__bullet">&bull;</span> Insulation
+                            Signalling Cable <span className="insul-hero__bullet">&bull;</span> Insulation
                           </h3>
                           <p className="insul-hero__meta">
-                            Insul: <strong>{formatNum(sharedInsulation?.closing ?? 0)}km ({formatNum(sharedInsulation?.consumed ?? 0)}km)</strong>
+                            Insul: <strong>{formatNum(sharedInsulation?.closing ?? 0)}km ({formatNum(sharedInsulation?.production ?? 0)}km)</strong>
                           </p>
                           <p className="insul-hero__closing">
                             Closing &mdash; <strong>{formatNum(sharedInsulation?.closing ?? 0)}km</strong>
+                          </p>
+                        </div>
+                      </div>
+                    </li>
+                  ) : null}
+                  {showQuadInsulation ? (
+                    <li
+                      className={`stock-status-card stock-status-card--insulation-hero${
+                        showSignallingInsulation ? "" : " is-full"
+                      }`}
+                    >
+                      <div className="insul-hero__left">
+                        <div className="insul-hero__img">
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        </div>
+                        <div className="insul-hero__details">
+                          <h3 className="insul-hero__title">
+                            Quad Cable <span className="insul-hero__bullet">&bull;</span> Insulation
+                          </h3>
+                          <p className="insul-hero__meta">
+                            Insul: <strong>{formatNum(quadInsulation?.closing ?? 0)}km ({formatNum(quadInsulation?.production ?? 0)}km)</strong>
+                          </p>
+                          <p className="insul-hero__closing">
+                            Closing &mdash; <strong>{formatNum(quadInsulation?.closing ?? 0)}km</strong>
                           </p>
                         </div>
                       </div>
@@ -941,6 +981,14 @@ export function StockStatusClient({
                         <>
                           <div className="stock-proc-grid">
                             {block.processes.map((p) => {
+                              const putupForOuter = block.putupKm ?? 0;
+                              const isOuter =
+                                p.name.trim().toLowerCase() === "outer sheath" ||
+                                p.name.trim().toLowerCase() === "outer";
+                              const afterPutup =
+                                isOuter && putupForOuter > 0
+                                  ? outerClosingAfterPutup(p.closing, putupForOuter)
+                                  : null;
                               const item = formatProcessStatusItem(p);
                               return (
                                 <div key={p.name} className="stock-proc-chip">
@@ -948,7 +996,18 @@ export function StockStatusClient({
                                     <span className="stock-proc-chip__icon">{getProcessIcon(p.name)}</span>
                                     <span className="stock-proc-chip__label">{p.name}</span>
                                   </div>
-                                  <span className="stock-proc-chip__val">{item.value}</span>
+                                  {afterPutup != null ? (
+                                    <>
+                                      <span className="stock-proc-chip__val stock-proc-chip__val--sm">
+                                        {item.value}
+                                      </span>
+                                      <span className="stock-proc-chip__val">
+                                        {formatNum(afterPutup)}km
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="stock-proc-chip__val">{item.value}</span>
+                                  )}
                                 </div>
                               );
                             })}

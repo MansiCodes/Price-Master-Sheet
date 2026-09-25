@@ -2,7 +2,9 @@ import { getAccessToken } from "./googleAuth";
 import { sheetsCache } from "./cache";
 import {
   assertSheetStructure,
+  mapHouseWirePerMeter,
   mapSheetRowsToRates,
+  overlayHouseWirePerMeter,
   type SheetRow,
 } from "./sheetReader";
 import {
@@ -226,9 +228,13 @@ async function fetchDailyRatesFromSheet(): Promise<CableRate[]> {
 
   try {
     const sheetName = await resolveSheetName(sheetId);
-    const rows = await fetchValues(sheetId, `${sheetName}!A:Z`);
-    assertSheetStructure(rows);
-    return mapSheetRowsToRates(rows);
+    const [masterRows, houseWireRows] = await Promise.all([
+      fetchValues(sheetId, `${sheetName}!A:Z`),
+      fetchValues(sheetId, "House Wire!A:O").catch(() => [] as SheetRow[]),
+    ]);
+    assertSheetStructure(masterRows);
+    const rates = mapSheetRowsToRates(masterRows);
+    return overlayHouseWirePerMeter(rates, mapHouseWirePerMeter(houseWireRows));
   } catch (error) {
     if (error instanceof SheetsError) {
       throw error;

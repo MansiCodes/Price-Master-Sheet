@@ -65,28 +65,41 @@ export default async function StockPage({
 
   let cableBlocks: CableStockStatusBlock[] = [];
   let sharedInsulation: SharedInsulationStatus | null = null;
+  let quadInsulation: SharedInsulationStatus | null = null;
   let rawRows: RawMaterialStockRow[] = [];
 
   try {
     const reportIds = await resolveReportPlantIds(selectedPlantId);
     const pScope = plantIdFilter(reportIds);
+    const qsFgWhere = {
+      ...pScope,
+      category: "FG" as const,
+      date: { lte: endOfDay },
+      notes: { startsWith: "QSSTOCK:" },
+    };
+    const qsSelect = {
+      id: true,
+      date: true,
+      createdAt: true,
+      itemName: true,
+      notes: true,
+    } as const;
 
-    const [cableEntries, rmEntries] = await Promise.all([
+    const [cableEntries, quadEntries, rmEntries] = await Promise.all([
+      prisma.stockEntry.findMany({
+        where: qsFgWhere,
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: 2500,
+        select: qsSelect,
+      }),
       prisma.stockEntry.findMany({
         where: {
-          ...pScope,
-          category: "FG",
-          date: { lte: endOfDay },
-          notes: { startsWith: "QSSTOCK:" },
+          ...qsFgWhere,
+          itemName: { contains: "Quad", mode: "insensitive" },
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        take: 200,
-        select: {
-          id: true,
-          date: true,
-          itemName: true,
-          notes: true,
-        },
+        take: 400,
+        select: qsSelect,
       }),
       prisma.stockEntry.findMany({
         where: {
@@ -108,9 +121,23 @@ export default async function StockPage({
       }),
     ]);
 
-    const built = buildCableStockStatus(cableEntries);
+    const seenIds = new Set<string>();
+    const mergedCableEntries = [];
+    for (const row of [...quadEntries, ...cableEntries]) {
+      if (seenIds.has(row.id)) continue;
+      seenIds.add(row.id);
+      mergedCableEntries.push(row);
+    }
+    mergedCableEntries.sort((a, b) => {
+      const byDate = b.date.getTime() - a.date.getTime();
+      if (byDate !== 0) return byDate;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    });
+
+    const built = buildCableStockStatus(mergedCableEntries);
     cableBlocks = built.blocks;
     sharedInsulation = built.sharedInsulation;
+    quadInsulation = built.quadInsulation;
     rawRows = buildRawMaterialStockStatus(
       QUAD_SIGNAL_STOCK_RAW_MATERIALS,
       rmEntries,
@@ -127,6 +154,7 @@ export default async function StockPage({
       tab={tab}
       cableBlocks={cableBlocks}
       sharedInsulation={sharedInsulation}
+      quadInsulation={quadInsulation}
       rawRows={rawRows}
     />
   );

@@ -5,7 +5,7 @@ import {
   quadSignalClosingFromMeta,
 } from "@/lib/plant-catalogs";
 import { toIsoDateString } from "@/lib/dates";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
 
 export type StockProcessLine = {
   name: string;
@@ -90,10 +90,31 @@ export type FormattedStatusItem = {
   value: string;
 };
 
-export function formatProcessStatusItem(line: StockProcessLine): FormattedStatusItem {
+export function outerClosingAfterPutup(
+  outerClosing: number,
+  putupKm: number,
+): number {
+  const putup = Number(putupKm) || 0;
+  const closing = Number(outerClosing) || 0;
+  return Math.round(Math.max(0, closing - putup) * 1000) / 1000;
+}
+
+export function formatProcessStatusItem(
+  line: StockProcessLine,
+  opts?: { putupKm?: number },
+): FormattedStatusItem {
+  const base = `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
+  const putupKm = Number(opts?.putupKm) || 0;
+  if (putupKm > 0 && isOuterProcess(line.name)) {
+    const after = outerClosingAfterPutup(line.closing, putupKm);
+    return {
+      label: `${line.shortName}:`,
+      value: `${base} → after putup ${fmtKm(after)}km`,
+    };
+  }
   return {
     label: `${line.shortName}:`,
-    value: `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`,
+    value: base,
   };
 }
 
@@ -290,9 +311,11 @@ export function buildCableStockStatus(
 ): {
   blocks: CableStockStatusBlock[];
   sharedInsulation: SharedInsulationStatus | null;
+  quadInsulation: SharedInsulationStatus | null;
 } {
   const byKey = new Map<string, CableStockStatusBlock>();
   let sharedInsulation: SharedInsulationStatus | null = null;
+  let quadInsulation: SharedInsulationStatus | null = null;
 
   for (const row of rows) {
     try {
@@ -304,8 +327,8 @@ export function buildCableStockStatus(
       const cable = meta.cable.trim();
       const size = meta.size.trim();
 
+      const entryDate = toIsoDateString(row.date);
       if (!sharedInsulation && isSignallingCableName(cable)) {
-        const entryDate = toIsoDateString(row.date);
         if (
           meta.sharedInsulation &&
           Number.isFinite(meta.sharedInsulation.closing)
@@ -322,14 +345,36 @@ export function buildCableStockStatus(
           const insulClose = Number(closingMap.Insulation);
           const insulProd = Number(meta.production?.Insulation) || 0;
           if (Number.isFinite(insulClose) || insulProd) {
+            const opening = Number(meta.opening?.Insulation) || 0;
+            const closingVal = Number.isFinite(insulClose) ? insulClose : 0;
             sharedInsulation = {
               entryDate,
-              opening: Number(meta.opening?.Insulation) || 0,
+              opening,
               production: insulProd,
-              consumed: 0,
-              closing: Number.isFinite(insulClose) ? insulClose : 0,
+              consumed: Math.max(0, Math.round((opening + insulProd - closingVal) * 1000) / 1000),
+              closing: closingVal,
             };
           }
+        }
+      }
+
+      if (!quadInsulation && isQuadCableName(cable)) {
+        const closingMap = quadSignalClosingFromMeta(meta);
+        const insulClose = Number(closingMap.Insulation);
+        const insulProd = Number(meta.production?.Insulation) || 0;
+        if (Number.isFinite(insulClose) || insulProd) {
+          const opening = Number(meta.opening?.Insulation) || 0;
+          const closingVal = Number.isFinite(insulClose) ? insulClose : 0;
+          quadInsulation = {
+            entryDate,
+            opening,
+            production: insulProd,
+            consumed: Math.max(
+              0,
+              Math.round((opening + insulProd - closingVal) * 1000) / 1000,
+            ),
+            closing: closingVal,
+          };
         }
       }
 
@@ -348,6 +393,7 @@ export function buildCableStockStatus(
             );
 
       // Signalling Insulation lives in the shared top card, not per-size.
+      // Quad keeps Insulation on the size card so it matches P&L PROCESS WIP.
       if (isSignallingCableName(cable)) {
         names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
       }
@@ -415,10 +461,13 @@ export function buildCableStockStatus(
         };
       });
 
-      // Insul + Single Quad stay visible on the card but are not part of Total.
+      // Insul + Single Quad stay out of Total. Outer uses closing after Call putup.
       const totalKm = processes.reduce((s, p) => {
         const n = p.name.trim().toLowerCase();
         if (n === "insulation" || n === "single quad") return s;
+        if (isOuterProcess(p.name)) {
+          return s + outerClosingAfterPutup(p.closing, totalPutupKm);
+        }
         return s + p.closing;
       }, 0);
 
@@ -448,6 +497,7 @@ export function buildCableStockStatus(
   return {
     blocks: Array.from(byKey.values()),
     sharedInsulation,
+    quadInsulation,
   };
 }
 

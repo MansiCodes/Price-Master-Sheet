@@ -731,7 +731,6 @@
 
 /* --- Insulation Top Hero Card --- */
 .stock-status-card--insulation-hero {
-  grid-column: 1 / -1;
   background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 60%, #e6f4f1 100%);
   border: 1px solid #d1fae5;
   border-radius: 16px;
@@ -744,8 +743,13 @@
   box-shadow: 0 4px 14px rgba(13, 148, 136, 0.05);
 }
 
+.stock-status-card--insulation-hero.is-full {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 720px) {
   .stock-status-card--insulation-hero {
+    grid-column: 1 / -1;
     flex-direction: column;
     align-items: flex-start;
     padding: 1rem;
@@ -803,11 +807,13 @@
 .insul-hero__meta, .insul-hero__closing {
   margin: 0.15rem 0;
   font-size: 0.88rem;
-  color: #475569;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .insul-hero__meta strong, .insul-hero__closing strong {
   color: #0f172a;
+  font-weight: 800;
 }
 
 .insul-hero__right {
@@ -997,6 +1003,16 @@
   font-size: 0.8rem;
   font-weight: 750;
   color: #0f172a;
+}
+
+.stock-proc-chip__val--sm {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.stock-proc-chip__val--sm + .stock-proc-chip__val {
+  font-weight: 800;
 }
 
 /* --- Call Putup & Total Row --- */
