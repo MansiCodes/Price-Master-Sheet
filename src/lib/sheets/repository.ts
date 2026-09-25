@@ -230,7 +230,7 @@ async function fetchDailyRatesFromSheet(): Promise<CableRate[]> {
     const sheetName = await resolveSheetName(sheetId);
     const [masterRows, houseWireRows] = await Promise.all([
       fetchValues(sheetId, `${sheetName}!A:Z`),
-      fetchValues(sheetId, "House Wire!A:O").catch(() => [] as SheetRow[]),
+      fetchValues(sheetId, "House Wire!A:AZ").catch(() => [] as SheetRow[]),
     ]);
     assertSheetStructure(masterRows);
     const rates = mapSheetRowsToRates(masterRows);
