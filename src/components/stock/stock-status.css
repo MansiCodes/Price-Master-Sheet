@@ -1005,14 +1005,18 @@
   color: #0f172a;
 }
 
+.stock-proc-chip__val--row {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
 .stock-proc-chip__val--sm {
   font-size: 0.68rem;
   font-weight: 600;
   color: #0f172a;
-}
-
-.stock-proc-chip__val--sm + .stock-proc-chip__val {
-  font-weight: 800;
 }
 
 /* --- Call Putup & Total Row --- */

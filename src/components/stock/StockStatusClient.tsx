@@ -997,14 +997,12 @@ export function StockStatusClient({
                                     <span className="stock-proc-chip__label">{p.name}</span>
                                   </div>
                                   {afterPutup != null ? (
-                                    <>
-                                      <span className="stock-proc-chip__val stock-proc-chip__val--sm">
+                                    <span className="stock-proc-chip__val stock-proc-chip__val--row">
+                                      <span className="stock-proc-chip__val--sm">
                                         {item.value}
                                       </span>
-                                      <span className="stock-proc-chip__val">
-                                        {formatNum(afterPutup)}km
-                                      </span>
-                                    </>
+                                      <span>{formatNum(afterPutup)}km</span>
+                                    </span>
                                   ) : (
                                     <span className="stock-proc-chip__val">{item.value}</span>
                                   )}
