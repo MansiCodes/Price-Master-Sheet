@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { SelectMenu } from "@/components/ui/SelectMenu";
 
 type AuditToolbarProps = {
   query: string;
@@ -35,27 +36,27 @@ function ExportIcon() {
   );
 }
 
-export function AuditToolbar({
-  query,
-  onQueryChange,
-  actorFilter,
-  onActorFilterChange,
-  dateFrom,
-  dateTo,
-  onDateFromChange,
-  onDateToChange,
-  actors,
-  activeFilterCount,
-  onClearFilters,
-  onExport,
-}: AuditToolbarProps) {
+function isInsideAuditFilter(target: EventTarget | null, root: HTMLElement | null): boolean {
+  if (!(target instanceof Node) || !root) return false;
+  if (root.contains(target)) return true;
+  return target instanceof Element && Boolean(target.closest(".select-menu__list"));
+}
+
+export function AuditToolbar(props: AuditToolbarProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const actorItems = useMemo(
+    () => [
+      { value: "ALL", label: "All users" },
+      ...props.actors.map((actor) => ({ value: actor, label: actor })),
+    ],
+    [props.actors],
+  );
 
   useEffect(() => {
     if (!filterOpen) return;
     function onDoc(e: MouseEvent) {
-      if (!filterRef.current?.contains(e.target as Node)) {
+      if (!isInsideAuditFilter(e.target, filterRef.current)) {
         setFilterOpen(false);
       }
     }
@@ -76,8 +77,8 @@ export function AuditToolbar({
         <input
           type="search"
           placeholder="Search actor, entity, field…"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
+          value={props.query}
+          onChange={(e) => props.onQueryChange(e.target.value)}
         />
       </label>
 
@@ -87,15 +88,15 @@ export function AuditToolbar({
         <div className="audit-filter" ref={filterRef}>
           <button
             type="button"
-            className={`audit-icon-btn ${activeFilterCount > 0 ? "is-active" : ""}`}
+            className={`audit-icon-btn ${props.activeFilterCount > 0 ? "is-active" : ""}`}
             onClick={() => setFilterOpen((v) => !v)}
             title="Filter"
             aria-label="Filter by date and user"
             aria-expanded={filterOpen}
           >
             <FilterIcon />
-            {activeFilterCount > 0 ? (
-              <span className="audit-icon-btn__badge">{activeFilterCount}</span>
+            {props.activeFilterCount > 0 ? (
+              <span className="audit-icon-btn__badge">{props.activeFilterCount}</span>
             ) : null}
           </button>
 
@@ -103,26 +104,23 @@ export function AuditToolbar({
             <div className="audit-filter__menu" role="dialog" aria-label="Audit filters">
               <div className="audit-filter__field">
                 <label htmlFor="audit-actor">User</label>
-                <select
+                <SelectMenu
                   id="audit-actor"
-                  value={actorFilter}
-                  onChange={(e) => onActorFilterChange(e.target.value)}
-                >
-                  <option value="ALL">All users</option>
-                  {actors.map((actor) => (
-                    <option key={actor} value={actor}>
-                      {actor}
-                    </option>
-                  ))}
-                </select>
+                  className="audit-filter__select"
+                  value={props.actorFilter}
+                  items={actorItems}
+                  searchable={actorItems.length > 8}
+                  searchPlaceholder="Search user…"
+                  onChange={props.onActorFilterChange}
+                />
               </div>
               <div className="audit-filter__field">
                 <label htmlFor="audit-from">From date</label>
                 <input
                   id="audit-from"
                   type="date"
-                  value={dateFrom}
-                  onChange={(e) => onDateFromChange(e.target.value)}
+                  value={props.dateFrom}
+                  onChange={(e) => props.onDateFromChange(e.target.value)}
                 />
               </div>
               <div className="audit-filter__field">
@@ -130,13 +128,13 @@ export function AuditToolbar({
                 <input
                   id="audit-to"
                   type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  onChange={(e) => onDateToChange(e.target.value)}
+                  value={props.dateTo}
+                  min={props.dateFrom || undefined}
+                  onChange={(e) => props.onDateToChange(e.target.value)}
                 />
               </div>
               <div className="audit-filter__actions">
-                <button type="button" className="audit-filter__clear" onClick={onClearFilters}>
+                <button type="button" className="audit-filter__clear" onClick={props.onClearFilters}>
                   Clear
                 </button>
                 <button
@@ -154,7 +152,7 @@ export function AuditToolbar({
         <button
           type="button"
           className="audit-icon-btn"
-          onClick={onExport}
+          onClick={props.onExport}
           title="Export audit CSV"
           aria-label="Export audit CSV"
         >

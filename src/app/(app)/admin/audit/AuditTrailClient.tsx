@@ -11,6 +11,7 @@ import {
   AUDIT_PAGE_SIZE,
   type AuditRow,
 } from "@/components/admin/audit/types";
+import { auditRowsToCsv, downloadTextFile } from "@/components/admin/audit/audit-csv";
 import "@/components/admin/audit/audit.css";
 
 type AuditPageResponse = {
@@ -111,35 +112,12 @@ export function AuditTrailClient() {
       nextPage += 1;
       if (nextPage > 40) break;
     }
-    const csvRows = [
-      ["When", "Actor", "Email", "Entity", "Field", "Backdated", "Change"],
-      ...collected.map((r) => [
-        r.createdAt,
-        r.actorName,
-        r.actorEmail,
-        r.entityType,
-        r.field ?? "",
-        r.isBackdated ? "Yes" : "No",
-        r.newValue ?? "",
-      ]),
-    ];
-    const csv = csvRows
-      .map((row) =>
-        row
-          .map((cell) => {
-            const s = String(cell);
-            return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-          })
-          .join(","),
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const csv = auditRowsToCsv(collected);
+    downloadTextFile(
+      `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`,
+      csv,
+      "text/csv;charset=utf-8",
+    );
   }
 
   if (bootstrapping) {

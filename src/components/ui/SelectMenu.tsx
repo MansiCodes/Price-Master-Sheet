@@ -10,6 +10,10 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import {
+  measureSelectMenuPos,
+  type SelectMenuPos,
+} from "./select-menu-position";
 
 export type SelectMenuItem = {
   value: string;
@@ -36,14 +40,6 @@ type SelectMenuProps = {
   className?: string;
 };
 
-type MenuPos = {
-  top: number;
-  left: number;
-  width: number;
-  maxHeight: number;
-  openUp: boolean;
-};
-
 export function SelectMenu({
   id,
   value,
@@ -63,7 +59,7 @@ export function SelectMenu({
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<MenuPos | null>(null);
+  const [pos, setPos] = useState<SelectMenuPos | null>(null);
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -102,33 +98,7 @@ export function SelectMenu({
   function updatePosition() {
     const el = rootRef.current;
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const gap = 6;
-    const edgePad = 16;
-    const spaceBelow = window.innerHeight - rect.bottom - gap - edgePad;
-    const spaceAbove = rect.top - gap - edgePad;
-    const minSpace = searchable ? 220 : 180;
-    const openUp = spaceBelow < minSpace && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(
-      searchable ? 160 : 140,
-      Math.min(searchable ? 320 : 280, openUp ? spaceAbove : spaceBelow),
-    );
-    const maxWidth = Math.max(120, window.innerWidth - edgePad * 2);
-    // Prefer trigger width; keep a modest floor so short labels still fit.
-    const width = Math.min(Math.max(rect.width, 128), maxWidth);
-    // Keep the menu inside the viewport with padding on the right (and left).
-    let left = rect.left;
-    if (left + width > window.innerWidth - edgePad) {
-      left = window.innerWidth - edgePad - width;
-    }
-    left = Math.max(edgePad, left);
-    setPos({
-      top: openUp ? rect.top - gap : rect.bottom + gap,
-      left,
-      width,
-      maxHeight,
-      openUp,
-    });
+    setPos(measureSelectMenuPos(el, searchable));
   }
 
   useLayoutEffect(() => {
