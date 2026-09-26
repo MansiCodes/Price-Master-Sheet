@@ -33,7 +33,6 @@ export function orderKey(cable: string, size: string): string {
 export function toSizeMatchKey(raw: string): string {
   let s = raw.toLowerCase().trim();
   if (!s) return "";
-  // "1 x 10 Sqmm" / jumper singles — drop the 1× prefix so they match catalog "10 Sqmm"
   s = s.replace(/^1\s*[x×]\s*/, "");
   s = s.replace(/\([^)]*\)/g, " ");
   s = s.replace(/\blzsh\b/gi, "lszh");
@@ -44,9 +43,14 @@ export function toSizeMatchKey(raw: string): string {
   s = s.replace(/\bun-?amoured\b/g, "unarmoured");
   s = s.replace(/\bun-?armou?red\b/g, "unarmoured");
   s = s.replace(/\barmored\b/g, "armoured");
-  s = s.replace(/\bcores?\b/g, "c");
-  s = s.replace(/\bquads?\b/g, "q");
-  s = s.replace(/\bpairs?\b/g, "p");
+  // 12Cx1.5 / 6c x 1.5 / 2CX25 — compact factory spellings
+  s = s.replace(/(\d+)\s*cores?\b/g, "$1c");
+  s = s.replace(/(\d+)\s*c\s*[x×]/g, "$1c");
+  s = s.replace(/(\d+)\s*[x×]\s*(?=\d+(?:\.\d+)?\s*sq)/g, "$1c");
+  s = s.replace(/(\d+)\s*quads?\b/g, "$1q");
+  s = s.replace(/(\d+)\s*pairs?\b/g, "$1p");
+  s = s.replace(/(\d+)\s*p\s*[x×]/g, "$1p");
+  s = s.replace(/(\d+)\s*q\s*[x×]/g, "$1q");
   s = s.replace(/sq\.?\s*m\.?m\.?/g, "");
   s = s.replace(/mm2/g, "");
   s = s.replace(/mm\b/g, "");
@@ -54,6 +58,7 @@ export function toSizeMatchKey(raw: string): string {
   s = s.replace(/\batc\b/g, "atc");
   s = s.replace(/\babc\b/g, "abc");
   s = s.replace(/[^a-z0-9./]/g, "");
+  s = s.replace(/([cpq])\.(\d)/g, "$10.$2");
   return s;
 }
 

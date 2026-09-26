@@ -4,8 +4,9 @@ import {
   quadSignalCableSizeDedupeKey,
   quadSignalClosingFromMeta,
 } from "@/lib/plant-catalogs";
-import { toIsoDateString } from "@/lib/dates";
-import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
+import { toIstDateString } from "@/lib/dates";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { pickBestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
   outerClosingAfterPutup,
@@ -33,8 +34,8 @@ export function buildCableStockStatus(
   quadInsulation: SharedInsulationStatus | null;
 } {
   const byKey = new Map<string, CableStockStatusBlock>();
-  let sharedInsulation: SharedInsulationStatus | null = null;
-  let quadInsulation: SharedInsulationStatus | null = null;
+  const signallingInsul: SharedInsulationStatus[] = [];
+  const quadInsul: SharedInsulationStatus[] = [];
 
   for (const row of rows) {
     try {
@@ -46,56 +47,11 @@ export function buildCableStockStatus(
       const cable = meta.cable.trim();
       const size = meta.size.trim();
 
-      const entryDate = toIsoDateString(row.date);
-      if (!sharedInsulation && isSignallingCableName(cable)) {
-        if (
-          meta.sharedInsulation &&
-          Number.isFinite(meta.sharedInsulation.closing)
-        ) {
-          sharedInsulation = {
-            entryDate,
-            opening: Number(meta.opening?.Insulation) || 0,
-            production: Number(meta.production?.Insulation) || 0,
-            consumed: Number(meta.sharedInsulation.consumed) || 0,
-            closing: Number(meta.sharedInsulation.closing) || 0,
-          };
-        } else {
-          const closingMap = quadSignalClosingFromMeta(meta);
-          const insulClose = Number(closingMap.Insulation);
-          const insulProd = Number(meta.production?.Insulation) || 0;
-          if (Number.isFinite(insulClose) || insulProd) {
-            const opening = Number(meta.opening?.Insulation) || 0;
-            const closingVal = Number.isFinite(insulClose) ? insulClose : 0;
-            sharedInsulation = {
-              entryDate,
-              opening,
-              production: insulProd,
-              consumed: Math.max(0, Math.round((opening + insulProd - closingVal) * 1000) / 1000),
-              closing: closingVal,
-            };
-          }
-        }
-      }
-
-      if (!quadInsulation && isQuadCableName(cable)) {
-        const closingMap = quadSignalClosingFromMeta(meta);
-        const insulClose = Number(closingMap.Insulation);
-        const insulProd = Number(meta.production?.Insulation) || 0;
-        if (Number.isFinite(insulClose) || insulProd) {
-          const opening = Number(meta.opening?.Insulation) || 0;
-          const closingVal = Number.isFinite(insulClose) ? insulClose : 0;
-          quadInsulation = {
-            entryDate,
-            opening,
-            production: insulProd,
-            consumed: Math.max(
-              0,
-              Math.round((opening + insulProd - closingVal) * 1000) / 1000,
-            ),
-            closing: closingVal,
-          };
-        }
-      }
+      const entryDate = toIstDateString(row.date);
+      const sig = familyInsulationCandidate(cable, meta, entryDate, "signalling");
+      if (sig) signallingInsul.push(sig);
+      const qd = familyInsulationCandidate(cable, meta, entryDate, "quad");
+      if (qd) quadInsul.push(qd);
 
       // Prefer normalized key so "100P" / "100 Pair" / "100Pair" show as one card.
       const key = quadSignalCableSizeDedupeKey(cable, size);
@@ -194,7 +150,7 @@ export function buildCableStockStatus(
         key: `${cable} · ${size}`,
         cable,
         size,
-        entryDate: toIsoDateString(row.date),
+        entryDate,
         processes,
         totalKm: Math.round(totalKm * 1000) / 1000,
         salesKm: Number(meta.salesKm) || 0,
@@ -215,7 +171,7 @@ export function buildCableStockStatus(
 
   return {
     blocks: Array.from(byKey.values()),
-    sharedInsulation,
-    quadInsulation,
+    sharedInsulation: pickBestInsulation(signallingInsul),
+    quadInsulation: pickBestInsulation(quadInsul),
   };
 }

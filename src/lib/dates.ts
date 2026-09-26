@@ -101,6 +101,16 @@ export function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** Calendar YYYY-MM-DD in IST for Prisma `@db.Date` values (UTC midnight IST next day). */
+export function toIstDateString(value: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
 /** Today's calendar date in Asia/Kolkata, as UTC midnight for Prisma `@db.Date`. */
 export function todayIstAsUtcDate(now: Date = new Date()): Date {
   const dateStr = new Intl.DateTimeFormat("en-CA", {

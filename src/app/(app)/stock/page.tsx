@@ -58,8 +58,6 @@ export default async function StockPage({
       ? dateStr
       : today;
   const day = parseDateOnly(date);
-  const endOfDay = new Date(day);
-  endOfDay.setUTCHours(23, 59, 59, 999);
 
   const tab = tabParam === "raw" ? "raw" : "cable";
 
@@ -74,7 +72,7 @@ export default async function StockPage({
     const qsFgWhere = {
       ...pScope,
       category: "FG" as const,
-      date: { lte: endOfDay },
+      date: { lte: day },
       notes: { startsWith: "QSSTOCK:" },
     };
     const qsSelect = {
@@ -105,7 +103,7 @@ export default async function StockPage({
         where: {
           ...pScope,
           category: "RM",
-          date: { lte: endOfDay },
+          date: { lte: day },
           notes: { startsWith: "QSSTOCK:" },
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],

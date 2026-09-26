@@ -101,12 +101,13 @@ export function extraSizesFromData(
 ): string[] {
   const set = new Set<string>();
   for (const b of cableBlocks) {
+    const cable = normalizeCableName(b.cable);
     if (
       !showAllCables &&
-      normalizeCableName(b.cable) !== normalizeCableName(activeCable)
+      cable !== normalizeCableName(activeCable)
     )
       continue;
-    const known = new Set(catalogSizesForCable(normalizeCableName(b.cable)));
+    const known = new Set(catalogSizesForCable(cable));
     if (b.size && !known.has(b.size)) set.add(b.size);
   }
   if (ordersByKey) {
@@ -120,6 +121,26 @@ export function extraSizesFromData(
     }
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+export function lookupCableBlock(
+  blocksByKey: Map<string, CableStockStatusBlock>,
+  cableBlocks: CableStockStatusBlock[],
+  cable: string,
+  size: string,
+): CableStockStatusBlock | null {
+  const direct = blocksByKey.get(quadSignalCableSizeDedupeKey(cable, size));
+  if (direct) return direct;
+
+  const sizeKey = toSizeMatchKey(size);
+  const cableN = normalizeCableName(cable);
+  if (!sizeKey) return null;
+
+  for (const b of cableBlocks) {
+    if (normalizeCableName(b.cable) !== cableN) continue;
+    if (toSizeMatchKey(b.size) === sizeKey) return b;
+  }
+  return null;
 }
 
 export function blocksByDedupeKey(

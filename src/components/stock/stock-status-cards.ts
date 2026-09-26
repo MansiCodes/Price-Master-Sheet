@@ -13,6 +13,7 @@ import {
   catalogSizesForCable,
   type DisplayCard,
 } from "./stock-status-constants";
+import { lookupCableBlock } from "./stock-status-lists";
 
 export function buildDisplayCards({
   cablesInView,
@@ -45,21 +46,23 @@ export function buildDisplayCards({
         key: `${cable} · ${size}`,
         cable,
         size,
-        block: blocksByKey.get(dedupeKey) ?? null,
+        block: lookupCableBlock(blocksByKey, cableBlocks, cable, size),
       });
     }
   }
 
   for (const b of cableBlocks) {
-    const dedupeKey = quadSignalCableSizeDedupeKey(b.cable, b.size);
+    const cable = normalizeCableName(b.cable);
+    const size = b.size;
+    const dedupeKey = quadSignalCableSizeDedupeKey(cable, size);
     if (seen.has(dedupeKey)) continue;
-    if (!showAllCables && normalizeCableName(b.cable) !== normalizeCableName(activeCable)) continue;
-    if (cableSize !== ALL_SIZES && toSizeMatchKey(b.size) !== toSizeMatchKey(cableSize)) continue;
+    if (!showAllCables && cable !== normalizeCableName(activeCable)) continue;
+    if (cableSize !== ALL_SIZES && toSizeMatchKey(size) !== toSizeMatchKey(cableSize)) continue;
     seen.add(dedupeKey);
     cards.push({
-      key: `${normalizeCableName(b.cable)} · ${b.size}`,
-      cable: normalizeCableName(b.cable),
-      size: b.size,
+      key: `${cable} · ${size}`,
+      cable,
+      size,
       block: b,
     });
   }
@@ -80,7 +83,7 @@ export function buildDisplayCards({
         key: `${cable} · ${size}`,
         cable,
         size,
-        block: blocksByKey.get(dedupeKey) ?? null,
+        block: lookupCableBlock(blocksByKey, cableBlocks, cable, size),
       });
     }
   }

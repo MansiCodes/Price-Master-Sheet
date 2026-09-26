@@ -107,10 +107,13 @@ export function EntryApproveRejectGroup({
               padding: "1.5rem",
             }}
           >
-            <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600 }}>
-              Reject entry
+            <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 600 }}>
+              Are you sure you want to reject?
             </h3>
-            <textarea
+            <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", color: "#4b5563" }}>
+              This will reject the entry.
+            </p>
+            <textarea>
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Optional rejection reason"
@@ -125,7 +128,7 @@ export function EntryApproveRejectGroup({
             />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
               <button type="button" onClick={() => setShowRejectModal(false)}>
-                Cancel
+                No
               </button>
               <button
                 type="button"
@@ -138,7 +141,7 @@ export function EntryApproveRejectGroup({
                   color: "#fff",
                 }}
               >
-                Confirm reject
+                Yes
               </button>
             </div>
           </div>

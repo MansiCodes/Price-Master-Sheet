@@ -169,6 +169,8 @@ export function StockStatusToolbar({
   onOrdersExcelSelected: (file: File | null) => void;
   onClearOrders: () => void;
 }) {
+  const [confirmClear, setConfirmClear] = useState(false);
+
   return (
     <div className="stock-status-toolbar">
       <div className="stock-status-toolbar__top-row">
@@ -193,7 +195,11 @@ export function StockStatusToolbar({
           </button>
         </div>
 
-        <div className="stock-status-toolbar__date" aria-label="Stock date">
+        <div
+          className="stock-status-toolbar__date"
+          aria-label="Stock as of date"
+          title="Shows the latest stock filled for this date. If a size was filled on an earlier day and not filled again, that earlier fill still shows."
+        >
           <span className={`stock-status-today-pill${isToday ? " is-today" : ""}`}>
             {isToday ? "Today" : formatDisplayDate(date)}
           </span>
@@ -208,7 +214,7 @@ export function StockStatusToolbar({
           <div className="pnl-date-filter stock-status-date-full">
             <div className="pnl-date-filter__field">
               <label htmlFor="stock-date" className="sr-only">
-                Calendar
+                Stock as of date
               </label>
               <div className="pnl-date-filter__input-wrap">
                 <input
@@ -219,7 +225,7 @@ export function StockStatusToolbar({
                   max={today}
                   onChange={(e) => onSetDate(e.target.value)}
                   onClick={onOpenCalendar}
-                  aria-label="Choose stock date"
+                  aria-label="Stock as of date — the day the stock form was filled for"
                 />
               </div>
             </div>
@@ -249,7 +255,7 @@ export function StockStatusToolbar({
               <button
                 type="button"
                 className="stock-orders-upload__clear"
-                onClick={onClearOrders}
+                onClick={() => setConfirmClear(true)}
                 title={ordersFileName}
               >
                 Clear
@@ -258,6 +264,49 @@ export function StockStatusToolbar({
           </div>
         ) : null}
       </div>
+
+      {confirmClear ? (
+        <div className="stock-confirm-dialog" role="presentation">
+          <button
+            type="button"
+            className="stock-confirm-dialog__backdrop"
+            aria-label="No"
+            onClick={() => setConfirmClear(false)}
+          />
+          <div
+            className="stock-confirm-dialog__panel"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="stock-clear-title"
+          >
+            <h2 id="stock-clear-title" className="stock-confirm-dialog__title">
+              Clear uploaded file?
+            </h2>
+            <p className="stock-confirm-dialog__copy">
+              Are you sure you want to clear the uploaded files?
+            </p>
+            <div className="stock-confirm-dialog__actions">
+              <button
+                type="button"
+                className="stock-confirm-dialog__no"
+                onClick={() => setConfirmClear(false)}
+              >
+                No
+              </button>
+              <button
+                type="button"
+                className="stock-confirm-dialog__yes"
+                onClick={() => {
+                  setConfirmClear(false);
+                  onClearOrders();
+                }}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

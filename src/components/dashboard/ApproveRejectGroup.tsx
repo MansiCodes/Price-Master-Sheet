@@ -115,9 +115,14 @@ export function ApproveRejectGroup({
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
             }}
           >
-            <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600 }}>Reject Shift Entry</h3>
+            <h3 style={{ margin: "0 0 0.5rem 0", fontSize: "1.1rem", fontWeight: 600 }}>
+              Are you sure you want to reject?
+            </h3>
+            <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", color: "#4b5563" }}>
+              This will reject the shift entry.
+            </p>
             <label style={{ display: "block", fontSize: "0.85rem", color: "#4b5563", marginBottom: "0.5rem" }}>
-              Rejection Reason (Optional):
+              Rejection reason (optional):
             </label>
             <textarea
               value={reason}
@@ -148,7 +153,7 @@ export function ApproveRejectGroup({
                   cursor: "pointer",
                 }}
               >
-                Cancel
+                No
               </button>
               <button
                 type="button"
@@ -164,7 +169,7 @@ export function ApproveRejectGroup({
                   cursor: "pointer",
                 }}
               >
-                Confirm Reject
+                Yes
               </button>
             </div>
           </div>
