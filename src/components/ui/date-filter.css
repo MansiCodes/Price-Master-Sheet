@@ -72,6 +72,10 @@
     contrast(92%);
 }
 
+.pnl-date-filter__clear-icon {
+  display: none;
+}
+
 .pnl-date-filter__clear {
   flex-shrink: 0;
   font-size: 0.75rem;
@@ -86,9 +90,145 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.pnl-date-filter__clear:hover {
+.pnl-date-picker {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.pnl-date-picker__trigger {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 8.6rem;
+  max-width: 100%;
+  min-width: 0;
+  height: 1.9rem;
+  padding: 0 0.55rem 0 0.65rem;
+  border: 1px solid var(--border, #d7e0dc);
+  border-radius: 999px;
+  background: var(--bg-elevated, #fff);
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--fg, #1a2421);
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.pnl-date-picker__trigger .is-placeholder {
+  color: var(--fg-muted, #5b6b66);
+}
+
+.pnl-date-picker__trigger svg {
+  flex-shrink: 0;
+  color: var(--teal, #127269);
+}
+
+.pnl-date-picker__trigger:hover,
+.pnl-date-picker__trigger[aria-expanded="true"] {
   border-color: var(--teal, #127269);
+}
+
+.pnl-date-picker__menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 80;
+  width: 16.25rem;
+  max-width: min(16.25rem, calc(100vw - 1.25rem));
+  padding: 0.75rem;
+  border-radius: 16px;
+  border: 1px solid var(--border, #d7e0dc);
+  background: #fff;
+  box-shadow: 0 14px 32px rgba(26, 36, 33, 0.14);
+  box-sizing: border-box;
+}
+
+.pnl-date-picker--end .pnl-date-picker__menu {
+  left: auto;
+  right: 0;
+}
+
+.pnl-date-picker__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+.pnl-date-picker__month {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--teal-ink, #0e5a54);
+}
+
+.pnl-date-picker__nav-btn {
+  appearance: none;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 999px;
   background: var(--teal-soft, #d8f3ef);
+  color: var(--teal-ink, #0e5a54);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pnl-date-picker__week,
+.pnl-date-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.15rem;
+  text-align: center;
+}
+
+.pnl-date-picker__week {
+  margin-bottom: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #5b6b66);
+}
+
+.pnl-date-picker__day {
+  appearance: none;
+  height: 1.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg, #1a2421);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pnl-date-picker__day:hover:not(:disabled) {
+  background: var(--teal-soft, #d8f3ef);
+  color: var(--teal-ink, #0e5a54);
+}
+
+.pnl-date-picker__day.is-selected {
+  background: var(--teal-fill, linear-gradient(90deg, #14b8a6 0%, #0d9488 45%, #0e5a54 100%));
+  color: #fff;
+}
+
+.pnl-date-picker__day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .pnl-date-picker__trigger {
+    width: 100%;
+    height: 2.35rem;
+  }
 }
 
 /* P&L toolbar: From, To, Export on one aligned row */

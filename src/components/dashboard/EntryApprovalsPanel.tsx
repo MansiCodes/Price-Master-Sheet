@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EntryApproveRejectGroup } from "@/components/dashboard/EntryApproveRejectGroup";
+import { Pagination } from "@/components/ui/Pagination";
 import { localeToBcp47, type AppLocale } from "@/i18n/config";
 import type { EntryApprovalKind } from "@/lib/entry-approval-types";
 
@@ -26,6 +27,8 @@ const TABS: { key: EntryApprovalKind; label: string }[] = [
   { key: "stock", label: "Stock" },
   { key: "expense", label: "Expense" },
 ];
+
+const APPROVALS_PAGE_SIZE = 10;
 
 function formatDay(dateStr: string, locale: AppLocale): string {
   const d = new Date(`${dateStr.slice(0, 10)}T00:00:00Z`);
@@ -54,11 +57,25 @@ export function EntryApprovalsPanel({
   locale: AppLocale;
 }) {
   const [tab, setTab] = useState<EntryApprovalKind>(initialTab);
-  const filtered = entries.filter((e) => e.kind === tab);
+  const [page, setPage] = useState(1);
+  const filtered = useMemo(
+    () => entries.filter((e) => e.kind === tab),
+    [entries, tab],
+  );
   const counts = TABS.map((t) => ({
     ...t,
     count: entries.filter((e) => e.kind === t.key).length,
   }));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / APPROVALS_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice(
+    (safePage - 1) * APPROVALS_PAGE_SIZE,
+    safePage * APPROVALS_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab]);
 
   return (
     <section className="mis-panel" style={{ marginTop: "0.85rem", padding: "1.25rem" }}>
@@ -77,7 +94,10 @@ export function EntryApprovalsPanel({
           <button
             key={t.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => {
+              setTab(t.key);
+              setPage(1);
+            }}
             style={{
               padding: "0.45rem 0.9rem",
               borderRadius: "999px",
@@ -116,7 +136,7 @@ export function EntryApprovalsPanel({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {paged.map((row) => (
                 <tr key={row.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   <td style={{ padding: "0.75rem 0.5rem" }}>
                     {formatDay(row.date, locale)}
@@ -159,6 +179,12 @@ export function EntryApprovalsPanel({
               ))}
             </tbody>
           </table>
+          <Pagination
+            page={safePage}
+            pageSize={APPROVALS_PAGE_SIZE}
+            total={filtered.length}
+            onPageChange={setPage}
+          />
         </div>
       )}
     </section>

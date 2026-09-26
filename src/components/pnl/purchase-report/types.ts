@@ -1,0 +1,25 @@
+export type PurchaseRow = {
+  id: string;
+  date: string;
+  billDate?: string | null;
+  billNumber?: string | null;
+  gstin?: string | null;
+  booksDate?: string | null;
+  notes?: string | null;
+  vendorName: string;
+  itemDescription: string;
+  quantity: string | number;
+  debitQuantity?: string | number | null;
+  unit: string;
+  rate: string | number;
+  basicValue: string | number;
+  gstPercent: string | number;
+  gstAmount: string | number;
+  invoiceValue: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
+  excelUploadedAt?: string | null;
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
+  approvalRequired?: boolean;
+};

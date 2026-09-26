@@ -1,0 +1,24 @@
+export type ExpenseRow = {
+  id: string;
+  date: string;
+  shift: string;
+  expenseHead: string;
+  payMode?: string | null;
+  nature?: string | null;
+  description: string | null;
+  location?: string | null;
+  checkedBy?: string | null;
+  approvedBy?: string | null;
+  billNumber?: string | null;
+  openingReading: string | number | null;
+  closingReading: string | number | null;
+  amount: string | number;
+  contractorSalary: string | number;
+  supervisorSalary: string | number;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
+  excelUploadedAt?: string | null;
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
+  approvalRequired?: boolean;
+};

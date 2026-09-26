@@ -394,11 +394,14 @@
 
 @media (max-width: 720px) {
   .audit-toolbar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.4rem;
   }
 
   .audit-toolbar__search {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-width: 0;
     max-width: none;
   }
 
@@ -407,7 +410,8 @@
   }
 
   .audit-toolbar__actions {
-    margin-left: auto;
+    flex: 0 0 auto;
+    margin-left: 0;
   }
 
   .audit-skeleton__head,

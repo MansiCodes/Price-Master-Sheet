@@ -305,11 +305,6 @@ textarea {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border-color: rgba(239, 68, 68, 0.3) !important;
-    color: #dc2626 !important;
-  }
-  .dash-header__logout .dash-header__logout-icon {
-    stroke: #dc2626 !important;
   }
 }
 

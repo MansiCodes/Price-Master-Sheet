@@ -199,7 +199,13 @@
 }
 
 .mp-counts__metrics {
-  display: contents;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .mp-shift-tabs--admin {
@@ -226,6 +232,7 @@
     grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 0.35rem;
     width: 100%;
+    align-items: stretch;
   }
 
   /* Total · Completed · Pending · Overdue — label then value stacked */
@@ -274,45 +281,68 @@
     text-align: center;
   }
 
-  /* Planned · Actual · Eff — label then value stacked */
-  .mp-counts--admin .mp-count:nth-child(5),
-  .mp-counts--admin .mp-count:nth-child(6),
-  .mp-counts--admin .mp-count:nth-child(7) {
-    grid-column: span 4;
+  /* Planned · Actual share leftover width; Eff sized for 4 digits + % */
+  .mp-counts--admin .mp-counts__metrics {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    grid-column: 1 / -1;
+    gap: 0.35rem;
+    align-items: stretch;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .mp-counts--admin .mp-counts__metrics .mp-count {
     display: flex;
     flex-direction: column;
     flex-wrap: nowrap;
     align-items: flex-start;
     justify-content: center;
     gap: 0.1rem;
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     min-width: 0;
-    white-space: normal;
-    padding: 0.4rem 0.5rem;
+    min-height: 3.35rem;
+    height: auto;
+    white-space: nowrap;
+    padding: 0.4rem 0.45rem;
     border-radius: 0.85rem;
     box-sizing: border-box;
     font-size: 0.72rem;
+  }
+
+  .mp-counts--admin .mp-counts__metrics .mp-count:last-child {
+    flex: 0 0 5rem;
+    width: 5rem;
+    max-width: 5rem;
+    min-width: 5rem;
+    padding: 0.4rem 0.35rem;
   }
 
   .mp-counts--admin .mp-count__label {
     flex: 0 0 auto;
   }
 
-  .mp-counts--admin .mp-count:nth-child(5) .mp-count__label,
-  .mp-counts--admin .mp-count:nth-child(6) .mp-count__label,
-  .mp-counts--admin .mp-count:nth-child(7) .mp-count__label {
+  .mp-counts--admin .mp-counts__metrics .mp-count .mp-count__label {
     width: 100%;
   }
 
-  .mp-counts--admin .mp-count:nth-child(5) .mp-count__value,
-  .mp-counts--admin .mp-count:nth-child(6) .mp-count__value,
-  .mp-counts--admin .mp-count:nth-child(7) .mp-count__value {
+  .mp-counts--admin .mp-counts__metrics .mp-count .mp-count__value {
     flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .mp-counts--admin .mp-counts__metrics .mp-count:last-child .mp-count__value {
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .mp-shift-tabs--admin {
@@ -877,8 +907,60 @@
   min-height: 2.55rem;
 }
 
+.mp-filters__date-filter {
+  display: none;
+}
+
+.mp-date-filter__menu {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.85rem;
+  border-radius: 16px;
+  border: 1px solid var(--border, #cbd5e1);
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(26, 36, 33, 0.12);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mp-date-filter__field .mp-date-pill {
+  min-width: 0;
+  width: 100%;
+}
+
+.mp-date-filter__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted, var(--stone));
+}
+
+.mp-date-filter__done {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 0 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--teal, #0d9488);
+  color: #fff;
+}
+
 .mp-filters__icon-btn {
   appearance: none;
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -890,6 +972,32 @@
   background: #fff;
   color: var(--fg-muted, var(--stone));
   cursor: pointer;
+}
+
+.mp-filters__icon-btn__text {
+  display: none;
+}
+
+.mp-filters__icon-btn.is-active {
+  border-color: var(--teal, #0d9488);
+  color: var(--teal, #0d9488);
+  background: color-mix(in srgb, var(--teal, #0d9488) 8%, #fff);
+}
+
+.mp-filters__icon-btn__badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--teal, #0d9488);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }
 
 .mp-filters__icon-btn:hover:not(:disabled) {
@@ -986,12 +1094,12 @@
     grid-column: 1 / -1;
   }
 
-  /* Mobile records layout: Machine | Slot | Icons, From | To | Shift */
+  /* Mobile records: Machine | Slot | Shift, then filter + reset + PDF */
   .mp-filters--records {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(92px, auto);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
-      "machine slot pdf"
-      "from to shift";
+      "machine slot shift"
+      "actions actions actions";
     gap: 0.5rem 0.5rem;
   }
 
@@ -1003,25 +1111,59 @@
     grid-area: slot;
   }
 
+  .mp-filters--records .mp-filter-field--shift {
+    grid-area: shift;
+  }
+
+  .mp-filters--records .mp-filter-field--from,
+  .mp-filters--records .mp-filter-field--to {
+    display: none;
+  }
+
+  .mp-filters--records .mp-filters__date-filter {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .mp-filters--records .mp-filters__date-filter .mp-filters__icon-btn {
+    width: 100%;
+  }
+
   .mp-filters--records .mp-filters__icon-actions {
-    grid-area: pdf;
-    align-self: end;
-    justify-content: flex-end;
-    min-height: unset;
+    grid-area: actions;
+    position: relative;
+    align-self: stretch;
+    align-items: center;
+    justify-content: stretch;
+    min-height: 2.75rem;
+    width: 100%;
+    gap: 0.4rem;
+  }
+
+  .mp-filters--records .mp-filters__icon-btn {
+    flex: 1 1 0;
     width: auto;
+    min-width: 0;
+    height: 2.5rem;
+    border-radius: 999px;
+    gap: 0.3rem;
+    padding: 0 0.5rem;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .mp-filters--records .mp-filters__icon-btn__text {
+    display: inline;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .mp-filters--records .mp-filter-field--from {
-    grid-area: from;
-  }
-
-  .mp-filters--records .mp-filter-field--to {
-    grid-area: to;
-  }
-
-  .mp-filters--records .mp-filter-field--shift {
-    grid-area: shift;
+  .mp-filters--records .mp-filters__icon-btn__badge {
+    top: -3px;
+    right: 2px;
   }
 }
 
@@ -1048,25 +1190,19 @@
   }
 
   .mp-filters--records {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(92px, auto);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
-      "machine slot pdf"
-      "from to shift";
-    gap: 0.5rem 0.5rem;
+      "machine slot shift"
+      "actions actions actions";
   }
 }
 
 @media (max-width: 520px) {
   .mp-filters--records {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     grid-template-areas:
-      "machine slot"
-      "from to"
-      "shift pdf";
-  }
-
-  .mp-filters--records .mp-filters__icon-actions {
-    justify-content: flex-start;
+      "machine slot shift"
+      "actions actions actions";
   }
 }
 

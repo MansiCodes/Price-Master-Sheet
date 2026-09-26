@@ -33,12 +33,17 @@ export function orderKey(cable: string, size: string): string {
 export function toSizeMatchKey(raw: string): string {
   let s = raw.toLowerCase().trim();
   if (!s) return "";
+  // "1 x 10 Sqmm" / jumper singles — drop the 1× prefix so they match catalog "10 Sqmm"
+  s = s.replace(/^1\s*[x×]\s*/, "");
   s = s.replace(/\([^)]*\)/g, " ");
   s = s.replace(/\blzsh\b/gi, "lszh");
   s = s.replace(
     /\b(outer|sheath|dia\.?|hold|grey|gray|yellow|black|green|red|clr|colour|color)\b/gi,
     " ",
   );
+  s = s.replace(/\bun-?amoured\b/g, "unarmoured");
+  s = s.replace(/\bun-?armou?red\b/g, "unarmoured");
+  s = s.replace(/\barmored\b/g, "armoured");
   s = s.replace(/\bcores?\b/g, "c");
   s = s.replace(/\bquads?\b/g, "q");
   s = s.replace(/\bpairs?\b/g, "p");
@@ -73,10 +78,12 @@ export function lookupStockOrder(
   // 3. Variant-aware fuzzy match (preserves LSZH, XLPE, LZSH, etc.)
   const cardMatchKey = toSizeMatchKey(size);
   if (cardMatchKey) {
-    const hits = Object.values(byKey).filter((o) => {
-      if (o.cable && o.cable !== cable) return false;
-      return toSizeMatchKey(o.size) === cardMatchKey;
-    });
+    const hits = Object.values(byKey).filter(
+      (o) => toSizeMatchKey(o.size) === cardMatchKey,
+    );
+    if (hits.length === 1) return hits[0]!;
+    const sameCable = hits.find((o) => !o.cable || o.cable === cable);
+    if (sameCable) return sameCable;
     if (hits.length > 0) return hits[0]!;
   }
 

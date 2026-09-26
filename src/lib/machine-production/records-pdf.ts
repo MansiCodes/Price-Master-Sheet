@@ -1,112 +1,28 @@
 import { jsPDF } from "jspdf";
-import autoTable, { type CellDef } from "jspdf-autotable";
+import autoTable from "jspdf-autotable";
+import {
+  INK,
+  MUTED,
+  TEAL,
+  drawTextRuns,
+  lastTableY,
+  num,
+  pdfText,
+  tealValue,
+  type MpPdfDayTotal,
+  type MpPdfEntry,
+  type MpPdfMachineDayTotal,
+} from "./records-pdf-helpers";
+import {
+  buildMachineSlotBody,
+  resolveMachineDays,
+} from "./records-pdf-tables";
 
-export type MpPdfEntry = {
-  entryDate: string;
-  machineName: string;
-  machineCode: string;
-  shiftLabel: string;
-  slotLabel: string;
-  operatorName: string;
-  currentProcess: string;
-  cableType: string;
-  cableSize: string;
-  plannedProduction: number;
-  actualProduction: number;
-  efficiencyPct: number;
-  status: string;
-  operators?: number;
-  helpers?: number;
-  totalManpower?: number;
-};
-
-export type MpPdfDayTotal = {
-  date: string;
-  entries: number;
-  plannedProduction: number;
-  actualProduction: number;
-  averageEfficiency: number;
-};
-
-export type MpPdfMachineDayTotal = {
-  date: string;
-  machineName: string;
-  machineCode: string;
-  entries: number;
-  plannedProduction: number;
-  actualProduction: number;
-  efficiencyPct: number;
-  slots?: MpPdfEntry[];
-};
-
-const TEAL: [number, number, number] = [13, 148, 136];
-const TEAL_SOFT: [number, number, number] = [216, 243, 239];
-const MUTED: [number, number, number] = [90, 107, 100];
-const INK: [number, number, number] = [20, 30, 28];
-
-function num(n: number): string {
-  return Number(n).toLocaleString("en-IN", {
-    maximumFractionDigits: 2,
-  });
-}
-
-/** Helvetica in jsPDF mishandles many Unicode glyphs — keep PDF text ASCII-safe. */
-function pdfText(value: string): string {
-  return value
-    .replace(/[\u2013\u2014\u2212]/g, "-")
-    .replace(/[\u2192\u2794]/g, "to")
-    .replace(/[\u00B7\u2022\u2023]/g, "|")
-    .replace(/\u00A0/g, " ");
-}
-
-function blackValue(text: string): CellDef {
-  return {
-    content: text,
-    styles: {
-      textColor: INK,
-      fontStyle: "normal",
-      halign: "right",
-    },
-  };
-}
-
-function tealValue(text: string): CellDef {
-  return {
-    content: text,
-    styles: {
-      textColor: TEAL,
-      fontStyle: "bold",
-      halign: "right",
-    },
-  };
-}
-
-function lastTableY(doc: jsPDF, fallback: number): number {
-  return (
-    (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable
-      ?.finalY ?? fallback
-  );
-}
-
-/** Draw mixed-color runs left-to-right (Helvetica has poor Unicode coverage). */
-function drawTextRuns(
-  doc: jsPDF,
-  x: number,
-  y: number,
-  runs: Array<{
-    text: string;
-    color: [number, number, number];
-    bold?: boolean;
-  }>,
-) {
-  let cursor = x;
-  for (const run of runs) {
-    doc.setFont("helvetica", run.bold ? "bold" : "normal");
-    doc.setTextColor(...run.color);
-    doc.text(run.text, cursor, y);
-    cursor += doc.getTextWidth(run.text);
-  }
-}
+export type {
+  MpPdfDayTotal,
+  MpPdfEntry,
+  MpPdfMachineDayTotal,
+} from "./records-pdf-helpers";
 
 /** Build a landscape PDF of machine-production admin records. */
 export function buildMachineProductionRecordsPdf(opts: {
@@ -132,56 +48,9 @@ export function buildMachineProductionRecordsPdf(opts: {
   const stamp = new Date().toISOString().slice(0, 10);
   const filename = `machine-production-${opts.dateFrom || stamp}-to-${opts.dateTo || stamp}.pdf`;
 
-  // Prefer machine groups with nested slots; fall back to grouping flat entries.
-  let machineDays = (opts.machineDayWise ?? []).map((m) => ({
-    ...m,
-    slots: m.slots?.length
-      ? m.slots
-      : opts.entries.filter(
-          (e) =>
-            e.entryDate === m.date &&
-            e.machineName === m.machineName &&
-            e.machineCode === m.machineCode,
-        ),
-  }));
-
-  if (machineDays.length === 0 && opts.entries.length > 0) {
-    const map = new Map<string, MpPdfMachineDayTotal & { slots: MpPdfEntry[] }>();
-    for (const e of opts.entries) {
-      const key = `${e.entryDate}|${e.machineCode}|${e.machineName}`;
-      const cur = map.get(key);
-      if (!cur) {
-        map.set(key, {
-          date: e.entryDate,
-          machineName: e.machineName,
-          machineCode: e.machineCode,
-          entries: 1,
-          plannedProduction: e.plannedProduction,
-          actualProduction: e.actualProduction,
-          efficiencyPct: e.efficiencyPct,
-          slots: [e],
-        });
-      } else {
-        cur.entries += 1;
-        cur.plannedProduction += e.plannedProduction;
-        cur.actualProduction += e.actualProduction;
-        cur.slots.push(e);
-      }
-    }
-    machineDays = [...map.values()].map((m) => ({
-      ...m,
-      plannedProduction: Math.round(m.plannedProduction * 100) / 100,
-      actualProduction: Math.round(m.actualProduction * 100) / 100,
-      efficiencyPct:
-        m.plannedProduction > 0
-          ? Math.round((m.actualProduction / m.plannedProduction) * 10000) / 100
-          : 0,
-    }));
-  }
-
-  machineDays = [...machineDays].sort((a, b) => {
-    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
-    return a.machineName.localeCompare(b.machineName);
+  const machineDays = resolveMachineDays({
+    entries: opts.entries,
+    machineDayWise: opts.machineDayWise,
   });
 
   doc.setFont("helvetica", "bold");
@@ -266,140 +135,7 @@ export function buildMachineProductionRecordsPdf(opts: {
   doc.text("Machines with slot-wise details", 14, y);
   y += 2;
 
-  const body: CellDef[][] = [];
-  for (const m of machineDays) {
-    const slots = [...(m.slots ?? [])].sort((a, b) => {
-      if (a.shiftLabel !== b.shiftLabel) {
-        return a.shiftLabel.localeCompare(b.shiftLabel);
-      }
-      return a.slotLabel.localeCompare(b.slotLabel);
-    });
-
-    body.push([
-      {
-        content: pdfText(
-          `${m.date}  |  ${m.machineName}${
-            m.machineCode ? ` (${m.machineCode})` : ""
-          }`,
-        ),
-        colSpan: 5,
-        styles: {
-          fillColor: TEAL_SOFT,
-          textColor: INK,
-          fontStyle: "bold",
-          halign: "left",
-        },
-      },
-      {
-        content: String(m.entries),
-        styles: {
-          fillColor: TEAL_SOFT,
-          textColor: INK,
-          fontStyle: "bold",
-          halign: "right",
-        },
-      },
-      {
-        content: num(m.plannedProduction),
-        styles: {
-          fillColor: TEAL_SOFT,
-          textColor: INK,
-          fontStyle: "bold",
-          halign: "right",
-        },
-      },
-      {
-        content: num(m.actualProduction),
-        styles: {
-          fillColor: TEAL_SOFT,
-          textColor: INK,
-          fontStyle: "bold",
-          halign: "right",
-        },
-      },
-      {
-        content: `${num(m.efficiencyPct)}%`,
-        styles: {
-          fillColor: TEAL_SOFT,
-          textColor: INK,
-          fontStyle: "bold",
-          halign: "right",
-        },
-      },
-    ]);
-
-    for (const e of slots) {
-      body.push([
-        {
-          content: pdfText(e.shiftLabel),
-          styles: { textColor: MUTED, fontSize: 7.5 },
-        },
-        {
-          content: pdfText(e.slotLabel),
-          styles: { textColor: INK, fontSize: 7.5 },
-        },
-        {
-          content: pdfText(e.operatorName),
-          styles: { textColor: INK, fontSize: 7.5 },
-        },
-        {
-          content: pdfText(e.currentProcess),
-          styles: { textColor: INK, fontSize: 7.5 },
-        },
-        {
-          content: pdfText(`${e.cableType} / ${e.cableSize}`),
-          styles: { textColor: MUTED, fontSize: 7.2 },
-        },
-        {
-          content: pdfText(e.status),
-          styles: { textColor: MUTED, fontSize: 7, halign: "center" },
-        },
-        blackValue(num(e.plannedProduction)),
-        blackValue(num(e.actualProduction)),
-        blackValue(`${num(e.efficiencyPct)}%`),
-      ]);
-    }
-
-    body.push([
-      {
-        content: "Total",
-        colSpan: 6,
-        styles: {
-          fontStyle: "bold",
-          textColor: INK,
-          halign: "right",
-          fillColor: [245, 252, 251],
-        },
-      },
-      {
-        content: num(m.plannedProduction),
-        styles: {
-          fontStyle: "bold",
-          textColor: TEAL,
-          halign: "right",
-          fillColor: [245, 252, 251],
-        },
-      },
-      {
-        content: num(m.actualProduction),
-        styles: {
-          fontStyle: "bold",
-          textColor: TEAL,
-          halign: "right",
-          fillColor: [245, 252, 251],
-        },
-      },
-      {
-        content: `${num(m.efficiencyPct)}%`,
-        styles: {
-          fontStyle: "bold",
-          textColor: TEAL,
-          halign: "right",
-          fillColor: [245, 252, 251],
-        },
-      },
-    ]);
-  }
+  const body = buildMachineSlotBody(machineDays);
 
   if (body.length === 0) {
     doc.setFont("helvetica", "normal");

@@ -183,13 +183,13 @@
 }
 
 .pnl-import-btn {
-  background: #0f766e !important;
+  background: var(--teal-fill) !important;
   color: #fff !important;
-  border-color: #0f766e !important;
+  border: 0 !important;
 }
 
 .pnl-import-btn:hover:not(:disabled) {
-  background: #0d9488 !important;
+  background: var(--teal-fill-hover) !important;
 }
 
 /* Keep header action cluster styling; export always lives in the header */
@@ -562,9 +562,10 @@
   height: 1.9rem;
   padding: 0 0.7rem;
   border-radius: 999px;
-  border: 1px solid rgba(13, 148, 136, 0.35);
-  background: #fff;
-  color: var(--teal, #0d9488);
+  border: 0;
+  background: var(--teal-fill);
+  color: #fff;
+  box-shadow: var(--teal-fill-shadow, none);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 700;
@@ -576,7 +577,7 @@
 }
 
 .pnl-export-btn:hover:not(:disabled) {
-  background: rgba(13, 148, 136, 0.08);
+  background: var(--teal-fill-hover);
 }
 
 .pnl-export-btn:disabled {
@@ -1544,6 +1545,11 @@
     min-width: 0 !important;
   }
 
+  .pnl-date-filter--has-clear,
+  .pnl-reports__actions .pnl-date-filter--has-clear {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto !important;
+  }
+
   .pnl-date-filter__field,
   .pnl-reports__actions .pnl-date-filter__field {
     display: flex !important;
@@ -1565,7 +1571,9 @@
 
   .pnl-date-filter__field input,
   .pnl-date-filter__field input[type="date"],
-  .pnl-reports__actions .pnl-date-filter__field input {
+  .pnl-reports__actions .pnl-date-filter__field input,
+  .pnl-date-picker,
+  .pnl-date-picker__trigger {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -1573,8 +1581,23 @@
   }
 
   .pnl-date-filter__clear {
-    grid-column: 1 / -1;
-    width: 100%;
+    grid-column: auto;
+    align-self: end;
+    width: 2.35rem;
+    height: 2.35rem;
+    min-height: 2.35rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pnl-date-filter__clear-label {
+    display: none;
+  }
+
+  .pnl-date-filter__clear-icon {
+    display: block;
   }
 
   .pnl-stmt__grid {
@@ -1799,6 +1822,10 @@
 
   .pnl-date-filter {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .pnl-date-filter--has-clear {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 
   .pnl-stmt__col-head,

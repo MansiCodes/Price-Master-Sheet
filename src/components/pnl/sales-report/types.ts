@@ -1,0 +1,22 @@
+export type SaleRow = {
+  id: string;
+  date: string;
+  billDate?: string | null;
+  billNumber?: string | null;
+  notes?: string | null;
+  customerName: string;
+  itemDescription: string;
+  quantity: string | number;
+  unit: string;
+  rate: string | number;
+  salesValue: string | number;
+  inMeter?: string | number | null;
+  qtyMtr?: string | number | null;
+  meterUnit?: string | null;
+  billPhotoUrl?: string | null;
+  billPhotoUrls?: string[];
+  excelUploadedAt?: string | null;
+  approvedByHead?: boolean;
+  approvedByAdmin?: boolean;
+  approvalRequired?: boolean;
+};
