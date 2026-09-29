@@ -64,19 +64,22 @@ function insulationProductionFromMeta(meta: QuadSignalStockMeta | null): number 
   return Number(meta.production?.[INSULATION_KEY]) || 0;
 }
 
+function insulationPoolTouch(meta: QuadSignalStockMeta | null): boolean {
+  if (!meta || meta.kind !== "cable") return false;
+  if (insulationProductionFromMeta(meta) > 0) return true;
+  return Number(meta.sharedInsulation?.consumed) > 0;
+}
+
 /**
- * Last filled Signalling Insulation (same as the Stock Insulation card):
- * newest row with Insulation production > 0, else newest Insulation closing.
- * Do not prefer an old sharedInsulation snapshot over a later fill.
- * rows must be newest-first.
+ * Last Signalling Insulation pool: Insulation production or extra-size Out.
+ * Laying → Outer Sheath saves do not move this value.
  */
 export function findLatestSharedInsulationOpening(
   rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
 ): { value: number; fromDate: string | null } | null {
   for (const row of rows) {
     const sig = matchesSignallingCable(row);
-    if (!sig.match) continue;
-    if (insulationProductionFromMeta(sig.meta) <= 0) continue;
+    if (!sig.match || !insulationPoolTouch(sig.meta)) continue;
     const ins = insulationClosingFromMeta(sig.meta);
     if (ins == null) continue;
     return { value: ins, fromDate: rowDateIso(row) };

@@ -20,6 +20,9 @@ export function insulationFromMeta(
       production: Number(meta.production?.Insulation) || 0,
       consumed: Number(meta.sharedInsulation.consumed) || 0,
       closing: Number(meta.sharedInsulation.closing),
+      poolTouch:
+        Number(meta.production?.Insulation) > 0 ||
+        Number(meta.sharedInsulation.consumed) > 0,
     };
   }
   const closingMap = quadSignalClosingFromMeta(meta);
@@ -41,6 +44,7 @@ export function insulationFromMeta(
     production,
     consumed: Math.max(0, Math.round((opening + production - closing) * 1000) / 1000),
     closing,
+    poolTouch: production > 0,
   };
 }
 
@@ -54,8 +58,10 @@ export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
   if (rows.length === 0) return null;
-  const withProd = rows.filter((r) => r.production > 0);
-  if (withProd.length > 0) return withProd[0]!;
+  const touched = rows.filter(
+    (r) => r.poolTouch || r.production > 0,
+  );
+  if (touched.length > 0) return touched[0]!;
   return rows[0] ?? null;
 }
 

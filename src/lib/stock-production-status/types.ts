@@ -53,6 +53,8 @@ export type SharedInsulationStatus = {
   production: number;
   consumed: number;
   closing: number;
+  /** Insulation production or extra-size Out — not Laying-table-only WIP. */
+  poolTouch?: boolean;
 };
 
 export type FormattedStatusItem = {

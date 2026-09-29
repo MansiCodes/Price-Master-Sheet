@@ -1,4 +1,5 @@
 import { getQuadSignalCableSizes } from "@/lib/plant-catalogs";
+import { resolveQuadSignalVariant } from "@/lib/quad-signal-wip";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindStockLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { HubStockInsulationExtraRow } from "@/components/today/hub/HubStockInsulationExtraRow";
@@ -14,8 +15,15 @@ function insulationExtraSizeOpts(vm: TodayHubVm) {
 }
 
 export function HubStockQuadInsulationExtras({ vm }: { vm: TodayHubVm }) {
-  const { stockInsulationExtras, setStockInsulationExtras } = bindStockLocals(vm);
+  const {
+    stockInsulationExtras, setStockInsulationExtras, stockLengthFactor, resolvedQuadSizeName,
+  } = bindStockLocals(vm);
   const insSizeOpts = insulationExtraSizeOpts(vm);
+  const variant = resolveQuadSignalVariant(resolvedQuadSizeName);
+  const drumFallback =
+    stockLengthFactor != null && Number.isFinite(stockLengthFactor) && stockLengthFactor > 0
+      ? stockLengthFactor
+      : variant?.lengthFactor ?? 1;
   return (
     <>
       {stockInsulationExtras.length > 0 ? (
@@ -26,6 +34,7 @@ export function HubStockQuadInsulationExtras({ vm }: { vm: TodayHubVm }) {
               extra={extra}
               insSizeOpts={insSizeOpts}
               setExtras={setStockInsulationExtras}
+              drumFallback={drumFallback}
             />
           ))}
         </div>

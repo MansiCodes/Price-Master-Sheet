@@ -47,8 +47,12 @@ function signallingDrumFactor(
 }
 
 /**
- * Insulation Out comes only from + extra size rows (their Total).
- * Laying → Outer Sheath production is size WIP and does not deduct this pool.
+ * Signalling mapping (keep these in lockstep):
+ * - Insulation Out / Closing = sum of + extra Totals only
+ * - Laying → Outer Sheath Production = that size only (does not change Insulation Out)
+ * - Extra row Total = same laying × cores × length as that slice of Out
+ * - Save sharedInsulation.consumed/closing = the same Out / Closing
+ * - Next day's Opening / Stock card = last Insulation P>0 or extra-Out save
  */
 export function signallingInsulationPool(
   stock: SignallingInsulStock,
@@ -87,12 +91,12 @@ export function signallingInsulationConsumed(
   stock: SignallingInsulStock,
   production: Record<string, number>,
 ) {
-  const pooled = signallingInsulationPool(stock, production).consumed;
-  const extraTotals = stock.stockInsulationExtras.reduce(
-    (sum, extra) => sum + insulationExtraRowConsumed(extra),
+  const variant = resolveQuadSignalVariant(stock.resolvedQuadSizeName);
+  const drum = signallingDrumFactor(stock, variant?.lengthFactor ?? 1);
+  return stock.stockInsulationExtras.reduce(
+    (sum, extra) => sum + insulationExtraRowConsumed(extra, drum),
     0,
   );
-  return pooled > 0 ? pooled : extraTotals;
 }
 
 function quadInsulationExtrasConsumed(extras: TodayHubStockState["stockInsulationExtras"]) {

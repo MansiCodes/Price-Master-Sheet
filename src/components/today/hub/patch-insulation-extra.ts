@@ -33,11 +33,20 @@ export function removeInsulationExtra(
   setExtras((prev) => prev.filter((row) => row.id !== extraId));
 }
 
-export function insulationExtraRowConsumed(extra: StockInsulationExtra) {
+export function insulationExtraRowConsumed(
+  extra: StockInsulationExtra,
+  drumFallback = 0,
+) {
   const sizeName =
     extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
   const ev = sizeName ? resolveQuadSignalVariant(sizeName) : null;
-  const lf = lengthValueToFactor(extra.lengthValue, extra.lengthUnit);
+  const parsed = lengthValueToFactor(extra.lengthValue, extra.lengthUnit);
+  const lf =
+    parsed != null && parsed > 0
+      ? parsed
+      : drumFallback > 0
+        ? drumFallback
+        : null;
   const layRaw = extra.layingProduced.trim();
   const lay = layRaw === "" || layRaw === "." ? 0 : Number(layRaw);
   return ev && lf != null && Number.isFinite(lay) && lay >= 0

@@ -83,12 +83,14 @@ export function HubStockInsulationExtraRow({
   extra,
   insSizeOpts,
   setExtras,
+  drumFallback = 0,
 }: {
   extra: StockInsulationExtra;
   insSizeOpts: string[];
   setExtras: SetStockInsulationExtras;
+  drumFallback?: number;
 }) {
-  const rowConsumed = insulationExtraRowConsumed(extra);
+  const rowConsumed = insulationExtraRowConsumed(extra, drumFallback);
   return (
     <div className="qs-wip__ins-extra-line">
       <HubStockInsulationExtraGrid
