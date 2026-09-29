@@ -92,7 +92,7 @@ function encodeSubmittedQuadCableNotes(
       stockDispatchPendingItems: args.stockDispatchPendingItems,
       stockCallPutup: args.stockCallPutup, stockPutupDate: args.stockPutupDate,
       stockPartyName: args.stockPartyName, stockDispatchPending: args.stockDispatchPending,
-      dispatchPending, selectedLengthLabel,
+      stockDispatchParty: args.stockDispatchParty, dispatchPending, selectedLengthLabel,
       sharedInsulationMeta: isSignallingCableName(resolved.resolvedCable)
         ? {
             consumed: wip.insulationConsumed,
