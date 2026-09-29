@@ -113,7 +113,7 @@ export function EntryApproveRejectGroup({
             <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", color: "#4b5563" }}>
               This will reject the entry.
             </p>
-            <textarea>
+            <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Optional rejection reason"
