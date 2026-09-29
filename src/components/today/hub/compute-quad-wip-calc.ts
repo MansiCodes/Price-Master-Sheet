@@ -1,5 +1,6 @@
 import {
   calculateQuadSignalWip,
+  calculateSharedSignallingInsulation,
   getQuadFactorFromSize,
   insulationConsumedFromLaying,
   isQuadCableName,
@@ -8,6 +9,7 @@ import {
   resolveQuadSignalVariant,
   type WipCalcResult,
 } from "@/lib/quad-signal-wip";
+import { insulationExtraRowConsumed } from "@/components/today/hub/patch-insulation-extra";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 
 function parseNamedNonneg(names: string[], rawMap: Record<string, string>, treatDot: boolean) {
@@ -19,6 +21,86 @@ function parseNamedNonneg(names: string[], rawMap: Record<string, string>, treat
     out[name] = Number.isFinite(n) && n >= 0 ? n : 0;
   }
   return out;
+}
+
+type SignallingInsulStock = Pick<
+  TodayHubStockState,
+  | "resolvedQuadSizeName"
+  | "stockLengthFactor"
+  | "stockInsulationExtras"
+  | "resolvedQuadCableName"
+  | "stockCable"
+>;
+
+function extraLayQty(extra: TodayHubStockState["stockInsulationExtras"][number]) {
+  const raw = extra.layingProduced.trim();
+  const lay = raw === "" || raw === "." ? 0 : Number(raw);
+  return Number.isFinite(lay) && lay >= 0 ? lay : 0;
+}
+
+function signallingDrumFactor(
+  stock: SignallingInsulStock,
+  fallback: number,
+) {
+  const lf = stock.stockLengthFactor;
+  return lf != null && Number.isFinite(lf) && lf > 0 ? lf : fallback;
+}
+
+/**
+ * Insulation Out = primary Laying consume + every + size Total
+ * (same laying × cores × length as the extra-row Total).
+ */
+export function signallingInsulationPool(
+  stock: SignallingInsulStock,
+  production: Record<string, number>,
+) {
+  const variant = resolveQuadSignalVariant(stock.resolvedQuadSizeName);
+  const drum = signallingDrumFactor(stock, variant?.lengthFactor ?? 1);
+  const sizes: Array<{
+    size: string;
+    layingProduced: number;
+    coreCount: number;
+    lengthFactor: number;
+  }> = [];
+  if (variant) {
+    sizes.push({
+      size: stock.resolvedQuadSizeName,
+      layingProduced: production["Laying"] ?? 0,
+      coreCount: variant.coreCount,
+      lengthFactor: drum,
+    });
+  }
+  for (const extra of stock.stockInsulationExtras) {
+    const sizeName = extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
+    if (!sizeName) continue;
+    const ev = resolveQuadSignalVariant(sizeName);
+    if (!ev) continue;
+    const parsed = lengthValueToFactor(extra.lengthValue, extra.lengthUnit);
+    const lengthFactor = parsed != null && parsed > 0 ? parsed : drum;
+    sizes.push({
+      size: sizeName,
+      layingProduced: extraLayQty(extra),
+      coreCount: ev.coreCount,
+      lengthFactor,
+    });
+  }
+  return calculateSharedSignallingInsulation({
+    opening: 0,
+    production: 0,
+    sizes,
+  });
+}
+
+export function signallingInsulationConsumed(
+  stock: SignallingInsulStock,
+  production: Record<string, number>,
+) {
+  const pooled = signallingInsulationPool(stock, production).consumed;
+  const extraTotals = stock.stockInsulationExtras.reduce(
+    (sum, extra) => sum + insulationExtraRowConsumed(extra),
+    0,
+  );
+  return pooled > 0 ? pooled : extraTotals;
 }
 
 function quadInsulationExtrasConsumed(extras: TodayHubStockState["stockInsulationExtras"]) {
@@ -105,8 +187,13 @@ export function computeStockWipCalc(
 }
 
 function resolveCalcOverrides(stock: TodayHubStockState, production: Record<string, number>) {
-  if (isSignallingCableName(stock.resolvedQuadCableName)) {
-    return { production, insulationConsumedOverride: undefined, singleQuadConsumedOverride: undefined };
+  const cableName = stock.resolvedQuadCableName || stock.stockCable;
+  if (isSignallingCableName(cableName)) {
+    return {
+      production,
+      insulationConsumedOverride: signallingInsulationConsumed(stock, production),
+      singleQuadConsumedOverride: undefined,
+    };
   }
   if (isQuadCableName(stock.resolvedQuadCableName)) return computeQuadCableOverrides(stock, production);
   return { production, insulationConsumedOverride: undefined, singleQuadConsumedOverride: undefined };

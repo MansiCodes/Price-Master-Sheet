@@ -6,6 +6,7 @@ import {
   lengthValueToFactor,
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
+import { signallingInsulationConsumed } from "@/components/today/hub/compute-quad-wip-calc";
 import type {
   StockInsulationExtra,
   StockSingleQuadExtra,
@@ -136,6 +137,7 @@ export function applyQuadCableProcessOverrides(args: {
   processes: Record<string, number>;
   stockInsulationExtras: StockInsulationExtra[];
   stockSingleQuadExtras: StockSingleQuadExtra[];
+  stockLengthFactor?: number | null;
   fail: FailFn;
 }): { insulationConsumedOverride?: number; singleQuadConsumedOverride?: number } | null {
   const { resolvedCable, resolvedSize, processes, stockInsulationExtras, stockSingleQuadExtras, fail } = args;
@@ -143,7 +145,18 @@ export function applyQuadCableProcessOverrides(args: {
     if (!validateSignallingInsulationExtras(stockInsulationExtras, resolvedSize, fail)) {
       return null;
     }
-    return { insulationConsumedOverride: undefined };
+    return {
+      insulationConsumedOverride: signallingInsulationConsumed(
+        {
+          resolvedQuadSizeName: resolvedSize,
+          stockLengthFactor: args.stockLengthFactor ?? null,
+          stockInsulationExtras,
+          resolvedQuadCableName: resolvedCable,
+          stockCable: resolvedCable,
+        },
+        processes,
+      ),
+    };
   }
   if (!isQuadCableName(resolvedCable)) return {};
   const totalSingleQuadProd = (processes["Single Quad"] ?? 0) + singleQuadExtrasProdSum(stockSingleQuadExtras);

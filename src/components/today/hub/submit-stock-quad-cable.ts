@@ -1,6 +1,7 @@
 import { postJson } from "@/lib/client-forms";
 import { encodeQuadSignalStockNotes } from "@/lib/plant-catalogs";
-import { calculateQuadSignalWip, resolveQuadSignalVariant } from "@/lib/quad-signal-wip";
+import { calculateQuadSignalWip, isSignallingCableName, resolveQuadSignalVariant } from "@/lib/quad-signal-wip";
+import { signallingInsulationPool } from "@/components/today/hub/compute-quad-wip-calc";
 import { buildQuadCableNotesPayload } from "@/components/today/hub/build-quad-cable-notes";
 import type {
   ShiftKey,
@@ -91,8 +92,23 @@ function encodeSubmittedQuadCableNotes(
       stockDispatchPendingItems: args.stockDispatchPendingItems,
       stockCallPutup: args.stockCallPutup, stockPutupDate: args.stockPutupDate,
       stockPartyName: args.stockPartyName, stockDispatchPending: args.stockDispatchPending,
-      stockDispatchParty: args.stockDispatchParty, dispatchPending, selectedLengthLabel,
-      sharedInsulationMeta: undefined,
+      dispatchPending, selectedLengthLabel,
+      sharedInsulationMeta: isSignallingCableName(resolved.resolvedCable)
+        ? {
+            consumed: wip.insulationConsumed,
+            closing: Number(wip.byProcess.Insulation) || 0,
+            contributions: signallingInsulationPool(
+              {
+                resolvedQuadSizeName: resolved.resolvedSize,
+                stockLengthFactor: args.stockLengthFactor,
+                stockInsulationExtras: args.stockInsulationExtras,
+                resolvedQuadCableName: resolved.resolvedCable,
+                stockCable: resolved.resolvedCable,
+              },
+              processes,
+            ).contributions,
+          }
+        : undefined,
     }),
     args.stockNotes.trim() || `Closing stock as on ${args.entryDate}`,
   );
@@ -144,6 +160,7 @@ function computeQuadCableWip(args: SubmitStockQuadCableArgs) {
   const overrides = applyQuadCableProcessOverrides({
     ...resolved, processes, stockInsulationExtras: args.stockInsulationExtras,
     stockSingleQuadExtras: args.stockSingleQuadExtras, fail: args.fail,
+    stockLengthFactor: lengthFactor,
   });
   if (!overrides) return null;
   const wip = calculateQuadSignalWip({

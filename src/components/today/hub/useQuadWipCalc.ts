@@ -9,16 +9,32 @@ export function useQuadWipCalc(
   quadCableProcessFields: string[],
 ) {
   const {
-    stockKind, stockProcessQtys, stockWipOpening, stockWipSalesKm, stockLengthFactor,
+    stockKind, stockCable, stockProcessQtys, stockWipOpening, stockWipSalesKm, stockLengthFactor,
     stockInsulationExtras, stockSingleQuadExtras, stockOpeningEditable,
     stockWipContextLoading, resolvedQuadCableName, resolvedQuadSizeName, setStockQty,
   } = stock;
   const stockWipCalc: WipCalcResult | null = useMemo(
-    () => computeStockWipCalc(isQuad, stock, quadCableProcessFields),
+    () =>
+      computeStockWipCalc(
+        isQuad,
+        {
+          ...stock,
+          stockCable,
+          stockInsulationExtras,
+          stockProcessQtys,
+          stockWipOpening,
+          stockLengthFactor,
+          resolvedQuadCableName: resolvedQuadCableName || stockCable,
+          resolvedQuadSizeName,
+          stockWipContextLoading,
+        },
+        quadCableProcessFields,
+      ),
     [
-      isQuad, stockKind, quadCableProcessFields, stockProcessQtys, stockSingleQuadExtras,
-      stockWipOpening, stockWipSalesKm, resolvedQuadCableName, resolvedQuadSizeName,
-      stockLengthFactor, stockInsulationExtras, stockOpeningEditable, stockWipContextLoading,
+      isQuad, stockKind, stockCable, quadCableProcessFields, stockProcessQtys,
+      stockSingleQuadExtras, stockWipOpening, stockWipSalesKm, resolvedQuadCableName,
+      resolvedQuadSizeName, stockLengthFactor, stockInsulationExtras, stockOpeningEditable,
+      stockWipContextLoading,
     ],
   );
   useEffect(() => {
