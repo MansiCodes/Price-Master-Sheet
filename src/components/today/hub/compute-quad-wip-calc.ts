@@ -47,12 +47,12 @@ function signallingDrumFactor(
 }
 
 /**
- * Insulation Out = primary Laying consume + every + size Total
- * (same laying × cores × length as the extra-row Total).
+ * Insulation Out comes only from + extra size rows (their Total).
+ * Laying → Outer Sheath production is size WIP and does not deduct this pool.
  */
 export function signallingInsulationPool(
   stock: SignallingInsulStock,
-  production: Record<string, number>,
+  _production: Record<string, number>,
 ) {
   const variant = resolveQuadSignalVariant(stock.resolvedQuadSizeName);
   const drum = signallingDrumFactor(stock, variant?.lengthFactor ?? 1);
@@ -62,14 +62,6 @@ export function signallingInsulationPool(
     coreCount: number;
     lengthFactor: number;
   }> = [];
-  if (variant) {
-    sizes.push({
-      size: stock.resolvedQuadSizeName,
-      layingProduced: production["Laying"] ?? 0,
-      coreCount: variant.coreCount,
-      lengthFactor: drum,
-    });
-  }
   for (const extra of stock.stockInsulationExtras) {
     const sizeName = extra.size === "Other" ? extra.sizeOther.trim() : extra.size.trim();
     if (!sizeName) continue;
