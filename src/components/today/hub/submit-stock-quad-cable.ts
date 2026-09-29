@@ -176,8 +176,11 @@ function computeQuadCableWip(args: SubmitStockQuadCableArgs) {
 export async function submitStockQuadCable(args: SubmitStockQuadCableArgs): Promise<SubmitOutcome> {
   const computed = computeQuadCableWip(args);
   if (!computed) return { status: "failed" };
-  if (computed.wip.warnings.length > 0) {
-    args.fail(computed.wip.warnings[0] ?? "WIP validation failed.");
+  const blocking = computed.wip.warnings.filter(
+    (w) => !w.toLowerCase().includes("outbound"),
+  );
+  if (blocking.length > 0) {
+    args.fail(blocking[0] ?? "WIP validation failed.");
     return { status: "failed" };
   }
   const pending = parseDispatchPending(args.stockDispatchPending, args.fail);

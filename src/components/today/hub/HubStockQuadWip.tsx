@@ -9,6 +9,9 @@ import { HubStockQuadDispatch } from "@/components/today/hub/HubStockQuadDispatc
 
 export function HubStockQuadWip({ vm }: { vm: TodayHubVm }) {
   const { isSignallingStock, isQuadCableStock, stockWipCalc } = bindStockLocals(vm);
+  const wipAlerts = (stockWipCalc?.warnings ?? []).filter(
+    (w) => !w.toLowerCase().includes("outbound"),
+  );
 
   return (
     <div className="field qs-wip">
@@ -24,9 +27,9 @@ export function HubStockQuadWip({ vm }: { vm: TodayHubVm }) {
       )}
       <HubStockQuadCallPutup vm={vm} />
       <HubStockQuadDispatch vm={vm} />
-      {stockWipCalc?.warnings?.length ? (
+      {wipAlerts.length ? (
         <div className="alert alert--error">
-          {stockWipCalc.warnings.join(" ")}
+          {wipAlerts.join(" ")}
         </div>
       ) : null}
     </div>
