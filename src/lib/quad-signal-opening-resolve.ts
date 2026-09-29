@@ -50,7 +50,7 @@ export async function resolveQuadSignalStockOpening(params: {
         OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 80,
+      take: 2500,
       select: { id: true, date: true, itemName: true, notes: true },
     }),
     prisma.stockEntry.findMany({
@@ -61,7 +61,7 @@ export async function resolveQuadSignalStockOpening(params: {
         OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
       },
       orderBy: [{ createdAt: "desc" }],
-      take: 80,
+      take: 2500,
       select: { id: true, date: true, itemName: true, notes: true },
     }),
   ]);
@@ -70,12 +70,14 @@ export async function resolveQuadSignalStockOpening(params: {
   let sizeOpeningFromDate: string | null = null;
   let sameDayEntryId: string | null = null;
   let sameDayOpening: Record<string, number> | null = null;
+  let sameDayInsulProd = 0;
 
   for (const row of sameDayRows) {
     const { match, meta } = matchesCableSize(row, cable, size, itemName);
     if (!match) continue;
     sameDayEntryId = row.id;
     sameDayOpening = { ...(meta?.opening ?? {}) };
+    sameDayInsulProd = Number(meta?.production?.[INSULATION_KEY]) || 0;
     break;
   }
 
@@ -112,9 +114,9 @@ export async function resolveQuadSignalStockOpening(params: {
     opening = { ...sizeOpening };
   }
 
-  if (signalling && sharedIns != null && !sameDayEntryId) {
-    // New size today: Insulation opening = today's shared closing (e.g. 227),
-    // never yesterday's size-specific closing (e.g. 46).
+  if (signalling && sharedIns != null && !(sameDayEntryId && sameDayInsulProd > 0)) {
+    // Insulation opening = last filled pool (Stock card), even if this size
+    // was saved today with a stale Opening and Insulation P: 0.
     opening[INSULATION_KEY] = sharedIns.value;
   }
 

@@ -45,21 +45,28 @@ export function insulationFromMeta(
 }
 
 /**
- * Shared insulation is one pool. Prefer the row that actually received
- * today's insulation production (e.g. 188.24 with 134km), not a later
- * size save that only copied a stale closing.
+ * Signalling Insulation is one pool. Use the newest row that actually
+ * recorded Insulation production (P&L Process WIP P: > 0), looking back
+ * through as-of history. Do not take a later size save whose Insulation
+ * closing only moved because Laying ran (e.g. 24 Sep 19 Core 84.24).
  */
-export function pickBestInsulation(
+export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
   if (rows.length === 0) return null;
-  const latest = rows.reduce(
-    (d, r) => (r.entryDate > d ? r.entryDate : d),
-    rows[0]!.entryDate,
-  );
-  const onDay = rows.filter((r) => r.entryDate === latest);
-  const withProd = onDay.filter((r) => r.production > 0);
-  return withProd[0] ?? onDay[0] ?? null;
+  const withProd = rows.filter((r) => r.production > 0);
+  if (withProd.length > 0) return withProd[0]!;
+  return rows[0] ?? null;
+}
+
+/**
+ * Quad Insulation follows the latest P&L stock row for that family
+ * (same as Process WIP on the newest Quad save).
+ */
+export function pickNewestInsulation(
+  rows: SharedInsulationStatus[],
+): SharedInsulationStatus | null {
+  return rows[0] ?? null;
 }
 
 export function familyInsulationCandidate(

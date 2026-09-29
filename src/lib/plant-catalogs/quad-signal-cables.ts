@@ -141,13 +141,14 @@ const QUAD_PROCESSES = [
   "Outer",
 ] as const;
 
+/** Power: Inner Sheath → Armouring → Outer Sheath. */
 const POWER_PROCESSES = [
   "Conductor",
   "Insulation",
   "Laying",
   "Inner Sheath",
-  "Outer Sheath",
   "Armouring",
+  "Outer Sheath",
 ] as const;
 
 /** Fire Survival keeps the prior chain (no Conductor stage). */

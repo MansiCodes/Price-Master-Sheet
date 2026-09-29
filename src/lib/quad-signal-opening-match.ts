@@ -55,31 +55,38 @@ export function insulationClosingFromMeta(
   return null;
 }
 
+function rowDateIso(row: { date?: Date }): string | null {
+  return row.date ? row.date.toISOString().slice(0, 10) : null;
+}
+
+function insulationProductionFromMeta(meta: QuadSignalStockMeta | null): number {
+  if (!meta || meta.kind !== "cable") return 0;
+  return Number(meta.production?.[INSULATION_KEY]) || 0;
+}
+
 /**
- * Prefer newest Signalling entry with sharedInsulation.closing (multi-size total).
- * Else newest Insulation closing. rows must be newest-first.
+ * Last filled Signalling Insulation (same as the Stock Insulation card):
+ * newest row with Insulation production > 0, else newest Insulation closing.
+ * Do not prefer an old sharedInsulation snapshot over a later fill.
+ * rows must be newest-first.
  */
 export function findLatestSharedInsulationOpening(
   rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
 ): { value: number; fromDate: string | null } | null {
   for (const row of rows) {
     const sig = matchesSignallingCable(row);
-    if (!sig.match || !sig.meta?.sharedInsulation) continue;
-    if (!Number.isFinite(sig.meta.sharedInsulation.closing)) continue;
-    return {
-      value: Number(sig.meta.sharedInsulation.closing),
-      fromDate: row.date ? row.date.toISOString().slice(0, 10) : null,
-    };
+    if (!sig.match) continue;
+    if (insulationProductionFromMeta(sig.meta) <= 0) continue;
+    const ins = insulationClosingFromMeta(sig.meta);
+    if (ins == null) continue;
+    return { value: ins, fromDate: rowDateIso(row) };
   }
   for (const row of rows) {
     const sig = matchesSignallingCable(row);
     if (!sig.match) continue;
     const ins = insulationClosingFromMeta(sig.meta);
     if (ins == null) continue;
-    return {
-      value: ins,
-      fromDate: row.date ? row.date.toISOString().slice(0, 10) : null,
-    };
+    return { value: ins, fromDate: rowDateIso(row) };
   }
   return null;
 }

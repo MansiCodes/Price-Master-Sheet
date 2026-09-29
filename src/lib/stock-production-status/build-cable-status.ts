@@ -6,7 +6,7 @@ import {
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
-import { pickBestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
+import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
   outerClosingAfterPutup,
@@ -171,7 +171,7 @@ export function buildCableStockStatus(
 
   return {
     blocks: Array.from(byKey.values()),
-    sharedInsulation: pickBestInsulation(signallingInsul),
-    quadInsulation: pickBestInsulation(quadInsul),
+    sharedInsulation: pickSharedInsulationPool(signallingInsul),
+    quadInsulation: pickNewestInsulation(quadInsul),
   };
 }
