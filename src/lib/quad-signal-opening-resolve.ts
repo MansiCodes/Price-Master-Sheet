@@ -6,11 +6,11 @@ import {
 import { plantIdFilter } from "@/lib/plant-merge";
 import { isSignallingCableName, normalizeCableName } from "@/lib/quad-signal-wip";
 import {
-  findLatestInsulationPoolMeta,
   findLatestSharedInsulationOpening,
   INSULATION_KEY,
   lastInsulationContributions,
   lastPositiveProductionByProcess,
+  lastClosingAfterProduction,
   matchesCableSize,
 } from "@/lib/quad-signal-opening-match";
 
@@ -104,14 +104,12 @@ export async function resolveQuadSignalStockOpening(params: {
   let sizeOpening: Record<string, number> | null = null;
   let sizeOpeningFromDate: string | null = null;
   let sameDayEntryId: string | null = null;
-  let sameDayOpening: Record<string, number> | null = null;
   let sameDayInsulProd = 0;
 
   for (const row of sameDayRows) {
     const { match, meta } = matchesCableSize(row, cable, size, itemName);
     if (!match) continue;
     sameDayEntryId = row.id;
-    sameDayOpening = { ...(meta?.opening ?? {}) };
     sameDayInsulProd = Number(meta?.production?.[INSULATION_KEY]) || 0;
     break;
   }
@@ -141,11 +139,6 @@ export async function resolveQuadSignalStockOpening(params: {
   const poolRows = sameDayEntryId
     ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
     : sameDayRows;
-  const poolToday = signalling ? findLatestInsulationPoolMeta(poolRows) : null;
-  const poolPrior = signalling ? findLatestInsulationPoolMeta(priorRows) : null;
-  const poolMeta = poolToday ?? poolPrior;
-
-  // Same-day shared Insulation CLOSING beats any prior-day Insulation value.
   const sharedToday = signalling
     ? findLatestSharedInsulationOpening(poolRows)
     : null;
@@ -160,26 +153,27 @@ export async function resolveQuadSignalStockOpening(params: {
     (!hasSizeHistory && !(signalling && sharedToday != null));
 
   let opening: Record<string, number> = {};
-  if (sameDayOpening && Object.keys(sameDayOpening).length > 0) {
-    opening = { ...sameDayOpening };
-  } else if (sizeOpening) {
-    opening = { ...sizeOpening };
-  }
+  if (sizeOpening) opening = { ...sizeOpening };
+  // Same-day notes.opening is often stale (2) after a save that closed at 4.
+  // Always prefer last closing after P>0 for Laying → Outer.
 
   if (signalling && sharedIns != null && !(sameDayEntryId && sameDayInsulProd > 0)) {
-    // Insulation opening = last filled pool (Stock card), even if this size
-    // was saved today with a stale Opening and Insulation P: 0.
     opening[INSULATION_KEY] = sharedIns.value;
   }
 
-  const production: Record<string, number> = { ...sizeProduction };
-  if (signalling && poolMeta && poolMeta.production > 0 && production[INSULATION_KEY] == null) {
-    production[INSULATION_KEY] = poolMeta.production;
+  const processes = getQuadSignalCableProcesses(cable);
+  for (let i = 0; i < processes.length; i++) {
+    const proc = processes[i]!;
+    if (proc.trim().toLowerCase() === "insulation") continue;
+    const afterP = lastClosingAfterProduction(
+      cableHistory, cable, size, itemName, proc, processes[i + 1],
+    );
+    if (afterP != null) opening[proc] = afterP;
   }
-  const insulationContributions =
-    sizeContributions.length > 0
-      ? sizeContributions
-      : (poolMeta?.contributions ?? []);
+
+  const production: Record<string, number> = { ...sizeProduction };
+  delete production[INSULATION_KEY];
+  const insulationContributions = sizeContributions;
 
   if (Object.keys(opening).length === 0 && !sameDayEntryId) {
     return {

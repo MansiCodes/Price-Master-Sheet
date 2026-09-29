@@ -97,6 +97,14 @@ export type StockDispatchPendingItem = {
   partyName: string;
 };
 
+export type StockSaleItem = {
+  invoiceNo: string;
+  date: string;
+  rate: string;
+  quantity: string;
+  gstPercent: string;
+};
+
 export type StockWipSalesLine = {
   id: string;
   billNumber: string | null;

@@ -1,13 +1,15 @@
 import type {
   StockCallPutupItem,
   StockDispatchPendingItem,
+  StockSaleItem,
 } from "@/components/today/today-hub-model";
 import type { WipCalcResult } from "@/lib/quad-signal-wip";
 import {
   callPutupSpreads,
   dispatchSpreads,
+  lockDispatchHistory,
   mappedCallPutupItems,
-  mappedDispatchItems,
+  mappedSaleItems,
 } from "@/components/today/hub/build-quad-cable-notes-items";
 
 export type QuadCableNotesPayloadArgs = {
@@ -24,6 +26,11 @@ export type QuadCableNotesPayloadArgs = {
   stockPartyName: string;
   stockDispatchPending: string;
   stockDispatchParty: string;
+  stockSaleItems: StockSaleItem[];
+  stockDispatchSettledKm: number;
+  stockDispatchSettledItems: Array<{ qty: string; partyName: string }>;
+  stockDispatchLoadedKm: number;
+  stockDispatchLoadedItems: Array<{ qty: string; partyName: string }>;
   dispatchPending: number | undefined;
   selectedLengthLabel: string | undefined;
   sharedInsulationMeta:
@@ -43,7 +50,14 @@ export type QuadCableNotesPayloadArgs = {
 
 export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
   const putups = mappedCallPutupItems(args.stockCallPutupItems);
-  const dispatches = mappedDispatchItems(args.stockDispatchPendingItems);
+  const locked = lockDispatchHistory({
+    formItems: args.stockDispatchPendingItems,
+    prevSettledKm: args.stockDispatchSettledKm,
+    loadedKm: args.stockDispatchLoadedKm,
+    prevSettledItems: args.stockDispatchSettledItems,
+    loadedItems: args.stockDispatchLoadedItems,
+  });
+  const sales = mappedSaleItems(args.stockSaleItems);
   return {
     v: 2 as const,
     kind: "cable" as const,
@@ -55,7 +69,10 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     processes: args.wip.byProcess,
     salesKm: args.stockWipSalesKm,
     ...(putups.length > 0 ? { callPutupItems: putups } : {}),
-    ...(dispatches.length > 0 ? { dispatchPendingItems: dispatches } : {}),
+    ...(locked.pendingItems.length > 0 ? { dispatchPendingItems: locked.pendingItems } : {}),
+    ...(sales.length > 0 ? { saleItems: sales } : {}),
+    ...(locked.settledKm > 0 ? { dispatchSettledKm: locked.settledKm } : {}),
+    ...(locked.settledItems.length > 0 ? { dispatchSettledItems: locked.settledItems } : {}),
     ...callPutupSpreads(args),
     ...dispatchSpreads(args),
     calcSnapshot: { ...args.wip.calcSnapshot, drumLabel: args.selectedLengthLabel },

@@ -52,6 +52,21 @@ export type QuadSignalStockMeta = {
     qty: number | string;
     partyName?: string;
   }>;
+  /** Dispatch km already taken off Outer/Total. Never shrinks if the form clears dispatch. */
+  dispatchSettledKm?: number;
+  /** Last dispatch rows after they were removed from the form (still shown on the card). */
+  dispatchSettledItems?: Array<{
+    qty: number | string;
+    partyName?: string;
+  }>;
+  /** Invoice lines on the stock form (not Sales ledger / WIP Out). */
+  saleItems?: Array<{
+    invoiceNo?: string;
+    date?: string;
+    rate?: number | string;
+    quantity?: number | string;
+    gstPercent?: number | string;
+  }>;
   calcSnapshot?: {
     coreCount: number;
     lengthFactor: number;

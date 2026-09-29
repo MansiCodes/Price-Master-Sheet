@@ -44,6 +44,12 @@ export type CableStockStatusBlock = {
     qty: number;
     dispatchParty: string;
   }>;
+  /** Highest dispatch km already deducted from Outer/Total. */
+  dispatchSettledKm?: number;
+  dispatchSettledItems?: Array<{
+    qty: number;
+    dispatchParty: string;
+  }>;
 };
 
 /** Signalling shared Insulation pool (one card for all sizes). */

@@ -2,7 +2,16 @@ import { useState } from "react";
 import type {
   StockCallPutupItem,
   StockDispatchPendingItem,
+  StockSaleItem,
 } from "@/components/today/today-hub-model";
+
+export const EMPTY_STOCK_SALE_ITEM: StockSaleItem = {
+  invoiceNo: "",
+  date: "",
+  rate: "",
+  quantity: "",
+  gstPercent: "",
+};
 
 export function useTodayHubStockCallFields() {
   const [stockCallPutup, setStockCallPutup] = useState("");
@@ -16,6 +25,17 @@ export function useTodayHubStockCallFields() {
   const [stockDispatchPendingItems, setStockDispatchPendingItems] = useState<
     StockDispatchPendingItem[]
   >([{ qty: "", partyName: "" }]);
+  const [stockSaleItems, setStockSaleItems] = useState<StockSaleItem[]>([
+    { ...EMPTY_STOCK_SALE_ITEM },
+  ]);
+  const [stockDispatchSettledKm, setStockDispatchSettledKm] = useState(0);
+  const [stockDispatchSettledItems, setStockDispatchSettledItems] = useState<
+    StockDispatchPendingItem[]
+  >([]);
+  const [stockDispatchLoadedKm, setStockDispatchLoadedKm] = useState(0);
+  const [stockDispatchLoadedItems, setStockDispatchLoadedItems] = useState<
+    StockDispatchPendingItem[]
+  >([]);
   return {
     stockCallPutup,
     setStockCallPutup,
@@ -31,5 +51,15 @@ export function useTodayHubStockCallFields() {
     setStockCallPutupItems,
     stockDispatchPendingItems,
     setStockDispatchPendingItems,
+    stockSaleItems,
+    setStockSaleItems,
+    stockDispatchSettledKm,
+    setStockDispatchSettledKm,
+    stockDispatchSettledItems,
+    setStockDispatchSettledItems,
+    stockDispatchLoadedKm,
+    setStockDispatchLoadedKm,
+    stockDispatchLoadedItems,
+    setStockDispatchLoadedItems,
   };
 }

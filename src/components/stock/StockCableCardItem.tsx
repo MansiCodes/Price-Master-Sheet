@@ -34,7 +34,8 @@ export function StockCableCardItem({
   const orderQty = order?.totalQty ?? 0;
   const putupKm = block?.putupKm ?? 0;
   const dispatchPending = block?.dispatchPending ?? 0;
-  const totalDoneKm = putupKm + dispatchPending;
+  const dispatchSettled = block?.dispatchSettledKm ?? 0;
+  const totalDoneKm = putupKm + Math.max(dispatchSettled, dispatchPending);
   const balanceTotal =
     Math.round((orderQty - totalDoneKm - stockTotal) * 10000) / 10000;
   const partyLines = order
@@ -77,12 +78,13 @@ export function StockCableCardItem({
               <div className="stock-proc-grid">
                 {block.processes.map((p) => {
                   const putupForOuter = block.putupKm ?? 0;
+                  const settled = block.dispatchSettledKm ?? 0;
                   const isOuter =
                     p.name.trim().toLowerCase() === "outer sheath" ||
                     p.name.trim().toLowerCase() === "outer";
                   const afterPutup =
-                    isOuter && putupForOuter > 0
-                      ? outerClosingAfterPutup(p.closing, putupForOuter)
+                    isOuter && (putupForOuter > 0 || settled > 0)
+                      ? outerClosingAfterPutup(p.closing, putupForOuter, settled)
                       : null;
                   const item = formatProcessStatusItem(p);
                   return (
@@ -127,7 +129,9 @@ export function StockCableCardItem({
                         .map((d) => `${d.label} ${d.value}`)
                         .join(" | ")}
                     </span>
-                    <span className="stock-pending-badge">Pending Dispatch</span>
+                    <span className="stock-pending-badge">
+                      {(block.dispatchPending ?? 0) > 0 ? "Pending Dispatch" : "Dispatch"}
+                    </span>
                   </div>
                 ) : (
                   <span className="stock-closing-date">Closing stock as on {block.entryDate}</span>

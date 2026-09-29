@@ -8,6 +8,7 @@ import type {
   StockCallPutupItem,
   StockDispatchPendingItem,
   StockInsulationExtra,
+  StockSaleItem,
   StockSingleQuadExtra,
 } from "@/components/today/today-hub-model";
 import type { FailFn, SubmitOutcome } from "@/components/today/hub/submit-types";
@@ -42,6 +43,11 @@ export type SubmitStockQuadCableArgs = {
   stockPartyName: string;
   stockDispatchPending: string;
   stockDispatchParty: string;
+  stockSaleItems: StockSaleItem[];
+  stockDispatchSettledKm: number;
+  stockDispatchSettledItems: StockDispatchPendingItem[];
+  stockDispatchLoadedKm: number;
+  stockDispatchLoadedItems: StockDispatchPendingItem[];
   stockNotes: string;
   stockPhotos: string[];
   fail: FailFn;
@@ -93,6 +99,11 @@ function encodeSubmittedQuadCableNotes(
       stockCallPutup: args.stockCallPutup, stockPutupDate: args.stockPutupDate,
       stockPartyName: args.stockPartyName, stockDispatchPending: args.stockDispatchPending,
       stockDispatchParty: args.stockDispatchParty, dispatchPending, selectedLengthLabel,
+      stockSaleItems: args.stockSaleItems,
+      stockDispatchSettledKm: args.stockDispatchSettledKm,
+      stockDispatchSettledItems: args.stockDispatchSettledItems,
+      stockDispatchLoadedKm: args.stockDispatchLoadedKm,
+      stockDispatchLoadedItems: args.stockDispatchLoadedItems,
       sharedInsulationMeta: isSignallingCableName(resolved.resolvedCable)
         ? {
             consumed: wip.insulationConsumed,

@@ -70,6 +70,7 @@ function isSameSizeRow(
   meta: QuadSignalStockMeta | null,
 ): boolean {
   if (row.itemName === itemName) return true;
+  if (meta?.kind !== "cable") return false;
   return (
     isSameCableRow(row, cable, meta) &&
     normalizeQuadSignalCableSizeKey(rowSizeName(row, meta)) ===
@@ -77,38 +78,43 @@ function isSameSizeRow(
   );
 }
 
-function fillLastPositiveProduction(
-  out: Record<string, number>,
+/** Last closing after a real P>0 (skip P:0 carry-forward that left Opening at 2 instead of 4). */
+export function lastClosingAfterProduction(
   rows: Array<{ itemName: string; notes: string | null }>,
-  processNames: readonly string[],
-  include: (
-    row: { itemName: string },
-    meta: QuadSignalStockMeta | null,
-  ) => boolean,
-) {
+  cable: string,
+  size: string,
+  itemName: string,
+  processName: string,
+  nextProcessName?: string,
+): number | null {
   for (const row of rows) {
     const { meta } = parseQuadSignalStockNotes(row.notes);
-    if (meta?.kind !== "cable" || !include(row, meta)) continue;
-    const production = meta.production ?? {};
-    if (processNames.length === 0) {
-      for (const [key, raw] of Object.entries(production)) {
-        if (out[key] != null) continue;
-        const n = Number(raw);
-        if (Number.isFinite(n) && n > 0) out[key] = n;
-      }
+    if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
       continue;
     }
-    for (const proc of processNames) {
-      if (out[proc] != null) continue;
-      const n = qtyOnMap(production, proc);
-      if (n > 0) out[proc] = n;
-    }
+    const fresh = freshClosingAfterProd(meta, processName, nextProcessName);
+    if (fresh != null) return fresh;
   }
+  return null;
+}
+
+export function freshClosingAfterProd(
+  meta: QuadSignalStockMeta,
+  processName: string,
+  nextProcessName?: string,
+): number | null {
+  const p = qtyOnMap(meta.production, processName);
+  if (p <= 0) return null;
+  const o = qtyOnMap(meta.opening, processName);
+  const c = qtyOnMap(quadSignalClosingFromMeta(meta), processName);
+  const outbound = nextProcessName ? qtyOnMap(meta.production, nextProcessName) : 0;
+  const implied = o + p - outbound;
+  if (Number.isFinite(implied) && implied > c + 1e-9) return implied;
+  return c;
 }
 
 /**
- * Last typed production (Stock Excel P columns), newest-first, skip P:0.
- * Prefers this size, then any size of the same cable (Signalling / Power / others).
+ * Last P>0 per process for this size only (never Insulation, never another size).
  */
 export function lastPositiveProductionByProcess(
   rows: Array<{ itemName: string; notes: string | null }>,
@@ -117,13 +123,39 @@ export function lastPositiveProductionByProcess(
   itemName: string,
   processNames: readonly string[] = [],
 ): Record<string, number> {
+  const names = processNames.filter(
+    (p) => p.trim().toLowerCase() !== "insulation",
+  );
   const out: Record<string, number> = {};
-  fillLastPositiveProduction(out, rows, processNames, (row, meta) =>
-    isSameSizeRow(row, cable, size, itemName, meta),
-  );
-  fillLastPositiveProduction(out, rows, processNames, (row, meta) =>
-    isSameCableRow(row, cable, meta),
-  );
+  const keys = names.length > 0 ? names : [];
+  if (keys.length === 0) {
+    for (const row of rows) {
+      const { meta } = parseQuadSignalStockNotes(row.notes);
+      if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
+        continue;
+      }
+      for (const [proc, raw] of Object.entries(meta.production ?? {})) {
+        if (proc.trim().toLowerCase() === "insulation" || out[proc] != null) continue;
+        const n = Number(raw);
+        if (Number.isFinite(n) && n > 0) out[proc] = n;
+      }
+    }
+    return out;
+  }
+  for (const proc of keys) {
+    for (const row of rows) {
+      const { meta } = parseQuadSignalStockNotes(row.notes);
+      if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
+        continue;
+      }
+      const n = qtyOnMap(meta.production, proc);
+      if (n > 0) {
+        out[proc] = n;
+        break;
+      }
+    }
+  }
+  delete out[INSULATION_KEY];
   return out;
 }
 
@@ -149,9 +181,7 @@ export function matchesCableSize(
   itemName: string,
 ): { match: boolean; meta: QuadSignalStockMeta | null } {
   const { meta } = parseQuadSignalStockNotes(row.notes);
-  const match =
-    row.itemName === itemName ||
-    (meta?.kind === "cable" && meta.cable === cable && meta.size === size);
+  const match = isSameSizeRow(row, cable, size, itemName, meta);
   return { match, meta };
 }
 

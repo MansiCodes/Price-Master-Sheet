@@ -11,31 +11,50 @@ import { weightedAveragePurchaseRate } from "@/lib/stock/purchase-average-rate";
 import type { stockLineSchema } from "./stock-schemas";
 
 /**
- * For Quad/Signal P&L Stock table: on today's date only, collapse near-duplicate
- * FG cable rows (Other spellings / double submits). Keeps newest (list is newest-first).
+ * Quad/Signal P&L Stock: one FG cable row per date + shift + cable/size.
+ * Repeated saves of the same size keep the newest (list is newest-first).
  */
-export function dedupeTodayQuadCableRows<
-  T extends { date: Date; notes: string | null; category?: string | null },
->(rows: T[], todayIso: string): T[] {
+export function dedupeQuadCableRows<
+  T extends {
+    date: Date | string;
+    notes: string | null;
+    category?: string | null;
+    shift?: string | null;
+    itemName?: string;
+  },
+>(rows: T[]): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const row of rows) {
+    if (row.category !== StockCategory.FG) {
+      out.push(row);
+      continue;
+    }
     const day = toIsoDateString(row.date);
-    if (day !== todayIso || row.category !== StockCategory.FG) {
-      out.push(row);
-      continue;
-    }
+    const shift = String(row.shift ?? "");
     const { meta } = parseQuadSignalStockNotes(row.notes);
-    if (!meta || meta.kind !== "cable" || !meta.cable || !meta.size) {
-      out.push(row);
-      continue;
-    }
-    const key = quadSignalCableSizeDedupeKey(meta.cable, meta.size);
+    const sizeKey =
+      meta?.kind === "cable" && meta.cable && meta.size
+        ? quadSignalCableSizeDedupeKey(meta.cable, meta.size)
+        : `item:${row.itemName ?? ""}`;
+    const key = `${day}|${shift}|${sizeKey}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
   }
   return out;
+}
+
+export function dedupeTodayQuadCableRows<
+  T extends {
+    date: Date | string;
+    notes: string | null;
+    category?: string | null;
+    shift?: string | null;
+    itemName?: string;
+  },
+>(rows: T[], _todayIso?: string): T[] {
+  return dedupeQuadCableRows(rows);
 }
 
 export function lineAmounts(quantity: number, rate?: number, value?: number) {

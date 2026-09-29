@@ -51,17 +51,23 @@ export function getPartyInHandKm(
   }
 
   let dispatchSum = 0;
-  if (Array.isArray(block.dispatchPendingItems) && block.dispatchPendingItems.length > 0) {
-    for (const item of block.dispatchPendingItems) {
-      const q = Number(item.qty);
-      const qty = Number.isFinite(q) && q > 0 ? q : 0;
-      if (qty > 0 && matchesParty(item.dispatchParty ?? "")) {
-        dispatchSum += qty;
-      }
-    }
+  const dispatchRows: Array<{ qty?: number; dispatchParty?: string }> = [];
+  if (Array.isArray(block.dispatchPendingItems)) {
+    dispatchRows.push(...block.dispatchPendingItems);
   } else if (block.dispatchPending && block.dispatchPending > 0) {
-    if (matchesParty(block.dispatchParty || block.partyName || "")) {
-      dispatchSum = block.dispatchPending;
+    dispatchRows.push({
+      qty: block.dispatchPending,
+      dispatchParty: block.dispatchParty || block.partyName || "",
+    });
+  }
+  if (Array.isArray(block.dispatchSettledItems)) {
+    dispatchRows.push(...block.dispatchSettledItems);
+  }
+  for (const item of dispatchRows) {
+    const q = Number(item.qty);
+    const qty = Number.isFinite(q) && q > 0 ? q : 0;
+    if (qty > 0 && matchesParty(item.dispatchParty ?? "")) {
+      dispatchSum = Math.max(dispatchSum, qty);
     }
   }
 

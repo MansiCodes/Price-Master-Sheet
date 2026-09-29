@@ -1,6 +1,8 @@
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 import { extrasFromPoolContributions } from "@/components/today/hub/add-insulation-extra";
+import { EMPTY_STOCK_SALE_ITEM } from "@/components/today/hub/useTodayHubStockCallFields";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { liveDispatchLock } from "@/lib/stock-production-status/dispatch-history";
 
 type QuadWipSetters = Pick<
   TodayHubStockState,
@@ -16,6 +18,11 @@ type QuadWipSetters = Pick<
   | "setStockDispatchParty"
   | "setStockCallPutupItems"
   | "setStockDispatchPendingItems"
+  | "setStockSaleItems"
+  | "setStockDispatchSettledKm"
+  | "setStockDispatchSettledItems"
+  | "setStockDispatchLoadedKm"
+  | "setStockDispatchLoadedItems"
   | "setStockLengthOptions"
   | "setStockLengthFactor"
   | "setStockInsulationExtras"
@@ -37,6 +44,11 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockDispatchParty("");
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
+  s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  s.setStockDispatchSettledKm(0);
+  s.setStockDispatchSettledItems([]);
+  s.setStockDispatchLoadedKm(0);
+  s.setStockDispatchLoadedItems([]);
   s.setStockLengthOptions([]);
   s.setStockLengthFactor(null);
   s.setStockInsulationExtras([]);
@@ -56,6 +68,11 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockDispatchParty("");
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
+  s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  s.setStockDispatchSettledKm(0);
+  s.setStockDispatchSettledItems([]);
+  s.setStockDispatchLoadedKm(0);
+  s.setStockDispatchLoadedItems([]);
   s.setStockInsulationExtras([]);
   s.setStockInsulationExtrasOpen(false);
   s.setStockWipContextLoading(false);
@@ -94,22 +111,70 @@ function applyDispatchFromMeta(
     dispatchPending: string;
     dispatchParty: string;
     dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
+    dispatchSettledKm?: number;
+    dispatchSettledItems?: Array<{ qty: number | string; partyName?: string }>;
   } | null,
 ) {
   const rawDispatches = meta?.dispatchPendingItems;
+  let loadedItems: Array<{ qty: string; partyName: string }> = [];
   if (Array.isArray(rawDispatches) && rawDispatches.length > 0) {
-    s.setStockDispatchPendingItems(rawDispatches.map((d) => ({
+    loadedItems = rawDispatches.map((d) => ({
       qty: d.qty != null ? String(d.qty) : "",
       partyName: d.partyName ?? "",
-    })));
+    }));
+    s.setStockDispatchPendingItems(loadedItems);
   } else if (meta?.dispatchPending || meta?.dispatchParty) {
-    s.setStockDispatchPendingItems([{
+    loadedItems = [{
       qty: meta.dispatchPending ?? "",
       partyName: meta.dispatchParty ?? "",
-    }]);
+    }];
+    s.setStockDispatchPendingItems(loadedItems);
   } else {
     s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   }
+  const formKm = loadedItems.reduce((sum, d) => {
+    const q = Number(d.qty);
+    return sum + (Number.isFinite(q) && q > 0 ? q : 0);
+  }, 0);
+  const locked = liveDispatchLock(
+    loadedItems,
+    loadedItems,
+    Array.isArray(meta?.dispatchSettledItems) ? meta.dispatchSettledItems : [],
+  );
+  const settledItems = locked.settledItems.map((d) => ({
+    qty: String(d.qty),
+    partyName: d.dispatchParty,
+  }));
+  s.setStockDispatchLoadedKm(formKm);
+  s.setStockDispatchLoadedItems(loadedItems);
+  s.setStockDispatchSettledKm(locked.settledKm);
+  s.setStockDispatchSettledItems(settledItems);
+}
+
+function applySaleFromMeta(
+  s: QuadWipSetters,
+  meta: {
+    saleItems?: Array<{
+      invoiceNo?: string;
+      date?: string;
+      rate?: number | string;
+      quantity?: number | string;
+      gstPercent?: number | string;
+    }>;
+  } | null,
+) {
+  const raw = meta?.saleItems;
+  if (Array.isArray(raw) && raw.length > 0) {
+    s.setStockSaleItems(raw.map((row) => ({
+      invoiceNo: row.invoiceNo ?? "",
+      date: row.date ?? "",
+      rate: row.rate != null ? String(row.rate) : "",
+      quantity: row.quantity != null ? String(row.quantity) : "",
+      gstPercent: row.gstPercent != null ? String(row.gstPercent) : "",
+    })));
+    return;
+  }
+  s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
 }
 
 function applyLengthOptions(
@@ -158,6 +223,15 @@ export type QuadWipContextData = {
     dispatchParty: string;
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
     dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
+    dispatchSettledKm?: number;
+    dispatchSettledItems?: Array<{ qty: number | string; partyName?: string }>;
+    saleItems?: Array<{
+      invoiceNo?: string;
+      date?: string;
+      rate?: number | string;
+      quantity?: number | string;
+      gstPercent?: number | string;
+    }>;
   } | null;
   cable?: string;
   size?: string;
@@ -187,11 +261,14 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
     "inner sheath": "Inner Sheath",
   };
   for (const [key, raw] of Object.entries(data.production ?? {})) {
+    if (key.trim().toLowerCase() === "insulation") continue;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) continue;
     productionStrings[key] = String(n);
     const canon = productionAliases[key] ?? productionAliases[key.trim().toLowerCase()];
-    if (canon) productionStrings[canon] = String(n);
+    if (canon && canon.trim().toLowerCase() !== "insulation") {
+      productionStrings[canon] = String(n);
+    }
   }
   s.setStockProcessQtys(productionStrings);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
@@ -206,6 +283,7 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
   s.setStockDispatchParty(meta?.dispatchParty ?? "");
   applyCallPutupFromMeta(s, meta);
   applyDispatchFromMeta(s, meta);
+  applySaleFromMeta(s, meta);
   const cable = data.cable ?? "";
   const size = data.size ?? "";
   if (isSignallingCableName(cable)) {

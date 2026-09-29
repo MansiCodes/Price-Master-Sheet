@@ -6,6 +6,7 @@ import {
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { freshClosingAfterProd } from "@/lib/quad-signal-opening-match";
 import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
@@ -14,6 +15,12 @@ import {
   shortProcessName,
 } from "./format";
 import type { CableStockStatusBlock, SharedInsulationStatus, StockProcessLine } from "./types";
+import {
+  collapseDispatchRows,
+  liveDispatchLock,
+  pendingOnlyFromMeta,
+  settledFromHistory,
+} from "./dispatch-history";
 
 /**
  * Build cable-size production status blocks from QSSTOCK FG rows.
@@ -34,6 +41,7 @@ export function buildCableStockStatus(
   quadInsulation: SharedInsulationStatus | null;
 } {
   const byKey = new Map<string, CableStockStatusBlock>();
+  const harvestedDispatch = new Set<string>();
   const signallingInsul: SharedInsulationStatus[] = [];
   const quadInsul: SharedInsulationStatus[] = [];
 
@@ -55,7 +63,60 @@ export function buildCableStockStatus(
 
       // Prefer normalized key so "100P" / "100 Pair" / "100Pair" show as one card.
       const key = quadSignalCableSizeDedupeKey(cable, size);
-      if (byKey.has(key)) continue;
+      if (byKey.has(key)) {
+        const block = byKey.get(key)!;
+        block.processes = block.processes.map((p, i) => {
+          if (p.production > 0) return p;
+          const fresh = freshClosingAfterProd(
+            meta, p.name, block.processes[i + 1]?.name,
+          );
+          if (fresh == null) return p;
+          const prod = Number(meta.production?.[p.name]) || 0;
+          return {
+            ...p,
+            production: prod,
+            closing: Math.round(fresh * 1000) / 1000,
+          };
+        });
+        const pending = collapseDispatchRows(
+          (block.dispatchPendingItems ?? []).map((d) => ({
+            qty: d.qty,
+            partyName: d.dispatchParty,
+          })),
+        );
+        if (!harvestedDispatch.has(key)) {
+          const extras = settledFromHistory(
+            pendingOnlyFromMeta(meta, String(meta.dispatchParty ?? "")),
+            pending,
+          );
+          if (extras.settledItems.length > 0) {
+            block.dispatchSettledItems = extras.settledItems;
+            block.dispatchSettledKm = extras.settledKm;
+            harvestedDispatch.add(key);
+          } else {
+            const live = settledFromHistory(
+              (block.dispatchSettledItems ?? []).map((d) => ({
+                qty: d.qty,
+                partyName: d.dispatchParty,
+              })),
+              pending,
+            );
+            block.dispatchSettledItems = live.settledItems;
+            block.dispatchSettledKm = live.settledKm;
+          }
+        }
+        const putup = block.putupKm;
+        const settled = block.dispatchSettledKm ?? 0;
+        block.totalKm = Math.round(block.processes.reduce((s, p) => {
+          const n = p.name.trim().toLowerCase();
+          if (n === "insulation" || n === "single quad") return s;
+          if (isOuterProcess(p.name)) {
+            return s + outerClosingAfterPutup(p.closing, putup, settled);
+          }
+          return s + p.closing;
+        }, 0) * 1000) / 1000;
+        continue;
+      }
 
       const procs = [...getQuadSignalCableProcesses(cable)];
       const production = meta.production ?? {};
@@ -112,27 +173,37 @@ export function buildCableStockStatus(
           ? [{ qty: dispatchPending, partyName: dispatchParty }]
           : [];
 
-      const dispatchPendingItems = rawDispatchItems
-        .map((item) => {
-          const q = Number(item.qty);
-          const qty = Number.isFinite(q) && q > 0 ? q : 0;
-          const pName = String(item.partyName ?? dispatchParty ?? "").trim();
-          return {
-            qty,
-            dispatchParty: pName,
-          };
-        })
-        .filter((item) => item.qty > 0 || item.dispatchParty);
-
+      const dispatchPendingItems = collapseDispatchRows(
+        rawDispatchItems.map((item) => ({
+          qty: item.qty,
+          partyName: String(item.partyName ?? dispatchParty ?? "").trim(),
+        })),
+      );
       const totalDispatchPending = dispatchPendingItems.reduce((sum, item) => sum + item.qty, 0);
+      const dispatchSettledItems = collapseDispatchRows(
+        (Array.isArray(meta.dispatchSettledItems) ? meta.dispatchSettledItems : []).map((item) => ({
+          qty: item.qty,
+          partyName: String(item.partyName ?? dispatchParty ?? "").trim(),
+        })),
+      );
+      const fromItems = liveDispatchLock(
+        dispatchPendingItems,
+        dispatchPendingItems,
+        dispatchSettledItems,
+      );
+      const dispatchSettledKm = fromItems.settledKm;
+      const settledItems =
+        fromItems.settledItems.length > 0 ? fromItems.settledItems : dispatchSettledItems;
 
-      const processes: StockProcessLine[] = names.map((name) => {
-        const closingQty = Number(closing[name]) || 0;
+      const processes: StockProcessLine[] = names.map((name, i) => {
+        const prod = Number(production[name]) || 0;
+        const fresh = freshClosingAfterProd(meta, name, names[i + 1]);
+        const closingQty = fresh != null ? fresh : Number(closing[name]) || 0;
         return {
           name,
           shortName: shortProcessName(name),
           closing: Math.round(closingQty * 1000) / 1000,
-          production: Number(production[name]) || 0,
+          production: prod,
         };
       });
 
@@ -141,7 +212,7 @@ export function buildCableStockStatus(
         const n = p.name.trim().toLowerCase();
         if (n === "insulation" || n === "single quad") return s;
         if (isOuterProcess(p.name)) {
-          return s + outerClosingAfterPutup(p.closing, totalPutupKm);
+          return s + outerClosingAfterPutup(p.closing, totalPutupKm, dispatchSettledKm);
         }
         return s + p.closing;
       }, 0);
@@ -160,6 +231,8 @@ export function buildCableStockStatus(
         partyName,
         dispatchParty,
         dispatchPending: Math.round(totalDispatchPending * 1000) / 1000,
+        dispatchSettledKm: Math.round(dispatchSettledKm * 1000) / 1000,
+        dispatchSettledItems: settledItems,
         userNotes: String(userNotes ?? "").trim(),
         callPutupItems,
         dispatchPendingItems,

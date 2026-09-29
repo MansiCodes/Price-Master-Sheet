@@ -14,6 +14,7 @@ import {
   parseDrumLengthOptions,
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
+import { freshClosingAfterProd } from "@/lib/quad-signal-opening-match";
 import { approvalFor, type PersistCtx } from "@/lib/pnl/excel-import/persist-types";
 
 export async function persistStock(
@@ -100,7 +101,7 @@ export async function persistStock(
           ],
         },
         orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-        take: 30,
+        take: 250,
         select: { itemName: true, notes: true },
       });
       let opening: Record<string, number> = {};
@@ -111,8 +112,19 @@ export async function persistStock(
           (meta?.kind === "cable" &&
             meta.cable === row.qsCable &&
             meta.size === row.qsSize);
-        if (!same) continue;
-        opening = quadSignalClosingFromMeta(meta);
+        if (!same || meta?.kind !== "cable") continue;
+        const closing = quadSignalClosingFromMeta(meta);
+        let touched = false;
+        const nextOpening = { ...closing };
+        for (let i = 0; i < processes.length; i++) {
+          const proc = processes[i]!;
+          const fresh = freshClosingAfterProd(meta, proc, processes[i + 1]);
+          if (fresh == null) continue;
+          nextOpening[proc] = fresh;
+          touched = true;
+        }
+        if (!touched) continue;
+        opening = nextOpening;
         break;
       }
 
@@ -168,7 +180,9 @@ export async function persistStock(
             ? { partyName: row.qsPartyName.trim() }
             : {}),
           ...(row.qsDispatchPending != null
-            ? { dispatchPending: row.qsDispatchPending }
+            ? {
+                dispatchPending: row.qsDispatchPending,
+              }
             : {}),
           ...(row.qsDispatchParty?.trim()
             ? { dispatchParty: row.qsDispatchParty.trim() }

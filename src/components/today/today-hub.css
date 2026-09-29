@@ -948,6 +948,39 @@
   color: var(--fg-muted);
   line-height: 1.35;
 }
+.qs-wip__sale-block {
+  margin-top: 0.35rem;
+}
+.qs-wip__sale-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.55rem 0.65rem;
+  align-items: end;
+}
+.qs-wip__sale-grid input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.qs-wip__sale-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.qs-wip__sale-calc {
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+.qs-wip__sale-totals {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.55rem 0.65rem;
+}
 .qs-wip__box .qs-wip__table-wrap {
   margin: 0;
   background: #fff;

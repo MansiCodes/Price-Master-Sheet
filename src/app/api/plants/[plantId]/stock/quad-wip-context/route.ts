@@ -152,6 +152,9 @@ export async function GET(
           dispatchParty: existingMeta.dispatchParty ?? "",
           callPutupItems: existingMeta.callPutupItems ?? [],
           dispatchPendingItems: existingMeta.dispatchPendingItems ?? [],
+          dispatchSettledKm: existingMeta.dispatchSettledKm ?? 0,
+          dispatchSettledItems: existingMeta.dispatchSettledItems ?? [],
+          saleItems: existingMeta.saleItems ?? [],
         }
       : null;
 

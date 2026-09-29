@@ -25,6 +25,11 @@ export function resetTodayHubStockWip(stock: TodayHubStockState) {
   stock.setStockDispatchParty("");
   stock.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   stock.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
+  stock.setStockSaleItems([{ invoiceNo: "", date: "", rate: "", quantity: "", gstPercent: "" }]);
+  stock.setStockDispatchSettledKm(0);
+  stock.setStockDispatchSettledItems([]);
+  stock.setStockDispatchLoadedKm(0);
+  stock.setStockDispatchLoadedItems([]);
 }
 
 export function resetTodayHubStockItem(

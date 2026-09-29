@@ -58,6 +58,11 @@ function submitStockQuadCableFromVm(
     stockCallPutup: stock.stockCallPutup, stockPutupDate: stock.stockPutupDate,
     stockPartyName: stock.stockPartyName, stockDispatchPending: stock.stockDispatchPending,
     stockDispatchParty: stock.stockDispatchParty,
+    stockSaleItems: stock.stockSaleItems,
+    stockDispatchSettledKm: stock.stockDispatchSettledKm,
+    stockDispatchSettledItems: stock.stockDispatchSettledItems,
+    stockDispatchLoadedKm: stock.stockDispatchLoadedKm,
+    stockDispatchLoadedItems: stock.stockDispatchLoadedItems,
     stockNotes: stock.stockNotes, stockPhotos: stock.stockPhotos, fail,
   });
 }

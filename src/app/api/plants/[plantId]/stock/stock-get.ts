@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { StockCategory } from "@prisma/client";
 import { requirePlantAccess, requireSession } from "@/lib/api";
 import { resolveEntryApprovalFlags } from "@/lib/entry-approval";
-import { todayDateString } from "@/lib/dates";
 import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { prisma } from "@/lib/db";
 import { CAT6_PNL_ONLY_STOCK_ITEMS, isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
@@ -13,7 +12,7 @@ import {
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
-import { dedupeTodayQuadCableRows } from "./stock-amounts";
+import { dedupeQuadCableRows } from "./stock-amounts";
 import type { RouteContext } from "./stock-schemas";
 
 export async function GET(
@@ -72,7 +71,7 @@ export async function GET(
 
   const entries =
     quadSignal && (kindParam === "cable" || kindParam === "")
-      ? dedupeTodayQuadCableRows(entriesRaw, todayDateString())
+      ? dedupeQuadCableRows(entriesRaw)
       : entriesRaw;
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);

@@ -6,6 +6,7 @@ import { HubStockQuadCableWip } from "@/components/today/hub/HubStockQuadCableWi
 import { HubStockQuadDefaultTable } from "@/components/today/hub/HubStockQuadDefaultTable";
 import { HubStockQuadCallPutup } from "@/components/today/hub/HubStockQuadCallPutup";
 import { HubStockQuadDispatch } from "@/components/today/hub/HubStockQuadDispatch";
+import { HubStockQuadSale } from "@/components/today/hub/HubStockQuadSale";
 
 export function HubStockQuadWip({ vm }: { vm: TodayHubVm }) {
   const { isSignallingStock, isQuadCableStock, stockWipCalc } = bindStockLocals(vm);
@@ -27,6 +28,7 @@ export function HubStockQuadWip({ vm }: { vm: TodayHubVm }) {
       )}
       <HubStockQuadCallPutup vm={vm} />
       <HubStockQuadDispatch vm={vm} />
+      <HubStockQuadSale vm={vm} />
       {wipAlerts.length ? (
         <div className="alert alert--error">
           {wipAlerts.join(" ")}
