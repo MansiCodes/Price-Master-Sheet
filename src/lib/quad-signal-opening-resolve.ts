@@ -1,22 +1,35 @@
 import { prisma } from "@/lib/db";
-import { quadSignalClosingFromMeta } from "@/lib/plant-catalogs";
-import { plantIdFilter } from "@/lib/plant-merge";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
+  getQuadSignalCableProcesses,
+  quadSignalClosingFromMeta,
+} from "@/lib/plant-catalogs";
+import { plantIdFilter } from "@/lib/plant-merge";
+import { isSignallingCableName, normalizeCableName } from "@/lib/quad-signal-wip";
+import {
+  findLatestInsulationPoolMeta,
   findLatestSharedInsulationOpening,
   INSULATION_KEY,
+  lastInsulationContributions,
+  lastPositiveProductionByProcess,
   matchesCableSize,
 } from "@/lib/quad-signal-opening-match";
+
+export type InsulationPoolContribution = {
+  size: string;
+  layingProduced: number;
+  coreCount: number;
+  lengthFactor: number;
+  consumed: number;
+};
 
 export type QuadSignalOpeningResolve = {
   opening: Record<string, number>;
   openingFromDate: string | null;
-  /**
-   * True for first entry of a cable+size, or when the designated editor
-   * (Tarun) may always override Opening.
-   */
   openingEditable: boolean;
   sameDayEntryId: string | null;
+  /** Last saved Process WIP production (Stock Excel process columns). */
+  production: Record<string, number>;
+  insulationContributions: InsulationPoolContribution[];
 };
 
 /**
@@ -28,6 +41,15 @@ export type QuadSignalOpeningResolve = {
  *   opening (e.g. yesterday's 46).
  * - Other stages (Laying → Outer) stay size-specific from that size's prior closing.
  */
+function cableItemNamePrefixes(cable: string): string[] {
+  const names = new Set([cable.trim(), normalizeCableName(cable)]);
+  if (isSignallingCableName(cable)) {
+    names.add("Signalling Cable");
+    names.add("Signaling Cable");
+  }
+  return [...names].filter(Boolean).map((n) => `${n} ·`);
+}
+
 export async function resolveQuadSignalStockOpening(params: {
   plantIds: string[];
   day: Date;
@@ -40,8 +62,9 @@ export async function resolveQuadSignalStockOpening(params: {
   const pScope = plantIdFilter(plantIds);
   const itemName = `${cable} · ${size}`;
   const signalling = isSignallingCableName(cable);
+  const cablePrefixes = cableItemNamePrefixes(cable);
 
-  const [priorRows, sameDayRows] = await Promise.all([
+  const [priorRows, sameDayRows, cableRows] = await Promise.all([
     prisma.stockEntry.findMany({
       where: {
         ...pScope,
@@ -62,6 +85,18 @@ export async function resolveQuadSignalStockOpening(params: {
       },
       orderBy: [{ createdAt: "desc" }],
       take: 2500,
+      select: { id: true, date: true, itemName: true, notes: true },
+    }),
+    prisma.stockEntry.findMany({
+      where: {
+        ...pScope,
+        category: "FG",
+        OR: cablePrefixes.map((prefix) => ({
+          itemName: { startsWith: prefix },
+        })),
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 1500,
       select: { id: true, date: true, itemName: true, notes: true },
     }),
   ]);
@@ -89,13 +124,30 @@ export async function resolveQuadSignalStockOpening(params: {
     break;
   }
 
+  const seenProd = new Set<string>();
+  const cableHistory: typeof cableRows = [];
+  for (const row of [...cableRows, ...sameDayRows, ...priorRows]) {
+    if (seenProd.has(row.id)) continue;
+    seenProd.add(row.id);
+    cableHistory.push(row);
+  }
+  const sizeProduction = lastPositiveProductionByProcess(
+    cableHistory, cable, size, itemName, getQuadSignalCableProcesses(cable),
+  );
+  const sizeContributions = lastInsulationContributions(
+    cableHistory, cable, size, itemName,
+  );
+
+  const poolRows = sameDayEntryId
+    ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
+    : sameDayRows;
+  const poolToday = signalling ? findLatestInsulationPoolMeta(poolRows) : null;
+  const poolPrior = signalling ? findLatestInsulationPoolMeta(priorRows) : null;
+  const poolMeta = poolToday ?? poolPrior;
+
   // Same-day shared Insulation CLOSING beats any prior-day Insulation value.
   const sharedToday = signalling
-    ? findLatestSharedInsulationOpening(
-        sameDayEntryId
-          ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
-          : sameDayRows,
-      )
+    ? findLatestSharedInsulationOpening(poolRows)
     : null;
   const sharedPrior = signalling
     ? findLatestSharedInsulationOpening(priorRows)
@@ -120,12 +172,23 @@ export async function resolveQuadSignalStockOpening(params: {
     opening[INSULATION_KEY] = sharedIns.value;
   }
 
+  const production: Record<string, number> = { ...sizeProduction };
+  if (signalling && poolMeta && poolMeta.production > 0 && production[INSULATION_KEY] == null) {
+    production[INSULATION_KEY] = poolMeta.production;
+  }
+  const insulationContributions =
+    sizeContributions.length > 0
+      ? sizeContributions
+      : (poolMeta?.contributions ?? []);
+
   if (Object.keys(opening).length === 0 && !sameDayEntryId) {
     return {
       opening: {},
       openingFromDate: null,
       openingEditable: true,
       sameDayEntryId: null,
+      production,
+      insulationContributions,
     };
   }
 
@@ -136,5 +199,7 @@ export async function resolveQuadSignalStockOpening(params: {
       : (sharedIns?.fromDate ?? sizeOpeningFromDate),
     openingEditable,
     sameDayEntryId,
+    production,
+    insulationContributions,
   };
 }

@@ -17,6 +17,7 @@ function insulationExtraSizeOpts(vm: TodayHubVm) {
 export function HubStockQuadInsulationExtras({ vm }: { vm: TodayHubVm }) {
   const {
     stockInsulationExtras, setStockInsulationExtras, stockLengthFactor, resolvedQuadSizeName,
+    stockInsulationExtrasOpen,
   } = bindStockLocals(vm);
   const insSizeOpts = insulationExtraSizeOpts(vm);
   const variant = resolveQuadSignalVariant(resolvedQuadSizeName);
@@ -24,21 +25,18 @@ export function HubStockQuadInsulationExtras({ vm }: { vm: TodayHubVm }) {
     stockLengthFactor != null && Number.isFinite(stockLengthFactor) && stockLengthFactor > 0
       ? stockLengthFactor
       : variant?.lengthFactor ?? 1;
+  if (!stockInsulationExtrasOpen) return null;
   return (
-    <>
-      {stockInsulationExtras.length > 0 ? (
-        <div className="qs-wip__ins-extras">
-          {stockInsulationExtras.map((extra) => (
-            <HubStockInsulationExtraRow
-              key={extra.id}
-              extra={extra}
-              insSizeOpts={insSizeOpts}
-              setExtras={setStockInsulationExtras}
-              drumFallback={drumFallback}
-            />
-          ))}
-        </div>
-      ) : null}
-    </>
+    <div className="qs-wip__ins-extras">
+      {stockInsulationExtras.map((extra) => (
+        <HubStockInsulationExtraRow
+          key={extra.id}
+          extra={extra}
+          insSizeOpts={insSizeOpts}
+          setExtras={setStockInsulationExtras}
+          drumFallback={drumFallback}
+        />
+      ))}
+    </div>
   );
 }

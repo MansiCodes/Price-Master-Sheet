@@ -1,12 +1,12 @@
-import { useEffect } from "react";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 
+/** Size changes load opening/production via quad-wip-context. Do not wipe production here. */
 export function useQuadWipResetOnSize(
-  isQuad: boolean,
-  stockKind: TodayHubStockState["stockKind"],
-  resolvedQuadCableName: string,
-  resolvedQuadSizeName: string,
-  stock: Pick<
+  _isQuad: boolean,
+  _stockKind: TodayHubStockState["stockKind"],
+  _resolvedQuadCableName: string,
+  _resolvedQuadSizeName: string,
+  _stock: Pick<
     TodayHubStockState,
     | "setStockProcessQtys"
     | "setStockWipOpening"
@@ -14,13 +14,4 @@ export function useQuadWipResetOnSize(
     | "setStockWipSalesKm"
     | "setStockWipSalesLines"
   >,
-) {
-  useEffect(() => {
-    if (!isQuad || stockKind !== "cable") return;
-    stock.setStockProcessQtys({});
-    stock.setStockWipOpening({});
-    stock.setStockOpeningEditable(false);
-    stock.setStockWipSalesKm(0);
-    stock.setStockWipSalesLines([]);
-  }, [isQuad, stockKind, resolvedQuadCableName, resolvedQuadSizeName]);
-}
+) {}

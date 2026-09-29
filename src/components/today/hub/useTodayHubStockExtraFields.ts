@@ -10,6 +10,7 @@ export function useTodayHubStockExtraFields() {
   >([]);
   const [stockLengthFactor, setStockLengthFactor] = useState<number | null>(null);
   const [stockInsulationExtras, setStockInsulationExtras] = useState<StockInsulationExtra[]>([]);
+  const [stockInsulationExtrasOpen, setStockInsulationExtrasOpen] = useState(false);
   const [stockSingleQuadExtras, setStockSingleQuadExtras] = useState<StockSingleQuadExtra[]>([]);
   return {
     stockLengthOptions,
@@ -18,6 +19,8 @@ export function useTodayHubStockExtraFields() {
     setStockLengthFactor,
     stockInsulationExtras,
     setStockInsulationExtras,
+    stockInsulationExtrasOpen,
+    setStockInsulationExtrasOpen,
     stockSingleQuadExtras,
     setStockSingleQuadExtras,
   };

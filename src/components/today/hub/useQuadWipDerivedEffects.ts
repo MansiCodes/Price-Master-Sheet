@@ -37,7 +37,6 @@ export function useQuadCableSizeResetEffect(
       stock.setStockCableSize(quadCableSizeOptions[0] ?? "Other");
       stock.setStockCableSizeOther("");
     }
-    stock.setStockProcessQtys({});
     stock.setStockInsulationExtras([]);
     stock.setStockSingleQuadExtras([]);
     stock.setStockWipOpening({});

@@ -1,4 +1,6 @@
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
+import { extrasFromPoolContributions } from "@/components/today/hub/add-insulation-extra";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
 
 type QuadWipSetters = Pick<
   TodayHubStockState,
@@ -17,10 +19,13 @@ type QuadWipSetters = Pick<
   | "setStockLengthOptions"
   | "setStockLengthFactor"
   | "setStockInsulationExtras"
+  | "setStockInsulationExtrasOpen"
+  | "setStockProcessQtys"
 >;
 
 export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockWipOpening({});
+  s.setStockProcessQtys({});
   s.setStockOpeningEditable(false);
   s.setStockWipContextLoading(false);
   s.setStockWipSalesKm(0);
@@ -35,10 +40,12 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockLengthOptions([]);
   s.setStockLengthFactor(null);
   s.setStockInsulationExtras([]);
+  s.setStockInsulationExtrasOpen(false);
 }
 
 export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockWipOpening({});
+  s.setStockProcessQtys({});
   s.setStockOpeningEditable(false);
   s.setStockWipSalesKm(0);
   s.setStockWipSalesLines([]);
@@ -49,6 +56,8 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockDispatchParty("");
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
+  s.setStockInsulationExtras([]);
+  s.setStockInsulationExtrasOpen(false);
   s.setStockWipContextLoading(false);
 }
 
@@ -150,6 +159,16 @@ export type QuadWipContextData = {
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
     dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
   } | null;
+  cable?: string;
+  size?: string;
+  production?: Record<string, number>;
+  insulationContributions?: Array<{
+    size: string;
+    layingProduced: number;
+    lengthFactor: number;
+    coreCount?: number;
+    consumed?: number;
+  }>;
 };
 
 export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextData) {
@@ -159,6 +178,22 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
     if (Number.isFinite(n)) openingStrings[key] = String(n);
   }
   s.setStockWipOpening(openingStrings);
+  const productionStrings: Record<string, string> = {};
+  const productionAliases: Record<string, string> = {
+    Outer: "Outer Sheath",
+    Inner: "Inner Sheath",
+    Armoring: "Armouring",
+    "outer sheath": "Outer Sheath",
+    "inner sheath": "Inner Sheath",
+  };
+  for (const [key, raw] of Object.entries(data.production ?? {})) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    productionStrings[key] = String(n);
+    const canon = productionAliases[key] ?? productionAliases[key.trim().toLowerCase()];
+    if (canon) productionStrings[canon] = String(n);
+  }
+  s.setStockProcessQtys(productionStrings);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
   s.setStockWipSalesKm(Number(data.salesKm) || 0);
   s.setStockWipSalesLines(data.sales ?? []);
@@ -171,6 +206,16 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
   s.setStockDispatchParty(meta?.dispatchParty ?? "");
   applyCallPutupFromMeta(s, meta);
   applyDispatchFromMeta(s, meta);
+  const cable = data.cable ?? "";
+  const size = data.size ?? "";
+  if (isSignallingCableName(cable)) {
+    s.setStockInsulationExtras(
+      extrasFromPoolContributions("Signalling Cable", size, data.insulationContributions ?? []),
+    );
+  } else {
+    s.setStockInsulationExtras([]);
+  }
+  s.setStockInsulationExtrasOpen(false);
   s.setStockWipContextLoading(false);
 }
 

@@ -5,7 +5,14 @@ import { nextInsulationExtra } from "@/components/today/hub/add-insulation-extra
 import { HubStockQuadInsulationTable } from "@/components/today/hub/HubStockQuadInsulationTable";
 
 export function HubStockQuadInsulationHead({ vm }: { vm: TodayHubVm }) {
-  const { setStockInsulationExtras, resolvedQuadSizeName, stockWipContextLoading } = bindStockLocals(vm);
+  const {
+    setStockInsulationExtras,
+    stockInsulationExtras,
+    stockInsulationExtrasOpen,
+    setStockInsulationExtrasOpen,
+    resolvedQuadSizeName,
+    stockWipContextLoading,
+  } = bindStockLocals(vm);
   return (
     <>
       <div className="qs-wip__box-head">
@@ -15,9 +22,20 @@ export function HubStockQuadInsulationHead({ vm }: { vm: TodayHubVm }) {
           className="qs-wip__ins-add"
           aria-label="Add size for Insulation"
           title="Add size"
-          onClick={() =>
-            setStockInsulationExtras((prev) => nextInsulationExtra("Signalling Cable", resolvedQuadSizeName, prev))
-          }
+          onClick={() => {
+            if (!stockInsulationExtrasOpen) {
+              setStockInsulationExtrasOpen(true);
+              if (stockInsulationExtras.length === 0) {
+                setStockInsulationExtras((prev) =>
+                  nextInsulationExtra("Signalling Cable", resolvedQuadSizeName, prev),
+                );
+              }
+              return;
+            }
+            setStockInsulationExtras((prev) =>
+              nextInsulationExtra("Signalling Cable", resolvedQuadSizeName, prev),
+            );
+          }}
         >
           +
         </button>

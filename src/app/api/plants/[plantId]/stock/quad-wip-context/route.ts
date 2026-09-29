@@ -79,6 +79,8 @@ export async function GET(
     opening,
     openingFromDate,
     openingEditable,
+    production,
+    insulationContributions,
   } = await resolveQuadSignalStockOpening({
     plantIds,
     day,
@@ -163,6 +165,8 @@ export async function GET(
     openingFromDate,
     openingEditable,
     openingAlwaysEditable: alwaysEditable,
+    production,
+    insulationContributions,
     salesKm,
     sales: matchedSales.map((s) => ({
       id: s.id,
