@@ -157,6 +157,7 @@ function applySaleFromMeta(
     saleItems?: Array<{
       invoiceNo?: string;
       date?: string;
+      partyName?: string;
       rate?: number | string;
       quantity?: number | string;
       gstPercent?: number | string;
@@ -168,6 +169,7 @@ function applySaleFromMeta(
     s.setStockSaleItems(raw.map((row) => ({
       invoiceNo: row.invoiceNo ?? "",
       date: row.date ?? "",
+      partyName: row.partyName ?? "",
       rate: row.rate != null ? String(row.rate) : "",
       quantity: row.quantity != null ? String(row.quantity) : "",
       gstPercent: row.gstPercent != null ? String(row.gstPercent) : "",
@@ -228,10 +230,13 @@ export type QuadWipContextData = {
     saleItems?: Array<{
       invoiceNo?: string;
       date?: string;
+      partyName?: string;
       rate?: number | string;
       quantity?: number | string;
       gstPercent?: number | string;
     }>;
+    opening?: Record<string, number>;
+    production?: Record<string, number>;
   } | null;
   cable?: string;
   size?: string;
@@ -245,13 +250,22 @@ export type QuadWipContextData = {
   }>;
 };
 
-export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextData) {
+function applyQtyMaps(
+  s: QuadWipSetters,
+  data: QuadWipContextData,
+) {
+  const savedOpen = data.stockMeta?.opening;
+  const openingSrc =
+    savedOpen && Object.keys(savedOpen).length > 0 ? savedOpen : data.opening;
   const openingStrings: Record<string, string> = {};
-  for (const [key, raw] of Object.entries(data.opening ?? {})) {
+  for (const [key, raw] of Object.entries(openingSrc ?? {})) {
     const n = Number(raw);
     if (Number.isFinite(n)) openingStrings[key] = String(n);
   }
   s.setStockWipOpening(openingStrings);
+  const savedProd = data.stockMeta?.production;
+  const productionSrc =
+    savedProd && Object.keys(savedProd).length > 0 ? savedProd : data.production;
   const productionStrings: Record<string, string> = {};
   const productionAliases: Record<string, string> = {
     Outer: "Outer Sheath",
@@ -260,7 +274,7 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
     "outer sheath": "Outer Sheath",
     "inner sheath": "Inner Sheath",
   };
-  for (const [key, raw] of Object.entries(data.production ?? {})) {
+  for (const [key, raw] of Object.entries(productionSrc ?? {})) {
     if (key.trim().toLowerCase() === "insulation") continue;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) continue;
@@ -271,8 +285,12 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
     }
   }
   s.setStockProcessQtys(productionStrings);
+}
+
+export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextData) {
+  applyQtyMaps(s, data);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
-  s.setStockWipSalesKm(Number(data.salesKm) || 0);
+  s.setStockWipSalesKm(0);
   s.setStockWipSalesLines(data.sales ?? []);
   applyLengthOptions(s, data.variant);
   const meta = data.stockMeta;

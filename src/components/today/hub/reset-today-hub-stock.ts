@@ -6,6 +6,7 @@ import {
 } from "@/lib/plant-catalogs";
 import type { TodayHubCatalogs } from "@/components/today/hub/useTodayHubCatalogs";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
+import { EMPTY_STOCK_SALE_ITEM } from "@/components/today/hub/useTodayHubStockCallFields";
 
 export function resetTodayHubStockWip(stock: TodayHubStockState) {
   stock.setStockCable(QUAD_SIGNAL_STOCK_CABLES[0]);
@@ -25,7 +26,7 @@ export function resetTodayHubStockWip(stock: TodayHubStockState) {
   stock.setStockDispatchParty("");
   stock.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   stock.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
-  stock.setStockSaleItems([{ invoiceNo: "", date: "", rate: "", quantity: "", gstPercent: "" }]);
+  stock.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
   stock.setStockDispatchSettledKm(0);
   stock.setStockDispatchSettledItems([]);
   stock.setStockDispatchLoadedKm(0);

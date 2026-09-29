@@ -78,6 +78,7 @@ export function mappedSaleItems(items: StockSaleItem[]) {
     .map((item) => ({
       invoiceNo: item.invoiceNo.trim() || undefined,
       date: item.date.trim() || undefined,
+      partyName: item.partyName.trim() || undefined,
       rate: item.rate.trim() ? Number(item.rate.trim()) || item.rate.trim() : undefined,
       quantity: item.quantity.trim()
         ? Number(item.quantity.trim()) || item.quantity.trim()
@@ -90,6 +91,7 @@ export function mappedSaleItems(items: StockSaleItem[]) {
       (item) =>
         Boolean(item.invoiceNo) ||
         Boolean(item.date) ||
+        Boolean(item.partyName) ||
         item.rate != null ||
         item.quantity != null ||
         item.gstPercent != null,

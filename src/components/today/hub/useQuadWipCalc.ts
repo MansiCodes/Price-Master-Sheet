@@ -9,7 +9,7 @@ export function useQuadWipCalc(
   quadCableProcessFields: string[],
 ) {
   const {
-    stockKind, stockCable, stockProcessQtys, stockWipOpening, stockWipSalesKm, stockLengthFactor,
+    stockKind, stockCable, stockProcessQtys, stockWipOpening, stockLengthFactor,
     stockInsulationExtras, stockSingleQuadExtras, stockOpeningEditable,
     stockWipContextLoading, resolvedQuadCableName, resolvedQuadSizeName, setStockQty,
   } = stock;
@@ -32,7 +32,7 @@ export function useQuadWipCalc(
       ),
     [
       isQuad, stockKind, stockCable, quadCableProcessFields, stockProcessQtys,
-      stockSingleQuadExtras, stockWipOpening, stockWipSalesKm, resolvedQuadCableName,
+      stockSingleQuadExtras, stockWipOpening, resolvedQuadCableName,
       resolvedQuadSizeName, stockLengthFactor, stockInsulationExtras, stockOpeningEditable,
       stockWipContextLoading,
     ],

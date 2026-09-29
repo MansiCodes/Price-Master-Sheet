@@ -175,7 +175,7 @@ export function computeStockWipCalc(
   const over = resolveCalcOverrides(stock, production);
   return calculateQuadSignalWip({
     processes: quadCableProcessFields, opening, production: over.production,
-    salesKm: stock.stockWipSalesKm, coreCount: variant.coreCount, lengthFactor,
+    salesKm: 0, coreCount: variant.coreCount, lengthFactor,
     insulationConsumedOverride: over.insulationConsumedOverride,
     singleQuadConsumedOverride: over.singleQuadConsumedOverride,
     sizeName: stock.resolvedQuadSizeName,

@@ -100,6 +100,7 @@ export type StockDispatchPendingItem = {
 export type StockSaleItem = {
   invoiceNo: string;
   date: string;
+  partyName: string;
   rate: string;
   quantity: string;
   gstPercent: string;

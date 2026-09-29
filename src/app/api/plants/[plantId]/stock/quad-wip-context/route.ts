@@ -155,6 +155,8 @@ export async function GET(
           dispatchSettledKm: existingMeta.dispatchSettledKm ?? 0,
           dispatchSettledItems: existingMeta.dispatchSettledItems ?? [],
           saleItems: existingMeta.saleItems ?? [],
+          opening: existingMeta.opening ?? {},
+          production: existingMeta.production ?? {},
         }
       : null;
 

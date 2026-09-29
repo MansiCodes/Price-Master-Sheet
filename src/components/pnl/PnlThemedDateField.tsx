@@ -19,10 +19,8 @@ function toISO(year: number, monthIndex: number, day: number) {
 function formatDisplay(iso: string) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const mi = Number(m) - 1;
-  if (!y || mi < 0 || mi > 11 || !d) return iso;
-  return `${d}-${months[mi]}-${y}`;
+  if (!y || !m || !d) return iso;
+  return `${d}-${m}-${y}`;
 }
 
 function shiftMonth(year: number, month: number, delta: number) {
@@ -102,7 +100,7 @@ export function PnlThemedDateField({
           onClick={() => setOpen((v) => !v)}
         >
           <span className={value ? "" : "is-placeholder"}>
-            {value ? formatDisplay(value) : "dd-mmm-yyyy"}
+            {value ? formatDisplay(value) : "dd-mm-yyyy"}
           </span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <rect x="3" y="5" width="18" height="16" rx="3" />

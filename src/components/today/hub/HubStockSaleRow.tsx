@@ -72,6 +72,15 @@ export function HubStockSaleRow({
             onChange={(e) => patchSale(setItems, idx, { date: e.target.value })}
           />
         </SaleField>
+        <SaleField id={`st-sale-party-${idx}`} label="Party name">
+          <input
+            id={`st-sale-party-${idx}`}
+            aria-label="Party name"
+            placeholder="Party name"
+            value={item.partyName}
+            onChange={(e) => patchSale(setItems, idx, { partyName: e.target.value })}
+          />
+        </SaleField>
         <SaleField id={`st-sale-rate-${idx}`} label="Rate">
           <input
             id={`st-sale-rate-${idx}`}

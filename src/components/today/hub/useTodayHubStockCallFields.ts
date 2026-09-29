@@ -8,6 +8,7 @@ import type {
 export const EMPTY_STOCK_SALE_ITEM: StockSaleItem = {
   invoiceNo: "",
   date: "",
+  partyName: "",
   rate: "",
   quantity: "",
   gstPercent: "",

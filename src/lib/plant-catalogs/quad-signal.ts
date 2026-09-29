@@ -63,6 +63,7 @@ export type QuadSignalStockMeta = {
   saleItems?: Array<{
     invoiceNo?: string;
     date?: string;
+    partyName?: string;
     rate?: number | string;
     quantity?: number | string;
     gstPercent?: number | string;

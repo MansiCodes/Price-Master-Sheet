@@ -176,7 +176,7 @@ function computeQuadCableWip(args: SubmitStockQuadCableArgs) {
   if (!overrides) return null;
   const wip = calculateQuadSignalWip({
     processes: args.quadCableProcessFields, opening: openingQty, production: processes,
-    salesKm: args.stockWipSalesKm, coreCount: variant.coreCount, lengthFactor,
+    salesKm: 0, coreCount: variant.coreCount, lengthFactor,
     insulationConsumedOverride: overrides.insulationConsumedOverride,
     singleQuadConsumedOverride: overrides.singleQuadConsumedOverride,
     sizeName: resolved.resolvedSize,
