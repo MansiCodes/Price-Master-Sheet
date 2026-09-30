@@ -163,19 +163,17 @@ export function computeStockWipCalc(
   quadCableProcessFields: string[],
 ): WipCalcResult | null {
   if (!isQuad || stock.stockKind !== "cable" || quadCableProcessFields.length === 0) return null;
-  if (stock.stockWipContextLoading && !stock.stockWipOpening.Insulation?.trim()) return null;
   const variant = resolveQuadSignalVariant(stock.resolvedQuadSizeName);
-  if (!variant) return null;
   const production = parseNamedNonneg(quadCableProcessFields, stock.stockProcessQtys, false);
   const opening = parseNamedNonneg(quadCableProcessFields, stock.stockWipOpening, true);
   const lengthFactor =
     stock.stockLengthFactor != null && Number.isFinite(stock.stockLengthFactor)
       ? stock.stockLengthFactor
-      : variant.lengthFactor;
+      : variant?.lengthFactor ?? 1;
   const over = resolveCalcOverrides(stock, production);
   return calculateQuadSignalWip({
     processes: quadCableProcessFields, opening, production: over.production,
-    salesKm: 0, coreCount: variant.coreCount, lengthFactor,
+    salesKm: 0, coreCount: variant?.coreCount ?? 1, lengthFactor,
     insulationConsumedOverride: over.insulationConsumedOverride,
     singleQuadConsumedOverride: over.singleQuadConsumedOverride,
     sizeName: stock.resolvedQuadSizeName,

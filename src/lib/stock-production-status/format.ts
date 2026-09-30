@@ -32,23 +32,21 @@ function fmtKm(n: number): string {
 export function outerClosingAfterPutup(
   outerClosing: number,
   putupKm: number,
-  dispatchKm = 0,
+  _dispatchKm = 0,
 ): number {
   const putup = Number(putupKm) || 0;
-  const dispatch = Number(dispatchKm) || 0;
   const closing = Number(outerClosing) || 0;
-  return Math.round(Math.max(0, closing - putup - dispatch) * 1000) / 1000;
+  return Math.round(Math.max(0, closing - putup) * 1000) / 1000;
 }
 
 export function formatProcessStatusItem(
   line: StockProcessLine,
-  opts?: { putupKm?: number; dispatchKm?: number },
+  opts?: { putupKm?: number },
 ): FormattedStatusItem {
   const base = `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
   const putupKm = Number(opts?.putupKm) || 0;
-  const dispatchKm = Number(opts?.dispatchKm) || 0;
-  if ((putupKm > 0 || dispatchKm > 0) && isOuterProcess(line.name)) {
-    const after = outerClosingAfterPutup(line.closing, putupKm, dispatchKm);
+  if (putupKm > 0 && isOuterProcess(line.name)) {
+    const after = outerClosingAfterPutup(line.closing, putupKm);
     return {
       label: `${line.shortName}:`,
       value: `${base} → after putup ${fmtKm(after)}km`,
@@ -183,11 +181,7 @@ export function formatDispatchItemsList(
     Array.isArray(block.dispatchPendingItems) && block.dispatchPendingItems.length > 0
       ? block.dispatchPendingItems
       : [];
-  const settled =
-    Array.isArray(block.dispatchSettledItems) && block.dispatchSettledItems.length > 0
-      ? block.dispatchSettledItems
-      : [];
-  const source = collapseDispatchRows([...pending, ...settled]);
+  const source = collapseDispatchRows(pending);
   if (source.length > 0) {
     return source.map((item, idx) => {
       const party = item.dispatchParty || "—";
@@ -202,7 +196,7 @@ export function formatDispatchItemsList(
   }
   const single = formatDispatchItem({
     ...block,
-    dispatchPending: block.dispatchPending || block.dispatchSettledKm || 0,
+    dispatchPending: block.dispatchPending || 0,
   });
   if (!single) return [];
   return [

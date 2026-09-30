@@ -270,11 +270,6 @@ function insulationQty(
 
 export type ApplyQuadWipOpts = { preserveInsulation?: boolean };
 
-function mapHasPositive(map?: Record<string, number> | null) {
-  if (!map) return false;
-  return Object.values(map).some((v) => Number(v) > 0);
-}
-
 function applyQtyMaps(
   s: QuadWipSetters,
   data: QuadWipContextData,
@@ -317,19 +312,12 @@ function applyQtyMaps(
     }
     return next;
   });
-  const savedProd = data.stockMeta?.production;
   const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
-  if (mapHasPositive(savedProd)) {
-    for (const [key, raw] of Object.entries(savedProd ?? {})) {
-      const n = Number(raw);
-      if (Number.isFinite(n) && n > 0) productionSrc[key] = n;
-    }
-  }
   const productionStrings: Record<string, string> = {};
   for (const [key, raw] of Object.entries(productionSrc)) {
     if (signalling && isInsulationKey(key)) continue;
     const n = Number(raw);
-    if (!Number.isFinite(n)) continue;
+    if (!Number.isFinite(n) || n <= 0) continue;
     productionStrings[key] = String(n);
     const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
     if (canon && !(signalling && isInsulationKey(canon))) {
@@ -341,7 +329,7 @@ function applyQtyMaps(
     const next = { ...productionStrings };
     if (signalling && preserveIns && prev.Insulation != null && prev.Insulation !== "") {
       next.Insulation = prev.Insulation;
-    } else if (signalling && insProd != null) {
+    } else if (signalling && insProd != null && Number(insProd) > 0) {
       next.Insulation = insProd;
     }
     return next;

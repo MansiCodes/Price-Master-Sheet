@@ -128,11 +128,11 @@ export default async function StockPage({
       mergedCableEntries.push(row);
     }
     mergedCableEntries.sort((a, b) => {
-      const byDate = b.date.getTime() - a.date.getTime();
-      if (byDate !== 0) return byDate;
+      const byUpd = b.updatedAt.getTime() - a.updatedAt.getTime();
+      if (byUpd !== 0) return byUpd;
       const byCreated = b.createdAt.getTime() - a.createdAt.getTime();
       if (byCreated !== 0) return byCreated;
-      return b.updatedAt.getTime() - a.updatedAt.getTime();
+      return b.date.getTime() - a.date.getTime();
     });
 
     const built = buildCableStockStatus(mergedCableEntries);

@@ -1,4 +1,3 @@
-import { pickLastInsulationFillRow } from "@/lib/quad-signal-opening-match";
 import {
   quadSignalClosingFromMeta,
   type QuadSignalStockMeta,
@@ -50,21 +49,25 @@ export function insulationFromMeta(
 }
 
 /**
- * Signalling Insulation is one pool. Last real fill wins.
- * A later size save that only copies an older idle 306.71 does not replace
- * the Opening the user typed today.
+ * Signalling Insulation is one pool. Newest save wins, but a later size
+ * save that only copies an older idle closing (P=0, Out=0) is ignored.
  */
 export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
-  return (
-    pickLastInsulationFillRow(rows, (s) => ({
-      opening: s.opening,
-      production: s.production,
-      consumed: s.consumed,
-      closing: s.closing,
-    })) ?? null
-  );
+  if (rows.length === 0) return null;
+  const sameKm = (a: number, b: number) =>
+    Math.round(a * 1000) === Math.round(b * 1000);
+  for (let i = 0; i < rows.length; i++) {
+    const s = rows[i];
+    const idle = s.production === 0 && s.consumed === 0;
+    if (!idle) return s;
+    const olderHasSameClosing = rows
+      .slice(i + 1)
+      .some((older) => sameKm(older.closing, s.closing));
+    if (!olderHasSameClosing) return s;
+  }
+  return rows[0] ?? null;
 }
 
 /**

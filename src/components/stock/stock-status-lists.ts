@@ -60,9 +60,6 @@ export function getPartyInHandKm(
       dispatchParty: block.dispatchParty || block.partyName || "",
     });
   }
-  if (Array.isArray(block.dispatchSettledItems)) {
-    dispatchRows.push(...block.dispatchSettledItems);
-  }
   for (const item of dispatchRows) {
     const q = Number(item.qty);
     const qty = Number.isFinite(q) && q > 0 ? q : 0;

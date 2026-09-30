@@ -27,14 +27,6 @@ export type QuadSignalOpeningResolve = {
   insulationContributions: InsulationPoolContribution[];
 };
 
-function cardRowOrder<T extends { date: Date; createdAt: Date }>(rows: T[]): T[] {
-  return [...rows].sort((a, b) => {
-    const byDate = b.date.getTime() - a.date.getTime();
-    if (byDate !== 0) return byDate;
-    return b.createdAt.getTime() - a.createdAt.getTime();
-  });
-}
-
 function fillRowOrder<T extends { updatedAt: Date; createdAt: Date }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     const byUpd = b.updatedAt.getTime() - a.updatedAt.getTime();
@@ -94,7 +86,7 @@ export async function resolveQuadSignalStockOpening(params: {
   }
 
   const sizeOpen = lastEnteredOpeningByProcess(
-    byFill, cable, size, itemName, processes, signalling,
+    byFill, cable, size, itemName, processes, signalling, !sameDayEntryId,
   );
   const sizeProduction = lastEnteredProductionByProcess(
     byFill, cable, size, itemName, processes, signalling,
@@ -108,10 +100,9 @@ export async function resolveQuadSignalStockOpening(params: {
   if (signalling) {
     delete opening[INSULATION_KEY];
     delete production[INSULATION_KEY];
-    const ins = buildCableStockStatus(cardRowOrder(rows)).sharedInsulation;
+    const ins = buildCableStockStatus(byFill).sharedInsulation;
     if (ins) {
-      opening[INSULATION_KEY] =
-        ins.production === 0 ? ins.closing : ins.opening;
+      opening[INSULATION_KEY] = ins.closing;
       production[INSULATION_KEY] = ins.production;
       insFromDate = ins.entryDate;
       insulationContributions = [];

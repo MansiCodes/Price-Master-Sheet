@@ -15,12 +15,7 @@ import {
   shortProcessName,
 } from "./format";
 import type { CableStockStatusBlock, SharedInsulationStatus, StockProcessLine } from "./types";
-import {
-  collapseDispatchRows,
-  liveDispatchLock,
-  pendingOnlyFromMeta,
-  settledFromHistory,
-} from "./dispatch-history";
+import { collapseDispatchRows } from "./dispatch-history";
 
 /**
  * Build cable-size production status from the last fill per cable · size
@@ -41,7 +36,6 @@ export function buildCableStockStatus(
   quadInsulation: SharedInsulationStatus | null;
 } {
   const byKey = new Map<string, CableStockStatusBlock>();
-  const harvestedDispatch = new Set<string>();
   const signallingInsul: SharedInsulationStatus[] = [];
   const quadInsul: SharedInsulationStatus[] = [];
 
@@ -64,44 +58,6 @@ export function buildCableStockStatus(
       // Prefer normalized key so "100P" / "100 Pair" / "100Pair" show as one card.
       const key = quadSignalCableSizeDedupeKey(cable, size);
       if (byKey.has(key)) {
-        const block = byKey.get(key)!;
-        const pending = collapseDispatchRows(
-          (block.dispatchPendingItems ?? []).map((d) => ({
-            qty: d.qty,
-            partyName: d.dispatchParty,
-          })),
-        );
-        if (!harvestedDispatch.has(key)) {
-          const extras = settledFromHistory(
-            pendingOnlyFromMeta(meta, String(meta.dispatchParty ?? "")),
-            pending,
-          );
-          if (extras.settledItems.length > 0) {
-            block.dispatchSettledItems = extras.settledItems;
-            block.dispatchSettledKm = extras.settledKm;
-            harvestedDispatch.add(key);
-          } else {
-            const live = settledFromHistory(
-              (block.dispatchSettledItems ?? []).map((d) => ({
-                qty: d.qty,
-                partyName: d.dispatchParty,
-              })),
-              pending,
-            );
-            block.dispatchSettledItems = live.settledItems;
-            block.dispatchSettledKm = live.settledKm;
-          }
-        }
-        const putup = block.putupKm;
-        const settled = block.dispatchSettledKm ?? 0;
-        block.totalKm = Math.round(block.processes.reduce((s, p) => {
-          const n = p.name.trim().toLowerCase();
-          if (n === "insulation" || n === "single quad") return s;
-          if (isOuterProcess(p.name)) {
-            return s + outerClosingAfterPutup(p.closing, putup, settled);
-          }
-          return s + p.closing;
-        }, 0) * 1000) / 1000;
         continue;
       }
 
@@ -167,20 +123,6 @@ export function buildCableStockStatus(
         })),
       );
       const totalDispatchPending = dispatchPendingItems.reduce((sum, item) => sum + item.qty, 0);
-      const dispatchSettledItems = collapseDispatchRows(
-        (Array.isArray(meta.dispatchSettledItems) ? meta.dispatchSettledItems : []).map((item) => ({
-          qty: item.qty,
-          partyName: String(item.partyName ?? dispatchParty ?? "").trim(),
-        })),
-      );
-      const fromItems = liveDispatchLock(
-        dispatchPendingItems,
-        dispatchPendingItems,
-        dispatchSettledItems,
-      );
-      const dispatchSettledKm = fromItems.settledKm;
-      const settledItems =
-        fromItems.settledItems.length > 0 ? fromItems.settledItems : dispatchSettledItems;
 
       const processes: StockProcessLine[] = names.map((name, i) => {
         const prod = processQtyFromMeta(production, name);
@@ -194,12 +136,12 @@ export function buildCableStockStatus(
         };
       });
 
-      // Insul + Single Quad stay out of Total. Outer uses closing after Call putup.
+      // Insul + Single Quad stay out of Total. Outer = closing − Call putup only.
       const totalKm = processes.reduce((s, p) => {
         const n = p.name.trim().toLowerCase();
         if (n === "insulation" || n === "single quad") return s;
         if (isOuterProcess(p.name)) {
-          return s + outerClosingAfterPutup(p.closing, totalPutupKm, dispatchSettledKm);
+          return s + outerClosingAfterPutup(p.closing, totalPutupKm);
         }
         return s + p.closing;
       }, 0);
@@ -218,8 +160,8 @@ export function buildCableStockStatus(
         partyName,
         dispatchParty,
         dispatchPending: Math.round(totalDispatchPending * 1000) / 1000,
-        dispatchSettledKm: Math.round(dispatchSettledKm * 1000) / 1000,
-        dispatchSettledItems: settledItems,
+        dispatchSettledKm: 0,
+        dispatchSettledItems: [],
         userNotes: String(userNotes ?? "").trim(),
         callPutupItems,
         dispatchPendingItems,

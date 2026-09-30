@@ -78,13 +78,12 @@ export function StockCableCardItem({
               <div className="stock-proc-grid">
                 {block.processes.map((p) => {
                   const putupForOuter = block.putupKm ?? 0;
-                  const settled = block.dispatchSettledKm ?? 0;
                   const isOuter =
                     p.name.trim().toLowerCase() === "outer sheath" ||
                     p.name.trim().toLowerCase() === "outer";
                   const afterPutup =
-                    isOuter && (putupForOuter > 0 || settled > 0)
-                      ? outerClosingAfterPutup(p.closing, putupForOuter, settled)
+                    isOuter && putupForOuter > 0
+                      ? outerClosingAfterPutup(p.closing, putupForOuter)
                       : null;
                   const item = formatProcessStatusItem(p);
                   return (

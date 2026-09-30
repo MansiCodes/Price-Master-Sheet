@@ -137,6 +137,7 @@ export function lastEnteredOpeningByProcess(
   itemName: string,
   processNames: readonly string[] = [],
   skipInsulation = false,
+  useLastClosing = false,
 ): { opening: Record<string, number>; fromDate: string | null } {
   const names = skipInsulation
     ? processNames.filter((p) => p.trim().toLowerCase() !== "insulation")
@@ -146,10 +147,10 @@ export function lastEnteredOpeningByProcess(
     if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
       continue;
     }
-    const src = {
-      ...quadSignalClosingFromMeta(meta),
-      ...(meta.opening ?? {}),
-    };
+    const closing = quadSignalClosingFromMeta(meta);
+    const src = useLastClosing
+      ? { ...(meta.opening ?? {}), ...closing }
+      : { ...closing, ...(meta.opening ?? {}) };
     const out: Record<string, number> = {};
     const keys = names.length > 0 ? names : Object.keys(src);
     for (const proc of keys) {
@@ -173,34 +174,20 @@ export function lastEnteredProductionByProcess(
   const names = skipInsulation
     ? processNames.filter((p) => p.trim().toLowerCase() !== "insulation")
     : [...processNames];
-  let fallback: Record<string, number> | null = null;
   for (const row of rows) {
     const { meta } = parseQuadSignalStockNotes(row.notes);
     if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
       continue;
     }
     const out: Record<string, number> = {};
-    let anyPositive = false;
     const keys = names.length > 0 ? names : Object.keys(meta.production ?? {});
     for (const proc of keys) {
       if (skipInsulation && proc.trim().toLowerCase() === "insulation") continue;
-      const n = qtyOnMap(meta.production, proc);
-      out[proc] = n;
-      if (n > 0) anyPositive = true;
+      out[proc] = qtyOnMap(meta.production, proc);
     }
-    if (!anyPositive) {
-      for (const [key, raw] of Object.entries(meta.production ?? {})) {
-        if (skipInsulation && key.trim().toLowerCase() === "insulation") continue;
-        const n = Number(raw);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        out[key] = n;
-        anyPositive = true;
-      }
-    }
-    if (!fallback) fallback = out;
-    if (anyPositive) return out;
+    return out;
   }
-  return fallback ?? {};
+  return {};
 }
 
 /** @deprecated Use lastEnteredProductionByProcess — latest row, including P=0. */
