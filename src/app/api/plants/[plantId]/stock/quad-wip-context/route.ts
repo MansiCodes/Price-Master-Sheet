@@ -9,7 +9,6 @@ import {
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
 } from "@/lib/plant-catalogs";
-import { ManpowerShift } from "@prisma/client";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
@@ -21,6 +20,15 @@ import {
 } from "@/lib/quad-signal-wip";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
+
+function stripInsulationQty(map: Record<string, number>) {
+  const out: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(map)) {
+    if (key.trim().toLowerCase() === "insulation") continue;
+    out[key] = raw;
+  }
+  return out;
+}
 
 /**
  * Opening WIP + Sales-ledger qty for Quad/Signal stock form.
@@ -54,8 +62,7 @@ export async function GET(
   const shiftRaw = (request.nextUrl.searchParams.get("shift") ?? "DAY")
     .trim()
     .toUpperCase();
-  const shift =
-    shiftRaw === "NIGHT" ? ManpowerShift.NIGHT : ManpowerShift.DAY;
+  void shiftRaw;
 
   if (!dateOnlyRegex.test(dateRaw)) {
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
@@ -120,7 +127,6 @@ export async function GET(
     where: {
       ...pScope,
       date: day,
-      shift,
       itemName,
     },
     orderBy: { updatedAt: "desc" },
@@ -133,7 +139,7 @@ export async function GET(
           ...pScope,
           itemName,
         },
-        orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
         select: { notes: true },
       });
   const { meta: existingMeta } = parseQuadSignalStockNotes(
@@ -155,8 +161,8 @@ export async function GET(
           dispatchSettledKm: existingMeta.dispatchSettledKm ?? 0,
           dispatchSettledItems: existingMeta.dispatchSettledItems ?? [],
           saleItems: existingMeta.saleItems ?? [],
-          opening: existingMeta.opening ?? {},
-          production: existingMeta.production ?? {},
+          opening: stripInsulationQty(existingMeta.opening ?? {}),
+          production: stripInsulationQty(existingMeta.production ?? {}),
         }
       : null;
 

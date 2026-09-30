@@ -1,15 +1,11 @@
 import { prisma } from "@/lib/db";
-import {
-  getQuadSignalCableProcesses,
-  quadSignalClosingFromMeta,
-} from "@/lib/plant-catalogs";
+import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
 import { plantIdFilter } from "@/lib/plant-merge";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { buildCableStockStatus } from "@/lib/stock-production-status";
 import {
-  findLatestSharedInsulationOpening,
   INSULATION_KEY,
-  lastInsulationContributions,
-  lastClosingAfterProduction,
+  lastEnteredOpeningByProcess,
   lastEnteredProductionByProcess,
   matchesCableSize,
 } from "@/lib/quad-signal-opening-match";
@@ -27,128 +23,102 @@ export type QuadSignalOpeningResolve = {
   openingFromDate: string | null;
   openingEditable: boolean;
   sameDayEntryId: string | null;
-  /** Last saved Process WIP production (Stock Excel process columns). */
   production: Record<string, number>;
   insulationContributions: InsulationPoolContribution[];
 };
 
+function cardRowOrder<T extends { date: Date; createdAt: Date }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byDate = b.date.getTime() - a.date.getTime();
+    if (byDate !== 0) return byDate;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+}
+
+function fillRowOrder<T extends { updatedAt: Date; createdAt: Date }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const byUpd = b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (byUpd !== 0) return byUpd;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+}
+
 /**
- * Opening WIP for Quad/Signal cable stock.
- *
- * Signalling Insulation is one pool for the day:
- * - Once any Signalling size saves Insulation today, later sizes use that
- *   entry's Insulation CLOSING (e.g. 227.24), not an older size-specific
- *   opening (e.g. yesterday's 46).
- * - Other stages (Laying → Outer) stay size-specific from that size's prior closing.
+ * Size WIP = last fill. Signalling Insulation = the Stock card snapshot
+ * (same rows + buildCableStockStatus), so the form Opening matches Insul km.
  */
 export async function resolveQuadSignalStockOpening(params: {
   plantIds: string[];
   day: Date;
   cable: string;
   size: string;
-  /** When true (Tarun), Opening stays editable even with history. */
   alwaysEditable?: boolean;
 }): Promise<QuadSignalOpeningResolve> {
-  const { plantIds, day, cable, size, alwaysEditable = false } = params;
+  const { plantIds, day, cable, size } = params;
   const pScope = plantIdFilter(plantIds);
   const itemName = `${cable} · ${size}`;
   const signalling = isSignallingCableName(cable);
+  const dayIso = day.toISOString().slice(0, 10);
 
-  const [priorRows, sameDayRows] = await Promise.all([
-    prisma.stockEntry.findMany({
-      where: {
-        ...pScope,
-        date: { lt: day },
-        category: "FG",
-        OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 2500,
-      select: { id: true, date: true, itemName: true, notes: true },
-    }),
-    prisma.stockEntry.findMany({
-      where: {
-        ...pScope,
-        date: day,
-        category: "FG",
-        OR: [{ itemName }, { notes: { startsWith: "QSSTOCK:" } }],
-      },
-      orderBy: [{ createdAt: "desc" }],
-      take: 2500,
-      select: { id: true, date: true, itemName: true, notes: true },
-    }),
-  ]);
+  const rows = await prisma.stockEntry.findMany({
+    where: {
+      ...pScope,
+      category: "FG",
+      date: { lte: day },
+      notes: { startsWith: "QSSTOCK:" },
+    },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    take: 2500,
+    select: {
+      id: true,
+      date: true,
+      createdAt: true,
+      updatedAt: true,
+      itemName: true,
+      notes: true,
+    },
+  });
 
-  let sizeOpening: Record<string, number> | null = null;
-  let sizeOpeningFromDate: string | null = null;
+  const sameDayRows = rows.filter(
+    (r) => r.date.toISOString().slice(0, 10) === dayIso,
+  );
+  const processes = getQuadSignalCableProcesses(cable);
+  const byFill = fillRowOrder(rows);
+
   let sameDayEntryId: string | null = null;
-  let sameDayInsulProd = 0;
-
   for (const row of sameDayRows) {
-    const { match, meta } = matchesCableSize(row, cable, size, itemName);
+    const { match } = matchesCableSize(row, cable, size, itemName);
     if (!match) continue;
     sameDayEntryId = row.id;
-    sameDayInsulProd = Number(meta?.production?.[INSULATION_KEY]) || 0;
     break;
   }
 
-  for (const row of priorRows) {
-    const { match, meta } = matchesCableSize(row, cable, size, itemName);
-    if (!match) continue;
-    sizeOpening = quadSignalClosingFromMeta(meta);
-    sizeOpeningFromDate = row.date.toISOString().slice(0, 10);
-    break;
-  }
-
-  const sizeContributions = lastInsulationContributions(
-    [...sameDayRows, ...priorRows], cable, size, itemName,
+  const sizeOpen = lastEnteredOpeningByProcess(
+    byFill, cable, size, itemName, processes, signalling,
+  );
+  const sizeProduction = lastEnteredProductionByProcess(
+    byFill, cable, size, itemName, processes, signalling,
   );
 
-  const sizeProduction = sameDayEntryId
-    ? lastEnteredProductionByProcess(
-        sameDayRows, cable, size, itemName, getQuadSignalCableProcesses(cable),
-      )
-    : {};
-
-  const poolRows = sameDayEntryId
-    ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
-    : sameDayRows;
-  const sharedToday = signalling
-    ? findLatestSharedInsulationOpening(poolRows)
-    : null;
-  const sharedPrior = signalling
-    ? findLatestSharedInsulationOpening(priorRows)
-    : null;
-  const sharedIns = sharedToday ?? sharedPrior;
-
-  const hasSizeHistory = sizeOpening != null || sameDayEntryId != null;
-  const openingEditable =
-    alwaysEditable ||
-    (!hasSizeHistory && !(signalling && sharedToday != null));
-
-  let opening: Record<string, number> = {};
-  if (sizeOpening) opening = { ...sizeOpening };
-  // Latest size-row closing (including P=0 days) is today's Opening.
-
-  if (signalling && sharedIns != null && !(sameDayEntryId && sameDayInsulProd > 0)) {
-    opening[INSULATION_KEY] = sharedIns.value;
-  }
-
-  const processes = getQuadSignalCableProcesses(cable);
-  for (let i = 0; i < processes.length; i++) {
-    const proc = processes[i]!;
-    if (proc.trim().toLowerCase() === "insulation") continue;
-    const afterP = lastClosingAfterProduction(
-      [...sameDayRows, ...priorRows], cable, size, itemName, proc, processes[i + 1],
-    );
-    if (afterP != null) opening[proc] = afterP;
-  }
-
+  const opening: Record<string, number> = { ...sizeOpen.opening };
   const production: Record<string, number> = { ...sizeProduction };
-  delete production[INSULATION_KEY];
-  const insulationContributions = sizeContributions;
+  let insulationContributions: InsulationPoolContribution[] = [];
+  let insFromDate: string | null = null;
 
-  if (Object.keys(opening).length === 0 && !sameDayEntryId) {
+  if (signalling) {
+    delete opening[INSULATION_KEY];
+    delete production[INSULATION_KEY];
+    const ins = buildCableStockStatus(cardRowOrder(rows)).sharedInsulation;
+    if (ins) {
+      opening[INSULATION_KEY] =
+        ins.production === 0 ? ins.closing : ins.opening;
+      production[INSULATION_KEY] = ins.production;
+      insFromDate = ins.entryDate;
+      insulationContributions = [];
+    }
+  }
+
+  if (Object.keys(opening).length === 0 && !sameDayEntryId && production[INSULATION_KEY] == null) {
     return {
       opening: {},
       openingFromDate: null,
@@ -161,10 +131,8 @@ export async function resolveQuadSignalStockOpening(params: {
 
   return {
     opening,
-    openingFromDate: sharedToday
-      ? null
-      : (sharedIns?.fromDate ?? sizeOpeningFromDate),
-    openingEditable,
+    openingFromDate: insFromDate ?? sizeOpen.fromDate,
+    openingEditable: true,
     sameDayEntryId,
     production,
     insulationContributions,

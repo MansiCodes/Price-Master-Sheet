@@ -250,45 +250,110 @@ export type QuadWipContextData = {
   }>;
 };
 
+function isInsulationKey(key: string) {
+  return key.trim().toLowerCase() === "insulation";
+}
+
+function insulationQty(
+  maps: Array<Record<string, number> | undefined | null>,
+): string | null {
+  for (const map of maps) {
+    if (!map) continue;
+    for (const [key, raw] of Object.entries(map)) {
+      if (!isInsulationKey(key)) continue;
+      const n = Number(raw);
+      if (Number.isFinite(n)) return String(n);
+    }
+  }
+  return null;
+}
+
+export type ApplyQuadWipOpts = { preserveInsulation?: boolean };
+
+function mapHasPositive(map?: Record<string, number> | null) {
+  if (!map) return false;
+  return Object.values(map).some((v) => Number(v) > 0);
+}
+
 function applyQtyMaps(
   s: QuadWipSetters,
   data: QuadWipContextData,
+  opts?: ApplyQuadWipOpts,
 ) {
+  const preserveIns = Boolean(opts?.preserveInsulation);
+  const signalling = isSignallingCableName(data.cable ?? "");
   const savedOpen = data.stockMeta?.opening;
-  const openingSrc =
-    savedOpen && Object.keys(savedOpen).length > 0 ? savedOpen : data.opening;
-  const openingStrings: Record<string, string> = {};
-  for (const [key, raw] of Object.entries(openingSrc ?? {})) {
-    const n = Number(raw);
-    if (Number.isFinite(n)) openingStrings[key] = String(n);
-  }
-  s.setStockWipOpening(openingStrings);
-  const savedProd = data.stockMeta?.production;
-  const productionSrc =
-    savedProd && Object.keys(savedProd).length > 0 ? savedProd : data.production;
-  const productionStrings: Record<string, string> = {};
-  const productionAliases: Record<string, string> = {
+  const processAliases: Record<string, string> = {
     Outer: "Outer Sheath",
-    Inner: "Inner Sheath",
-    Armoring: "Armouring",
+    outer: "Outer Sheath",
     "outer sheath": "Outer Sheath",
+    Inner: "Inner Sheath",
+    inner: "Inner Sheath",
     "inner sheath": "Inner Sheath",
+    Armoring: "Armouring",
+    armoring: "Armouring",
   };
-  for (const [key, raw] of Object.entries(productionSrc ?? {})) {
-    if (key.trim().toLowerCase() === "insulation") continue;
+  const openingStrings: Record<string, string> = {};
+  const putOpening = (map?: Record<string, number> | null) => {
+    if (!map) return;
+    for (const [key, raw] of Object.entries(map)) {
+      if (isInsulationKey(key)) continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) continue;
+      openingStrings[key] = String(n);
+      const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
+      if (canon) openingStrings[canon] = String(n);
+    }
+  };
+  putOpening(data.opening);
+  putOpening(savedOpen);
+  const insOpen = insulationQty([data.opening]);
+  s.setStockWipOpening((prev) => {
+    const next = { ...openingStrings };
+    if (preserveIns && prev.Insulation != null && prev.Insulation !== "") {
+      next.Insulation = prev.Insulation;
+    } else if (insOpen != null) {
+      next.Insulation = insOpen;
+    }
+    return next;
+  });
+  const savedProd = data.stockMeta?.production;
+  const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
+  if (mapHasPositive(savedProd)) {
+    for (const [key, raw] of Object.entries(savedProd ?? {})) {
+      const n = Number(raw);
+      if (Number.isFinite(n) && n > 0) productionSrc[key] = n;
+    }
+  }
+  const productionStrings: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(productionSrc)) {
+    if (signalling && isInsulationKey(key)) continue;
     const n = Number(raw);
     if (!Number.isFinite(n)) continue;
     productionStrings[key] = String(n);
-    const canon = productionAliases[key] ?? productionAliases[key.trim().toLowerCase()];
-    if (canon && canon.trim().toLowerCase() !== "insulation") {
+    const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
+    if (canon && !(signalling && isInsulationKey(canon))) {
       productionStrings[canon] = String(n);
     }
   }
-  s.setStockProcessQtys(productionStrings);
+  const insProd = insulationQty([data.production]);
+  s.setStockProcessQtys((prev) => {
+    const next = { ...productionStrings };
+    if (signalling && preserveIns && prev.Insulation != null && prev.Insulation !== "") {
+      next.Insulation = prev.Insulation;
+    } else if (signalling && insProd != null) {
+      next.Insulation = insProd;
+    }
+    return next;
+  });
 }
 
-export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextData) {
-  applyQtyMaps(s, data);
+export function applyQuadWipContextData(
+  s: QuadWipSetters,
+  data: QuadWipContextData,
+  opts?: ApplyQuadWipOpts,
+) {
+  applyQtyMaps(s, data, opts);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
   s.setStockWipSalesKm(0);
   s.setStockWipSalesLines(data.sales ?? []);
@@ -303,15 +368,19 @@ export function applyQuadWipContextData(s: QuadWipSetters, data: QuadWipContextD
   applyDispatchFromMeta(s, meta);
   applySaleFromMeta(s, meta);
   const cable = data.cable ?? "";
-  const size = data.size ?? "";
-  if (isSignallingCableName(cable)) {
-    s.setStockInsulationExtras(
-      extrasFromPoolContributions("Signalling Cable", size, data.insulationContributions ?? []),
-    );
-  } else {
-    s.setStockInsulationExtras([]);
+  if (!opts?.preserveInsulation) {
+    if (isSignallingCableName(cable)) {
+      const extras = extrasFromPoolContributions(
+        "Signalling Cable",
+        data.insulationContributions ?? [],
+      );
+      s.setStockInsulationExtras(extras);
+      s.setStockInsulationExtrasOpen(extras.length > 0);
+    } else {
+      s.setStockInsulationExtras([]);
+      s.setStockInsulationExtrasOpen(false);
+    }
   }
-  s.setStockInsulationExtrasOpen(false);
   s.setStockWipContextLoading(false);
 }
 

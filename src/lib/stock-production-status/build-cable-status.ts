@@ -23,8 +23,8 @@ import {
 } from "./dispatch-history";
 
 /**
- * Build cable-size production status blocks from QSSTOCK FG rows.
- * Keeps the newest entry per cable · size (rows should be newest-first).
+ * Build cable-size production status from the last fill per cable · size
+ * (newest save, any date — not last calendar day).
  * Near-duplicate "Other" spellings collapse via normalizeQuadSignalCableSizeKey.
  * Signalling Insulation is returned separately (shared across sizes).
  */

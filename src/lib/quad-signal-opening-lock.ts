@@ -1,20 +1,21 @@
 import { parseQuadSignalStockNotes } from "@/lib/plant-catalogs";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
-import { INSULATION_KEY } from "@/lib/quad-signal-opening-match";
 import { recomputeCableNotesWithOpening } from "@/lib/quad-signal-opening-recompute";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening-resolve";
 
+function hasOpeningValues(opening: Record<string, number> | undefined): boolean {
+  if (!opening) return false;
+  return Object.values(opening).some((n) => Number.isFinite(Number(n)));
+}
+
 /**
- * On create/update: if opening is locked, force server opening and recompute closing.
- * First-time seed / designated editor keeps client opening.
+ * Keep the submitted last fill when the form sent Opening.
+ * Only seed Opening from the last fill when the client left it empty.
  */
 export async function applyQuadSignalOpeningLockToNotes(params: {
   plantIds: string[];
   day: Date;
   notes: string | null | undefined;
-  /** When editing, keep the opening that was already saved (non-editors). */
   lockOpeningTo?: Record<string, number> | null;
-  /** Designated editor may submit a new Opening anytime. */
   allowOpeningOverride?: boolean;
 }): Promise<string | null | undefined> {
   const {
@@ -31,52 +32,21 @@ export async function applyQuadSignalOpeningLockToNotes(params: {
     return notes;
   }
 
-  const cable = meta.cable;
-  const size = meta.size;
-
-  if (allowOpeningOverride) {
-    return recomputeCableNotesWithOpening(
-      meta,
-      userNotes,
-      meta.opening ?? {},
-    );
+  if (allowOpeningOverride || lockOpeningTo != null) {
+    const opening = lockOpeningTo ?? meta.opening ?? {};
+    return recomputeCableNotesWithOpening(meta, userNotes, opening);
   }
 
-  let opening = meta.opening ?? {};
-  let mustLock = lockOpeningTo != null;
-
-  if (lockOpeningTo != null) {
-    opening = lockOpeningTo;
-  } else {
-    const resolved = await resolveQuadSignalStockOpening({
-      plantIds,
-      day,
-      cable,
-      size,
-    });
-    if (!resolved.openingEditable) {
-      opening = resolved.opening;
-      mustLock = true;
-    }
+  if (hasOpeningValues(meta.opening)) {
+    return recomputeCableNotesWithOpening(meta, userNotes, meta.opening ?? {});
   }
 
-  if (!mustLock) return notes;
-
-  // Always refresh Signalling Insulation from shared pool when locking
-  if (isSignallingCableName(cable)) {
-    const resolved = await resolveQuadSignalStockOpening({
-      plantIds,
-      day,
-      cable,
-      size,
-    });
-    if (resolved.opening[INSULATION_KEY] != null) {
-      opening = {
-        ...opening,
-        [INSULATION_KEY]: resolved.opening[INSULATION_KEY]!,
-      };
-    }
-  }
-
-  return recomputeCableNotesWithOpening(meta, userNotes, opening);
+  const resolved = await resolveQuadSignalStockOpening({
+    plantIds,
+    day,
+    cable: meta.cable,
+    size: meta.size,
+  });
+  if (Object.keys(resolved.opening).length === 0) return notes;
+  return recomputeCableNotesWithOpening(meta, userNotes, resolved.opening);
 }

@@ -12,7 +12,7 @@ import {
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
-import { dedupeQuadCableRows } from "./stock-amounts";
+import { dedupeQuadCableRows, stampSharedInsulationOnRows } from "./stock-amounts";
 import type { RouteContext } from "./stock-schemas";
 
 export async function GET(
@@ -71,7 +71,7 @@ export async function GET(
 
   const entries =
     quadSignal && (kindParam === "cable" || kindParam === "")
-      ? dedupeQuadCableRows(entriesRaw)
+      ? stampSharedInsulationOnRows(dedupeQuadCableRows(entriesRaw))
       : entriesRaw;
 
   const { slice, ...pageInfo } = paginate(entries, page, pageSize);

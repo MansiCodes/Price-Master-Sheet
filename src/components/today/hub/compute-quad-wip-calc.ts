@@ -163,7 +163,7 @@ export function computeStockWipCalc(
   quadCableProcessFields: string[],
 ): WipCalcResult | null {
   if (!isQuad || stock.stockKind !== "cable" || quadCableProcessFields.length === 0) return null;
-  if (stock.stockWipContextLoading) return null;
+  if (stock.stockWipContextLoading && !stock.stockWipOpening.Insulation?.trim()) return null;
   const variant = resolveQuadSignalVariant(stock.resolvedQuadSizeName);
   if (!variant) return null;
   const production = parseNamedNonneg(quadCableProcessFields, stock.stockProcessQtys, false);

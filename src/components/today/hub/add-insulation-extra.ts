@@ -26,7 +26,6 @@ export function nextInsulationExtra(
 
 export function extrasFromPoolContributions(
   catalogKey: "Signalling Cable" | "Quad Cable",
-  primarySize: string,
   contributions: Array<{
     size: string;
     layingProduced: number;
@@ -34,9 +33,8 @@ export function extrasFromPoolContributions(
   }>,
 ): StockInsulationExtra[] {
   const catalog = getQuadSignalCableSizes(catalogKey);
-  const primary = primarySize.trim();
   return contributions
-    .filter((c) => c.size.trim() && c.size.trim() !== primary)
+    .filter((c) => c.size.trim())
     .map((c, i) => {
       const inCatalog = catalog.includes(c.size);
       return {

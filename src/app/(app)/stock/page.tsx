@@ -79,6 +79,7 @@ export default async function StockPage({
       id: true,
       date: true,
       createdAt: true,
+      updatedAt: true,
       itemName: true,
       notes: true,
     } as const;
@@ -86,7 +87,7 @@ export default async function StockPage({
     const [cableEntries, quadEntries, rmEntries] = await Promise.all([
       prisma.stockEntry.findMany({
         where: qsFgWhere,
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
         take: 2500,
         select: qsSelect,
       }),
@@ -95,7 +96,7 @@ export default async function StockPage({
           ...qsFgWhere,
           itemName: { contains: "Quad", mode: "insensitive" },
         },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
         take: 400,
         select: qsSelect,
       }),
@@ -106,7 +107,7 @@ export default async function StockPage({
           date: { lte: day },
           notes: { startsWith: "QSSTOCK:" },
         },
-        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
         take: 300,
         select: {
           itemName: true,
@@ -129,7 +130,9 @@ export default async function StockPage({
     mergedCableEntries.sort((a, b) => {
       const byDate = b.date.getTime() - a.date.getTime();
       if (byDate !== 0) return byDate;
-      return b.createdAt.getTime() - a.createdAt.getTime();
+      const byCreated = b.createdAt.getTime() - a.createdAt.getTime();
+      if (byCreated !== 0) return byCreated;
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
     });
 
     const built = buildCableStockStatus(mergedCableEntries);

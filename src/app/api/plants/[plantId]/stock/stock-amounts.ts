@@ -2,27 +2,29 @@ import { ManpowerShift, StockCategory } from "@prisma/client";
 import { z } from "zod";
 import { round2, round4 } from "@/lib/api";
 import {
+  encodeQuadSignalStockNotes,
   parseQuadSignalStockNotes,
   quadSignalCableSizeDedupeKey,
 } from "@/lib/plant-catalogs";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { toIsoDateString } from "@/lib/dates";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import { weightedAveragePurchaseRate } from "@/lib/stock/purchase-average-rate";
 import type { stockLineSchema } from "./stock-schemas";
 
+type QuadCableRow = {
+  date: Date | string;
+  notes: string | null;
+  category?: string | null;
+  shift?: string | null;
+  itemName?: string;
+};
+
 /**
- * Quad/Signal P&L Stock: one FG cable row per date + shift + cable/size.
- * Repeated saves of the same size keep the newest (list is newest-first).
+ * Quad/Signal P&L Stock: one FG cable row per date + cable/size.
+ * Repeated saves (any shift) keep the newest (list is newest-first).
  */
-export function dedupeQuadCableRows<
-  T extends {
-    date: Date | string;
-    notes: string | null;
-    category?: string | null;
-    shift?: string | null;
-    itemName?: string;
-  },
->(rows: T[]): T[] {
+export function dedupeQuadCableRows<T extends QuadCableRow>(rows: T[]): T[] {
   const seen = new Set<string>();
   const out: T[] = [];
   for (const row of rows) {
@@ -31,18 +33,56 @@ export function dedupeQuadCableRows<
       continue;
     }
     const day = toIsoDateString(row.date);
-    const shift = String(row.shift ?? "");
     const { meta } = parseQuadSignalStockNotes(row.notes);
     const sizeKey =
       meta?.kind === "cable" && meta.cable && meta.size
         ? quadSignalCableSizeDedupeKey(meta.cable, meta.size)
         : `item:${row.itemName ?? ""}`;
-    const key = `${day}|${shift}|${sizeKey}`;
+    const key = `${day}|${sizeKey}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(row);
   }
   return out;
+}
+
+/** Same Insulation O/P/C on every Signalling size row for that date. */
+export function stampSharedInsulationOnRows<T extends QuadCableRow>(rows: T[]): T[] {
+  const byDay = new Map<
+    string,
+    { opening?: number; production?: number; closing?: number }
+  >();
+  for (const row of rows) {
+    if (row.category !== StockCategory.FG) continue;
+    const { meta } = parseQuadSignalStockNotes(row.notes);
+    if (meta?.kind !== "cable" || !isSignallingCableName(meta.cable ?? "")) continue;
+    const day = toIsoDateString(row.date);
+    if (byDay.has(day)) continue;
+    byDay.set(day, {
+      opening: meta.opening?.Insulation,
+      production: meta.production?.Insulation,
+      closing: meta.sharedInsulation?.closing ?? meta.closing?.Insulation,
+    });
+  }
+  return rows.map((row) => {
+    if (row.category !== StockCategory.FG) return row;
+    const { meta, userNotes } = parseQuadSignalStockNotes(row.notes);
+    if (meta?.kind !== "cable" || !isSignallingCableName(meta.cable ?? "")) {
+      return row;
+    }
+    const ins = byDay.get(toIsoDateString(row.date));
+    if (!ins) return row;
+    const next = {
+      ...meta,
+      opening: { ...meta.opening },
+      production: { ...meta.production },
+      closing: { ...meta.closing },
+    };
+    if (ins.opening != null) next.opening.Insulation = ins.opening;
+    if (ins.production != null) next.production.Insulation = ins.production;
+    if (ins.closing != null) next.closing.Insulation = ins.closing;
+    return { ...row, notes: encodeQuadSignalStockNotes(next, userNotes) };
+  });
 }
 
 export function dedupeTodayQuadCableRows<

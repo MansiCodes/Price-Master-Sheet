@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { ShiftKey } from "@/components/today/today-hub-model";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 import {
@@ -8,6 +8,7 @@ import {
   type QuadWipContextData,
   type QuadWipSetters,
 } from "@/components/today/hub/apply-quad-wip-context";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
 
 function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
   return {
@@ -41,8 +42,9 @@ function fetchQuadWipContext(
   args: { plantId: string; entryDate: string; shift: ShiftKey; cable: string; size: string },
   setters: QuadWipSetters,
   stockWipSalesLines: TodayHubStockState["stockWipSalesLines"],
+  preserveInsulation: boolean,
 ) {
-  setters.setStockWipContextLoading(true);
+  if (!preserveInsulation) setters.setStockWipContextLoading(true);
   const q = new URLSearchParams({
     date: args.entryDate, shift: args.shift, cable: args.cable, size: args.size,
   });
@@ -55,11 +57,15 @@ function fetchQuadWipContext(
     })
     .then((data) => {
       if (ac.signal.aborted) return;
-      applyQuadWipContextData(setters, data);
+      applyQuadWipContextData(setters, data, { preserveInsulation });
     })
     .catch((err) => {
       if (ac.signal.aborted) return;
       console.error(err);
+      if (preserveInsulation) {
+        setters.setStockWipContextLoading(false);
+        return;
+      }
       resetQuadWipFieldsOnError(setters);
     });
 }
@@ -73,16 +79,39 @@ export function useQuadWipContext(
 ) {
   const { stockKind, resolvedQuadCableName, resolvedQuadSizeName, stockWipSalesLines } = stock;
   const setters = pickQuadWipSetters(stock);
+  const lastKey = useRef({
+    plantId: "",
+    entryDate: "",
+    shift: "" as ShiftKey | "",
+    cable: "",
+    size: "",
+  });
   useEffect(() => {
     if (!isQuad || stockKind !== "cable") {
       resetQuadWipFields(setters);
+      lastKey.current = { plantId: "", entryDate: "", shift: "", cable: "", size: "" };
       return;
     }
     if (!resolvedQuadCableName || !resolvedQuadSizeName) return;
+    const prev = lastKey.current;
+    const preserveInsulation =
+      isSignallingCableName(resolvedQuadCableName) &&
+      prev.plantId === plantId &&
+      prev.entryDate === entryDate &&
+      prev.shift === shift &&
+      prev.cable === resolvedQuadCableName &&
+      prev.cable !== "";
+    lastKey.current = {
+      plantId,
+      entryDate,
+      shift,
+      cable: resolvedQuadCableName,
+      size: resolvedQuadSizeName,
+    };
     const ac = new AbortController();
     fetchQuadWipContext(
       ac, { plantId, entryDate, shift, cable: resolvedQuadCableName, size: resolvedQuadSizeName },
-      setters, stockWipSalesLines,
+      setters, stockWipSalesLines, preserveInsulation,
     );
     return () => { ac.abort(); };
   }, [isQuad, stockKind, plantId, entryDate, shift, resolvedQuadCableName, resolvedQuadSizeName]);
