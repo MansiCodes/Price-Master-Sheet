@@ -4,13 +4,13 @@ import {
   quadSignalClosingFromMeta,
 } from "@/lib/plant-catalogs";
 import { plantIdFilter } from "@/lib/plant-merge";
-import { isSignallingCableName, normalizeCableName } from "@/lib/quad-signal-wip";
+import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
   findLatestSharedInsulationOpening,
   INSULATION_KEY,
   lastInsulationContributions,
-  lastPositiveProductionByProcess,
   lastClosingAfterProduction,
+  lastEnteredProductionByProcess,
   matchesCableSize,
 } from "@/lib/quad-signal-opening-match";
 
@@ -41,15 +41,6 @@ export type QuadSignalOpeningResolve = {
  *   opening (e.g. yesterday's 46).
  * - Other stages (Laying → Outer) stay size-specific from that size's prior closing.
  */
-function cableItemNamePrefixes(cable: string): string[] {
-  const names = new Set([cable.trim(), normalizeCableName(cable)]);
-  if (isSignallingCableName(cable)) {
-    names.add("Signalling Cable");
-    names.add("Signaling Cable");
-  }
-  return [...names].filter(Boolean).map((n) => `${n} ·`);
-}
-
 export async function resolveQuadSignalStockOpening(params: {
   plantIds: string[];
   day: Date;
@@ -62,9 +53,8 @@ export async function resolveQuadSignalStockOpening(params: {
   const pScope = plantIdFilter(plantIds);
   const itemName = `${cable} · ${size}`;
   const signalling = isSignallingCableName(cable);
-  const cablePrefixes = cableItemNamePrefixes(cable);
 
-  const [priorRows, sameDayRows, cableRows] = await Promise.all([
+  const [priorRows, sameDayRows] = await Promise.all([
     prisma.stockEntry.findMany({
       where: {
         ...pScope,
@@ -85,18 +75,6 @@ export async function resolveQuadSignalStockOpening(params: {
       },
       orderBy: [{ createdAt: "desc" }],
       take: 2500,
-      select: { id: true, date: true, itemName: true, notes: true },
-    }),
-    prisma.stockEntry.findMany({
-      where: {
-        ...pScope,
-        category: "FG",
-        OR: cablePrefixes.map((prefix) => ({
-          itemName: { startsWith: prefix },
-        })),
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 1500,
       select: { id: true, date: true, itemName: true, notes: true },
     }),
   ]);
@@ -122,19 +100,15 @@ export async function resolveQuadSignalStockOpening(params: {
     break;
   }
 
-  const seenProd = new Set<string>();
-  const cableHistory: typeof cableRows = [];
-  for (const row of [...cableRows, ...sameDayRows, ...priorRows]) {
-    if (seenProd.has(row.id)) continue;
-    seenProd.add(row.id);
-    cableHistory.push(row);
-  }
-  const sizeProduction = lastPositiveProductionByProcess(
-    cableHistory, cable, size, itemName, getQuadSignalCableProcesses(cable),
-  );
   const sizeContributions = lastInsulationContributions(
-    cableHistory, cable, size, itemName,
+    [...sameDayRows, ...priorRows], cable, size, itemName,
   );
+
+  const sizeProduction = sameDayEntryId
+    ? lastEnteredProductionByProcess(
+        sameDayRows, cable, size, itemName, getQuadSignalCableProcesses(cable),
+      )
+    : {};
 
   const poolRows = sameDayEntryId
     ? sameDayRows.filter((r) => r.id !== sameDayEntryId)
@@ -154,8 +128,7 @@ export async function resolveQuadSignalStockOpening(params: {
 
   let opening: Record<string, number> = {};
   if (sizeOpening) opening = { ...sizeOpening };
-  // Same-day notes.opening is often stale (2) after a save that closed at 4.
-  // Always prefer last closing after P>0 for Laying → Outer.
+  // Latest size-row closing (including P=0 days) is today's Opening.
 
   if (signalling && sharedIns != null && !(sameDayEntryId && sameDayInsulProd > 0)) {
     opening[INSULATION_KEY] = sharedIns.value;
@@ -166,7 +139,7 @@ export async function resolveQuadSignalStockOpening(params: {
     const proc = processes[i]!;
     if (proc.trim().toLowerCase() === "insulation") continue;
     const afterP = lastClosingAfterProduction(
-      cableHistory, cable, size, itemName, proc, processes[i + 1],
+      [...sameDayRows, ...priorRows], cable, size, itemName, proc, processes[i + 1],
     );
     if (afterP != null) opening[proc] = afterP;
   }

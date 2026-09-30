@@ -14,7 +14,7 @@ import {
   parseDrumLengthOptions,
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
-import { freshClosingAfterProd } from "@/lib/quad-signal-opening-match";
+import { stageClosingFromMeta } from "@/lib/quad-signal-opening-match";
 import { approvalFor, type PersistCtx } from "@/lib/pnl/excel-import/persist-types";
 
 export async function persistStock(
@@ -118,7 +118,7 @@ export async function persistStock(
         const nextOpening = { ...closing };
         for (let i = 0; i < processes.length; i++) {
           const proc = processes[i]!;
-          const fresh = freshClosingAfterProd(meta, proc, processes[i + 1]);
+          const fresh = stageClosingFromMeta(meta, proc, processes[i + 1]);
           if (fresh == null) continue;
           nextOpening[proc] = fresh;
           touched = true;

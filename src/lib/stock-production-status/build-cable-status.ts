@@ -6,7 +6,7 @@ import {
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
-import { freshClosingAfterProd } from "@/lib/quad-signal-opening-match";
+import { processQtyFromMeta, stageClosingFromMeta } from "@/lib/quad-signal-opening-match";
 import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
@@ -65,19 +65,6 @@ export function buildCableStockStatus(
       const key = quadSignalCableSizeDedupeKey(cable, size);
       if (byKey.has(key)) {
         const block = byKey.get(key)!;
-        block.processes = block.processes.map((p, i) => {
-          if (p.production > 0) return p;
-          const fresh = freshClosingAfterProd(
-            meta, p.name, block.processes[i + 1]?.name,
-          );
-          if (fresh == null) return p;
-          const prod = Number(meta.production?.[p.name]) || 0;
-          return {
-            ...p,
-            production: prod,
-            closing: Math.round(fresh * 1000) / 1000,
-          };
-        });
         const pending = collapseDispatchRows(
           (block.dispatchPendingItems ?? []).map((d) => ({
             qty: d.qty,
@@ -196,9 +183,9 @@ export function buildCableStockStatus(
         fromItems.settledItems.length > 0 ? fromItems.settledItems : dispatchSettledItems;
 
       const processes: StockProcessLine[] = names.map((name, i) => {
-        const prod = Number(production[name]) || 0;
-        const fresh = freshClosingAfterProd(meta, name, names[i + 1]);
-        const closingQty = fresh != null ? fresh : Number(closing[name]) || 0;
+        const prod = processQtyFromMeta(production, name);
+        const fresh = stageClosingFromMeta(meta, name, names[i + 1]);
+        const closingQty = fresh != null ? fresh : processQtyFromMeta(closing, name);
         return {
           name,
           shortName: shortProcessName(name),

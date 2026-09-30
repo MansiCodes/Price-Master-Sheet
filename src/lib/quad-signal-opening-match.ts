@@ -23,17 +23,19 @@ const PROCESS_KEY_ALIASES: Record<string, string[]> = {
 
 function qtyOnMap(map: Record<string, number> | undefined, proc: string): number {
   if (!map) return 0;
-  const names = [proc, ...(PROCESS_KEY_ALIASES[proc.trim().toLowerCase()] ?? [])];
-  const want = new Set(names.map((n) => n.trim().toLowerCase()));
-  let zero = 0;
-  for (const [key, raw] of Object.entries(map)) {
-    if (!want.has(key.trim().toLowerCase())) continue;
-    const n = Number(raw);
-    if (!Number.isFinite(n)) continue;
-    if (n > 0) return n;
-    zero = n;
+  const aliases = [proc, ...(PROCESS_KEY_ALIASES[proc.trim().toLowerCase()] ?? [])];
+  const seen = new Set<string>();
+  for (const name of aliases) {
+    const want = name.trim().toLowerCase();
+    if (!want || seen.has(want)) continue;
+    seen.add(want);
+    for (const [key, raw] of Object.entries(map)) {
+      if (key.trim().toLowerCase() !== want) continue;
+      const n = Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
   }
-  return zero;
+  return 0;
 }
 
 function rowCableName(
@@ -78,7 +80,22 @@ function isSameSizeRow(
   );
 }
 
-/** Last closing after a real P>0 (skip P:0 carry-forward that left Opening at 2 instead of 4). */
+/** Latest size-row closing: opening + production − next production (P=0 still counts). */
+export function stageClosingFromMeta(
+  meta: QuadSignalStockMeta,
+  processName: string,
+  nextProcessName?: string,
+): number | null {
+  const p = qtyOnMap(meta.production, processName);
+  const o = qtyOnMap(meta.opening, processName);
+  const c = qtyOnMap(quadSignalClosingFromMeta(meta), processName);
+  const outbound = nextProcessName ? qtyOnMap(meta.production, nextProcessName) : 0;
+  if (o === 0 && p === 0 && c === 0 && outbound === 0) return null;
+  const implied = o + p - outbound;
+  if (Number.isFinite(implied)) return Math.round(implied * 1000) / 1000;
+  return c;
+}
+
 export function lastClosingAfterProduction(
   rows: Array<{ itemName: string; notes: string | null }>,
   cable: string,
@@ -92,7 +109,7 @@ export function lastClosingAfterProduction(
     if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
       continue;
     }
-    const fresh = freshClosingAfterProd(meta, processName, nextProcessName);
+    const fresh = stageClosingFromMeta(meta, processName, nextProcessName);
     if (fresh != null) return fresh;
   }
   return null;
@@ -103,20 +120,17 @@ export function freshClosingAfterProd(
   processName: string,
   nextProcessName?: string,
 ): number | null {
-  const p = qtyOnMap(meta.production, processName);
-  if (p <= 0) return null;
-  const o = qtyOnMap(meta.opening, processName);
-  const c = qtyOnMap(quadSignalClosingFromMeta(meta), processName);
-  const outbound = nextProcessName ? qtyOnMap(meta.production, nextProcessName) : 0;
-  const implied = o + p - outbound;
-  if (Number.isFinite(implied) && implied > c + 1e-9) return implied;
-  return c;
+  return stageClosingFromMeta(meta, processName, nextProcessName);
 }
 
-/**
- * Last P>0 per process for this size only (never Insulation, never another size).
- */
-export function lastPositiveProductionByProcess(
+export function processQtyFromMeta(
+  map: Record<string, number> | undefined,
+  proc: string,
+): number {
+  return qtyOnMap(map, proc);
+}
+
+export function lastEnteredProductionByProcess(
   rows: Array<{ itemName: string; notes: string | null }>,
   cable: string,
   size: string,
@@ -126,37 +140,31 @@ export function lastPositiveProductionByProcess(
   const names = processNames.filter(
     (p) => p.trim().toLowerCase() !== "insulation",
   );
-  const out: Record<string, number> = {};
-  const keys = names.length > 0 ? names : [];
-  if (keys.length === 0) {
-    for (const row of rows) {
-      const { meta } = parseQuadSignalStockNotes(row.notes);
-      if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
-        continue;
-      }
-      for (const [proc, raw] of Object.entries(meta.production ?? {})) {
-        if (proc.trim().toLowerCase() === "insulation" || out[proc] != null) continue;
-        const n = Number(raw);
-        if (Number.isFinite(n) && n > 0) out[proc] = n;
-      }
+  for (const row of rows) {
+    const { meta } = parseQuadSignalStockNotes(row.notes);
+    if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
+      continue;
+    }
+    const out: Record<string, number> = {};
+    const keys = names.length > 0 ? names : Object.keys(meta.production ?? {});
+    for (const proc of keys) {
+      if (proc.trim().toLowerCase() === "insulation") continue;
+      out[proc] = qtyOnMap(meta.production, proc);
     }
     return out;
   }
-  for (const proc of keys) {
-    for (const row of rows) {
-      const { meta } = parseQuadSignalStockNotes(row.notes);
-      if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
-        continue;
-      }
-      const n = qtyOnMap(meta.production, proc);
-      if (n > 0) {
-        out[proc] = n;
-        break;
-      }
-    }
-  }
-  delete out[INSULATION_KEY];
-  return out;
+  return {};
+}
+
+/** @deprecated Use lastEnteredProductionByProcess — latest row, including P=0. */
+export function lastPositiveProductionByProcess(
+  rows: Array<{ itemName: string; notes: string | null }>,
+  cable: string,
+  size: string,
+  itemName: string,
+  processNames: readonly string[] = [],
+): Record<string, number> {
+  return lastEnteredProductionByProcess(rows, cable, size, itemName, processNames);
 }
 
 export function lastInsulationContributions(
@@ -169,7 +177,7 @@ export function lastInsulationContributions(
     const { match, meta } = matchesCableSize(row, cable, size, itemName);
     if (!match) continue;
     const contrib = meta?.sharedInsulation?.contributions ?? [];
-    if (contrib.some((c) => Number(c.layingProduced) > 0)) return contrib;
+    return contrib;
   }
   return [];
 }
@@ -229,12 +237,6 @@ function insulationProductionFromMeta(meta: QuadSignalStockMeta | null): number 
   return Number(meta.production?.[INSULATION_KEY]) || 0;
 }
 
-function insulationPoolTouch(meta: QuadSignalStockMeta | null): boolean {
-  if (!meta || meta.kind !== "cable") return false;
-  if (insulationProductionFromMeta(meta) > 0) return true;
-  return Number(meta.sharedInsulation?.consumed) > 0;
-}
-
 export function findLatestInsulationPoolMeta(
   rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
 ): {
@@ -245,7 +247,7 @@ export function findLatestInsulationPoolMeta(
 } | null {
   for (const row of rows) {
     const sig = matchesSignallingCable(row);
-    if (!sig.match || !insulationPoolTouch(sig.meta)) continue;
+    if (!sig.match) continue;
     const ins = insulationClosingFromMeta(sig.meta);
     if (ins == null) continue;
     return {
@@ -259,19 +261,11 @@ export function findLatestInsulationPoolMeta(
 }
 
 /**
- * Last Signalling Insulation pool: Insulation production or extra-size Out.
- * Laying → Outer Sheath saves do not move this value.
+ * Latest Signalling Insulation closing from the newest matching save.
  */
 export function findLatestSharedInsulationOpening(
   rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
 ): { value: number; fromDate: string | null } | null {
-  for (const row of rows) {
-    const sig = matchesSignallingCable(row);
-    if (!sig.match || !insulationPoolTouch(sig.meta)) continue;
-    const ins = insulationClosingFromMeta(sig.meta);
-    if (ins == null) continue;
-    return { value: ins, fromDate: rowDateIso(row) };
-  }
   for (const row of rows) {
     const sig = matchesSignallingCable(row);
     if (!sig.match) continue;

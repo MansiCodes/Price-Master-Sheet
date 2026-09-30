@@ -49,19 +49,12 @@ export function insulationFromMeta(
 }
 
 /**
- * Signalling Insulation is one pool. Use the newest row that actually
- * recorded Insulation production (P&L Process WIP P: > 0), looking back
- * through as-of history. Do not take a later size save whose Insulation
- * closing only moved because Laying ran (e.g. 24 Sep 19 Core 84.24).
+ * Signalling Insulation is one pool. Newest save for the family wins
+ * (including P=0), so the card matches the last form entry.
  */
 export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
-  if (rows.length === 0) return null;
-  const touched = rows.filter(
-    (r) => r.poolTouch || r.production > 0,
-  );
-  if (touched.length > 0) return touched[0]!;
   return rows[0] ?? null;
 }
 

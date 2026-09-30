@@ -277,7 +277,7 @@ function applyQtyMaps(
   for (const [key, raw] of Object.entries(productionSrc ?? {})) {
     if (key.trim().toLowerCase() === "insulation") continue;
     const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) continue;
+    if (!Number.isFinite(n)) continue;
     productionStrings[key] = String(n);
     const canon = productionAliases[key] ?? productionAliases[key.trim().toLowerCase()];
     if (canon && canon.trim().toLowerCase() !== "insulation") {
