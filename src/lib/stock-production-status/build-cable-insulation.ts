@@ -49,8 +49,9 @@ export function insulationFromMeta(
 }
 
 /**
- * Signalling Insulation is one pool. Newest save wins, but a later size
- * save that only copies an older idle closing (P=0, Out=0) is ignored.
+ * Signalling Insulation is one pool. Newest real fill wins.
+ * A later size save that copies the last Production onto the last
+ * Closing (prefill double-add) is ignored.
  */
 export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
@@ -60,11 +61,19 @@ export function pickSharedInsulationPool(
     Math.round(a * 1000) === Math.round(b * 1000);
   for (let i = 0; i < rows.length; i++) {
     const s = rows[i];
+    const older = rows.slice(i + 1);
+    const replayPrefill =
+      s.production > 0 &&
+      older.some(
+        (o) =>
+          o.production > 0 &&
+          sameKm(o.production, s.production) &&
+          sameKm(s.opening, o.closing),
+      );
+    if (replayPrefill) continue;
     const idle = s.production === 0 && s.consumed === 0;
     if (!idle) return s;
-    const olderHasSameClosing = rows
-      .slice(i + 1)
-      .some((older) => sameKm(older.closing, s.closing));
+    const olderHasSameClosing = older.some((o) => sameKm(o.closing, s.closing));
     if (!olderHasSameClosing) return s;
   }
   return rows[0] ?? null;

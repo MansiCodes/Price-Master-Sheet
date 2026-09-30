@@ -17,7 +17,6 @@ export function HubStockQuadCableWip({ vm }: { vm: TodayHubVm }) {
       <HubStockQuadCableSingleQuad
         vm={vm}
         singleQuadStage={d.singleQuadStage}
-        primaryQuadFactor={d.primaryQuadFactor}
         primaryLaying={d.primaryLaying}
         primaryRowOutbound={d.primaryRowOutbound}
         totalSingleQuadProd={d.totalSingleQuadProd}

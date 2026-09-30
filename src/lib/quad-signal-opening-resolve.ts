@@ -103,7 +103,6 @@ export async function resolveQuadSignalStockOpening(params: {
     const ins = buildCableStockStatus(byFill).sharedInsulation;
     if (ins) {
       opening[INSULATION_KEY] = ins.closing;
-      production[INSULATION_KEY] = ins.production;
       insFromDate = ins.entryDate;
       insulationContributions = [];
     }

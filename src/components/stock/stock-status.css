@@ -973,9 +973,16 @@
 
 .stock-proc-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 0.45rem;
   margin-bottom: 0.75rem;
+}
+
+.stock-proc-grid.is-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.stock-proc-grid.is-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .stock-proc-chip {
@@ -1187,9 +1194,6 @@
 }
 
 @media (max-width: 900px) {
-  .stock-proc-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .stock-summary-bar {
     grid-template-columns: repeat(2, 1fr);
   }

@@ -32,12 +32,13 @@ export function StockCableCardItem({
   const order = lookupStockOrder(ordersByKey, card.cable, card.size);
   const stockTotal = block?.totalKm ?? 0;
   const orderQty = order?.totalQty ?? 0;
-  const putupKm = block?.putupKm ?? 0;
-  const dispatchPending = block?.dispatchPending ?? 0;
-  const dispatchSettled = block?.dispatchSettledKm ?? 0;
-  const totalDoneKm = putupKm + Math.max(dispatchSettled, dispatchPending);
+  const orderPutupKm = (block?.orderPutupItems ?? block?.callPutupItems ?? []).reduce(
+    (sum, item) => sum + (Number(item.qty) > 0 ? Number(item.qty) : 0),
+    0,
+  );
+  const totalDoneKm = orderPutupKm;
   const balanceTotal =
-    Math.round((orderQty - totalDoneKm - stockTotal) * 10000) / 10000;
+    Math.round((orderQty - totalDoneKm) * 10000) / 10000;
   const partyLines = order
     ? order.parties.filter(
         (p) => p.partyName.trim() && p.partyName.trim() !== "—",
@@ -75,7 +76,11 @@ export function StockCableCardItem({
         <div className="stock-status-card__stock">
           {block ? (
             <>
-              <div className="stock-proc-grid">
+              <div
+                className={`stock-proc-grid${
+                  block.processes.length <= 4 ? " is-cols-2" : " is-cols-3"
+                }`}
+              >
                 {block.processes.map((p) => {
                   const putupForOuter = block.putupKm ?? 0;
                   const isOuter =

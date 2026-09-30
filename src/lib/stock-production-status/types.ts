@@ -40,6 +40,13 @@ export type CableStockStatusBlock = {
     putupDate: string;
     partyName: string;
   }>;
+  /** Call putups across saves (party + date). Order-in-hand DONE uses this, not dispatch. */
+  orderPutupItems?: Array<{
+    qty: number;
+    callPutup: string;
+    putupDate: string;
+    partyName: string;
+  }>;
   dispatchPendingItems?: Array<{
     qty: number;
     dispatchParty: string;

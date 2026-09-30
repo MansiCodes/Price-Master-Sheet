@@ -36,8 +36,12 @@ export function getPartyInHandKm(
   }
 
   let putupSum = 0;
-  if (Array.isArray(block.callPutupItems) && block.callPutupItems.length > 0) {
-    for (const item of block.callPutupItems) {
+  const putupRows =
+    Array.isArray(block.orderPutupItems) && block.orderPutupItems.length > 0
+      ? block.orderPutupItems
+      : block.callPutupItems;
+  if (Array.isArray(putupRows) && putupRows.length > 0) {
+    for (const item of putupRows) {
       const q = Number(item.qty);
       const qty = Number.isFinite(q) && q > 0 ? q : 0;
       if (qty > 0 && matchesParty(item.partyName ?? "")) {
@@ -50,25 +54,7 @@ export function getPartyInHandKm(
     }
   }
 
-  let dispatchSum = 0;
-  const dispatchRows: Array<{ qty?: number; dispatchParty?: string }> = [];
-  if (Array.isArray(block.dispatchPendingItems)) {
-    dispatchRows.push(...block.dispatchPendingItems);
-  } else if (block.dispatchPending && block.dispatchPending > 0) {
-    dispatchRows.push({
-      qty: block.dispatchPending,
-      dispatchParty: block.dispatchParty || block.partyName || "",
-    });
-  }
-  for (const item of dispatchRows) {
-    const q = Number(item.qty);
-    const qty = Number.isFinite(q) && q > 0 ? q : 0;
-    if (qty > 0 && matchesParty(item.dispatchParty ?? "")) {
-      dispatchSum = Math.max(dispatchSum, qty);
-    }
-  }
-
-  return Math.round((putupSum + dispatchSum) * 10000) / 10000;
+  return Math.round(putupSum * 10000) / 10000;
 }
 
 export function extraCablesFromBlocks(

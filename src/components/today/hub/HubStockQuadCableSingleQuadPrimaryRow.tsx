@@ -20,10 +20,8 @@ function HubStockQuadCableSingleQuadOtherSize({ vm }: { vm: TodayHubVm }) {
 
 function HubStockQuadCableSingleQuadSizeCell({
   vm,
-  primaryQuadFactor,
 }: {
   vm: TodayHubVm;
-  primaryQuadFactor: number;
 }) {
   const { stockCableSize, setStockCableSize, setStockCableSizeOther, quadCableSizeOptions } =
     bindStockLocals(vm);
@@ -40,9 +38,6 @@ function HubStockQuadCableSingleQuadSizeCell({
         }}
       />
       <HubStockQuadCableSingleQuadOtherSize vm={vm} />
-      <span style={{ display: "block", fontSize: "10px", color: "#666", fontWeight: "normal", marginTop: "2px" }}>
-        (Factor: {primaryQuadFactor})
-      </span>
     </td>
   );
 }
@@ -99,18 +94,16 @@ function HubStockQuadCableSingleQuadQtyCell({
 
 export function HubStockQuadCableSingleQuadPrimaryRow({
   vm,
-  primaryQuadFactor,
   primaryRowOutbound,
   singleQuadStage,
 }: {
   vm: TodayHubVm;
-  primaryQuadFactor: number;
   primaryRowOutbound: number;
   singleQuadStage?: { outbound: number; closing: number; opening: number };
 }) {
   return (
     <tr>
-      <HubStockQuadCableSingleQuadSizeCell vm={vm} primaryQuadFactor={primaryQuadFactor} />
+      <HubStockQuadCableSingleQuadSizeCell vm={vm} />
       <HubStockQuadCableSingleQuadOpeningCell vm={vm} singleQuadStage={singleQuadStage} />
       <HubStockQuadCableSingleQuadQtyCell vm={vm} field="Single Quad" id="st-proc-Single Quad" />
       <HubStockQuadCableSingleQuadQtyCell vm={vm} field="Laying" id="st-proc-Laying" />

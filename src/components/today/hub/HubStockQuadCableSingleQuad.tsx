@@ -83,7 +83,6 @@ function HubStockQuadCableSingleQuadFoot({
 
 type SingleQuadTableProps = {
   vm: TodayHubVm;
-  primaryQuadFactor: number;
   primaryRowOutbound: number;
   singleQuadStage?: { outbound: number; closing: number; opening: number };
 };
@@ -98,7 +97,6 @@ function HubStockQuadCableSingleQuadTable(props: SingleQuadTableProps) {
         <tbody>
           <HubStockQuadCableSingleQuadPrimaryRow
             vm={props.vm}
-            primaryQuadFactor={props.primaryQuadFactor}
             primaryRowOutbound={props.primaryRowOutbound}
             singleQuadStage={props.singleQuadStage}
           />
@@ -116,7 +114,6 @@ function HubStockQuadCableSingleQuadTable(props: SingleQuadTableProps) {
 type HubStockQuadCableSingleQuadProps = {
   vm: TodayHubVm;
   singleQuadStage?: { outbound: number; closing: number; opening: number };
-  primaryQuadFactor: number;
   primaryLaying: number;
   primaryRowOutbound: number;
   totalSingleQuadProd: number;
@@ -134,7 +131,6 @@ export function HubStockQuadCableSingleQuad(p: HubStockQuadCableSingleQuadProps)
         />
         <HubStockQuadCableSingleQuadTable
           vm={p.vm}
-          primaryQuadFactor={p.primaryQuadFactor}
           primaryRowOutbound={p.primaryRowOutbound}
           singleQuadStage={p.singleQuadStage}
         />

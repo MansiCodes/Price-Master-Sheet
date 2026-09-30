@@ -276,7 +276,6 @@ function applyQtyMaps(
   opts?: ApplyQuadWipOpts,
 ) {
   const preserveIns = Boolean(opts?.preserveInsulation);
-  const signalling = isSignallingCableName(data.cable ?? "");
   const savedOpen = data.stockMeta?.opening;
   const processAliases: Record<string, string> = {
     Outer: "Outer Sheath",
@@ -315,25 +314,16 @@ function applyQtyMaps(
   const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
   const productionStrings: Record<string, string> = {};
   for (const [key, raw] of Object.entries(productionSrc)) {
-    if (signalling && isInsulationKey(key)) continue;
+    if (isInsulationKey(key)) continue;
     const n = Number(raw);
     if (!Number.isFinite(n) || n <= 0) continue;
     productionStrings[key] = String(n);
     const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
-    if (canon && !(signalling && isInsulationKey(canon))) {
+    if (canon && !isInsulationKey(canon)) {
       productionStrings[canon] = String(n);
     }
   }
-  const insProd = insulationQty([data.production]);
-  s.setStockProcessQtys((prev) => {
-    const next = { ...productionStrings };
-    if (signalling && preserveIns && prev.Insulation != null && prev.Insulation !== "") {
-      next.Insulation = prev.Insulation;
-    } else if (signalling && insProd != null && Number(insProd) > 0) {
-      next.Insulation = insProd;
-    }
-    return next;
-  });
+  s.setStockProcessQtys(() => ({ ...productionStrings }));
 }
 
 export function applyQuadWipContextData(

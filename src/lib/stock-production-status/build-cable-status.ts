@@ -3,9 +3,10 @@ import {
   parseQuadSignalStockNotes,
   quadSignalCableSizeDedupeKey,
   quadSignalClosingFromMeta,
+  type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { getQuadFactorFromSize, isSignallingCableName } from "@/lib/quad-signal-wip";
 import { processQtyFromMeta, stageClosingFromMeta } from "@/lib/quad-signal-opening-match";
 import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
@@ -16,6 +17,74 @@ import {
 } from "./format";
 import type { CableStockStatusBlock, SharedInsulationStatus, StockProcessLine } from "./types";
 import { collapseDispatchRows } from "./dispatch-history";
+
+type PutupRow = {
+  qty: number;
+  callPutup: string;
+  putupDate: string;
+  partyName: string;
+};
+
+function putupMergeKey(item: PutupRow): string {
+  const party = item.partyName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const date = item.putupDate.trim();
+  if (party && date) return `${party}|${date}`;
+  if (party) return `${party}|${item.qty}`;
+  return `|${date}|${item.qty}`;
+}
+
+function putupItemsFromMeta(meta: QuadSignalStockMeta): PutupRow[] {
+  const legacyPutupKm = parsePutupKm(meta.callPutup);
+  const callPutup = String(meta.callPutup ?? "").trim();
+  const putupDate = String(meta.putupDate ?? "").trim();
+  const partyName = String(meta.partyName ?? "").trim();
+  const rawPutupItems =
+    Array.isArray(meta.callPutupItems) && meta.callPutupItems.length > 0
+      ? meta.callPutupItems
+      : legacyPutupKm > 0 || callPutup || partyName
+        ? [{ qty: legacyPutupKm > 0 ? legacyPutupKm : callPutup, date: putupDate, partyName }]
+        : [];
+  return rawPutupItems
+    .map((item) => {
+      const q = Number(item.qty);
+      const qty = Number.isFinite(q) && q > 0 ? q : 0;
+      const callPutupStr = String(item.qty ?? "").trim();
+      const pDate = String(item.date ?? putupDate ?? "").trim();
+      const pName = String(item.partyName ?? partyName ?? "").trim();
+      return {
+        qty,
+        callPutup: callPutupStr ? `${callPutupStr}km` : "",
+        putupDate: pDate,
+        partyName: pName,
+      };
+    })
+    .filter((item) => item.qty > 0);
+}
+
+function singleQuadClosingFromMeta(
+  meta: QuadSignalStockMeta,
+  size: string,
+  storedClosing: number,
+): number {
+  const opening = processQtyFromMeta(meta.opening, "Single Quad");
+  const prod = processQtyFromMeta(meta.production, "Single Quad");
+  const laying = processQtyFromMeta(meta.production, "Laying");
+  const outbound = laying * getQuadFactorFromSize(size);
+  if (opening === 0 && prod === 0 && laying === 0) return storedClosing;
+  return Math.round((opening + prod - outbound) * 1000) / 1000;
+}
+
+function mergeOrderPutups(into: PutupRow[], extras: PutupRow[]): PutupRow[] {
+  const seen = new Set(into.map(putupMergeKey));
+  const next = [...into];
+  for (const item of extras) {
+    const key = putupMergeKey(item);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    next.push(item);
+  }
+  return next;
+}
 
 /**
  * Build cable-size production status from the last fill per cable · size
@@ -58,6 +127,11 @@ export function buildCableStockStatus(
       // Prefer normalized key so "100P" / "100 Pair" / "100Pair" show as one card.
       const key = quadSignalCableSizeDedupeKey(cable, size);
       if (byKey.has(key)) {
+        const block = byKey.get(key)!;
+        block.orderPutupItems = mergeOrderPutups(
+          block.orderPutupItems ?? block.callPutupItems ?? [],
+          putupItemsFromMeta(meta),
+        );
         continue;
       }
 
@@ -77,7 +151,6 @@ export function buildCableStockStatus(
         names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
       }
 
-      const legacyPutupKm = parsePutupKm(meta.callPutup);
       const callPutup = String(meta.callPutup ?? "").trim();
       const putupDate = String(meta.putupDate ?? "").trim();
       const partyName = String(meta.partyName ?? "").trim();
@@ -86,28 +159,7 @@ export function buildCableStockStatus(
       const dispatchPending =
         Number.isFinite(dispatchRaw) && dispatchRaw > 0 ? dispatchRaw : 0;
 
-      const rawPutupItems = Array.isArray(meta.callPutupItems) && meta.callPutupItems.length > 0
-        ? meta.callPutupItems
-        : legacyPutupKm > 0 || callPutup || partyName
-          ? [{ qty: legacyPutupKm > 0 ? legacyPutupKm : callPutup, date: putupDate, partyName }]
-          : [];
-
-      const callPutupItems = rawPutupItems
-        .map((item) => {
-          const q = Number(item.qty);
-          const qty = Number.isFinite(q) && q > 0 ? q : 0;
-          const callPutupStr = String(item.qty ?? "").trim();
-          const pDate = String(item.date ?? putupDate ?? "").trim();
-          const pName = String(item.partyName ?? partyName ?? "").trim();
-          return {
-            qty,
-            callPutup: callPutupStr ? `${callPutupStr}km` : "",
-            putupDate: pDate,
-            partyName: pName,
-          };
-        })
-        .filter((item) => item.qty > 0 || item.partyName || item.callPutup);
-
+      const callPutupItems = putupItemsFromMeta(meta);
       const totalPutupKm = callPutupItems.reduce((sum, item) => sum + item.qty, 0);
 
       const rawDispatchItems = Array.isArray(meta.dispatchPendingItems) && meta.dispatchPendingItems.length > 0
@@ -126,8 +178,11 @@ export function buildCableStockStatus(
 
       const processes: StockProcessLine[] = names.map((name, i) => {
         const prod = processQtyFromMeta(production, name);
-        const fresh = stageClosingFromMeta(meta, name, names[i + 1]);
-        const closingQty = fresh != null ? fresh : processQtyFromMeta(closing, name);
+        const stored = processQtyFromMeta(closing, name);
+        const closingQty =
+          name.trim().toLowerCase() === "single quad"
+            ? singleQuadClosingFromMeta(meta, size, stored)
+            : (stageClosingFromMeta(meta, name, names[i + 1]) ?? stored);
         return {
           name,
           shortName: shortProcessName(name),
@@ -164,6 +219,7 @@ export function buildCableStockStatus(
         dispatchSettledItems: [],
         userNotes: String(userNotes ?? "").trim(),
         callPutupItems,
+        orderPutupItems: [...callPutupItems],
         dispatchPendingItems,
       });
     } catch (err) {
