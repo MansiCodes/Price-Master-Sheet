@@ -164,7 +164,7 @@ export function applyQuadCableProcessOverrides(args: {
   const primaryLaying = processes["Laying"] ?? 0;
   const primaryQuadFactor = getQuadFactorFromSize(resolvedSize);
   return {
-    insulationConsumedOverride: totalSingleQuadProd * 4 + quadInsulationExtrasConsumed(stockInsulationExtras),
+    insulationConsumedOverride: quadInsulationExtrasConsumed(stockInsulationExtras),
     singleQuadConsumedOverride:
       primaryLaying * primaryQuadFactor + singleQuadExtrasOutbound(stockSingleQuadExtras),
   };

@@ -150,7 +150,7 @@ function computeQuadCableOverrides(stock: TodayHubStockState, production: Record
   const primaryLaying = Number.isFinite(layingVal) && layingVal >= 0 ? layingVal : 0;
   return {
     production: { ...production, "Single Quad": totalSingleQuadProd },
-    insulationConsumedOverride: totalSingleQuadProd * 4 + quadInsulationExtrasConsumed(stock.stockInsulationExtras),
+    insulationConsumedOverride: quadInsulationExtrasConsumed(stock.stockInsulationExtras),
     singleQuadConsumedOverride: singleQuadExtrasOutbound(
       stock.stockSingleQuadExtras, primaryLaying, getQuadFactorFromSize(stock.resolvedQuadSizeName),
     ),
