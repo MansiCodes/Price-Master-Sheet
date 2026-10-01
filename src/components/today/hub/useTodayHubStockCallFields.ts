@@ -29,6 +29,7 @@ export function useTodayHubStockCallFields() {
   const [stockSaleItems, setStockSaleItems] = useState<StockSaleItem[]>([
     { ...EMPTY_STOCK_SALE_ITEM },
   ]);
+  const [stockSaleHints, setStockSaleHints] = useState<StockSaleItem[]>([]);
   const [stockDispatchSettledKm, setStockDispatchSettledKm] = useState(0);
   const [stockDispatchSettledItems, setStockDispatchSettledItems] = useState<
     StockDispatchPendingItem[]
@@ -54,6 +55,8 @@ export function useTodayHubStockCallFields() {
     setStockDispatchPendingItems,
     stockSaleItems,
     setStockSaleItems,
+    stockSaleHints,
+    setStockSaleHints,
     stockDispatchSettledKm,
     setStockDispatchSettledKm,
     stockDispatchSettledItems,

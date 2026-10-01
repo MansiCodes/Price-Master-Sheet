@@ -77,7 +77,8 @@ function HubStockQuadCableSingleQuadQtyCell({
   field: "Single Quad" | "Laying";
   id: string;
 }) {
-  const { stockProcessQtys, setStockProcessQtys } = bindStockLocals(vm);
+  const { stockProcessQtys, setStockProcessQtys, stockProcessHints } = bindStockLocals(vm);
+  const hint = stockProcessHints[field];
   return (
     <td>
       <DecimalInput
@@ -86,7 +87,7 @@ function HubStockQuadCableSingleQuadQtyCell({
         onChange={(next) =>
           setStockProcessQtys((prev) => ({ ...prev, [field]: next }))
         }
-        placeholder="0"
+        placeholder={hint && hint !== "0" ? hint : "0"}
       />
     </td>
   );

@@ -6,7 +6,7 @@ import { HubStockQuadWipTableHead } from "@/components/today/hub/HubStockQuadWip
 export function HubStockQuadDefaultBody({ vm }: { vm: TodayHubVm }) {
   const {
     quadCableProcessFields, stockWipCalc, stockOpeningEditable, stockWipOpening,
-    setStockWipOpening, stockProcessQtys, setStockProcessQtys,
+    setStockWipOpening, stockProcessQtys, setStockProcessQtys, stockProcessHints,
   } = bindStockLocals(vm);
   return (
     <tbody>
@@ -20,6 +20,7 @@ export function HubStockQuadDefaultBody({ vm }: { vm: TodayHubVm }) {
           setStockWipOpening={setStockWipOpening}
           stockProcessQtys={stockProcessQtys}
           setStockProcessQtys={setStockProcessQtys}
+          stockProcessHints={stockProcessHints}
         />
       ))}
     </tbody>

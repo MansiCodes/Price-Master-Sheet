@@ -34,10 +34,12 @@ export function HubStockQuadProductionCell({
   proc,
   stockProcessQtys,
   setStockProcessQtys,
+  hint,
 }: {
   proc: string;
   stockProcessQtys: Record<string, string>;
   setStockProcessQtys: Dispatch<SetStateAction<Record<string, string>>>;
+  hint?: string;
 }) {
   return (
     <td>
@@ -45,7 +47,7 @@ export function HubStockQuadProductionCell({
         id={`st-proc-${proc}`}
         value={stockProcessQtys[proc] ?? ""}
         onChange={(next) => setStockProcessQtys((prev) => ({ ...prev, [proc]: next }))}
-        placeholder="0"
+        placeholder={hint && hint !== "0" ? hint : "0"}
       />
     </td>
   );

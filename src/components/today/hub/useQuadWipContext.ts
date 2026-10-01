@@ -25,6 +25,7 @@ function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
     setStockCallPutupItems: stock.setStockCallPutupItems,
     setStockDispatchPendingItems: stock.setStockDispatchPendingItems,
     setStockSaleItems: stock.setStockSaleItems,
+    setStockSaleHints: stock.setStockSaleHints,
     setStockDispatchSettledKm: stock.setStockDispatchSettledKm,
     setStockDispatchSettledItems: stock.setStockDispatchSettledItems,
     setStockDispatchLoadedKm: stock.setStockDispatchLoadedKm,
@@ -34,6 +35,7 @@ function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
     setStockInsulationExtras: stock.setStockInsulationExtras,
     setStockInsulationExtrasOpen: stock.setStockInsulationExtrasOpen,
     setStockProcessQtys: stock.setStockProcessQtys,
+    setStockProcessHints: stock.setStockProcessHints,
   };
 }
 

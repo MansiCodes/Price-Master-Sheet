@@ -15,6 +15,7 @@ type ProcessRowProps = {
   setStockWipOpening: Dispatch<SetStateAction<Record<string, string>>>;
   stockProcessQtys: Record<string, string>;
   setStockProcessQtys: Dispatch<SetStateAction<Record<string, string>>>;
+  stockProcessHints?: Record<string, string>;
 };
 
 export function HubStockQuadProcessRow(props: ProcessRowProps) {
@@ -34,6 +35,7 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
         proc={props.proc}
         stockProcessQtys={props.stockProcessQtys}
         setStockProcessQtys={props.setStockProcessQtys}
+        hint={props.stockProcessHints?.[props.proc]}
       />
       <td className="qs-wip__num qs-wip__calc">{processRowOutLabel(stage)}</td>
       <td className="qs-wip__num qs-wip__calc">{stage != null ? String(stage.closing) : "—"}</td>

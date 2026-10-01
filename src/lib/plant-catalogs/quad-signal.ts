@@ -76,6 +76,8 @@ export type QuadSignalStockMeta = {
     salesKm: number;
     drumLabel?: string;
   };
+  /** Signalling: DST closing on this save already excludes Laying km. */
+  dstExcludesLaying?: boolean;
   /**
    * Signalling Cable only: Insulation is one pool across sizes.
    * Extra size rows contribute laying×cores×factor to the shared deduction.

@@ -120,6 +120,7 @@ function encodeSubmittedQuadCableNotes(
             ).contributions,
           }
         : undefined,
+      dstExcludesLaying: isSignallingCableName(resolved.resolvedCable),
     }),
     args.stockNotes.trim() || `Closing stock as on ${args.entryDate}`,
   );

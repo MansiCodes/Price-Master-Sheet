@@ -37,18 +37,25 @@ function SaleField({
   );
 }
 
+function ph(hint: string | undefined, fallback: string) {
+  const t = String(hint ?? "").trim();
+  return t ? t : fallback;
+}
+
 export function HubStockSaleRow({
   item,
   idx,
   count,
   setItems,
   onRemove,
+  hint,
 }: {
   item: StockSaleItem;
   idx: number;
   count: number;
   setItems: Dispatch<SetStateAction<StockSaleItem[]>>;
   onRemove: (i: number) => void;
+  hint?: StockSaleItem;
 }) {
   const { total, grand } = saleTotals(item);
   return (
@@ -58,7 +65,7 @@ export function HubStockSaleRow({
           <input
             id={`st-sale-inv-${idx}`}
             aria-label="Invoice no"
-            placeholder="Invoice no."
+            placeholder={ph(hint?.invoiceNo, "Invoice no.")}
             value={item.invoiceNo}
             onChange={(e) => patchSale(setItems, idx, { invoiceNo: e.target.value })}
           />
@@ -68,6 +75,8 @@ export function HubStockSaleRow({
             id={`st-sale-date-${idx}`}
             type="date"
             aria-label="Invoice date"
+            title={ph(hint?.date, "")}
+            placeholder={ph(hint?.date, "")}
             value={item.date}
             onChange={(e) => patchSale(setItems, idx, { date: e.target.value })}
           />
@@ -76,7 +85,7 @@ export function HubStockSaleRow({
           <input
             id={`st-sale-party-${idx}`}
             aria-label="Party name"
-            placeholder="Party name"
+            placeholder={ph(hint?.partyName, "Party name")}
             value={item.partyName}
             onChange={(e) => patchSale(setItems, idx, { partyName: e.target.value })}
           />
@@ -86,7 +95,7 @@ export function HubStockSaleRow({
             id={`st-sale-rate-${idx}`}
             inputMode="decimal"
             aria-label="Rate"
-            placeholder="Rate"
+            placeholder={ph(hint?.rate, "Rate")}
             value={item.rate}
             onChange={(e) => patchSale(setItems, idx, { rate: e.target.value })}
           />
@@ -96,7 +105,7 @@ export function HubStockSaleRow({
             id={`st-sale-qty-${idx}`}
             inputMode="decimal"
             aria-label="Quantity"
-            placeholder="Qty"
+            placeholder={ph(hint?.quantity, "Qty")}
             value={item.quantity}
             onChange={(e) => patchSale(setItems, idx, { quantity: e.target.value })}
           />
@@ -106,7 +115,7 @@ export function HubStockSaleRow({
             id={`st-sale-gst-${idx}`}
             inputMode="decimal"
             aria-label="GST percent"
-            placeholder="GST %"
+            placeholder={ph(hint?.gstPercent, "GST %")}
             value={item.gstPercent}
             onChange={(e) => patchSale(setItems, idx, { gstPercent: e.target.value })}
           />

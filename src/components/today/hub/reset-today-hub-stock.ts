@@ -16,6 +16,7 @@ export function resetTodayHubStockWip(stock: TodayHubStockState) {
   );
   stock.setStockCableSizeOther("");
   stock.setStockProcessQtys({});
+  stock.setStockProcessHints({});
   stock.setStockWipOpening({});
   stock.setStockOpeningEditable(false);
   stock.setStockWipContextLoading(false);
@@ -27,6 +28,7 @@ export function resetTodayHubStockWip(stock: TodayHubStockState) {
   stock.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   stock.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   stock.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  stock.setStockSaleHints([]);
   stock.setStockDispatchSettledKm(0);
   stock.setStockDispatchSettledItems([]);
   stock.setStockDispatchLoadedKm(0);

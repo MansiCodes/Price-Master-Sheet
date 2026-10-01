@@ -96,6 +96,31 @@ export function stageClosingFromMeta(
   return c;
 }
 
+/**
+ * Signalling size WIP from one fill: each stage O + P − next P.
+ * DST still includes Laying km, so DST display = that closing − Laying.
+ */
+export function signallingProcessClosingsFromMeta(
+  meta: QuadSignalStockMeta,
+  processNames: readonly string[],
+): Record<string, number> {
+  const names = processNames.filter((p) => p.trim().toLowerCase() !== "insulation");
+  const out: Record<string, number> = {};
+  for (let i = 0; i < names.length; i++) {
+    const proc = names[i]!;
+    const n = stageClosingFromMeta(meta, proc, names[i + 1]);
+    if (n != null) out[proc] = n;
+  }
+  const layingKm = qtyOnMap(out, "Laying");
+  if (layingKm > 0 && !meta.dstExcludesLaying) {
+    for (const key of Object.keys(out)) {
+      if (key.trim().toLowerCase() !== "dst") continue;
+      out[key] = Math.round(Math.max(0, qtyOnMap(out, "DST") - layingKm) * 1000) / 1000;
+    }
+  }
+  return out;
+}
+
 export function lastClosingAfterProduction(
   rows: Array<{ itemName: string; notes: string | null }>,
   cable: string,
@@ -130,6 +155,17 @@ export function processQtyFromMeta(
   return qtyOnMap(map, proc);
 }
 
+/** Size WIP with no production (Insulation P does not count). */
+export function isIdleSizeWipFill(meta: QuadSignalStockMeta): boolean {
+  const prod = meta.production ?? {};
+  for (const [key, raw] of Object.entries(prod)) {
+    if (key.trim().toLowerCase() === "insulation") continue;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n > 0) return false;
+  }
+  return true;
+}
+
 export function lastEnteredOpeningByProcess(
   rows: Array<{ date?: Date; itemName: string; notes: string | null }>,
   cable: string,
@@ -152,13 +188,17 @@ export function lastEnteredOpeningByProcess(
       ? { ...(meta.opening ?? {}), ...closing }
       : { ...closing, ...(meta.opening ?? {}) };
     const out: Record<string, number> = {};
-    const keys = names.length > 0 ? names : Object.keys(src);
-    for (const proc of keys) {
-      if (skipInsulation && proc.trim().toLowerCase() === "insulation") continue;
-      const n = qtyOnMap(src, proc);
-      if (Number.isFinite(n)) out[proc] = n;
+    if (skipInsulation) {
+      Object.assign(out, signallingProcessClosingsFromMeta(meta, names));
+    } else {
+      const keys = names.length > 0 ? names : Object.keys(src);
+      for (const proc of keys) {
+        const n = qtyOnMap(src, proc);
+        if (Number.isFinite(n)) out[proc] = n;
+      }
     }
-    return { opening: out, fromDate: rowDateIso(row) };
+    const snap = { opening: out, fromDate: rowDateIso(row) };
+    return snap;
   }
   return { opening: {}, fromDate: null };
 }

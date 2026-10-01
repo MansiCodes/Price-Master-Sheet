@@ -1,6 +1,7 @@
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 import { extrasFromPoolContributions } from "@/components/today/hub/add-insulation-extra";
 import { EMPTY_STOCK_SALE_ITEM } from "@/components/today/hub/useTodayHubStockCallFields";
+import type { StockSaleItem } from "@/components/today/today-hub-model";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import { liveDispatchLock } from "@/lib/stock-production-status/dispatch-history";
 
@@ -19,6 +20,7 @@ type QuadWipSetters = Pick<
   | "setStockCallPutupItems"
   | "setStockDispatchPendingItems"
   | "setStockSaleItems"
+  | "setStockSaleHints"
   | "setStockDispatchSettledKm"
   | "setStockDispatchSettledItems"
   | "setStockDispatchLoadedKm"
@@ -28,11 +30,13 @@ type QuadWipSetters = Pick<
   | "setStockInsulationExtras"
   | "setStockInsulationExtrasOpen"
   | "setStockProcessQtys"
+  | "setStockProcessHints"
 >;
 
 export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockWipOpening({});
   s.setStockProcessQtys({});
+  s.setStockProcessHints({});
   s.setStockOpeningEditable(false);
   s.setStockWipContextLoading(false);
   s.setStockWipSalesKm(0);
@@ -45,6 +49,7 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  s.setStockSaleHints([]);
   s.setStockDispatchSettledKm(0);
   s.setStockDispatchSettledItems([]);
   s.setStockDispatchLoadedKm(0);
@@ -58,6 +63,7 @@ export function resetQuadWipFields(s: QuadWipSetters) {
 export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockWipOpening({});
   s.setStockProcessQtys({});
+  s.setStockProcessHints({});
   s.setStockOpeningEditable(false);
   s.setStockWipSalesKm(0);
   s.setStockWipSalesLines([]);
@@ -69,6 +75,7 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  s.setStockSaleHints([]);
   s.setStockDispatchSettledKm(0);
   s.setStockDispatchSettledItems([]);
   s.setStockDispatchLoadedKm(0);
@@ -151,6 +158,31 @@ function applyDispatchFromMeta(
   s.setStockDispatchSettledItems(settledItems);
 }
 
+function saleHintFromMeta(row: {
+  invoiceNo?: string;
+  date?: string;
+  partyName?: string;
+  rate?: number | string;
+  quantity?: number | string;
+  gstPercent?: number | string;
+}): StockSaleItem {
+  return {
+    invoiceNo: String(row.invoiceNo ?? "").trim(),
+    date: String(row.date ?? "").trim(),
+    partyName: String(row.partyName ?? "").trim(),
+    rate: row.rate != null && String(row.rate).trim() !== "" ? String(row.rate) : "",
+    quantity: row.quantity != null && String(row.quantity).trim() !== "" ? String(row.quantity) : "",
+    gstPercent:
+      row.gstPercent != null && String(row.gstPercent).trim() !== "" ? String(row.gstPercent) : "",
+  };
+}
+
+function saleHintHasValue(row: StockSaleItem) {
+  return Boolean(
+    row.invoiceNo || row.date || row.partyName || row.rate || row.quantity || row.gstPercent,
+  );
+}
+
 function applySaleFromMeta(
   s: QuadWipSetters,
   meta: {
@@ -165,18 +197,16 @@ function applySaleFromMeta(
   } | null,
 ) {
   const raw = meta?.saleItems;
-  if (Array.isArray(raw) && raw.length > 0) {
-    s.setStockSaleItems(raw.map((row) => ({
-      invoiceNo: row.invoiceNo ?? "",
-      date: row.date ?? "",
-      partyName: row.partyName ?? "",
-      rate: row.rate != null ? String(row.rate) : "",
-      quantity: row.quantity != null ? String(row.quantity) : "",
-      gstPercent: row.gstPercent != null ? String(row.gstPercent) : "",
-    })));
-    return;
-  }
-  s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
+  const hints =
+    Array.isArray(raw) && raw.length > 0
+      ? raw.map(saleHintFromMeta).filter(saleHintHasValue)
+      : [];
+  s.setStockSaleHints(hints);
+  s.setStockSaleItems(
+    hints.length > 0
+      ? hints.map(() => ({ ...EMPTY_STOCK_SALE_ITEM }))
+      : [{ ...EMPTY_STOCK_SALE_ITEM }],
+  );
 }
 
 function applyLengthOptions(
@@ -299,8 +329,8 @@ function applyQtyMaps(
       if (canon) openingStrings[canon] = String(n);
     }
   };
-  putOpening(data.opening);
   putOpening(savedOpen);
+  putOpening(data.opening);
   const insOpen = insulationQty([data.opening]);
   s.setStockWipOpening((prev) => {
     const next = { ...openingStrings };
@@ -323,7 +353,8 @@ function applyQtyMaps(
       productionStrings[canon] = String(n);
     }
   }
-  s.setStockProcessQtys(() => ({ ...productionStrings }));
+  s.setStockProcessHints(productionStrings);
+  s.setStockProcessQtys({});
 }
 
 export function applyQuadWipContextData(

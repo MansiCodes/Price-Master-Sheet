@@ -46,6 +46,7 @@ export type QuadCableNotesPayloadArgs = {
         }>;
       }
     | undefined;
+  dstExcludesLaying?: boolean;
 };
 
 export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
@@ -77,5 +78,6 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     ...dispatchSpreads(args),
     calcSnapshot: { ...args.wip.calcSnapshot, drumLabel: args.selectedLengthLabel },
     ...(args.sharedInsulationMeta ? { sharedInsulation: args.sharedInsulationMeta } : {}),
+    ...(args.dstExcludesLaying ? { dstExcludesLaying: true } : {}),
   };
 }

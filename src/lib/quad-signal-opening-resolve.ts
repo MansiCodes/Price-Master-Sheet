@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
+import { getQuadSignalCableProcesses, quadSignalCableSizeDedupeKey } from "@/lib/plant-catalogs";
 import { plantIdFilter } from "@/lib/plant-merge";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
 import { buildCableStockStatus } from "@/lib/stock-production-status";
@@ -97,10 +97,21 @@ export async function resolveQuadSignalStockOpening(params: {
   let insulationContributions: InsulationPoolContribution[] = [];
   let insFromDate: string | null = null;
 
+  const built = buildCableStockStatus(byFill);
+  const wantKey = quadSignalCableSizeDedupeKey(cable, size);
+  const block = built.blocks.find(
+    (b) => quadSignalCableSizeDedupeKey(b.cable, b.size) === wantKey,
+  );
+  if (block) {
+    for (const line of block.processes) {
+      opening[line.name] = line.closing;
+    }
+  }
+
   if (signalling) {
     delete opening[INSULATION_KEY];
     delete production[INSULATION_KEY];
-    const ins = buildCableStockStatus(byFill).sharedInsulation;
+    const ins = built.sharedInsulation;
     if (ins) {
       opening[INSULATION_KEY] = ins.closing;
       insFromDate = ins.entryDate;

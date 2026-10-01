@@ -3,6 +3,7 @@ import type { StockWipSalesLine } from "@/components/today/today-hub-model";
 
 export function useTodayHubStockWipFields() {
   const [stockProcessQtys, setStockProcessQtys] = useState<Record<string, string>>({});
+  const [stockProcessHints, setStockProcessHints] = useState<Record<string, string>>({});
   const [stockWipOpening, setStockWipOpening] = useState<Record<string, string>>({});
   const [stockOpeningEditable, setStockOpeningEditable] = useState(false);
   /** True while quad-wip-context is loading for the selected cable+size. */
@@ -12,6 +13,8 @@ export function useTodayHubStockWipFields() {
   return {
     stockProcessQtys,
     setStockProcessQtys,
+    stockProcessHints,
+    setStockProcessHints,
     stockWipOpening,
     setStockWipOpening,
     stockOpeningEditable,

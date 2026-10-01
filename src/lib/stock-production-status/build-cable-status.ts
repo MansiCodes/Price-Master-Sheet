@@ -7,7 +7,12 @@ import {
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
 import { getQuadFactorFromSize, isSignallingCableName } from "@/lib/quad-signal-wip";
-import { processQtyFromMeta, stageClosingFromMeta } from "@/lib/quad-signal-opening-match";
+import {
+  isIdleSizeWipFill,
+  processQtyFromMeta,
+  signallingProcessClosingsFromMeta,
+  stageClosingFromMeta,
+} from "@/lib/quad-signal-opening-match";
 import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
@@ -74,6 +79,66 @@ function singleQuadClosingFromMeta(
   return Math.round((opening + prod - outbound) * 1000) / 1000;
 }
 
+function processLinesFromMeta(
+  meta: QuadSignalStockMeta,
+  cable: string,
+  size: string,
+): StockProcessLine[] {
+  const procs = [...getQuadSignalCableProcesses(cable)];
+  const production = meta.production ?? {};
+  const closing = quadSignalClosingFromMeta(meta);
+  let names =
+    procs.length > 0
+      ? procs
+      : Array.from(
+          new Set([...Object.keys(closing), ...Object.keys(production)]),
+        );
+  if (isSignallingCableName(cable)) {
+    names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
+    const by = signallingProcessClosingsFromMeta(meta, names);
+    return names.map((name) => ({
+      name,
+      shortName: shortProcessName(name),
+      closing: Math.round((by[name] ?? processQtyFromMeta(closing, name)) * 1000) / 1000,
+      production: processQtyFromMeta(production, name),
+    }));
+  }
+  const idle = isIdleSizeWipFill(meta);
+  return names.map((name, i) => {
+    const prod = processQtyFromMeta(production, name);
+    const stored = processQtyFromMeta(closing, name);
+    const nextName = names[i + 1];
+    const nextP = nextName ? processQtyFromMeta(production, nextName) : 0;
+    let closingQty = stored;
+    if (name.trim().toLowerCase() === "single quad") {
+      closingQty = singleQuadClosingFromMeta(meta, size, stored);
+    } else if (!idle && nextP > 0) {
+      closingQty = stageClosingFromMeta(meta, name, nextName) ?? stored;
+    }
+    return {
+      name,
+      shortName: shortProcessName(name),
+      closing: Math.round(closingQty * 1000) / 1000,
+      production: prod,
+    };
+  });
+}
+
+function totalKmFromProcesses(
+  processes: StockProcessLine[],
+  totalPutupKm: number,
+): number {
+  const totalKm = processes.reduce((s, p) => {
+    const n = p.name.trim().toLowerCase();
+    if (n === "insulation" || n === "single quad") return s;
+    if (isOuterProcess(p.name)) {
+      return s + outerClosingAfterPutup(p.closing, totalPutupKm);
+    }
+    return s + p.closing;
+  }, 0);
+  return Math.round(totalKm * 1000) / 1000;
+}
+
 function mergeOrderPutups(into: PutupRow[], extras: PutupRow[]): PutupRow[] {
   const seen = new Set(into.map(putupMergeKey));
   const next = [...into];
@@ -135,22 +200,6 @@ export function buildCableStockStatus(
         continue;
       }
 
-      const procs = [...getQuadSignalCableProcesses(cable)];
-      const production = meta.production ?? {};
-      const closing = quadSignalClosingFromMeta(meta);
-      let names =
-        procs.length > 0
-          ? procs
-          : Array.from(
-              new Set([...Object.keys(closing), ...Object.keys(production)]),
-            );
-
-      // Signalling Insulation lives in the shared top card, not per-size.
-      // Quad keeps Insulation on the size card so it matches P&L PROCESS WIP.
-      if (isSignallingCableName(cable)) {
-        names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
-      }
-
       const callPutup = String(meta.callPutup ?? "").trim();
       const putupDate = String(meta.putupDate ?? "").trim();
       const partyName = String(meta.partyName ?? "").trim();
@@ -176,30 +225,8 @@ export function buildCableStockStatus(
       );
       const totalDispatchPending = dispatchPendingItems.reduce((sum, item) => sum + item.qty, 0);
 
-      const processes: StockProcessLine[] = names.map((name, i) => {
-        const prod = processQtyFromMeta(production, name);
-        const stored = processQtyFromMeta(closing, name);
-        const closingQty =
-          name.trim().toLowerCase() === "single quad"
-            ? singleQuadClosingFromMeta(meta, size, stored)
-            : (stageClosingFromMeta(meta, name, names[i + 1]) ?? stored);
-        return {
-          name,
-          shortName: shortProcessName(name),
-          closing: Math.round(closingQty * 1000) / 1000,
-          production: prod,
-        };
-      });
-
-      // Insul + Single Quad stay out of Total. Outer = closing − Call putup only.
-      const totalKm = processes.reduce((s, p) => {
-        const n = p.name.trim().toLowerCase();
-        if (n === "insulation" || n === "single quad") return s;
-        if (isOuterProcess(p.name)) {
-          return s + outerClosingAfterPutup(p.closing, totalPutupKm);
-        }
-        return s + p.closing;
-      }, 0);
+      const processes = processLinesFromMeta(meta, cable, size);
+      const totalKm = totalKmFromProcesses(processes, totalPutupKm);
 
       byKey.set(key, {
         key: `${cable} · ${size}`,

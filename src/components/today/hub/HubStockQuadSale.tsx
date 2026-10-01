@@ -4,7 +4,7 @@ import { EMPTY_STOCK_SALE_ITEM } from "@/components/today/hub/useTodayHubStockCa
 import { HubStockSaleRow } from "@/components/today/hub/HubStockSaleRow";
 
 export function HubStockQuadSale({ vm }: { vm: TodayHubVm }) {
-  const { stockSaleItems, setStockSaleItems } = bindStockLocals(vm);
+  const { stockSaleItems, setStockSaleItems, stockSaleHints } = bindStockLocals(vm);
   return (
     <div className="qs-wip__box">
       <div className="qs-wip__box-head">
@@ -25,6 +25,7 @@ export function HubStockQuadSale({ vm }: { vm: TodayHubVm }) {
           idx={idx}
           count={stockSaleItems.length}
           setItems={setStockSaleItems}
+          hint={stockSaleHints[idx]}
           onRemove={(i) => setStockSaleItems((prev) => prev.filter((_, j) => j !== i))}
         />
       ))}

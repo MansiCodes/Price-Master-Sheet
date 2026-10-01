@@ -3,7 +3,7 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 
 export function HubEntryStockTypeField({ vm }: { vm: TodayHubVm }) {
-  const { stockKind, setStockKind, setStockProcessQtys } = vm.stock;
+  const { stockKind, setStockKind, setStockProcessQtys, setStockProcessHints } = vm.stock;
   return (
     <div className="field">
       <label htmlFor="st-kind">Stock type</label>
@@ -15,6 +15,7 @@ export function HubEntryStockTypeField({ vm }: { vm: TodayHubVm }) {
         onChange={(next) => {
           setStockKind(next === "Cable" ? "cable" : "raw");
           setStockProcessQtys({});
+          setStockProcessHints({});
         }}
       />
     </div>
