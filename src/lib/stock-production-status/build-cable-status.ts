@@ -30,12 +30,49 @@ type PutupRow = {
   partyName: string;
 };
 
+function normalizePutupDate(date: string): string {
+  const s = String(date ?? "").trim();
+  if (!s) return "";
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1]!;
+  return s.toLowerCase().replace(/[^0-9]/g, "");
+}
+
+function putupPartyKey(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function putupMergeKey(item: PutupRow): string {
-  const party = item.partyName.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-  const date = item.putupDate.trim();
-  if (party && date) return `${party}|${date}`;
-  if (party) return `${party}|${item.qty}`;
-  return `|${date}|${item.qty}`;
+  const party = putupPartyKey(item.partyName);
+  const date = normalizePutupDate(item.putupDate);
+  const qty = String(Math.round(item.qty * 1000) / 1000);
+  if (party && date) return `${party}|${date}|${qty}`;
+  if (party) return `${party}|${qty}`;
+  return `|${date}|${qty}`;
+}
+
+function isSamePutup(a: PutupRow, b: PutupRow): boolean {
+  const pa = putupPartyKey(a.partyName);
+  const pb = putupPartyKey(b.partyName);
+  if (!pa || !pb) return false;
+  if (pa !== pb && !pa.includes(pb) && !pb.includes(pa)) return false;
+  if (Math.round(a.qty * 1000) !== Math.round(b.qty * 1000)) return false;
+  const da = normalizePutupDate(a.putupDate);
+  const db = normalizePutupDate(b.putupDate);
+  return !da || !db || da === db;
+}
+
+function mergeOrderPutups(into: PutupRow[], extras: PutupRow[]): PutupRow[] {
+  const seen = new Set(into.map(putupMergeKey));
+  const next = [...into];
+  for (const item of extras) {
+    const key = putupMergeKey(item);
+    if (key && seen.has(key)) continue;
+    if (next.some((row) => isSamePutup(row, item))) continue;
+    if (key) seen.add(key);
+    next.push(item);
+  }
+  return next;
 }
 
 function putupItemsFromMeta(meta: QuadSignalStockMeta): PutupRow[] {
@@ -137,18 +174,6 @@ function totalKmFromProcesses(
     return s + p.closing;
   }, 0);
   return Math.round(totalKm * 1000) / 1000;
-}
-
-function mergeOrderPutups(into: PutupRow[], extras: PutupRow[]): PutupRow[] {
-  const seen = new Set(into.map(putupMergeKey));
-  const next = [...into];
-  for (const item of extras) {
-    const key = putupMergeKey(item);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    next.push(item);
-  }
-  return next;
 }
 
 /**
