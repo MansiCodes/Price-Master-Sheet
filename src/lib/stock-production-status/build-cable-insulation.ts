@@ -5,11 +5,25 @@ import {
 import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
 import type { SharedInsulationStatus } from "./types";
 
+function sameKm(a: number, b: number) {
+  return Math.round(a * 1000) === Math.round(b * 1000);
+}
+
+function insulationExtrasTouched(meta: QuadSignalStockMeta): boolean {
+  const rows = meta.sharedInsulation?.contributions;
+  if (!Array.isArray(rows) || rows.length === 0) return false;
+  return rows.some(
+    (c) => Number(c.layingProduced) > 0 || Number(c.consumed) > 0,
+  );
+}
+
 export function insulationFromMeta(
   meta: QuadSignalStockMeta,
   entryDate: string,
 ): SharedInsulationStatus | null {
   if (meta.kind !== "cable") return null;
+  const production = Number(meta.production?.Insulation) || 0;
+  const extrasTouch = insulationExtrasTouched(meta);
   if (
     meta.sharedInsulation &&
     Number.isFinite(Number(meta.sharedInsulation.closing))
@@ -17,12 +31,10 @@ export function insulationFromMeta(
     return {
       entryDate,
       opening: Number(meta.opening?.Insulation) || 0,
-      production: Number(meta.production?.Insulation) || 0,
+      production,
       consumed: Number(meta.sharedInsulation.consumed) || 0,
       closing: Number(meta.sharedInsulation.closing),
-      poolTouch:
-        Number(meta.production?.Insulation) > 0 ||
-        Number(meta.sharedInsulation.consumed) > 0,
+      poolTouch: extrasTouch,
     };
   }
   const closingMap = quadSignalClosingFromMeta(meta);
@@ -34,7 +46,6 @@ export function insulationFromMeta(
     return null;
   }
   const opening = Number(meta.opening?.Insulation) || 0;
-  const production = Number(meta.production?.Insulation) || 0;
   const closeRaw = Number(closingMap.Insulation);
   const closing = Number.isFinite(closeRaw) ? closeRaw : 0;
   if (opening === 0 && production === 0 && closing === 0) return null;
@@ -44,23 +55,39 @@ export function insulationFromMeta(
     production,
     consumed: Math.max(0, Math.round((opening + production - closing) * 1000) / 1000),
     closing,
-    poolTouch: production > 0,
+    poolTouch: extrasTouch,
   };
 }
 
+/** Size WIP ate Insulation (closing ≠ opening + extras-only P). Use typed Opening. */
+function sizeWipAteInsulation(s: SharedInsulationStatus): boolean {
+  if (s.poolTouch) return false;
+  const implied = s.opening + s.production;
+  if (s.production > 0 && sameKm(s.closing, implied)) return false;
+  return s.consumed > 0 || (s.production > 0 && !sameKm(s.closing, implied));
+}
+
+function asPoolSnap(s: SharedInsulationStatus): SharedInsulationStatus {
+  if (s.poolTouch) return s;
+  if (sizeWipAteInsulation(s)) {
+    return { ...s, closing: s.opening, consumed: 0, production: 0 };
+  }
+  if (s.opening > 0 && s.production === 0 && !sameKm(s.opening, s.closing)) {
+    return { ...s, closing: s.opening, consumed: 0 };
+  }
+  return s;
+}
+
 /**
- * Signalling Insulation is one pool. Newest real fill wins.
- * A later size save that copies the last Production onto the last
- * Closing (prefill double-add) is ignored.
+ * Last fill wins. If that save only moved Laying/Single Quad and Insulation
+ * closing drifted, keep the typed Insulation Opening.
  */
 export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
   if (rows.length === 0) return null;
-  const sameKm = (a: number, b: number) =>
-    Math.round(a * 1000) === Math.round(b * 1000);
   for (let i = 0; i < rows.length; i++) {
-    const s = rows[i];
+    const s = asPoolSnap(rows[i]!);
     const older = rows.slice(i + 1);
     const replayPrefill =
       s.production > 0 &&
@@ -71,22 +98,15 @@ export function pickSharedInsulationPool(
           sameKm(s.opening, o.closing),
       );
     if (replayPrefill) continue;
-    const idle = s.production === 0 && s.consumed === 0;
-    if (!idle) return s;
-    const olderHasSameClosing = older.some((o) => sameKm(o.closing, s.closing));
-    if (!olderHasSameClosing) return s;
+    return s;
   }
-  return rows[0] ?? null;
+  return asPoolSnap(rows[0]!);
 }
 
-/**
- * Quad Insulation follows the latest P&L stock row for that family
- * (same as Process WIP on the newest Quad save).
- */
 export function pickNewestInsulation(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
-  return rows[0] ?? null;
+  return pickSharedInsulationPool(rows);
 }
 
 export function familyInsulationCandidate(

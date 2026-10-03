@@ -16,6 +16,7 @@ function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
     setStockOpeningEditable: stock.setStockOpeningEditable,
     setStockWipContextLoading: stock.setStockWipContextLoading,
     setStockWipSalesKm: stock.setStockWipSalesKm,
+    setStockOrderPutupKm: stock.setStockOrderPutupKm,
     setStockWipSalesLines: stock.setStockWipSalesLines,
     setStockCallPutup: stock.setStockCallPutup,
     setStockPutupDate: stock.setStockPutupDate,

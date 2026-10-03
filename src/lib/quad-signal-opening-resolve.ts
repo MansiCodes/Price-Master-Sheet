@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getQuadSignalCableProcesses, quadSignalCableSizeDedupeKey } from "@/lib/plant-catalogs";
 import { plantIdFilter } from "@/lib/plant-merge";
-import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
 import { buildCableStockStatus } from "@/lib/stock-production-status";
 import {
   INSULATION_KEY,
@@ -25,6 +25,7 @@ export type QuadSignalOpeningResolve = {
   sameDayEntryId: string | null;
   production: Record<string, number>;
   insulationContributions: InsulationPoolContribution[];
+  putupKm: number;
 };
 
 function fillRowOrder<T extends { updatedAt: Date; createdAt: Date }>(rows: T[]): T[] {
@@ -104,19 +105,28 @@ export async function resolveQuadSignalStockOpening(params: {
   );
   if (block) {
     for (const line of block.processes) {
+      if (line.name.trim().toLowerCase() === "insulation") continue;
       opening[line.name] = line.closing;
     }
   }
 
-  if (signalling) {
+  const familyIns = signalling
+    ? built.sharedInsulation
+    : isQuadCableName(cable)
+      ? built.quadInsulation
+      : null;
+  const putupKm = block
+    ? Math.round((block.putupKm ?? 0) * 1000) / 1000
+    : 0;
+  if (familyIns) {
     delete opening[INSULATION_KEY];
     delete production[INSULATION_KEY];
-    const ins = built.sharedInsulation;
-    if (ins) {
-      opening[INSULATION_KEY] = ins.closing;
-      insFromDate = ins.entryDate;
-      insulationContributions = [];
-    }
+    opening[INSULATION_KEY] = familyIns.closing;
+    insFromDate = familyIns.entryDate;
+    insulationContributions = [];
+  } else if (signalling) {
+    delete opening[INSULATION_KEY];
+    delete production[INSULATION_KEY];
   }
 
   if (Object.keys(opening).length === 0 && !sameDayEntryId && production[INSULATION_KEY] == null) {
@@ -127,6 +137,7 @@ export async function resolveQuadSignalStockOpening(params: {
       sameDayEntryId: null,
       production,
       insulationContributions,
+      putupKm,
     };
   }
 
@@ -137,5 +148,6 @@ export async function resolveQuadSignalStockOpening(params: {
     sameDayEntryId,
     production,
     insulationContributions,
+    putupKm,
   };
 }

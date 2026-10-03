@@ -9,6 +9,7 @@ export function useTodayHubStockWipFields() {
   /** True while quad-wip-context is loading for the selected cable+size. */
   const [stockWipContextLoading, setStockWipContextLoading] = useState(false);
   const [stockWipSalesKm, setStockWipSalesKm] = useState(0);
+  const [stockOrderPutupKm, setStockOrderPutupKm] = useState(0);
   const [stockWipSalesLines, setStockWipSalesLines] = useState<StockWipSalesLine[]>([]);
   return {
     stockProcessQtys,
@@ -23,6 +24,8 @@ export function useTodayHubStockWipFields() {
     setStockWipContextLoading,
     stockWipSalesKm,
     setStockWipSalesKm,
+    stockOrderPutupKm,
+    setStockOrderPutupKm,
     stockWipSalesLines,
     setStockWipSalesLines,
   };

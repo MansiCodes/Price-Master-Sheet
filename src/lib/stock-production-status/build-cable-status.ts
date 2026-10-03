@@ -6,14 +6,13 @@ import {
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
-import { getQuadFactorFromSize, isSignallingCableName } from "@/lib/quad-signal-wip";
+import { getQuadFactorFromSize, isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
 import {
-  isIdleSizeWipFill,
   processQtyFromMeta,
   signallingProcessClosingsFromMeta,
   stageClosingFromMeta,
 } from "@/lib/quad-signal-opening-match";
-import { pickSharedInsulationPool, pickNewestInsulation, familyInsulationCandidate } from "./build-cable-insulation";
+import { pickSharedInsulationPool, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
   outerClosingAfterPutup,
@@ -130,8 +129,10 @@ function processLinesFromMeta(
       : Array.from(
           new Set([...Object.keys(closing), ...Object.keys(production)]),
         );
-  if (isSignallingCableName(cable)) {
+  if (isSignallingCableName(cable) || isQuadCableName(cable)) {
     names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
+  }
+  if (isSignallingCableName(cable)) {
     const by = signallingProcessClosingsFromMeta(meta, names);
     return names.map((name) => ({
       name,
@@ -140,16 +141,14 @@ function processLinesFromMeta(
       production: processQtyFromMeta(production, name),
     }));
   }
-  const idle = isIdleSizeWipFill(meta);
   return names.map((name, i) => {
     const prod = processQtyFromMeta(production, name);
     const stored = processQtyFromMeta(closing, name);
     const nextName = names[i + 1];
-    const nextP = nextName ? processQtyFromMeta(production, nextName) : 0;
     let closingQty = stored;
     if (name.trim().toLowerCase() === "single quad") {
       closingQty = singleQuadClosingFromMeta(meta, size, stored);
-    } else if (!idle && nextP > 0) {
+    } else {
       closingQty = stageClosingFromMeta(meta, name, nextName) ?? stored;
     }
     return {
@@ -159,6 +158,14 @@ function processLinesFromMeta(
       production: prod,
     };
   });
+}
+
+function sizeWipEmpty(processes: StockProcessLine[]): boolean {
+  return processes.every(
+    (p) =>
+      p.name.trim().toLowerCase() === "insulation" ||
+      (p.closing === 0 && p.production === 0),
+  );
 }
 
 function totalKmFromProcesses(
@@ -222,6 +229,11 @@ export function buildCableStockStatus(
           block.orderPutupItems ?? block.callPutupItems ?? [],
           putupItemsFromMeta(meta),
         );
+        const incoming = processLinesFromMeta(meta, cable, size);
+        if (sizeWipEmpty(block.processes) && !sizeWipEmpty(incoming)) {
+          block.processes = incoming;
+          block.entryDate = entryDate;
+        }
         continue;
       }
 
@@ -279,9 +291,21 @@ export function buildCableStockStatus(
     }
   }
 
+  const blocks = Array.from(byKey.values());
+  for (const block of blocks) {
+    const putupKm = Math.round(
+      (block.orderPutupItems ?? block.callPutupItems ?? []).reduce(
+        (sum, item) => sum + item.qty,
+        0,
+      ) * 1000,
+    ) / 1000;
+    block.putupKm = putupKm;
+    block.totalKm = totalKmFromProcesses(block.processes, putupKm);
+  }
+
   return {
-    blocks: Array.from(byKey.values()),
+    blocks,
     sharedInsulation: pickSharedInsulationPool(signallingInsul),
-    quadInsulation: pickNewestInsulation(quadInsul),
+    quadInsulation: pickSharedInsulationPool(quadInsul),
   };
 }

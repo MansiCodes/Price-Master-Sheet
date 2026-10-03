@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { WipCalcResult } from "@/lib/quad-signal-wip";
-import { processRowOpening, processRowOutLabel } from "@/components/today/hub/process-row-out-label";
+import { processRowOpening, processRowOutLabel, isOuterProcessName, outerFormOutAndClose } from "@/components/today/hub/process-row-out-label";
 import {
   HubStockQuadOpeningCell,
   HubStockQuadProductionCell,
@@ -16,11 +16,19 @@ type ProcessRowProps = {
   stockProcessQtys: Record<string, string>;
   setStockProcessQtys: Dispatch<SetStateAction<Record<string, string>>>;
   stockProcessHints?: Record<string, string>;
+  orderPutupKm?: number;
 };
 
 export function HubStockQuadProcessRow(props: ProcessRowProps) {
   const stage = props.stockWipCalc?.stages.find((s) => s.process === props.proc);
   const openingVal = processRowOpening(stage, props.stockWipOpening, props.proc);
+  const outerLive = isOuterProcessName(props.proc)
+    ? outerFormOutAndClose(
+        openingVal,
+        props.stockProcessQtys[props.proc] ?? "",
+        props.orderPutupKm ?? 0,
+      )
+    : null;
   return (
     <tr key={props.proc}>
       {props.hideProcessLabel ? null : <td>{props.proc}</td>}
@@ -37,8 +45,16 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
         setStockProcessQtys={props.setStockProcessQtys}
         hint={props.stockProcessHints?.[props.proc]}
       />
-      <td className="qs-wip__num qs-wip__calc">{processRowOutLabel(stage)}</td>
-      <td className="qs-wip__num qs-wip__calc">{stage != null ? String(stage.closing) : "—"}</td>
+      <td className="qs-wip__num qs-wip__calc">
+        {outerLive ? String(outerLive.out) : processRowOutLabel(stage)}
+      </td>
+      <td className="qs-wip__num qs-wip__calc">
+        {outerLive
+          ? String(outerLive.closing)
+          : stage != null
+            ? String(stage.closing)
+            : "—"}
+      </td>
     </tr>
   );
 }

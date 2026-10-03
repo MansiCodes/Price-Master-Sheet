@@ -5,7 +5,7 @@ import { HubStockQuadProcessRow } from "@/components/today/hub/HubStockQuadProce
 export function HubStockQuadProcessBody({ vm, processes }: { vm: TodayHubVm; processes: string[] }) {
   const {
     stockWipCalc, stockOpeningEditable, stockWipOpening, setStockWipOpening,
-    stockProcessQtys, setStockProcessQtys, stockProcessHints,
+    stockProcessQtys, setStockProcessQtys, stockProcessHints, stockOrderPutupKm,
   } = bindStockLocals(vm);
   return (
     <tbody>
@@ -20,6 +20,7 @@ export function HubStockQuadProcessBody({ vm, processes }: { vm: TodayHubVm; pro
           stockProcessQtys={stockProcessQtys}
           setStockProcessQtys={setStockProcessQtys}
           stockProcessHints={stockProcessHints}
+          orderPutupKm={stockOrderPutupKm}
         />
       ))}
     </tbody>

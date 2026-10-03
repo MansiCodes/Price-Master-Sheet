@@ -11,6 +11,7 @@ type QuadWipSetters = Pick<
   | "setStockOpeningEditable"
   | "setStockWipContextLoading"
   | "setStockWipSalesKm"
+  | "setStockOrderPutupKm"
   | "setStockWipSalesLines"
   | "setStockCallPutup"
   | "setStockPutupDate"
@@ -40,6 +41,7 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockOpeningEditable(false);
   s.setStockWipContextLoading(false);
   s.setStockWipSalesKm(0);
+  s.setStockOrderPutupKm(0);
   s.setStockWipSalesLines([]);
   s.setStockCallPutup("");
   s.setStockPutupDate("");
@@ -66,6 +68,7 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockProcessHints({});
   s.setStockOpeningEditable(false);
   s.setStockWipSalesKm(0);
+  s.setStockOrderPutupKm(0);
   s.setStockWipSalesLines([]);
   s.setStockCallPutup("");
   s.setStockPutupDate("");
@@ -278,6 +281,7 @@ export type QuadWipContextData = {
     coreCount?: number;
     consumed?: number;
   }>;
+  putupKm?: number;
 };
 
 function isInsulationKey(key: string) {
@@ -365,6 +369,7 @@ export function applyQuadWipContextData(
   applyQtyMaps(s, data, opts);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
   s.setStockWipSalesKm(0);
+  s.setStockOrderPutupKm(Number(data.putupKm) > 0 ? Number(data.putupKm) : 0);
   s.setStockWipSalesLines(data.sales ?? []);
   applyLengthOptions(s, data.variant);
   const meta = data.stockMeta;
