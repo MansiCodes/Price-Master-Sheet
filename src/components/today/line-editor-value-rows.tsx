@@ -1,6 +1,7 @@
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { patchLine, type LineEditorFieldProps } from "./line-editor-field-types";
+import { formatLineNetValue } from "./LineEditorDebitValueFields";
 
 export function LineEditorCompactRateFields({
   line,
@@ -105,6 +106,70 @@ export function LineEditorStandardValueFields({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export function LineEditorAtclNetFields({
+  line,
+  idx,
+  lines,
+  onChange,
+  unitOptions,
+  rateLabel,
+}: LineEditorFieldProps) {
+  return (
+    <>
+      <div className="line-stack__row line-stack__row--meta has-unit cols-2-unit-qty">
+        {unitOptions ? (
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor={`line-unit-${line.id}`}>Unit</label>
+            <SelectMenu
+              id={`line-unit-${line.id}`}
+              value={
+                unitOptions.some((u) => u === line.unit)
+                  ? line.unit
+                  : unitOptions[0] || line.unit
+              }
+              options={unitOptions}
+              onChange={(unit) => {
+                patchLine(lines, idx, line, onChange, { unit });
+              }}
+            />
+          </div>
+        ) : null}
+        <div className="field" style={{ margin: 0 }}>
+          <label htmlFor={`line-qty-${line.id}`}>Qty</label>
+          <DecimalInput
+            id={`line-qty-${line.id}`}
+            value={line.quantity}
+            onChange={(quantity) => {
+              patchLine(lines, idx, line, onChange, { quantity });
+            }}
+          />
+        </div>
+      </div>
+      <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
+        <div className="field" style={{ margin: 0 }}>
+          <label htmlFor={`line-rate-${line.id}`}>{rateLabel}</label>
+          <DecimalInput
+            id={`line-rate-${line.id}`}
+            value={line.rate}
+            onChange={(rate) => {
+              patchLine(lines, idx, line, onChange, { rate });
+            }}
+            placeholder="0"
+          />
+        </div>
+        <div className="field" style={{ margin: 0 }}>
+          <label htmlFor={`line-net-value-${line.id}`}>Net value</label>
+          <input
+            id={`line-net-value-${line.id}`}
+            readOnly
+            value={formatLineNetValue(line.quantity, line.rate)}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 

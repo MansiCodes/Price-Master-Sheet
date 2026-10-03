@@ -2,6 +2,21 @@ import { DecimalInput } from "@/components/ui/DecimalInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { patchLine, type LineEditorFieldProps } from "./line-editor-field-types";
 
+export function formatLineNetValue(
+  quantity: string,
+  rate: string,
+  debitQuantity = "",
+) {
+  if (quantity.trim() === "" || rate.trim() === "") return "—";
+  const n =
+    Math.max(0, Number(quantity) - Number(debitQuantity || 0)) * Number(rate);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function LineEditorDebitValueFields({
   line,
   idx,
@@ -13,7 +28,7 @@ export function LineEditorDebitValueFields({
 }: LineEditorFieldProps) {
   return (
     <>
-      <div className="line-stack__row line-stack__row--meta has-unit cols-3">
+      <div className="line-stack__row line-stack__row--meta has-unit cols-2-unit-qty">
         {unitOptions ? (
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor={`line-unit-${line.id}`}>Unit</label>
@@ -41,6 +56,8 @@ export function LineEditorDebitValueFields({
             }}
           />
         </div>
+      </div>
+      <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
         <div className="field" style={{ margin: 0 }}>
           <label htmlFor={`line-rate-${line.id}`}>{rateLabel}</label>
           <DecimalInput
@@ -52,8 +69,16 @@ export function LineEditorDebitValueFields({
             placeholder="0"
           />
         </div>
+        <div className="field" style={{ margin: 0 }}>
+          <label htmlFor={`line-net-value-${line.id}`}>Net value</label>
+          <input
+            id={`line-net-value-${line.id}`}
+            readOnly
+            value={formatLineNetValue(line.quantity, line.rate, line.debitQuantity)}
+          />
+        </div>
       </div>
-      <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate cols-3">
+      <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
         <div className="field" style={{ margin: 0 }}>
           <label htmlFor={`line-debit-qty-${line.id}`}>Debit Qty</label>
           <DecimalInput
@@ -82,29 +107,8 @@ export function LineEditorDebitValueFields({
           />
         </div>
       </div>
-      <div className="line-stack__row line-stack__row--meta has-unit">
-        <div className="field" style={{ margin: 0 }}>
-          <label htmlFor={`line-net-value-${line.id}`}>Net value</label>
-          <input
-            id={`line-net-value-${line.id}`}
-            readOnly
-            value={
-              Number(line.rate || 0) > 0
-                ? (
-                    Math.max(
-                      0,
-                      Number(line.quantity || 0) -
-                        Number(line.debitQuantity || 0),
-                    ) * Number(line.rate || 0)
-                  ).toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })
-                : "—"
-            }
-          />
-        </div>
-        {showGst ? (
+      {showGst ? (
+        <div className="line-stack__row line-stack__row--meta">
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor={`line-gst-${line.id}`}>GST %</label>
             <DecimalInput
@@ -115,8 +119,8 @@ export function LineEditorDebitValueFields({
               }}
             />
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </>
   );
 }

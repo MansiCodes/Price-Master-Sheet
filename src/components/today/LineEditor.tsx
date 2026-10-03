@@ -15,6 +15,7 @@ export function LineEditor({
   showGst = false,
   showCat6MeterFields = false,
   showDebitQty = false,
+  showNetValue = false,
   sizeQtyUnitRow = false,
   rateLabel = "Rate (per unit)",
 }: {
@@ -29,6 +30,7 @@ export function LineEditor({
   showGst?: boolean;
   showCat6MeterFields?: boolean;
   showDebitQty?: boolean;
+  showNetValue?: boolean;
   /** Put item/size + Qty + Unit on one row (Rate below). */
   sizeQtyUnitRow?: boolean;
   rateLabel?: string;
@@ -58,6 +60,7 @@ export function LineEditor({
             showGst={showGst}
             showCat6MeterFields={showCat6MeterFields}
             showDebitQty={showDebitQty}
+            showNetValue={showNetValue}
             sizeQtyUnitRow={sizeQtyUnitRow}
             rateLabel={rateLabel}
           />

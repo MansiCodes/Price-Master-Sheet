@@ -196,7 +196,11 @@ export function PurchaseReport({
         onPageChange={setPage}
         onPageSizeChange={setPageSize}
       />
-      <PurchaseEditDrawer crud={crud} cat6={cat6} />
+      <PurchaseEditDrawer
+        crud={crud}
+        cat6={cat6}
+        atcl={isPvc && purchaseView === "atcl"}
+      />
       {crud.deleteDialog}
     </section>
   );

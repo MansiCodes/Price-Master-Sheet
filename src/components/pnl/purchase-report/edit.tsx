@@ -14,12 +14,20 @@ type CrudLike = {
   save: (payload: Record<string, unknown>) => void;
 };
 
+const debitQtyField = {
+  name: "debitQuantity",
+  label: "Debit Qty",
+  type: "number" as const,
+};
+
 export function PurchaseEditDrawer({
   crud,
   cat6,
+  atcl = false,
 }: {
   crud: CrudLike;
   cat6: boolean;
+  atcl?: boolean;
 }) {
   return (
     <EntryEditDrawer
@@ -34,11 +42,7 @@ export function PurchaseEditDrawer({
               { name: "billNumber", label: "Bill Number" },
               { name: "itemDescription", label: "Item Details", required: true },
               { name: "quantity", label: "Item QTY", type: "number", required: true },
-              {
-                name: "debitQuantity",
-                label: "Debit Qty",
-                type: "number",
-              },
+              ...(atcl ? [] : [debitQtyField]),
               { name: "unit", label: "Unit", required: true },
               { name: "rate", label: "Rate", type: "number", required: false },
               { name: "notes", label: "Notes", type: "textarea" },
@@ -49,11 +53,7 @@ export function PurchaseEditDrawer({
               { name: "billNumber", label: "Invoice no. / Challan no." },
               { name: "itemDescription", label: "Description", required: true },
               { name: "quantity", label: "Qty", type: "number", required: true },
-              {
-                name: "debitQuantity",
-                label: "Debit Qty",
-                type: "number",
-              },
+              ...(atcl ? [] : [debitQtyField]),
               { name: "unit", label: "Unit", required: true },
               { name: "rate", label: "Rate", type: "number", required: false },
               { name: "gstPercent", label: "GST %", type: "number" },
@@ -80,7 +80,7 @@ export function PurchaseEditDrawer({
           gstin: crud.values.gstin || null,
           itemDescription: crud.values.itemDescription,
           quantity: Number(crud.values.quantity),
-          debitQuantity: Number(crud.values.debitQuantity || 0),
+          debitQuantity: atcl ? 0 : Number(crud.values.debitQuantity || 0),
           unit: crud.values.unit,
           rate: Number(crud.values.rate),
           gstPercent: Number(crud.values.gstPercent || 0),
@@ -89,23 +89,27 @@ export function PurchaseEditDrawer({
         })
       }
     >
+      {atcl ? null : (
+        <div className="field">
+          <label htmlFor="edit-debit-value">Debit Value</label>
+          <input
+            id="edit-debit-value"
+            readOnly
+            value={
+              num(crud.values.debitQuantity || 0) > 0
+                ? formatINR(
+                    num(crud.values.debitQuantity || 0) *
+                      num(crud.values.rate || 0),
+                  )
+                : "—"
+            }
+          />
+        </div>
+      )}
       <div className="field">
-        <label htmlFor="edit-debit-value">Debit Value</label>
-        <input
-          id="edit-debit-value"
-          readOnly
-          value={
-            num(crud.values.debitQuantity || 0) > 0
-              ? formatINR(
-                  num(crud.values.debitQuantity || 0) *
-                    num(crud.values.rate || 0),
-                )
-              : "—"
-          }
-        />
-      </div>
-      <div className="field">
-        <label htmlFor="edit-net-value">Net value (after debit)</label>
+        <label htmlFor="edit-net-value">
+          {atcl ? "Goods Value" : "Net value (after debit)"}
+        </label>
         <input
           id="edit-net-value"
           readOnly
@@ -113,7 +117,7 @@ export function PurchaseEditDrawer({
             Math.max(
               0,
               num(crud.values.quantity || 0) -
-                num(crud.values.debitQuantity || 0),
+                (atcl ? 0 : num(crud.values.debitQuantity || 0)),
             ) * num(crud.values.rate || 0),
           )}
         />

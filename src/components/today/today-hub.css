@@ -382,6 +382,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.line-stack__row--meta.cols-2-unit-qty,
+.line-stack__row--meta.has-unit.cols-2-unit-qty {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .line-stack__row--meta.line-stack__row--debit-rate {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 0;

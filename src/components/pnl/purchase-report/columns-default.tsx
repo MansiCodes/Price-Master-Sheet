@@ -93,7 +93,7 @@ export function buildCat6PurchaseColumns(
       label: "Net value (after debit)",
       align: "right",
       render: (r) =>
-        formatINR(num(r.basicValue) || (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
+        formatINR((num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate)),
     },
     {
       key: "notes",
@@ -202,8 +202,7 @@ export function buildDefaultPurchaseColumns(
       align: "right",
       render: (r) =>
         formatINR(
-          num(r.basicValue) ||
-            (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
+          (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
         ),
     },
     {

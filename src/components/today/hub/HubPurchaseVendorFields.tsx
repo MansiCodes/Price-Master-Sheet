@@ -18,6 +18,7 @@ export function HubPurchaseQuadLineEditor({ vm }: { vm: TodayHubVm }) {
       unitOptions={purchaseUnitOptions}
       showGst={true}
       showDebitQty={true}
+      showNetValue={true}
       rateLabel="Rate (per unit)"
     />
   );
@@ -109,7 +110,8 @@ export function HubPurchaseDefaultLineEditor({ vm }: { vm: TodayHubVm }) {
       itemPlaceholder={isCat6 ? "Select item details" : "Select description"}
       unitOptions={purchaseUnitOptions}
       showGst={!isCat6 && purchaseSource !== "atcl"}
-      showDebitQty={true}
+      showDebitQty={purchaseSource !== "atcl"}
+      showNetValue={true}
       rateLabel="Rate (per unit)"
     />
   );

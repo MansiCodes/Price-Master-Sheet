@@ -9,7 +9,7 @@ export async function submitPurchase(args: SubmitPurchaseArgs): Promise<SubmitOu
     args.vendorName === "Other" ? args.vendorNameOther.trim() : args.vendorName.trim();
   const invalid = validatePurchaseLines(args.purchaseLines, args.fail);
   if (invalid) return invalid;
-  const items = mapPurchaseItems(args.purchaseLines, args.isCat6);
+  const items = mapPurchaseItems(args.purchaseLines, args.isCat6, args.purchaseSource);
   if (args.purchaseSource !== "atcl" && (!resolvedVendorName || items.length === 0)) {
     args.fail("Add supplier and at least one description item.");
     return { status: "failed" };

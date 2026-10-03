@@ -1,6 +1,7 @@
 import type { LineItem } from "@/components/today/today-hub-model";
 import { LineEditorDebitValueFields } from "./LineEditorDebitValueFields";
 import {
+  LineEditorAtclNetFields,
   LineEditorCompactRateFields,
   LineEditorMeterFields,
   LineEditorStandardValueFields,
@@ -15,6 +16,7 @@ export function LineEditorValueFields({
   showGst,
   showCat6MeterFields,
   showDebitQty,
+  showNetValue,
   sizeQtyUnitRow,
   rateLabel,
 }: {
@@ -26,6 +28,7 @@ export function LineEditorValueFields({
   showGst: boolean;
   showCat6MeterFields: boolean;
   showDebitQty: boolean;
+  showNetValue?: boolean;
   sizeQtyUnitRow: boolean;
   rateLabel: string;
 }) {
@@ -34,6 +37,8 @@ export function LineEditorValueFields({
     <>
       {showDebitQty ? (
         <LineEditorDebitValueFields {...shared} />
+      ) : showNetValue ? (
+        <LineEditorAtclNetFields {...shared} />
       ) : sizeQtyUnitRow ? (
         <LineEditorCompactRateFields {...shared} />
       ) : (

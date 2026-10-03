@@ -1,5 +1,6 @@
 import type ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
+import { isAtclPurchase } from "@/lib/plant-catalogs";
 import { iso, styleHeader, toNum, type DateFilter } from "./export-utils";
 
 export async function fillPurchaseSheet(
@@ -55,6 +56,7 @@ export async function fillPurchaseSheet(
     const debitQty = toNum(r.debitQuantity);
     const qty = toNum(r.quantity);
     const rate = toNum(r.rate);
+    const qtyTimesRate = qty * rate;
     sheet.addRow({
       sno: i + 1,
       books: iso(r.booksDate),
@@ -68,8 +70,8 @@ export async function fillPurchaseSheet(
       debitQty: debitQty > 0 ? debitQty : "",
       rate,
       debitValue: debitQty > 0 ? debitQty * rate : "",
-      basicGross: qty * rate,
-      basic: toNum(r.basicValue),
+      basicGross: qtyTimesRate,
+      basic: isAtclPurchase(r) ? qtyTimesRate : (qty - debitQty) * rate,
       gstPct: toNum(r.gstPercent),
       gstAmt: toNum(r.gstAmount),
       invoice: toNum(r.invoiceValue),

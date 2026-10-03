@@ -4,13 +4,18 @@ import {
 } from "@/lib/plant-catalogs";
 import type { LineItem, PurchaseTypeValue, ShiftKey } from "@/components/today/today-hub-model";
 
-export function mapPurchaseItems(purchaseLines: LineItem[], isCat6: boolean) {
+export function mapPurchaseItems(
+  purchaseLines: LineItem[],
+  isCat6: boolean,
+  purchaseSource: "vendor" | "atcl" = "vendor",
+) {
   return purchaseLines
     .map((l) => ({
       itemDescription: l.itemDescription.trim(),
       unit: l.unit.trim() || "KGS",
       quantity: Number(l.quantity),
-      debitQuantity: l.debitQuantity ? Number(l.debitQuantity) : 0,
+      debitQuantity:
+        purchaseSource === "atcl" ? 0 : l.debitQuantity ? Number(l.debitQuantity) : 0,
       openingReading: l.openingReading ? Number(l.openingReading) : null,
       closingReading: l.closingReading ? Number(l.closingReading) : null,
       rate: l.rate.trim() === "" ? 0 : Number(l.rate),

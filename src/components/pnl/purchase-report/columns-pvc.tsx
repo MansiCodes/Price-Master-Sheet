@@ -83,8 +83,7 @@ export function buildPvcPurchaseColumns(
       align: "right",
       render: (r) =>
         formatINR(
-          num(r.basicValue) ||
-            (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
+          (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
         ),
     },
     {
@@ -190,7 +189,7 @@ export function buildAtclPurchaseColumns(
       key: "basic",
       label: "Goods Value",
       align: "right",
-      render: (r) => formatINR(num(r.basicValue) || num(r.quantity) * num(r.rate)),
+      render: (r) => formatINR(num(r.quantity) * num(r.rate)),
     },
     {
       key: "excelUploadedAt",
