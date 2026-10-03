@@ -35,6 +35,7 @@ function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
     setStockLengthFactor: stock.setStockLengthFactor,
     setStockInsulationExtras: stock.setStockInsulationExtras,
     setStockInsulationExtrasOpen: stock.setStockInsulationExtrasOpen,
+    setStockPowerLayingFactor: stock.setStockPowerLayingFactor,
     setStockProcessQtys: stock.setStockProcessQtys,
     setStockProcessHints: stock.setStockProcessHints,
   };

@@ -901,6 +901,12 @@
 .qs-wip__factor {
   margin: 0 0 0.35rem;
 }
+.qs-wip__factor input {
+  width: 3rem;
+  min-width: 3rem;
+  max-width: 3rem;
+  text-align: center;
+}
 .qs-wip__size-for-chain {
   margin: 0 0 0.85rem;
   padding: 0.65rem 0.75rem 0.75rem;

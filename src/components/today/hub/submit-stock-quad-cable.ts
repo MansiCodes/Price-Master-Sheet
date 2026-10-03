@@ -1,7 +1,7 @@
 import { postJson } from "@/lib/client-forms";
 import { encodeQuadSignalStockNotes } from "@/lib/plant-catalogs";
 import { calculateQuadSignalWip, isSignallingCableName, resolveQuadSignalVariant } from "@/lib/quad-signal-wip";
-import { signallingInsulationPool } from "@/components/today/hub/compute-quad-wip-calc";
+import { parsePowerLayingFactor } from "@/lib/power-cable";
 import { buildQuadCableNotesPayload } from "@/components/today/hub/build-quad-cable-notes";
 import type {
   ShiftKey,
@@ -32,6 +32,7 @@ export type SubmitStockQuadCableArgs = {
   stockLengthOptions: Array<{ label: string; lengthFactor: number }>;
   stockInsulationExtras: StockInsulationExtra[];
   stockSingleQuadExtras: StockSingleQuadExtra[];
+  stockPowerLayingFactor: string;
   stockWipSalesKm: number;
   stockUnit: string;
   issuedQty: number;
@@ -121,6 +122,7 @@ function encodeSubmittedQuadCableNotes(
           }
         : undefined,
       dstExcludesLaying: isSignallingCableName(resolved.resolvedCable),
+      powerLayingFactor: parsePowerLayingFactor(args.stockPowerLayingFactor) ?? undefined,
     }),
     args.stockNotes.trim() || `Closing stock as on ${args.entryDate}`,
   );
@@ -173,6 +175,7 @@ function computeQuadCableWip(args: SubmitStockQuadCableArgs) {
     ...resolved, processes, stockInsulationExtras: args.stockInsulationExtras,
     stockSingleQuadExtras: args.stockSingleQuadExtras, fail: args.fail,
     stockLengthFactor: lengthFactor,
+    stockPowerLayingFactor: args.stockPowerLayingFactor,
   });
   if (!overrides) return null;
   const wip = calculateQuadSignalWip({

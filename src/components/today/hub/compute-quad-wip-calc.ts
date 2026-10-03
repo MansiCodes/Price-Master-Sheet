@@ -9,6 +9,7 @@ import {
   resolveQuadSignalVariant,
   type WipCalcResult,
 } from "@/lib/quad-signal-wip";
+import { isPowerCableName, powerInsulationConsumed, parsePowerLayingFactor } from "@/lib/power-cable";
 import { insulationExtraRowConsumed } from "@/components/today/hub/patch-insulation-extra";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 
@@ -182,6 +183,16 @@ export function computeStockWipCalc(
 
 function resolveCalcOverrides(stock: TodayHubStockState, production: Record<string, number>) {
   const cableName = stock.resolvedQuadCableName || stock.stockCable;
+  if (isPowerCableName(cableName)) {
+    return {
+      production,
+      insulationConsumedOverride: powerInsulationConsumed(
+        production["Laying"] ?? 0,
+        parsePowerLayingFactor(stock.stockPowerLayingFactor),
+      ),
+      singleQuadConsumedOverride: undefined,
+    };
+  }
   if (isSignallingCableName(cableName)) {
     return {
       production,

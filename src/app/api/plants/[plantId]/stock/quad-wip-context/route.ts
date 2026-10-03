@@ -164,6 +164,7 @@ export async function GET(
           saleItems: existingMeta.saleItems ?? [],
           opening: stripInsulationQty(existingMeta.opening ?? {}),
           production: stripInsulationQty(existingMeta.production ?? {}),
+          powerLayingFactor: existingMeta.powerLayingFactor,
         }
       : null;
 

@@ -7,6 +7,7 @@ import {
 } from "@/lib/plant-catalogs";
 import { toIstDateString } from "@/lib/dates";
 import { getQuadFactorFromSize, isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isPowerCableName } from "@/lib/power-cable";
 import {
   processQtyFromMeta,
   signallingProcessClosingsFromMeta,
@@ -148,6 +149,18 @@ function processLinesFromMeta(
     let closingQty = stored;
     if (name.trim().toLowerCase() === "single quad") {
       closingQty = singleQuadClosingFromMeta(meta, size, stored);
+    } else if (
+      isPowerCableName(cable) &&
+      name.trim().toLowerCase() === "insulation"
+    ) {
+      const factor = Number(meta.powerLayingFactor);
+      const laying = processQtyFromMeta(production, "Laying");
+      if (Number.isFinite(factor) && factor > 0) {
+        const open = processQtyFromMeta(meta.opening, "Insulation");
+        closingQty = Math.round((open + prod - laying * factor) * 1000) / 1000;
+      } else {
+        closingQty = stored;
+      }
     } else {
       closingQty = stageClosingFromMeta(meta, name, nextName) ?? stored;
     }

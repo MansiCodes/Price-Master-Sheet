@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { getQuadSignalCableProcesses } from "@/lib/plant-catalogs";
 import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isPowerCableName } from "@/lib/power-cable";
 import type { TodayHubStockState } from "@/components/today/hub/useTodayHubStockState";
 import type { TodayHubCatalogs } from "@/components/today/hub/useTodayHubCatalogs";
 import { buildQuadCableSizeOptions } from "@/components/today/hub/build-quad-cable-size-options";
@@ -32,6 +33,7 @@ export function useQuadWipDerived(
     quadCableProcessFields,
     isSignallingStock: isQuad && stockKind === "cable" && isSignallingCableName(cableName),
     isQuadCableStock: isQuad && stockKind === "cable" && isQuadCableName(cableName),
+    isPowerCableStock: isQuad && stockKind === "cable" && isPowerCableName(cableName),
   };
 }
 

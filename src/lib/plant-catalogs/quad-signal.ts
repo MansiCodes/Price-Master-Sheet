@@ -93,6 +93,8 @@ export type QuadSignalStockMeta = {
       consumed: number;
     }>;
   };
+  /** Power Cable: Insulation Out = Laying × this 1–2 digit factor. */
+  powerLayingFactor?: number;
 };
 
 const QS_STOCK_PREFIX = "QSSTOCK:";

@@ -51,6 +51,7 @@ function submitStockQuadCableFromVm(
     stockLengthFactor: stock.stockLengthFactor, stockLengthOptions: stock.stockLengthOptions,
     stockInsulationExtras: stock.stockInsulationExtras,
     stockSingleQuadExtras: stock.stockSingleQuadExtras,
+    stockPowerLayingFactor: stock.stockPowerLayingFactor,
     stockWipSalesKm: stock.stockWipSalesKm, stockUnit: stock.stockUnit,
     issuedQty, closingRate,
     stockCallPutupItems: stock.stockCallPutupItems,

@@ -30,6 +30,7 @@ type QuadWipSetters = Pick<
   | "setStockLengthFactor"
   | "setStockInsulationExtras"
   | "setStockInsulationExtrasOpen"
+  | "setStockPowerLayingFactor"
   | "setStockProcessQtys"
   | "setStockProcessHints"
 >;
@@ -60,6 +61,7 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockLengthFactor(null);
   s.setStockInsulationExtras([]);
   s.setStockInsulationExtrasOpen(false);
+  s.setStockPowerLayingFactor("");
 }
 
 export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
@@ -85,6 +87,7 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockDispatchLoadedItems([]);
   s.setStockInsulationExtras([]);
   s.setStockInsulationExtrasOpen(false);
+  s.setStockPowerLayingFactor("");
   s.setStockWipContextLoading(false);
 }
 
@@ -270,6 +273,7 @@ export type QuadWipContextData = {
     }>;
     opening?: Record<string, number>;
     production?: Record<string, number>;
+    powerLayingFactor?: number;
   } | null;
   cable?: string;
   size?: string;
@@ -381,6 +385,12 @@ export function applyQuadWipContextData(
   applyCallPutupFromMeta(s, meta);
   applyDispatchFromMeta(s, meta);
   applySaleFromMeta(s, meta);
+  const factor = meta?.powerLayingFactor;
+  s.setStockPowerLayingFactor(
+    factor != null && Number.isFinite(factor) && factor >= 0 && factor <= 99
+      ? String(Math.round(factor))
+      : "",
+  );
   const cable = data.cable ?? "";
   if (!opts?.preserveInsulation) {
     if (isSignallingCableName(cable)) {

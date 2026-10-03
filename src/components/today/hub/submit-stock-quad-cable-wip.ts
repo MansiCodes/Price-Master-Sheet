@@ -6,6 +6,7 @@ import {
   lengthValueToFactor,
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
+import { isPowerCableName, parsePowerLayingFactor, powerInsulationConsumed } from "@/lib/power-cable";
 import { signallingInsulationConsumed } from "@/components/today/hub/compute-quad-wip-calc";
 import type {
   StockInsulationExtra,
@@ -138,9 +139,19 @@ export function applyQuadCableProcessOverrides(args: {
   stockInsulationExtras: StockInsulationExtra[];
   stockSingleQuadExtras: StockSingleQuadExtra[];
   stockLengthFactor?: number | null;
+  stockPowerLayingFactor?: string;
   fail: FailFn;
 }): { insulationConsumedOverride?: number; singleQuadConsumedOverride?: number } | null {
   const { resolvedCable, resolvedSize, processes, stockInsulationExtras, stockSingleQuadExtras, fail } = args;
+  if (isPowerCableName(resolvedCable)) {
+    const factor = parsePowerLayingFactor(args.stockPowerLayingFactor ?? "");
+    const laying = processes["Laying"] ?? 0;
+    if (laying > 0 && (factor == null || factor === 0)) {
+      fail("Enter Factor (1–2 digits) for Power Cable Insulation.");
+      return null;
+    }
+    return { insulationConsumedOverride: powerInsulationConsumed(laying, factor) };
+  }
   if (isSignallingCableName(resolvedCable)) {
     if (!validateSignallingInsulationExtras(stockInsulationExtras, resolvedSize, fail)) {
       return null;
