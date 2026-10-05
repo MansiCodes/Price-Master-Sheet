@@ -116,7 +116,12 @@ export async function resolveQuadSignalStockOpening(params: {
       ? built.quadInsulation
       : null;
   const putupKm = block
-    ? Math.round((block.putupKm ?? 0) * 1000) / 1000
+    ? Math.round(
+        (block.callPutupItems ?? []).reduce(
+          (sum, item) => sum + (Number(item.qty) > 0 ? Number(item.qty) : 0),
+          0,
+        ) * 1000,
+      ) / 1000
     : 0;
   if (familyIns) {
     delete opening[INSULATION_KEY];

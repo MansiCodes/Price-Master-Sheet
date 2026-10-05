@@ -23,6 +23,7 @@ export {
   formatSharedInsulationLine,
   outerClosingAfterPutup,
   parsePutupKm,
+  sessionOuterDeductKm,
 } from "./format";
 
 export { buildCableStockStatus } from "./build-cable-status";

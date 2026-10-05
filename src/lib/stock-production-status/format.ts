@@ -39,22 +39,23 @@ export function outerClosingAfterPutup(
   return Math.round(Math.max(0, closing - putup) * 1000) / 1000;
 }
 
-export function formatProcessStatusItem(
-  line: StockProcessLine,
-  opts?: { putupKm?: number },
-): FormattedStatusItem {
-  const base = `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`;
-  const putupKm = Number(opts?.putupKm) || 0;
-  if (putupKm > 0 && isOuterProcess(line.name)) {
-    const after = outerClosingAfterPutup(line.closing, putupKm);
-    return {
-      label: `${line.shortName}:`,
-      value: `${base} → after putup ${fmtKm(after)}km`,
-    };
-  }
+/** Latest-session put-up only. Never lifetime order put-ups; skip if closing already netted. */
+export function sessionOuterDeductKm(
+  closingIncludesPutup: boolean | undefined,
+  items: Array<{ qty?: number }> | undefined,
+): number {
+  if (closingIncludesPutup) return 0;
+  const sum = (items ?? []).reduce((s, item) => {
+    const q = Number(item.qty);
+    return s + (Number.isFinite(q) && q > 0 ? q : 0);
+  }, 0);
+  return Math.round(sum * 1000) / 1000;
+}
+
+export function formatProcessStatusItem(line: StockProcessLine): FormattedStatusItem {
   return {
     label: `${line.shortName}:`,
-    value: base,
+    value: `${fmtKm(line.closing)}km(${fmtKm(line.production)}km)`,
   };
 }
 

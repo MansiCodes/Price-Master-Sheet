@@ -3,6 +3,7 @@ import {
   formatDispatchItemsList,
   formatProcessStatusItem,
   outerClosingAfterPutup,
+  sessionOuterDeductKm,
 } from "@/lib/stock-production-status";
 import {
   lookupStockOrder,
@@ -81,14 +82,18 @@ export function StockCableCardItem({
                   block.processes.length <= 4 ? " is-cols-2" : " is-cols-3"
                 }`}
               >
-                {block.processes.map((p) => {
-                  const putupForOuter = block.putupKm ?? 0;
+                {(() => {
+                  const deductKm = sessionOuterDeductKm(
+                    block.outerClosingIncludesPutup,
+                    block.callPutupItems,
+                  );
+                  return block.processes.map((p) => {
                   const isOuter =
                     p.name.trim().toLowerCase() === "outer sheath" ||
                     p.name.trim().toLowerCase() === "outer";
                   const afterPutup =
-                    isOuter && putupForOuter > 0
-                      ? outerClosingAfterPutup(p.closing, putupForOuter)
+                    isOuter && deductKm > 0
+                      ? outerClosingAfterPutup(p.closing, deductKm)
                       : null;
                   const item = formatProcessStatusItem(p);
                   return (
@@ -107,7 +112,8 @@ export function StockCableCardItem({
                       )}
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
 
               {formatCallPutupItemsList(block).length > 0 ? (

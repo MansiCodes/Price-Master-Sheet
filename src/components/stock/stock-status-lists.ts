@@ -48,10 +48,6 @@ export function getPartyInHandKm(
         putupSum += qty;
       }
     }
-  } else if (block.putupKm && block.putupKm > 0) {
-    if (matchesParty(block.partyName ?? "")) {
-      putupSum = block.putupKm;
-    }
   }
 
   return Math.round(putupSum * 10000) / 10000;

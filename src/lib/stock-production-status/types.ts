@@ -26,7 +26,7 @@ export type CableStockStatusBlock = {
   processes: StockProcessLine[];
   totalKm: number;
   salesKm: number;
-  /** Put-up km total from Call putup. */
+  /** Latest-session call put-up km (not lifetime across saves). */
   putupKm: number;
   callPutup: string;
   putupDate: string;
@@ -47,6 +47,8 @@ export type CableStockStatusBlock = {
     putupDate: string;
     partyName: string;
   }>;
+  /** Latest notes already subtracted call put-up from Outer closing. */
+  outerClosingIncludesPutup?: boolean;
   dispatchPendingItems?: Array<{
     qty: number;
     dispatchParty: string;

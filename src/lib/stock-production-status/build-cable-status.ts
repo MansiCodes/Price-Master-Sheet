@@ -18,6 +18,7 @@ import {
   isOuterProcess,
   outerClosingAfterPutup,
   parsePutupKm,
+  sessionOuterDeductKm,
   shortProcessName,
 } from "./format";
 import type { CableStockStatusBlock, SharedInsulationStatus, StockProcessLine } from "./types";
@@ -276,7 +277,10 @@ export function buildCableStockStatus(
       const totalDispatchPending = dispatchPendingItems.reduce((sum, item) => sum + item.qty, 0);
 
       const processes = processLinesFromMeta(meta, cable, size);
-      const totalKm = totalKmFromProcesses(processes, totalPutupKm);
+      const totalKm = totalKmFromProcesses(
+        processes,
+        sessionOuterDeductKm(Boolean(meta.outerClosingIncludesPutup), callPutupItems),
+      );
 
       byKey.set(key, {
         key: `${cable} · ${size}`,
@@ -297,6 +301,7 @@ export function buildCableStockStatus(
         userNotes: String(userNotes ?? "").trim(),
         callPutupItems,
         orderPutupItems: [...callPutupItems],
+        outerClosingIncludesPutup: Boolean(meta.outerClosingIncludesPutup),
         dispatchPendingItems,
       });
     } catch (err) {
@@ -306,14 +311,14 @@ export function buildCableStockStatus(
 
   const blocks = Array.from(byKey.values());
   for (const block of blocks) {
-    const putupKm = Math.round(
-      (block.orderPutupItems ?? block.callPutupItems ?? []).reduce(
-        (sum, item) => sum + item.qty,
-        0,
-      ) * 1000,
+    const sessionPutupKm = Math.round(
+      (block.callPutupItems ?? []).reduce((sum, item) => sum + item.qty, 0) * 1000,
     ) / 1000;
-    block.putupKm = putupKm;
-    block.totalKm = totalKmFromProcesses(block.processes, putupKm);
+    block.putupKm = sessionPutupKm;
+    block.totalKm = totalKmFromProcesses(
+      block.processes,
+      sessionOuterDeductKm(block.outerClosingIncludesPutup, block.callPutupItems),
+    );
   }
 
   return {
