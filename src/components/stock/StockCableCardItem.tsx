@@ -86,6 +86,11 @@ export function StockCableCardItem({
                   const deductKm = sessionOuterDeductKm(
                     block.outerClosingIncludesPutup,
                     block.callPutupItems,
+                    block.processes.find(
+                      (line) =>
+                        line.name.trim().toLowerCase() === "outer sheath" ||
+                        line.name.trim().toLowerCase() === "outer",
+                    )?.closing,
                   );
                   return block.processes.map((p) => {
                   const isOuter =

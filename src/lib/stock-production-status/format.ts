@@ -39,17 +39,34 @@ export function outerClosingAfterPutup(
   return Math.round(Math.max(0, closing - putup) * 1000) / 1000;
 }
 
-/** Latest-session put-up only. Never lifetime order put-ups; skip if closing already netted. */
+/** Latest-session put-up only. Skip only when stored Outer is already net of that put-up. */
 export function sessionOuterDeductKm(
   closingIncludesPutup: boolean | undefined,
   items: Array<{ qty?: number }> | undefined,
+  outerClosing?: number,
 ): number {
-  if (closingIncludesPutup) return 0;
   const sum = (items ?? []).reduce((s, item) => {
     const q = Number(item.qty);
     return s + (Number.isFinite(q) && q > 0 ? q : 0);
   }, 0);
-  return Math.round(sum * 1000) / 1000;
+  const putup = Math.round(sum * 1000) / 1000;
+  if (putup <= 0) return 0;
+  const closing = Number(outerClosing);
+  if (
+    closingIncludesPutup &&
+    Number.isFinite(closing) &&
+    closing < putup
+  ) {
+    return 0;
+  }
+  return putup;
+}
+
+export function outerProcessClosing(
+  processes: Array<{ name: string; closing: number }> | undefined,
+): number | undefined {
+  const line = (processes ?? []).find((p) => isOuterProcess(p.name));
+  return line ? Number(line.closing) : undefined;
 }
 
 export function formatProcessStatusItem(line: StockProcessLine): FormattedStatusItem {

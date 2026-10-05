@@ -19,6 +19,7 @@ import {
   outerClosingAfterPutup,
   parsePutupKm,
   sessionOuterDeductKm,
+  outerProcessClosing,
   shortProcessName,
 } from "./format";
 import type { CableStockStatusBlock, SharedInsulationStatus, StockProcessLine } from "./types";
@@ -279,7 +280,11 @@ export function buildCableStockStatus(
       const processes = processLinesFromMeta(meta, cable, size);
       const totalKm = totalKmFromProcesses(
         processes,
-        sessionOuterDeductKm(Boolean(meta.outerClosingIncludesPutup), callPutupItems),
+        sessionOuterDeductKm(
+          Boolean(meta.outerClosingIncludesPutup),
+          callPutupItems,
+          outerProcessClosing(processes),
+        ),
       );
 
       byKey.set(key, {
@@ -317,7 +322,11 @@ export function buildCableStockStatus(
     block.putupKm = sessionPutupKm;
     block.totalKm = totalKmFromProcesses(
       block.processes,
-      sessionOuterDeductKm(block.outerClosingIncludesPutup, block.callPutupItems),
+      sessionOuterDeductKm(
+        block.outerClosingIncludesPutup,
+        block.callPutupItems,
+        outerProcessClosing(block.processes),
+      ),
     );
   }
 

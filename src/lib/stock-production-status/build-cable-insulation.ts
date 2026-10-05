@@ -62,13 +62,13 @@ export function insulationFromMeta(
 /** Size WIP ate Insulation (closing ≠ opening + extras-only P). Use typed Opening. */
 function sizeWipAteInsulation(s: SharedInsulationStatus): boolean {
   if (s.poolTouch) return false;
-  const implied = s.opening + s.production;
-  if (s.production > 0 && sameKm(s.closing, implied)) return false;
-  return s.consumed > 0 || (s.production > 0 && !sameKm(s.closing, implied));
+  if (s.production > 0) return false;
+  return s.consumed > 0;
 }
 
 function asPoolSnap(s: SharedInsulationStatus): SharedInsulationStatus {
   if (s.poolTouch) return s;
+  if (s.production > 0) return s;
   if (sizeWipAteInsulation(s)) {
     return { ...s, closing: s.opening, consumed: 0, production: 0 };
   }
@@ -78,16 +78,23 @@ function asPoolSnap(s: SharedInsulationStatus): SharedInsulationStatus {
   return s;
 }
 
+function isIdleInsulationFill(s: SharedInsulationStatus): boolean {
+  return s.production === 0 && s.consumed === 0 && !s.poolTouch;
+}
+
 /**
- * Last fill wins. If that save only moved Laying/Single Quad and Insulation
- * closing drifted, keep the typed Insulation Opening.
+ * Last real Insulation fill wins for production. Later size-only saves
+ * (P=0) must not wipe that production. Closing still follows the newest snap.
  */
 export function pickSharedInsulationPool(
   rows: SharedInsulationStatus[],
 ): SharedInsulationStatus | null {
   if (rows.length === 0) return null;
+  let newestSnap: SharedInsulationStatus | null = null;
   for (let i = 0; i < rows.length; i++) {
     const s = asPoolSnap(rows[i]!);
+    if (!newestSnap) newestSnap = s;
+    if (isIdleInsulationFill(s)) continue;
     const older = rows.slice(i + 1);
     const replayPrefill =
       s.production > 0 &&
@@ -98,9 +105,14 @@ export function pickSharedInsulationPool(
           sameKm(s.opening, o.closing),
       );
     if (replayPrefill) continue;
-    return s;
+    return {
+      ...s,
+      closing: newestSnap.closing,
+      opening: newestSnap.opening,
+      entryDate: newestSnap.entryDate,
+    };
   }
-  return asPoolSnap(rows[0]!);
+  return newestSnap;
 }
 
 export function pickNewestInsulation(
