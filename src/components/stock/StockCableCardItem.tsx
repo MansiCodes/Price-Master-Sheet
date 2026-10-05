@@ -79,7 +79,7 @@ export function StockCableCardItem({
             <>
               <div
                 className={`stock-proc-grid${
-                  block.processes.length <= 4 ? " is-cols-2" : " is-cols-3"
+                  block.processes.length >= 4 ? " is-cols-4" : " is-cols-2"
                 }`}
               >
                 {(() => {

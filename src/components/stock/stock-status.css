@@ -981,8 +981,24 @@
   grid-template-columns: repeat(2, 1fr);
 }
 
-.stock-proc-grid.is-cols-3 {
-  grid-template-columns: repeat(3, 1fr);
+.stock-proc-grid.is-cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stock-proc-grid.is-cols-4 .stock-proc-chip {
+  min-width: 0;
+  padding: 0.4rem 0.4rem;
+}
+
+@media (max-width: 720px) {
+  .stock-proc-grid.is-cols-2,
+  .stock-proc-grid.is-cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stock-proc-grid.is-cols-4 .stock-proc-chip {
+    padding: 0.45rem 0.55rem;
+  }
 }
 
 .stock-proc-chip {
