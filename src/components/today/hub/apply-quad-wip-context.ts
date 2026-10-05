@@ -19,6 +19,8 @@ type QuadWipSetters = Pick<
   | "setStockDispatchPending"
   | "setStockDispatchParty"
   | "setStockCallPutupItems"
+  | "setStockCallPutupLoadedItems"
+  | "setStockCallPutupLoadedKm"
   | "setStockDispatchPendingItems"
   | "setStockSaleItems"
   | "setStockSaleHints"
@@ -50,6 +52,8 @@ export function resetQuadWipFields(s: QuadWipSetters) {
   s.setStockDispatchPending("");
   s.setStockDispatchParty("");
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+  s.setStockCallPutupLoadedItems([]);
+  s.setStockCallPutupLoadedKm(0);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
   s.setStockSaleHints([]);
@@ -78,6 +82,8 @@ export function resetQuadWipFieldsOnError(s: QuadWipSetters) {
   s.setStockDispatchPending("");
   s.setStockDispatchParty("");
   s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+  s.setStockCallPutupLoadedItems([]);
+  s.setStockCallPutupLoadedKm(0);
   s.setStockDispatchPendingItems([{ qty: "", partyName: "" }]);
   s.setStockSaleItems([{ ...EMPTY_STOCK_SALE_ITEM }]);
   s.setStockSaleHints([]);
@@ -98,24 +104,36 @@ function applyCallPutupFromMeta(
     putupDate: string;
     partyName: string;
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
+    callPutupOriginalKm?: number;
   } | null,
 ) {
   const rawPutups = meta?.callPutupItems;
+  let items: Array<{ qty: string; date: string; partyName: string }> = [];
   if (Array.isArray(rawPutups) && rawPutups.length > 0) {
-    s.setStockCallPutupItems(rawPutups.map((p) => ({
+    items = rawPutups.map((p) => ({
       qty: p.qty != null ? String(p.qty) : "",
       date: p.date ?? "",
       partyName: p.partyName ?? "",
-    })));
+    }));
   } else if (meta?.callPutup || meta?.putupDate || meta?.partyName) {
-    s.setStockCallPutupItems([{
+    items = [{
       qty: meta.callPutup ?? "",
       date: meta.putupDate ?? "",
       partyName: meta.partyName ?? "",
-    }]);
-  } else {
-    s.setStockCallPutupItems([{ qty: "", date: "", partyName: "" }]);
+    }];
   }
+  const formKm = items.reduce((sum, item) => {
+    const n = Number(item.qty);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+  const original = Number(meta?.callPutupOriginalKm);
+  s.setStockCallPutupLoadedItems([]);
+  s.setStockCallPutupLoadedKm(
+    Number.isFinite(original) && original > 0 ? Math.max(original, formKm) : formKm,
+  );
+  s.setStockCallPutupItems(
+    items.length > 0 ? items : [{ qty: "", date: "", partyName: "" }],
+  );
 }
 
 function applyDispatchFromMeta(
@@ -260,9 +278,11 @@ export type QuadWipContextData = {
     dispatchPending: string;
     dispatchParty: string;
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
+    callPutupOriginalKm?: number;
     dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
     dispatchSettledKm?: number;
     dispatchSettledItems?: Array<{ qty: number | string; partyName?: string }>;
+    outerClosingIncludesPutup?: boolean;
     saleItems?: Array<{
       invoiceNo?: string;
       date?: string;
@@ -278,6 +298,7 @@ export type QuadWipContextData = {
   cable?: string;
   size?: string;
   production?: Record<string, number>;
+  sameDay?: boolean;
   insulationContributions?: Array<{
     size: string;
     layingProduced: number;
@@ -337,8 +358,8 @@ function applyQtyMaps(
       if (canon) openingStrings[canon] = String(n);
     }
   };
-  putOpening(savedOpen);
   putOpening(data.opening);
+  if (data.sameDay) putOpening(savedOpen);
   const insOpen = insulationQty([data.opening]);
   s.setStockWipOpening((prev) => {
     const next = { ...openingStrings };
@@ -373,7 +394,7 @@ export function applyQuadWipContextData(
   applyQtyMaps(s, data, opts);
   s.setStockOpeningEditable(Boolean(data.openingEditable));
   s.setStockWipSalesKm(0);
-  s.setStockOrderPutupKm(Number(data.putupKm) > 0 ? Number(data.putupKm) : 0);
+  s.setStockOrderPutupKm(0);
   s.setStockWipSalesLines(data.sales ?? []);
   applyLengthOptions(s, data.variant);
   const meta = data.stockMeta;

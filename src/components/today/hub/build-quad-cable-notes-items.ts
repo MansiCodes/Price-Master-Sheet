@@ -15,6 +15,13 @@ export function mappedCallPutupItems(items: StockCallPutupItem[]) {
     .filter((item) => Boolean(item.qty) || Boolean(item.date) || Boolean(item.partyName));
 }
 
+export function mergeCallPutupItems(
+  loaded: StockCallPutupItem[],
+  form: StockCallPutupItem[],
+) {
+  return mappedCallPutupItems([...loaded, ...form]);
+}
+
 export function mappedDispatchItems(items: StockDispatchPendingItem[]) {
   return items
     .map((item) => ({

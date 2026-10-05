@@ -3,7 +3,7 @@ import { type ReportColumn } from "@/components/pnl/ReportTable";
 import { BillPhotosCell } from "@/components/pnl/BillPhotosCell";
 import { formatDayMonthYear } from "@/lib/dates";
 import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
-import { formatBillDate, formatQty, num } from "@/components/pnl/purchase-report/format";
+import { debitRupees, formatBillDate, formatQty, netRupeesAfterDebit, num } from "@/components/pnl/purchase-report/format";
 import type { PurchaseRow } from "@/components/pnl/purchase-report/types";
 
 export function buildPvcPurchaseColumns(
@@ -66,10 +66,10 @@ export function buildPvcPurchaseColumns(
       key: "debitValue",
       label: "Debit Value",
       align: "right",
-      render: (r) =>
-        num(r.debitQuantity ?? 0) > 0
-          ? formatINR(num(r.debitQuantity ?? 0) * num(r.rate))
-          : "—",
+      render: (r) => {
+        const debit = debitRupees(r.debitQuantity ?? 0, r.rate);
+        return debit > 0 ? formatINR(-debit) : "—";
+      },
     },
     {
       key: "basic",
@@ -83,7 +83,7 @@ export function buildPvcPurchaseColumns(
       align: "right",
       render: (r) =>
         formatINR(
-          (num(r.quantity) - num(r.debitQuantity ?? 0)) * num(r.rate),
+          netRupeesAfterDebit(r.quantity, r.debitQuantity ?? 0, r.rate),
         ),
     },
     {

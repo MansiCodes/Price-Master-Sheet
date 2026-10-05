@@ -1,11 +1,41 @@
 import { prisma } from "@/lib/db";
 import { isCat6Plant } from "@/lib/plant-layout";
-import { resolveReportPlantIds } from "@/lib/plant-merge";
+import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import type { PlantPnlResult, PlantPnlStatement } from "@/lib/pnl/types";
 import { buildCat6Dynamic } from "./cat6";
 import { buildDynamic } from "./dynamic";
 import { startOfUtcDay } from "./helpers";
 import { buildPvcDynamic } from "./pvc";
+
+function ymdUtc(d: Date): string {
+  return startOfUtcDay(d).toISOString().slice(0, 10);
+}
+
+/** First sale / purchase / expense / stock / FAR date for this plant. */
+export async function earliestPlantActivityYmd(
+  plantId: string,
+): Promise<string | null> {
+  const plantIds = await resolveReportPlantIds(plantId);
+  const where = plantIdFilter(plantIds);
+  const [sale, purchase, petty, stock, manpower, asset] = await Promise.all([
+    prisma.sale.aggregate({ where, _min: { date: true } }),
+    prisma.purchase.aggregate({ where, _min: { date: true } }),
+    prisma.pettyCashEntry.aggregate({ where, _min: { date: true } }),
+    prisma.stockEntry.aggregate({ where, _min: { date: true } }),
+    prisma.manpowerEntry.aggregate({ where, _min: { date: true } }),
+    prisma.fixedAsset.aggregate({ where, _min: { billDate: true } }),
+  ]);
+  const dates = [
+    sale._min.date,
+    purchase._min.date,
+    petty._min.date,
+    stock._min.date,
+    manpower._min.date,
+    asset._min.billDate,
+  ].filter((d): d is Date => d != null);
+  if (!dates.length) return null;
+  return ymdUtc(new Date(Math.min(...dates.map((d) => d.getTime()))));
+}
 
 export async function calculatePlantPnl(
   plantId: string,

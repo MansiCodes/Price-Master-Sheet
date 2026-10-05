@@ -16,6 +16,11 @@ import {
   applyQuadCableProcessOverrides,
   parseNamedQtyMap,
 } from "@/components/today/hub/submit-stock-quad-cable-wip";
+import { signallingInsulationPool } from "@/components/today/hub/compute-quad-wip-calc";
+import {
+  applyOuterCallPutupClosing,
+  sumCallPutupKm,
+} from "@/components/today/hub/process-row-out-label";
 
 export type SubmitStockQuadCableArgs = {
   plantId: string;
@@ -38,6 +43,8 @@ export type SubmitStockQuadCableArgs = {
   issuedQty: number;
   closingRate: number;
   stockCallPutupItems: StockCallPutupItem[];
+  stockCallPutupLoadedItems: StockCallPutupItem[];
+  stockCallPutupLoadedKm: number;
   stockDispatchPendingItems: StockDispatchPendingItem[];
   stockCallPutup: string;
   stockPutupDate: string;
@@ -96,6 +103,8 @@ function encodeSubmittedQuadCableNotes(
       resolvedSize: resolved.resolvedSize,
       processes, openingQty, wip, stockWipSalesKm: args.stockWipSalesKm,
       stockCallPutupItems: args.stockCallPutupItems,
+      stockCallPutupLoadedItems: args.stockCallPutupLoadedItems,
+      stockCallPutupLoadedKm: args.stockCallPutupLoadedKm,
       stockDispatchPendingItems: args.stockDispatchPendingItems,
       stockCallPutup: args.stockCallPutup, stockPutupDate: args.stockPutupDate,
       stockPartyName: args.stockPartyName, stockDispatchPending: args.stockDispatchPending,
@@ -185,6 +194,13 @@ function computeQuadCableWip(args: SubmitStockQuadCableArgs) {
     singleQuadConsumedOverride: overrides.singleQuadConsumedOverride,
     sizeName: resolved.resolvedSize,
   });
+  const formPutupKm = sumCallPutupKm(args.stockCallPutupItems);
+  wip.byProcess = applyOuterCallPutupClosing(
+    wip.byProcess,
+    openingQty,
+    processes,
+    formPutupKm,
+  );
   return { resolved, processes, openingQty, variant, lengthFactor, wip };
 }
 

@@ -35,9 +35,6 @@ export function purchaseCreateData(
 ) {
   const gstPercent = item.gstPercent ?? headerGst;
   const debitQuantity = item.debitQuantity ?? 0;
-  if (debitQuantity > item.quantity) {
-    throw new Error("Debit quantity cannot exceed item quantity");
-  }
   const { basicValue, gstAmount, invoiceValue } = lineTotals(
     item.quantity,
     item.rate,

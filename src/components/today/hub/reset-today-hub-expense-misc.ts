@@ -15,12 +15,13 @@ export function resetTodayHubExpenseHead(
   expense.setExpenseHead(
     isCat6
       ? "Miscellaneous"
-      : isUpcast ||
-          plantCode.toUpperCase() === "LEDROPE" ||
-          plantCode.toUpperCase() === "SLSSL" ||
-          isQuad
-        ? "Electricity"
-        : "Fuel & Power",
+      : isUpcast
+        ? "Fuel & Power"
+        : plantCode.toUpperCase() === "LEDROPE" ||
+            plantCode.toUpperCase() === "SLSSL" ||
+            isQuad
+          ? "Electricity"
+          : "Fuel & Power",
   );
 }
 

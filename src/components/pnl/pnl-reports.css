@@ -1133,6 +1133,37 @@
   border-top: 1px solid rgba(13, 148, 136, 0.2);
 }
 
+.pnl-expense-type-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem 1.5rem;
+  width: 100%;
+  padding: 0.2rem 0.35rem;
+}
+
+.pnl-expense-type-totals__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.pnl-expense-type-totals__item span:first-child {
+  white-space: nowrap;
+}
+
+.pnl-expense-type-totals__item span:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .pnl-expense-type-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .pnl-report-table--register tbody tr:last-child td {
   border-bottom: 0;
 }

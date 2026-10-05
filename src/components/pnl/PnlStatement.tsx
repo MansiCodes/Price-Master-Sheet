@@ -6,7 +6,7 @@ import { isCat6Plant } from "@/lib/plant-layout";
 
 function visibleLines(lines: PnlStatementLine[]): PnlStatementLine[] {
   return lines.filter((row) => {
-    if (row.kind === "blank") return true;
+    if (row.kind === "item" && row.amount == null) return false;
     if (row.amount == null && (row.kind === "profit" || row.kind === "tax")) {
       return false;
     }

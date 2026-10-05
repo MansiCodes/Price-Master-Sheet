@@ -9,7 +9,7 @@ export function formatLineNetValue(
 ) {
   if (quantity.trim() === "" || rate.trim() === "") return "—";
   const n =
-    Math.max(0, Number(quantity) - Number(debitQuantity || 0)) * Number(rate);
+    (Number(quantity) - Number(debitQuantity || 0)) * Number(rate);
   if (!Number.isFinite(n)) return "—";
   return n.toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -97,7 +97,7 @@ export function LineEditorDebitValueFields({
             value={
               Number(line.debitQuantity || 0) > 0 && Number(line.rate || 0) > 0
                 ? (
-                    Number(line.debitQuantity || 0) * Number(line.rate || 0)
+                    -(Number(line.debitQuantity || 0) * Number(line.rate || 0))
                   ).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,

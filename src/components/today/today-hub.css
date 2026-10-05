@@ -898,14 +898,30 @@
   width: 100%;
   min-width: 4.5rem;
 }
-.qs-wip__factor {
-  margin: 0 0 0.35rem;
+.qs-wip__proc-cell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
 }
-.qs-wip__factor input {
-  width: 3rem;
-  min-width: 3rem;
-  max-width: 3rem;
-  text-align: center;
+.qs-wip__factor {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+}
+.qs-wip__factor-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.85rem;
+  height: 38px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--teal-ink, #0e5a54);
 }
 .qs-wip__size-for-chain {
   margin: 0 0 0.85rem;
@@ -1125,5 +1141,13 @@
 .qs-wip__num {
   text-align: center !important;
   vertical-align: middle !important;
+}
+
+.qs-wip__table .qs-wip__factor input {
+  width: 2.85rem !important;
+  min-width: 2.85rem !important;
+  max-width: 2.85rem !important;
+  height: 38px !important;
+  padding: 0.4rem 0.35rem !important;
 }
 

@@ -11,19 +11,25 @@ import {
   PVC_EXPENSE_HEADS,
   PVC_INDIRECT_EXPENSE_HEADS,
   UPCAST_DIRECT_EXPENSE_HEADS,
+  UPCAST_DIRECT_MISC_NATURES,
   UPCAST_EXPENSE_HEADS,
   UPCAST_INDIRECT_EXPENSE_HEADS,
-  UPCAST_MISC_NATURES,
+  UPCAST_INDIRECT_MISC_NATURES,
   type PvcExpenseSection,
 } from "./expense-heads";
 import {
   normalizePvcExpenseHead,
   normalizeUpcastExpenseHead,
+  upcastEntryHead,
 } from "./expense-normalize";
 
 export {
   normalizePvcExpenseHead,
   normalizeUpcastExpenseHead,
+  upcastEntryHead,
+  isTypedExpenseCategory,
+  expenseTypeLabel,
+  expenseTypeTotalLabel,
 } from "./expense-normalize";
 export {
   cat6ExpensePnlLine,
@@ -65,6 +71,23 @@ export function getExpenseHeadsForSection(
   return section === "direct"
     ? LED_DIRECT_EXPENSE_HEADS
     : LED_INDIRECT_EXPENSE_HEADS;
+}
+
+export function getUpcastMiscNaturesForSection(
+  section: PvcExpenseSection,
+): readonly string[] {
+  return section === "indirect"
+    ? UPCAST_INDIRECT_MISC_NATURES
+    : UPCAST_DIRECT_MISC_NATURES;
+}
+
+/** Direct misc query includes Graphite Flakes rows folded into Freight & Others. */
+export function getUpcastMiscQueryHeads(
+  section: PvcExpenseSection,
+): string[] {
+  const natures = [...getUpcastMiscNaturesForSection(section)];
+  if (section === "direct") natures.push("Graphite Flakes");
+  return natures;
 }
 
 /** All plants use Direct / Indirect expense UI. */
@@ -109,8 +132,15 @@ export function expenseSectionForPlant(
   if (code === "UPCAST") {
     const upcastHead = normalizeUpcastExpenseHead(normalized);
     if (
+      (UPCAST_INDIRECT_EXPENSE_HEADS as readonly string[]).includes(upcastHead) ||
+      (UPCAST_INDIRECT_MISC_NATURES as readonly string[]).includes(upcastHead) ||
+      upcastHead === "Depreciation"
+    ) {
+      return "indirect";
+    }
+    if (
       (UPCAST_DIRECT_EXPENSE_HEADS as readonly string[]).includes(upcastHead) ||
-      (UPCAST_MISC_NATURES as readonly string[]).includes(upcastHead)
+      (UPCAST_DIRECT_MISC_NATURES as readonly string[]).includes(upcastHead)
     ) {
       return "direct";
     }

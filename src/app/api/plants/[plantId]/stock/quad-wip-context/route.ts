@@ -9,6 +9,12 @@ import {
   getQuadSignalCableProcesses,
   parseQuadSignalStockNotes,
 } from "@/lib/plant-catalogs";
+import {
+  callPutupItemsFromCableMeta,
+  frozenCallPutupKm,
+  mergeNoteCallPutups,
+  type NoteCallPutup,
+} from "@/components/today/hub/process-row-out-label";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
@@ -20,6 +26,11 @@ import {
 } from "@/lib/quad-signal-wip";
 
 type RouteContext = { params: Promise<{ plantId: string }> };
+
+function callPutupsFromNotes(notes: string | null | undefined): NoteCallPutup[] {
+  const { meta } = parseQuadSignalStockNotes(notes);
+  return meta?.kind === "cable" ? callPutupItemsFromCableMeta(meta) : [];
+}
 
 function stripInsulationQty(map: Record<string, number>) {
   const out: Record<string, number> = {};
@@ -124,7 +135,7 @@ export async function GET(
     size,
   );
 
-  const existingStock = await prisma.stockEntry.findFirst({
+  const todayStocks = await prisma.stockEntry.findMany({
     where: {
       ...pScope,
       date: day,
@@ -133,6 +144,7 @@ export async function GET(
     orderBy: { updatedAt: "desc" },
     select: { notes: true },
   });
+  const existingStock = todayStocks[0] ?? null;
   const latestStock = existingStock
     ? existingStock
     : await prisma.stockEntry.findFirst({
@@ -146,21 +158,55 @@ export async function GET(
   const { meta: existingMeta } = parseQuadSignalStockNotes(
     latestStock?.notes,
   );
+  const putupsAlreadyClosed = Boolean(
+    existingMeta?.kind === "cable" && existingMeta.outerClosingIncludesPutup,
+  );
+  const latestPutups = callPutupsFromNotes(latestStock?.notes);
+
+  let callPutupItems: NoteCallPutup[] = [];
+  if (existingStock) {
+    const todayItems = mergeNoteCallPutups(
+      todayStocks.flatMap((row) => callPutupsFromNotes(row.notes)),
+    );
+    callPutupItems = todayItems.length > 0 ? todayItems : latestPutups;
+    if (callPutupItems.length === 0) {
+      const prevStock = await prisma.stockEntry.findFirst({
+        where: { ...pScope, itemName, date: { lt: day } },
+        orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
+        select: { notes: true },
+      });
+      callPutupItems = callPutupsFromNotes(prevStock?.notes);
+    }
+  } else if (!putupsAlreadyClosed) {
+    callPutupItems = latestPutups;
+  }
+  const callPutupOriginalKm = frozenCallPutupKm(
+    existingMeta?.kind === "cable" ? existingMeta.callPutupOriginalKm : 0,
+    callPutupItems,
+  );
+
   const stockMeta =
     existingMeta?.kind === "cable"
       ? {
-          callPutup: existingMeta.callPutup ?? "",
-          putupDate: existingMeta.putupDate ?? "",
-          partyName: existingMeta.partyName ?? "",
+          callPutup:
+            callPutupItems[0]?.qty != null
+              ? String(callPutupItems[0].qty)
+              : existingMeta.callPutup ?? "",
+          putupDate:
+            callPutupItems[0]?.date ?? existingMeta.putupDate ?? "",
+          partyName:
+            callPutupItems[0]?.partyName ?? existingMeta.partyName ?? "",
           dispatchPending:
             existingMeta.dispatchPending != null
               ? String(existingMeta.dispatchPending)
               : "",
           dispatchParty: existingMeta.dispatchParty ?? "",
-          callPutupItems: existingMeta.callPutupItems ?? [],
+          callPutupItems,
+          callPutupOriginalKm,
           dispatchPendingItems: existingMeta.dispatchPendingItems ?? [],
           dispatchSettledKm: existingMeta.dispatchSettledKm ?? 0,
           dispatchSettledItems: existingMeta.dispatchSettledItems ?? [],
+          outerClosingIncludesPutup: Boolean(existingMeta.outerClosingIncludesPutup),
           saleItems: existingMeta.saleItems ?? [],
           opening: stripInsulationQty(existingMeta.opening ?? {}),
           production: stripInsulationQty(existingMeta.production ?? {}),
@@ -192,5 +238,6 @@ export async function GET(
     })),
     variant,
     stockMeta,
+    sameDay: Boolean(existingStock),
   });
 }

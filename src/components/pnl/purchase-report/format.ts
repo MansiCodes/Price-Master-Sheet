@@ -15,3 +15,16 @@ export function formatQty(value: string | number) {
     maximumFractionDigits: 2,
   });
 }
+
+/** Debit is a reduction, so the rupee amount is shown as negative. */
+export function debitRupees(debitQuantity: string | number, rate: string | number) {
+  return num(debitQuantity) * num(rate);
+}
+
+export function netRupeesAfterDebit(
+  quantity: string | number,
+  debitQuantity: string | number,
+  rate: string | number,
+) {
+  return (num(quantity) - num(debitQuantity)) * num(rate);
+}

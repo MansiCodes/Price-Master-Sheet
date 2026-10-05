@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindStockLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { HubStockCallPutupRow } from "@/components/today/hub/HubStockCallPutupRow";
+import { sumCallPutupKm } from "@/components/today/hub/process-row-out-label";
 
 const ADD_BTN_STYLE = {
   display: "inline-flex",
@@ -26,11 +28,22 @@ const HEAD_STYLE = {
   marginBottom: "12px",
 } as const;
 
-function HubStockCallPutupHead({ onAdd }: { onAdd: () => void }) {
+function HubStockCallPutupHead({
+  onAdd,
+  totalKm,
+}: {
+  onAdd: () => void;
+  totalKm: number;
+}) {
   return (
     <div className="qs-wip__box-head" style={HEAD_STYLE}>
       <h4 className="qs-wip__box-title" style={{ margin: 0 }}>
         Call put up
+        {totalKm > 0 ? (
+          <span style={{ marginLeft: "8px", fontWeight: 600, fontSize: "0.85rem", color: "#0f766e" }}>
+            Total {totalKm} km
+          </span>
+        ) : null}
       </h4>
       <button
         type="button"
@@ -63,7 +76,10 @@ function HubStockCallPutupList({ vm }: { vm: TodayHubVm }) {
           onFirstDate={setStockPutupDate}
           onFirstParty={setStockPartyName}
           onRemove={(i) =>
-            setStockCallPutupItems((prev) => prev.filter((_, j) => j !== i))
+            setStockCallPutupItems((prev) => {
+              const next = prev.filter((_, j) => j !== i);
+              return next.length > 0 ? next : [{ qty: "", date: "", partyName: "" }];
+            })
           }
         />
       ))}
@@ -72,11 +88,21 @@ function HubStockCallPutupList({ vm }: { vm: TodayHubVm }) {
 }
 
 export function HubStockQuadCallPutup({ vm }: { vm: TodayHubVm }) {
-  const { setStockCallPutupItems } = bindStockLocals(vm);
+  const {
+    setStockCallPutupItems,
+    stockCallPutupItems,
+    stockCallPutupLoadedKm,
+    setStockCallPutupLoadedKm,
+  } = bindStockLocals(vm);
+  const formKm = sumCallPutupKm(stockCallPutupItems);
+  useEffect(() => {
+    if (formKm > stockCallPutupLoadedKm) setStockCallPutupLoadedKm(formKm);
+  }, [formKm, stockCallPutupLoadedKm, setStockCallPutupLoadedKm]);
   return (
     <>
       <div className="qs-wip__box">
         <HubStockCallPutupHead
+          totalKm={Math.max(stockCallPutupLoadedKm, formKm)}
           onAdd={() =>
             setStockCallPutupItems((prev) => [...prev, { qty: "", date: "", partyName: "" }])
           }

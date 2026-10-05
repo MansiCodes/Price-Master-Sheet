@@ -1,12 +1,14 @@
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindStockLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { HubStockQuadProcessRow } from "@/components/today/hub/HubStockQuadProcessRow";
+import { sumCallPutupKm } from "@/components/today/hub/process-row-out-label";
 
 export function HubStockQuadProcessBody({ vm, processes }: { vm: TodayHubVm; processes: string[] }) {
   const {
     stockWipCalc, stockOpeningEditable, stockWipOpening, setStockWipOpening,
-    stockProcessQtys, setStockProcessQtys, stockProcessHints, stockOrderPutupKm,
+    stockProcessQtys, setStockProcessQtys, stockProcessHints, stockCallPutupItems,
   } = bindStockLocals(vm);
+  const formPutupKm = sumCallPutupKm(stockCallPutupItems);
   return (
     <tbody>
       {processes.map((proc) => (
@@ -20,7 +22,7 @@ export function HubStockQuadProcessBody({ vm, processes }: { vm: TodayHubVm; pro
           stockProcessQtys={stockProcessQtys}
           setStockProcessQtys={setStockProcessQtys}
           stockProcessHints={stockProcessHints}
-          orderPutupKm={stockOrderPutupKm}
+          orderPutupKm={formPutupKm}
         />
       ))}
     </tbody>

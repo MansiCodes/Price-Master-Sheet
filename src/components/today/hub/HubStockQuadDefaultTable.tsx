@@ -8,6 +8,7 @@ export function HubStockQuadDefaultBody({ vm }: { vm: TodayHubVm }) {
   const {
     quadCableProcessFields, stockWipCalc, stockOpeningEditable, stockWipOpening,
     setStockWipOpening, stockProcessQtys, setStockProcessQtys, stockProcessHints,
+    isPowerCableStock,
   } = bindStockLocals(vm);
   return (
     <tbody>
@@ -15,6 +16,9 @@ export function HubStockQuadDefaultBody({ vm }: { vm: TodayHubVm }) {
         <HubStockQuadProcessRow
           key={proc}
           proc={proc}
+          processLabelExtra={
+            isPowerCableStock && proc === "Laying" ? <HubStockPowerLayingFactor vm={vm} /> : null
+          }
           stockWipCalc={stockWipCalc}
           stockOpeningEditable={stockOpeningEditable}
           stockWipOpening={stockWipOpening}
@@ -31,7 +35,6 @@ export function HubStockQuadDefaultBody({ vm }: { vm: TodayHubVm }) {
 export function HubStockQuadDefaultTable({ vm }: { vm: TodayHubVm }) {
   return (
     <div className="qs-wip__table-wrap">
-      <HubStockPowerLayingFactor vm={vm} />
       <table className="qs-wip__table">
         <HubStockQuadWipTableHead />
         <HubStockQuadDefaultBody vm={vm} />

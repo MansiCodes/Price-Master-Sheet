@@ -15,6 +15,7 @@ import {
   resolveReportPlantIds,
 } from "@/lib/plant-merge";
 import { enrichExpenseElectricityReadings } from "@/lib/electricity-readings-enrich";
+import { expenseTypeLabel } from "@/lib/plant-catalogs";
 import type { PettyCashRouteContext } from "./schema";
 
 export async function GET(
@@ -87,6 +88,15 @@ export async function GET(
   const expenses = Number(aggregate._sum.amount ?? 0);
   const contractorSalary = Number(aggregate._sum.contractorSalary ?? 0);
   const supervisorSalary = Number(aggregate._sum.supervisorSalary ?? 0);
+  const byHead: Record<string, number> = {};
+  for (const entry of entries) {
+    const key = expenseTypeLabel(entry.expenseHead, entry.nature);
+    const amt =
+      Number(entry.amount ?? 0) +
+      Number(entry.contractorSalary ?? 0) +
+      Number(entry.supervisorSalary ?? 0);
+    byHead[key] = (byHead[key] ?? 0) + amt;
+  }
 
   const rowsWithStatus = enrichedSlice.map((entry) => ({
     ...entry,
@@ -105,6 +115,7 @@ export async function GET(
       contractorSalary,
       supervisorSalary,
       total: expenses + contractorSalary + supervisorSalary,
+      byHead,
     },
   });
 }

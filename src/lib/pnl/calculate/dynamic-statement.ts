@@ -1,7 +1,4 @@
-import {
-  UPCAST_MISC_NATURES,
-  upcastExpensePnlLine,
-} from "@/lib/plant-catalogs";
+import { upcastExpensePnlLine } from "@/lib/plant-catalogs";
 import type { PlantPnlStatement, PnlStatementLine } from "@/lib/pnl/types";
 import { line, ratioOf, round2 } from "./helpers";
 import type { DynamicTotals } from "./dynamic-compute";
@@ -57,15 +54,16 @@ export function assembleDynamicStatement(
           manpower ? ratioOf(manpower, salesBase) : null,
           "item",
         ),
-        ...UPCAST_MISC_NATURES.map((head) => {
-          const amt = upcastMiscDirectTotals[head] ?? 0;
-          return line(
-            upcastExpensePnlLine(head),
-            amt || null,
-            amt ? ratioOf(amt, salesBase) : null,
-            "item",
-          );
-        }),
+        ...Object.entries(upcastMiscDirectTotals)
+          .filter(([, amt]) => amt > 0)
+          .map(([head, amt]) =>
+            line(
+              upcastExpensePnlLine(head),
+              amt,
+              ratioOf(amt, salesBase),
+              "item",
+            ),
+          ),
       ]
     : [
         line(

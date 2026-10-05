@@ -9,7 +9,10 @@ import {
   parseDateOnly,
   todayDateString,
 } from "@/lib/dates";
-import { calculatePlantPnlStatement } from "@/lib/pnl/calculate";
+import {
+  calculatePlantPnlStatement,
+  earliestPlantActivityYmd,
+} from "@/lib/pnl/calculate";
 import { canViewFullPnl, seesOwnEntriesOnly, usesSuperAdminPnlScope } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 
@@ -32,10 +35,12 @@ export async function GET(
 
   const fromParam = request.nextUrl.searchParams.get("from")?.trim();
   const toParam = request.nextUrl.searchParams.get("to")?.trim();
-  const fromStr =
-    fromParam && dateOnlyRegex.test(fromParam) ? fromParam : "2025-01-01";
   const toStr =
     toParam && dateOnlyRegex.test(toParam) ? toParam : todayDateString();
+  const fromStr =
+    fromParam && dateOnlyRegex.test(fromParam)
+      ? fromParam
+      : ((await earliestPlantActivityYmd(plantId)) ?? toStr);
 
   try {
     const ownEntriesOnly = seesOwnEntriesOnly(session.user.globalRole);

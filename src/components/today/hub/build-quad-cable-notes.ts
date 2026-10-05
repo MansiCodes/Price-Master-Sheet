@@ -11,6 +11,10 @@ import {
   mappedCallPutupItems,
   mappedSaleItems,
 } from "@/components/today/hub/build-quad-cable-notes-items";
+import {
+  applyOuterCallPutupClosing,
+  sumCallPutupKm,
+} from "@/components/today/hub/process-row-out-label";
 
 export type QuadCableNotesPayloadArgs = {
   resolvedCable: string;
@@ -20,6 +24,8 @@ export type QuadCableNotesPayloadArgs = {
   wip: WipCalcResult;
   stockWipSalesKm: number;
   stockCallPutupItems: StockCallPutupItem[];
+  stockCallPutupLoadedItems: StockCallPutupItem[];
+  stockCallPutupLoadedKm: number;
   stockDispatchPendingItems: StockDispatchPendingItem[];
   stockCallPutup: string;
   stockPutupDate: string;
@@ -52,6 +58,17 @@ export type QuadCableNotesPayloadArgs = {
 
 export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
   const putups = mappedCallPutupItems(args.stockCallPutupItems);
+  const formPutupKm = sumCallPutupKm(args.stockCallPutupItems);
+  const callPutupOriginalKm = Math.max(
+    Number(args.stockCallPutupLoadedKm) || 0,
+    formPutupKm,
+  );
+  const closing = applyOuterCallPutupClosing(
+    args.wip.byProcess,
+    args.openingQty,
+    args.processes,
+    formPutupKm,
+  );
   const locked = lockDispatchHistory({
     formItems: args.stockDispatchPendingItems,
     prevSettledKm: args.stockDispatchSettledKm,
@@ -67,14 +84,16 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     size: args.resolvedSize,
     production: args.processes,
     opening: args.openingQty,
-    closing: args.wip.byProcess,
-    processes: args.wip.byProcess,
+    closing,
+    processes: closing,
     salesKm: args.stockWipSalesKm,
     ...(putups.length > 0 ? { callPutupItems: putups } : {}),
+    ...(callPutupOriginalKm > 0 ? { callPutupOriginalKm } : {}),
     ...(locked.pendingItems.length > 0 ? { dispatchPendingItems: locked.pendingItems } : {}),
     ...(sales.length > 0 ? { saleItems: sales } : {}),
     ...(locked.settledKm > 0 ? { dispatchSettledKm: locked.settledKm } : {}),
     ...(locked.settledItems.length > 0 ? { dispatchSettledItems: locked.settledItems } : {}),
+    outerClosingIncludesPutup: true,
     ...callPutupSpreads(args),
     ...dispatchSpreads(args),
     calcSnapshot: { ...args.wip.calcSnapshot, drumLabel: args.selectedLengthLabel },

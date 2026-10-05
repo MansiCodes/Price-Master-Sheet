@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { WipCalcResult } from "@/lib/quad-signal-wip";
 import { processRowOpening, processRowOutLabel, isOuterProcessName, outerFormOutAndClose } from "@/components/today/hub/process-row-out-label";
 import {
@@ -9,6 +9,7 @@ import {
 type ProcessRowProps = {
   proc: string;
   hideProcessLabel?: boolean;
+  processLabelExtra?: ReactNode;
   stockWipCalc: WipCalcResult | null;
   stockOpeningEditable: boolean;
   stockWipOpening: Record<string, string>;
@@ -31,7 +32,16 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
     : null;
   return (
     <tr key={props.proc}>
-      {props.hideProcessLabel ? null : <td>{props.proc}</td>}
+      {props.hideProcessLabel ? null : props.processLabelExtra ? (
+        <td>
+          <div className="qs-wip__proc-cell">
+            <span>{props.proc}</span>
+            {props.processLabelExtra}
+          </div>
+        </td>
+      ) : (
+        <td>{props.proc}</td>
+      )}
       <HubStockQuadOpeningCell
         proc={props.proc}
         stockOpeningEditable={props.stockOpeningEditable}

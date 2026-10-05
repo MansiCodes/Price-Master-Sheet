@@ -1,6 +1,9 @@
 import { formatINR } from "@/lib/format/inr";
 import { EntryEditDrawer } from "@/components/pnl/EntryEditDrawer";
-import { num } from "@/components/pnl/purchase-report/format";
+import {
+  debitRupees,
+  netRupeesAfterDebit,
+} from "@/components/pnl/purchase-report/format";
 
 type CrudLike = {
   editing: unknown;
@@ -90,21 +93,10 @@ export function PurchaseEditDrawer({
       }
     >
       {atcl ? null : (
-        <div className="field">
-          <label htmlFor="edit-debit-value">Debit Value</label>
-          <input
-            id="edit-debit-value"
-            readOnly
-            value={
-              num(crud.values.debitQuantity || 0) > 0
-                ? formatINR(
-                    num(crud.values.debitQuantity || 0) *
-                      num(crud.values.rate || 0),
-                  )
-                : "—"
-            }
-          />
-        </div>
+        <PurchaseDebitValue
+          debitQuantity={crud.values.debitQuantity || 0}
+          rate={crud.values.rate || 0}
+        />
       )}
       <div className="field">
         <label htmlFor="edit-net-value">
@@ -114,14 +106,34 @@ export function PurchaseEditDrawer({
           id="edit-net-value"
           readOnly
           value={formatINR(
-            Math.max(
-              0,
-              num(crud.values.quantity || 0) -
-                (atcl ? 0 : num(crud.values.debitQuantity || 0)),
-            ) * num(crud.values.rate || 0),
+            netRupeesAfterDebit(
+              crud.values.quantity || 0,
+              atcl ? 0 : crud.values.debitQuantity || 0,
+              crud.values.rate || 0,
+            ),
           )}
         />
       </div>
     </EntryEditDrawer>
+  );
+}
+
+function PurchaseDebitValue({
+  debitQuantity,
+  rate,
+}: {
+  debitQuantity: string | number;
+  rate: string | number;
+}) {
+  const debit = debitRupees(debitQuantity, rate);
+  return (
+    <div className="field">
+      <label htmlFor="edit-debit-value">Debit Value</label>
+      <input
+        id="edit-debit-value"
+        readOnly
+        value={debit > 0 ? formatINR(-debit) : "—"}
+      />
+    </div>
   );
 }

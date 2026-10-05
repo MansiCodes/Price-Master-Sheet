@@ -2,15 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { formatINR } from "@/lib/format/inr";
 import { ReportTable } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
 import { isCat6Plant } from "@/lib/plant-layout";
 import {
   getExpenseHeadsForSection,
+  getUpcastMiscQueryHeads,
   normalizePvcExpenseHead,
-  UPCAST_MISC_NATURES,
   usesExpenseSections,
   type PvcExpenseSection,
 } from "@/lib/plant-catalogs";
@@ -26,6 +25,7 @@ import {
   buildExpenseEditFields,
   ExpenseEditDrawer,
 } from "@/components/pnl/expense-report/edit";
+import { buildExpenseFooterRows } from "@/components/pnl/expense-report/footers";
 import { isElectricityExpenseHead } from "@/lib/electricity-readings";
 import type { ExpenseRow } from "@/components/pnl/expense-report/types";
 
@@ -64,6 +64,8 @@ export function ExpenseReport({
   const isPettyCategory = category === "Petty Cash";
   const isFarCategory = normalizePvcExpenseHead(category) === "FAR";
   const isUpcastMiscCategory = upcast && category === "Miscellaneous";
+  const isUpcastPowerCategory =
+    upcast && isElectricityExpenseHead(category);
 
   const baseUrl = isPettyCategory
     ? `/api/plants/${plantId}/petty-cash?entryType=PETTY_CASH` +
@@ -73,7 +75,14 @@ export function ExpenseReport({
       ? `/api/plants/${plantId}/petty-cash?` +
         `from=${encodeURIComponent(from)}` +
         `&to=${encodeURIComponent(to)}` +
-        `&expenseHeads=${encodeURIComponent(UPCAST_MISC_NATURES.join(","))}`
+        `&expenseHeads=${encodeURIComponent(
+          getUpcastMiscQueryHeads(section).join(","),
+        )}`
+      : isUpcastPowerCategory
+      ? `/api/plants/${plantId}/petty-cash?` +
+        `from=${encodeURIComponent(from)}` +
+        `&to=${encodeURIComponent(to)}` +
+        `&expenseHeads=${encodeURIComponent("Fuel & Power,Electricity")}`
       : upcast
       ? `/api/plants/${plantId}/petty-cash?` +
         `from=${encodeURIComponent(from)}` +
@@ -88,7 +97,7 @@ export function ExpenseReport({
       enabled: !isFarCategory,
     });
   const totals = response?.totals as
-    | { total?: number; expenses?: number }
+    | { total?: number; expenses?: number; byHead?: Record<string, number> }
     | undefined;
   const crud = useReportCrud<ExpenseRow>(`/api/plants/${plantId}/petty-cash`, reload);
 
@@ -222,13 +231,12 @@ export function ExpenseReport({
             loading={loading}
             emptyLabel={t("noRecords")}
             variant="register"
-            footer={
-              totals && rows.length > 0 && sectionHeads.length > 0
-                ? cat6
-                  ? { s: "TOTAL", amount: formatINR(totals.total ?? 0) }
-                  : { head: "TOTAL", amount: formatINR(totals.total ?? 0) }
-                : undefined
-            }
+            footerRows={buildExpenseFooterRows({
+              category,
+              cat6,
+              hasRows: rows.length > 0 && sectionHeads.length > 0,
+              totals,
+            })}
           />
           {sectionHeads.length > 0 ? (
             <Pagination

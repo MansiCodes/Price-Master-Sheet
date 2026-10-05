@@ -23,6 +23,10 @@ export function useTodayHubStockCallFields() {
   const [stockCallPutupItems, setStockCallPutupItems] = useState<StockCallPutupItem[]>([
     { qty: "", date: "", partyName: "" },
   ]);
+  const [stockCallPutupLoadedItems, setStockCallPutupLoadedItems] = useState<
+    StockCallPutupItem[]
+  >([]);
+  const [stockCallPutupLoadedKm, setStockCallPutupLoadedKm] = useState(0);
   const [stockDispatchPendingItems, setStockDispatchPendingItems] = useState<
     StockDispatchPendingItem[]
   >([{ qty: "", partyName: "" }]);
@@ -51,6 +55,10 @@ export function useTodayHubStockCallFields() {
     setStockDispatchParty,
     stockCallPutupItems,
     setStockCallPutupItems,
+    stockCallPutupLoadedItems,
+    setStockCallPutupLoadedItems,
+    stockCallPutupLoadedKm,
+    setStockCallPutupLoadedKm,
     stockDispatchPendingItems,
     setStockDispatchPendingItems,
     stockSaleItems,

@@ -1,11 +1,11 @@
 import { SelectMenu } from "@/components/ui/SelectMenu";
-import { PVC_EXPENSE_SECTIONS, getExpenseHeadsForSection } from "@/lib/plant-catalogs";
+import { PVC_EXPENSE_SECTIONS, getExpenseHeadsForSection, getUpcastMiscNaturesForSection } from "@/lib/plant-catalogs";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { onExpenseHeadChange } from "@/components/today/hub/on-expense-head-change";
 
 export function HubExpenseSectionField({ vm }: { vm: TodayHubVm }) {
-  const { hasExpenseSections, expenseSection, setExpenseSection, setExpenseHead, plantCode } =
+  const { hasExpenseSections, expenseSection, setExpenseSection, setExpenseHead, plantCode, setUpcastMiscNature } =
     bindExpenseLocals(vm);
   if (!hasExpenseSections) return null;
   return (
@@ -22,6 +22,8 @@ export function HubExpenseSectionField({ vm }: { vm: TodayHubVm }) {
           setExpenseSection(next.value);
           const heads = [...getExpenseHeadsForSection(plantCode, next.value)];
           setExpenseHead(heads[0] ?? "");
+          const natures = getUpcastMiscNaturesForSection(next.value);
+          setUpcastMiscNature?.(natures[0] ?? "");
         }}
       />
     </div>

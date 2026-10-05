@@ -103,13 +103,12 @@ export function upcastExpensePnlLine(head: string): string {
       return "TRAVELLING CHARGES";
     case "Welfare Charges":
       return "WELFARE CHARGES";
-    case "Other Charges":
-      return "OTHER CHARGES";
     case "Miscellaneous":
       return "MISCELLANEOUS EXP.";
     case "Salary Expenses":
       return "SALARY EXPENSES";
     case "FAR":
+    case "Depreciation":
       return "DEPRECIATION";
     case "Financial Cost":
       return "FINANCIAL COST";

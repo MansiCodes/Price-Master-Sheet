@@ -22,7 +22,7 @@ export const purchaseHeaderFields = {
 export const purchaseItemSchema = z.object({
   itemDescription: z.string().min(1),
   unit: z.string().min(1),
-  quantity: z.coerce.number().positive(),
+  quantity: z.coerce.number().nonnegative(),
   rate: z.coerce.number().nonnegative().optional().default(0),
   gstPercent: z.coerce.number().min(0).optional(),
   debitQuantity: z.coerce.number().nonnegative().optional().default(0),
@@ -34,7 +34,7 @@ export const purchaseSingleSchema = z.object({
   ...purchaseHeaderFields,
   itemDescription: z.string().min(1),
   unit: z.string().min(1),
-  quantity: z.coerce.number().positive(),
+  quantity: z.coerce.number().nonnegative(),
   rate: z.coerce.number().nonnegative().optional().default(0),
   gstPercent: z.coerce.number().min(0).default(0),
   debitQuantity: z.coerce.number().nonnegative().optional().default(0),

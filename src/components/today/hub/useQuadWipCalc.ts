@@ -12,6 +12,7 @@ export function useQuadWipCalc(
     stockKind, stockCable, stockProcessQtys, stockWipOpening, stockLengthFactor,
     stockInsulationExtras, stockSingleQuadExtras, stockOpeningEditable,
     stockWipContextLoading, resolvedQuadCableName, resolvedQuadSizeName, setStockQty,
+    stockPowerLayingFactor,
   } = stock;
   const stockWipCalc: WipCalcResult | null = useMemo(
     () =>
@@ -24,6 +25,7 @@ export function useQuadWipCalc(
           stockProcessQtys,
           stockWipOpening,
           stockLengthFactor,
+          stockPowerLayingFactor,
           resolvedQuadCableName: resolvedQuadCableName || stockCable,
           resolvedQuadSizeName,
           stockWipContextLoading,
@@ -34,7 +36,7 @@ export function useQuadWipCalc(
       isQuad, stockKind, stockCable, quadCableProcessFields, stockProcessQtys,
       stockSingleQuadExtras, stockWipOpening, resolvedQuadCableName,
       resolvedQuadSizeName, stockLengthFactor, stockInsulationExtras, stockOpeningEditable,
-      stockWipContextLoading,
+      stockWipContextLoading, stockPowerLayingFactor,
     ],
   );
   useEffect(() => {

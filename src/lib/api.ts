@@ -207,9 +207,21 @@ export function zodErrorResponse(error: {
   issues?: unknown;
 }) {
   return NextResponse.json(
-    { error: "Validation failed", details: error.flatten() },
+    {
+      error: firstIssueMessage(error.issues) ?? "Validation failed",
+      details: error.flatten(),
+    },
     { status: 400 },
   );
+}
+
+function firstIssueMessage(issues: unknown) {
+  if (!Array.isArray(issues) || issues.length === 0) return null;
+  const issue = issues[0] as { path?: unknown; message?: unknown };
+  if (typeof issue?.message !== "string" || !issue.message) return null;
+  const path = Array.isArray(issue.path) ? issue.path : [];
+  const field = path.filter((p) => p !== "").join(".");
+  return field ? `${field}: ${issue.message}` : issue.message;
 }
 
 export function round2(n: number): number {

@@ -7,4 +7,5 @@ export type { PnlLineKind } from "@/lib/pnl/types";
 export {
   calculatePlantPnl,
   calculatePlantPnlStatement,
+  earliestPlantActivityYmd,
 } from "./calculate/statement";

@@ -16,6 +16,12 @@ export type ReportColumn<T> = {
   render: (row: T, index?: number) => ReactNode;
 };
 
+export type ReportFooterRow = {
+  cells?: Record<string, ReactNode>;
+  variant?: "total" | "subtotal";
+  colSpanContent?: ReactNode;
+};
+
 export function ReportTable<T extends { id: string }>({
   columns,
   rows,
@@ -24,6 +30,7 @@ export function ReportTable<T extends { id: string }>({
   variant = "register",
   footer,
   secondaryFooter,
+  footerRows,
 }: {
   columns: ReportColumn<T>[];
   rows: T[];
@@ -32,6 +39,7 @@ export function ReportTable<T extends { id: string }>({
   variant?: "default" | "register";
   footer?: Record<string, ReactNode>;
   secondaryFooter?: Record<string, ReactNode>;
+  footerRows?: ReportFooterRow[];
 }) {
   const isRegister = variant !== "default";
   const tableClass = isRegister
@@ -73,6 +81,12 @@ export function ReportTable<T extends { id: string }>({
   }
 
   const showEmpty = !loading && rows.length === 0;
+  const fallbackFooters: ReportFooterRow[] = [];
+  if (footer) fallbackFooters.push({ cells: footer, variant: "total" });
+  if (secondaryFooter) {
+    fallbackFooters.push({ cells: secondaryFooter, variant: "subtotal" });
+  }
+  const tfootRows = footerRows ?? fallbackFooters;
 
   return (
     <div
@@ -128,24 +142,28 @@ export function ReportTable<T extends { id: string }>({
             ))
           )}
         </tbody>
-        {footer && !loading && rows.length > 0 ? (
+        {tfootRows.length > 0 && !loading && rows.length > 0 ? (
           <tfoot>
-            <tr className="pnl-report-table__total">
-              {columns.map((col) => (
-                <td key={col.key} className={cellClass(col) || undefined}>
-                  {footer[col.key] ?? ""}
-                </td>
-              ))}
-            </tr>
-            {secondaryFooter ? (
-              <tr className="pnl-report-table__subtotal">
-                {columns.map((col) => (
-                  <td key={col.key} className={cellClass(col) || undefined}>
-                    {secondaryFooter[col.key] ?? ""}
-                  </td>
-                ))}
+            {tfootRows.map((foot, idx) => (
+              <tr
+                key={`foot-${idx}`}
+                className={
+                  foot.variant === "subtotal"
+                    ? "pnl-report-table__subtotal"
+                    : "pnl-report-table__total"
+                }
+              >
+                {foot.colSpanContent ? (
+                  <td colSpan={columns.length}>{foot.colSpanContent}</td>
+                ) : (
+                  columns.map((col) => (
+                    <td key={col.key} className={cellClass(col) || undefined}>
+                      {(foot.cells ?? {})[col.key] ?? ""}
+                    </td>
+                  ))
+                )}
               </tr>
-            ) : null}
+            ))}
           </tfoot>
         ) : null}
       </table>

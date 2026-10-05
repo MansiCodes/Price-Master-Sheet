@@ -102,7 +102,7 @@ function HubStockCallPutupRemove({
   if (count <= 1) return null;
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
-      {idx > 0 ? (
+      {count > 1 ? (
         <button
           type="button"
           className="btn btn--sm btn--danger"

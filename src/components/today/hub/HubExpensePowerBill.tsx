@@ -3,7 +3,7 @@ import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
 
 export function HubExpensePowerBillRow({ vm }: { vm: TodayHubVm }) {
-  const { expenseRate, setExpenseRate, expenseAmount } = bindExpenseLocals(vm);
+  const { expenseRate, setExpenseRate, expenseAmount, isUpcast } = bindExpenseLocals(vm);
   return (
     <div className="prod-fields__row">
       <div className="field">
@@ -11,7 +11,7 @@ export function HubExpensePowerBillRow({ vm }: { vm: TodayHubVm }) {
         <DecimalInput id="e-rate" value={expenseRate} onChange={setExpenseRate} placeholder="0" />
       </div>
       <div className="field">
-        <label htmlFor="e-amt">Electricity bill Amt</label>
+        <label htmlFor="e-amt">{isUpcast ? "Fuel & Power Amt" : "Electricity bill Amt"}</label>
         <input
           id="e-amt"
           readOnly

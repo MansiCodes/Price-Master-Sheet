@@ -55,6 +55,8 @@ function submitStockQuadCableFromVm(
     stockWipSalesKm: stock.stockWipSalesKm, stockUnit: stock.stockUnit,
     issuedQty, closingRate,
     stockCallPutupItems: stock.stockCallPutupItems,
+    stockCallPutupLoadedItems: stock.stockCallPutupLoadedItems,
+    stockCallPutupLoadedKm: stock.stockCallPutupLoadedKm,
     stockDispatchPendingItems: stock.stockDispatchPendingItems,
     stockCallPutup: stock.stockCallPutup, stockPutupDate: stock.stockPutupDate,
     stockPartyName: stock.stockPartyName, stockDispatchPending: stock.stockDispatchPending,

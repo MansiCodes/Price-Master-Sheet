@@ -2,7 +2,7 @@ import { PettyCashKind } from "@prisma/client";
 import {
   isAtclPurchase,
   normalizeUpcastExpenseHead,
-  UPCAST_MISC_NATURES,
+  upcastEntryHead,
 } from "@/lib/plant-catalogs";
 import { INCOME_TAX_RATE, round2, toNumber } from "./helpers";
 import type { DynamicInputs } from "./dynamic-query";
@@ -12,12 +12,11 @@ export function computeDynamicTotals(
   plantCode?: string | null,
 ) {
   const {
-    pvcFarMonths,
+    periodDays,
     salesAgg,
     purchaseRowsScoped,
     manpowerAgg,
     pettyEntries,
-    electricityRows,
     fixedAssets,
     openingStockRaw,
     closingStockRaw,
@@ -54,41 +53,28 @@ export function computeDynamicTotals(
     : (openingStock > 0 || totalPurchases > 0 || salesRevenue > 0)
       ? Math.max(0, round2(openingStock + totalPurchases - salesRevenue))
       : (stockFromAtclPurchases > 0 ? closingStockSnap : 0);
-  const electricityRentAmount = round2(
-    electricityRows.reduce((sum, row) => sum + toNumber(row.billAmount), 0),
-  );
-  const rentFromElectricityRent = round2(
-    electricityRows.reduce((sum, row) => sum + toNumber(row.rentAmount), 0),
-  );
-
-  // Electricity can be available in two places depending on how the DB was seeded:
-  // 1) `electricityRent` table (preferred)
-  // 2) legacy import into `pettyCashEntry` with `entryType=EXPENSE` & `expenseHead="Electricity"`
-  const electricityFromPettyCash = round2(
-    pettyEntries
-      .filter(
-        (r) =>
-          r.entryType === PettyCashKind.EXPENSE &&
-          (r.expenseHead.trim().toLowerCase() === "electricity" ||
-            r.expenseHead.trim().toLowerCase() === "fuel & power" ||
-            r.payMode.trim().toLowerCase() === "electricity"),
-      )
-      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  const electricity = round2(
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizeUpcastExpenseHead(
+        row.expenseHead || row.nature || "",
+      );
+      const pay = row.payMode.trim().toLowerCase();
+      if (head !== "Electricity" && pay !== "electricity") return sum;
+      const amt = toNumber(row.amount);
+      return amt > 0 ? sum + amt : sum;
+    }, 0),
   );
 
-  const rentFromPettyCash = round2(
-    pettyEntries
-      .filter((r) => {
-        const head = normalizeUpcastExpenseHead(
-          r.expenseHead || r.nature || "",
-        );
-        return head === "Factory Rent" && toNumber(r.amount) > 0;
-      })
-      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  const rent = round2(
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizeUpcastExpenseHead(
+        row.expenseHead || row.nature || "",
+      );
+      if (head !== "Factory Rent") return sum;
+      const amt = toNumber(row.amount);
+      return amt > 0 ? sum + amt : sum;
+    }, 0),
   );
-
-  const electricity = electricityRentAmount > 0 ? electricityRentAmount : electricityFromPettyCash;
-  const rent = rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
   // Unloading: only use actual logged unloading expense entries (no auto-calculated rate estimate when unentered)
   const unloadingExpense = round2(
@@ -108,16 +94,13 @@ export function computeDynamicTotals(
   );
 
   const upcastMiscDirectTotals: Record<string, number> = {};
-  for (const head of UPCAST_MISC_NATURES) {
-    upcastMiscDirectTotals[head] = 0;
-  }
-  let upcastUnmappedFactory = 0;
+  let depreciation = 0;
 
   if (isUpcast) {
     for (const row of pettyEntries) {
-      const head = normalizeUpcastExpenseHead(row.expenseHead || row.nature || "");
+      const head = upcastEntryHead(row.expenseHead || "", row.nature);
       const amt = toNumber(row.amount);
-      if (!(amt > 0)) continue;
+      if (!(amt > 0) || !head) continue;
       if (
         head === "Fuel & Power" ||
         head === "Electricity" ||
@@ -126,22 +109,16 @@ export function computeDynamicTotals(
         head === "Salary Expenses" ||
         head === "Contractor Wages" ||
         head === "FAR" ||
-        head === "Depreciation (FAR)" ||
         head === "Financial Cost"
       ) {
         continue;
       }
-      if ((UPCAST_MISC_NATURES as readonly string[]).includes(head)) {
-        upcastMiscDirectTotals[head] = round2(
-          (upcastMiscDirectTotals[head] ?? 0) + amt,
-        );
-      } else {
-        upcastUnmappedFactory = round2(upcastUnmappedFactory + amt);
+      if (head === "Depreciation") {
+        depreciation = round2(depreciation + amt);
+        continue;
       }
-    }
-    if (upcastUnmappedFactory > 0) {
-      upcastMiscDirectTotals["Other Charges"] = round2(
-        (upcastMiscDirectTotals["Other Charges"] ?? 0) + upcastUnmappedFactory,
+      upcastMiscDirectTotals[head] = round2(
+        (upcastMiscDirectTotals[head] ?? 0) + amt,
       );
     }
   }
@@ -201,24 +178,23 @@ export function computeDynamicTotals(
 
   const grossProfit = round2(salesRevenue - cogs);
   const financialCost = round2(
-    fixedAssets.reduce((maxBasis, asset) => {
-      const invoiceBasis =
-        toNumber(asset.invoiceValue) > 0
-          ? toNumber(asset.invoiceValue)
-          : toNumber(asset.cost) + toNumber(asset.gst);
-      return Math.max(maxBasis, invoiceBasis);
-    }, 0) *
-      0.12 *
-      (pvcFarMonths / 12),
-  );
-
-  const depreciation = round2(
-    fixedAssets.reduce((sum, asset) => {
-      const annual =
-        toNumber(asset.cost) * (toNumber(asset.depreciationPercent) / 100);
-      return sum + (annual * pvcFarMonths) / 12;
+    pettyEntries.reduce((sum, row) => {
+      const head = upcastEntryHead(row.expenseHead || "", row.nature);
+      if (head !== "Financial Cost") return sum;
+      const amt = toNumber(row.amount);
+      return amt > 0 ? sum + amt : sum;
     }, 0),
   );
+
+  if (!isUpcast) {
+    depreciation = round2(
+      fixedAssets.reduce((sum, asset) => {
+        const annual =
+          toNumber(asset.cost) * (toNumber(asset.depreciationPercent) / 100);
+        return sum + (annual * periodDays) / 365;
+      }, 0),
+    );
+  }
 
   // Trading account already contains direct expenses; indirect section should subtract only indirect expenses.
   const profitBeforeTax = round2(

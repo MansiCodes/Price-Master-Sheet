@@ -155,7 +155,7 @@ export function PurchaseReport({
                   qty: formatQty(totals.quantity ?? 0),
                   amt: formatINR(totals.basicValue ?? 0),
                 }
-              : isPvc && purchaseView === "atcl"
+              : purchaseView === "atcl"
                 ? {
                     description: "TOTAL",
                     qty: formatQty(totals.quantity ?? 0),

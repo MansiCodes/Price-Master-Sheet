@@ -28,6 +28,80 @@ export function outerFormOutAndClose(
   };
 }
 
+export function sumCallPutupKm(items: Array<{ qty?: string | number | null }>) {
+  return items.reduce((sum, item) => {
+    const n = Number(item.qty);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
+export type NoteCallPutup = {
+  qty: number | string;
+  date?: string;
+  partyName?: string;
+};
+
+export function callPutupItemsFromCableMeta(meta: {
+  callPutupItems?: NoteCallPutup[];
+  callPutup?: string;
+  putupDate?: string;
+  partyName?: string;
+} | null | undefined): NoteCallPutup[] {
+  if (!meta) return [];
+  if (Array.isArray(meta.callPutupItems) && meta.callPutupItems.length > 0) {
+    return meta.callPutupItems.map((item) => ({
+      qty: item.qty,
+      date: item.date,
+      partyName: item.partyName,
+    }));
+  }
+  if (meta.callPutup || meta.putupDate || meta.partyName) {
+    return [{
+      qty: meta.callPutup ?? "",
+      date: meta.putupDate,
+      partyName: meta.partyName,
+    }];
+  }
+  return [];
+}
+
+export function mergeNoteCallPutups(items: NoteCallPutup[]): NoteCallPutup[] {
+  const seen = new Set<string>();
+  const out: NoteCallPutup[] = [];
+  for (const item of items) {
+    const key = `${item.qty}|${item.date ?? ""}|${item.partyName ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+export function frozenCallPutupKm(originalKm: number | undefined, items: NoteCallPutup[]) {
+  const orig = Number(originalKm);
+  const frozen = Number.isFinite(orig) && orig > 0 ? orig : 0;
+  return Math.max(frozen, sumCallPutupKm(items));
+}
+
+export function applyOuterCallPutupClosing(
+  byProcess: Record<string, number>,
+  opening: Record<string, number>,
+  production: Record<string, number>,
+  putupKm: number,
+) {
+  const next = { ...byProcess };
+  for (const key of Object.keys(next)) {
+    if (!isOuterProcessName(key)) continue;
+    const live = outerFormOutAndClose(
+      Number(opening[key] ?? 0),
+      String(production[key] ?? ""),
+      putupKm,
+    );
+    next[key] = live.closing;
+  }
+  return next;
+}
+
 export function processRowOpening(
   stage: WipCalcResult["stages"][number] | undefined,
   stockWipOpening: Record<string, string>,

@@ -24,6 +24,8 @@ function pickQuadWipSetters(stock: TodayHubStockState): QuadWipSetters {
     setStockDispatchPending: stock.setStockDispatchPending,
     setStockDispatchParty: stock.setStockDispatchParty,
     setStockCallPutupItems: stock.setStockCallPutupItems,
+    setStockCallPutupLoadedItems: stock.setStockCallPutupLoadedItems,
+    setStockCallPutupLoadedKm: stock.setStockCallPutupLoadedKm,
     setStockDispatchPendingItems: stock.setStockDispatchPendingItems,
     setStockSaleItems: stock.setStockSaleItems,
     setStockSaleHints: stock.setStockSaleHints,

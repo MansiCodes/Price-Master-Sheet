@@ -1,12 +1,22 @@
 import { DecimalInput } from "@/components/ui/DecimalInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { BillUpload } from "@/components/today/BillUpload";
-import { UPCAST_MISC_NATURES } from "@/lib/plant-catalogs";
+import { getUpcastMiscNaturesForSection } from "@/lib/plant-catalogs";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
 
 export function HubExpenseUpcastMiscPay({ vm }: { vm: TodayHubVm }) {
-  const { expensePayMode, setExpensePayMode, upcastMiscNature, setUpcastMiscNature } = bindExpenseLocals(vm);
+  const {
+    expensePayMode,
+    setExpensePayMode,
+    upcastMiscNature,
+    setUpcastMiscNature,
+    expenseSection,
+  } = bindExpenseLocals(vm);
+  const natures = [...getUpcastMiscNaturesForSection(expenseSection)];
+  const natureValue = natures.includes(upcastMiscNature)
+    ? upcastMiscNature
+    : (natures[0] ?? "");
   return (
     <>
       <div className="field">
@@ -23,8 +33,8 @@ export function HubExpenseUpcastMiscPay({ vm }: { vm: TodayHubVm }) {
         <label htmlFor="e-misc-nature">Nature of Expense</label>
         <SelectMenu
           id="e-misc-nature"
-          value={upcastMiscNature}
-          options={[...UPCAST_MISC_NATURES]}
+          value={natureValue}
+          options={natures}
           required
           onChange={setUpcastMiscNature}
         />

@@ -76,11 +76,11 @@ export const LED_EXPENSE_HEADS = [
 ] as const;
 
 /**
- * Upcast expense UI: Electricity / Rent like PVC, plus Misc natures from Excel.
+ * Upcast expense UI: Fuel & Power / Rent like PVC, plus Misc natures from Excel.
  * P&L still breaks Misc natures into Excel lines (Consultancy, Consumable, …).
  */
 export const UPCAST_DIRECT_EXPENSE_HEADS = [
-  "Electricity",
+  "Fuel & Power",
   "Unloading of MT",
   "Contractor Wages",
   "Miscellaneous",
@@ -91,6 +91,7 @@ export const UPCAST_INDIRECT_EXPENSE_HEADS = [
   "FAR",
   "Financial Cost",
   "Factory Rent",
+  "Miscellaneous",
 ] as const;
 
 export const UPCAST_EXPENSE_HEADS = [
@@ -98,19 +99,26 @@ export const UPCAST_EXPENSE_HEADS = [
   ...UPCAST_INDIRECT_EXPENSE_HEADS,
 ] as const;
 
-/** Excel Misc Exp. factory natures → P&L DIRECT lines (entered via Miscellaneous). */
-export const UPCAST_MISC_NATURES = [
+/** Direct Miscellaneous natures → matching P&L direct lines. */
+export const UPCAST_DIRECT_MISC_NATURES = [
   "Consultancy Exp.",
   "Consumable Item",
   "Freight & Others",
   "Maintenance Item",
   "Travelling Charges",
   "Welfare Charges",
-  "Other Charges",
 ] as const;
 
-/** @deprecated use UPCAST_MISC_NATURES */
-export const UPCAST_MISC_DIRECT_HEADS = UPCAST_MISC_NATURES;
+/** Indirect Miscellaneous natures → matching P&L indirect lines. */
+export const UPCAST_INDIRECT_MISC_NATURES = ["Depreciation"] as const;
+
+export const UPCAST_MISC_NATURES = [
+  ...UPCAST_DIRECT_MISC_NATURES,
+  ...UPCAST_INDIRECT_MISC_NATURES,
+] as const;
+
+/** @deprecated use UPCAST_DIRECT_MISC_NATURES */
+export const UPCAST_MISC_DIRECT_HEADS = UPCAST_DIRECT_MISC_NATURES;
 
 /** @deprecated prefer plant-specific heads / getExpenseHeadsForSection */
 export const DEFAULT_EXPENSE_HEADS = CAT6_EXPENSE_HEADS;

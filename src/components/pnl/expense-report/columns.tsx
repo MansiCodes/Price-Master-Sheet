@@ -5,6 +5,7 @@ import { formatDayMonthYear } from "@/lib/dates";
 import {
   cat6ExpensePnlLine,
   pvcExpensePnlLine,
+  normalizeUpcastExpenseHead,
   upcastExpensePnlLine,
 } from "@/lib/plant-catalogs";
 import { PnlApprovalBadge } from "@/components/pnl/PnlApprovalBadge";
@@ -103,7 +104,14 @@ export function buildExpenseColumns(opts: {
           String((page - 1) * pageSize + (index ?? 0) + 1),
       },
       { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
-      { key: "head", label: t("category"), render: (r) => r.expenseHead },
+      {
+        key: "head",
+        label: t("category"),
+        render: (r) =>
+          upcast
+            ? normalizeUpcastExpenseHead(r.expenseHead)
+            : r.expenseHead,
+      },
       {
         key: "pnlLine",
         label: "P&L Line",

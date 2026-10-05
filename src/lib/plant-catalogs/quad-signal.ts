@@ -48,6 +48,8 @@ export type QuadSignalStockMeta = {
     date?: string;
     partyName?: string;
   }>;
+  /** First filled Call put-up km; stays put if rows are later removed. */
+  callPutupOriginalKm?: number;
   dispatchPendingItems?: Array<{
     qty: number | string;
     partyName?: string;
@@ -59,6 +61,8 @@ export type QuadSignalStockMeta = {
     qty: number | string;
     partyName?: string;
   }>;
+  /** Outer closing already subtracted call put-up; do not subtract again on load. */
+  outerClosingIncludesPutup?: boolean;
   /** Invoice lines on the stock form (not Sales ledger / WIP Out). */
   saleItems?: Array<{
     invoiceNo?: string;

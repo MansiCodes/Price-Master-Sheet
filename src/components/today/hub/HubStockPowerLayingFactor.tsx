@@ -6,8 +6,8 @@ export function HubStockPowerLayingFactor({ vm }: { vm: TodayHubVm }) {
     bindStockLocals(vm);
   if (!isPowerCableStock) return null;
   return (
-    <div className="qs-wip__factor field" style={{ margin: "0 0 0.5rem", maxWidth: "6.5rem" }}>
-      <label htmlFor="power-laying-factor">Factor</label>
+    <label className="qs-wip__factor" htmlFor="power-laying-factor" title="Factor">
+      <span className="qs-wip__factor-letter">F</span>
       <input
         id="power-laying-factor"
         inputMode="numeric"
@@ -19,6 +19,6 @@ export function HubStockPowerLayingFactor({ vm }: { vm: TodayHubVm }) {
           setStockPowerLayingFactor(next);
         }}
       />
-    </div>
+    </label>
   );
 }
