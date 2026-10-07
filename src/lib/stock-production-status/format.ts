@@ -39,27 +39,18 @@ export function outerClosingAfterPutup(
   return Math.round(Math.max(0, closing - putup) * 1000) / 1000;
 }
 
-/** Latest-session put-up only. Skip only when stored Outer is already net of that put-up. */
+/** Put-up still to take off Outer. 0 when closing is already net of this session. */
 export function sessionOuterDeductKm(
   closingIncludesPutup: boolean | undefined,
   items: Array<{ qty?: number }> | undefined,
-  outerClosing?: number,
+  _outerClosing?: number,
 ): number {
+  if (closingIncludesPutup) return 0;
   const sum = (items ?? []).reduce((s, item) => {
     const q = Number(item.qty);
     return s + (Number.isFinite(q) && q > 0 ? q : 0);
   }, 0);
-  const putup = Math.round(sum * 1000) / 1000;
-  if (putup <= 0) return 0;
-  const closing = Number(outerClosing);
-  if (
-    closingIncludesPutup &&
-    Number.isFinite(closing) &&
-    closing < putup
-  ) {
-    return 0;
-  }
-  return putup;
+  return Math.round(sum * 1000) / 1000;
 }
 
 export function outerProcessClosing(

@@ -298,6 +298,7 @@ export type QuadWipContextData = {
   cable?: string;
   size?: string;
   production?: Record<string, number>;
+  productionHints?: Record<string, number>;
   sameDay?: boolean;
   insulationContributions?: Array<{
     size: string;
@@ -370,20 +371,22 @@ function applyQtyMaps(
     }
     return next;
   });
-  const productionStrings: Record<string, string> = {};
-  const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
-  for (const [key, raw] of Object.entries(productionSrc)) {
-    if (isInsulationKey(key)) continue;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n <= 0) continue;
-    productionStrings[key] = String(n);
-    const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
-    if (canon && !isInsulationKey(canon)) {
-      productionStrings[canon] = String(n);
+  const toProdMap = (src: Record<string, number> | undefined) => {
+    const productionStrings: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(src ?? {})) {
+      if (isInsulationKey(key)) continue;
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      productionStrings[key] = String(n);
+      const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
+      if (canon && !isInsulationKey(canon)) {
+        productionStrings[canon] = String(n);
+      }
     }
-  }
-  s.setStockProcessHints(productionStrings);
-  s.setStockProcessQtys(data.sameDay ? { ...productionStrings } : {});
+    return productionStrings;
+  };
+  s.setStockProcessHints(toProdMap(data.productionHints ?? data.production));
+  s.setStockProcessQtys(data.sameDay ? toProdMap(data.production) : {});
 }
 
 export function applyQuadWipContextData(

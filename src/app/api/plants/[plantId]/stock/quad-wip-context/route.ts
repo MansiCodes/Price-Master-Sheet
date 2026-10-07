@@ -98,6 +98,7 @@ export async function GET(
     openingFromDate,
     openingEditable,
     production,
+    productionHints,
     insulationContributions,
     putupKm,
   } = await resolveQuadSignalStockOpening({
@@ -231,6 +232,7 @@ export async function GET(
     openingEditable,
     openingAlwaysEditable: alwaysEditable,
     production,
+    productionHints,
     insulationContributions,
     putupKm,
     salesKm,

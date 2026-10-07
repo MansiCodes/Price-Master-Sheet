@@ -64,8 +64,11 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     Number(args.stockCallPutupLoadedKm) || 0,
     formPutupKm,
   );
+  const orderedNames = args.wip.stages.map((s) => s.process);
   const sizeClosing = formClosingByProcess(
-    Object.keys({ ...args.openingQty, ...args.processes }),
+    orderedNames.length > 0
+      ? orderedNames
+      : Object.keys({ ...args.openingQty, ...args.processes }),
     args.openingQty,
     args.processes,
     formPutupKm,

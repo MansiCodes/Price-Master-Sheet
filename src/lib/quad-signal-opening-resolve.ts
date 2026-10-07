@@ -7,6 +7,7 @@ import {
   INSULATION_KEY,
   lastEnteredOpeningByProcess,
   lastEnteredProductionByProcess,
+  lastNonZeroProductionByProcess,
   matchesCableSize,
 } from "@/lib/quad-signal-opening-match";
 
@@ -24,6 +25,7 @@ export type QuadSignalOpeningResolve = {
   openingEditable: boolean;
   sameDayEntryId: string | null;
   production: Record<string, number>;
+  productionHints: Record<string, number>;
   insulationContributions: InsulationPoolContribution[];
   putupKm: number;
 };
@@ -86,15 +88,30 @@ export async function resolveQuadSignalStockOpening(params: {
     break;
   }
 
-  const sizeOpen = lastEnteredOpeningByProcess(
-    byFill, cable, size, itemName, processes, signalling, !sameDayEntryId,
-  );
   const sizeProduction = lastEnteredProductionByProcess(
     byFill, cable, size, itemName, processes, signalling,
   );
+  const productionHints = lastNonZeroProductionByProcess(
+    byFill, cable, size, itemName, processes, signalling,
+  );
+  const todayIdle = Object.values(sizeProduction).every((n) => !(Number(n) > 0));
+  const openRows =
+    sameDayEntryId && todayIdle
+      ? byFill.filter((r) => r.id !== sameDayEntryId)
+      : byFill;
+  const sizeOpen = lastEnteredOpeningByProcess(
+    openRows,
+    cable,
+    size,
+    itemName,
+    processes,
+    signalling,
+    !sameDayEntryId || todayIdle,
+  );
 
   const opening: Record<string, number> = { ...sizeOpen.opening };
-  const production: Record<string, number> = { ...sizeProduction };
+  const production: Record<string, number> =
+    sameDayEntryId && !todayIdle ? { ...sizeProduction } : {};
   let insulationContributions: InsulationPoolContribution[] = [];
   let insFromDate: string | null = null;
 
@@ -135,6 +152,7 @@ export async function resolveQuadSignalStockOpening(params: {
       openingEditable: true,
       sameDayEntryId: null,
       production,
+      productionHints,
       insulationContributions,
       putupKm,
     };
@@ -146,6 +164,7 @@ export async function resolveQuadSignalStockOpening(params: {
     openingEditable: true,
     sameDayEntryId,
     production,
+    productionHints,
     insulationContributions,
     putupKm,
   };

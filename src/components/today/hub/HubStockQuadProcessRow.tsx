@@ -1,7 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { WipCalcResult } from "@/lib/quad-signal-wip";
 import { processRowOpening, processRowOutLabel, isOuterProcessName, outerFormOutAndClose } from "@/components/today/hub/process-row-out-label";
-import { formProcessClosing } from "@/lib/quad-signal-form-stock";
 import {
   HubStockQuadOpeningCell,
   HubStockQuadProductionCell,
@@ -19,7 +18,6 @@ type ProcessRowProps = {
   setStockProcessQtys: Dispatch<SetStateAction<Record<string, string>>>;
   stockProcessHints?: Record<string, string>;
   orderPutupKm?: number;
-  independentClosing?: boolean;
 };
 
 export function HubStockQuadProcessRow(props: ProcessRowProps) {
@@ -32,23 +30,7 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
         props.orderPutupKm ?? 0,
       )
     : null;
-  const prodRaw = props.stockProcessQtys[props.proc] ?? "";
-  const prodN = prodRaw.trim() === "" || prodRaw === "." ? 0 : Number(prodRaw);
-  const independentLive =
-    props.independentClosing &&
-    !isOuterProcessName(props.proc) &&
-    props.proc.trim().toLowerCase() !== "insulation"
-      ? {
-          out: 0,
-          closing: formProcessClosing(
-            props.proc,
-            openingVal,
-            Number.isFinite(prodN) ? prodN : 0,
-            0,
-          ),
-        }
-      : null;
-  const live = outerLive ?? independentLive;
+  const live = outerLive;
   return (
     <tr key={props.proc}>
       {props.hideProcessLabel ? null : props.processLabelExtra ? (

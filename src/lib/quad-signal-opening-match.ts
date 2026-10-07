@@ -232,6 +232,36 @@ export function lastEnteredProductionByProcess(
   return {};
 }
 
+export function lastNonZeroProductionByProcess(
+  rows: Array<{ itemName: string; notes: string | null }>,
+  cable: string,
+  size: string,
+  itemName: string,
+  processNames: readonly string[] = [],
+  skipInsulation = false,
+): Record<string, number> {
+  const names = skipInsulation
+    ? processNames.filter((p) => p.trim().toLowerCase() !== "insulation")
+    : [...processNames];
+  for (const row of rows) {
+    const { meta } = parseQuadSignalStockNotes(row.notes);
+    if (meta?.kind !== "cable" || !isSameSizeRow(row, cable, size, itemName, meta)) {
+      continue;
+    }
+    const out: Record<string, number> = {};
+    const keys = names.length > 0 ? names : Object.keys(meta.production ?? {});
+    let any = false;
+    for (const proc of keys) {
+      if (skipInsulation && proc.trim().toLowerCase() === "insulation") continue;
+      const n = qtyOnMap(meta.production, proc);
+      out[proc] = n;
+      if (n > 0) any = true;
+    }
+    if (any) return out;
+  }
+  return {};
+}
+
 /** @deprecated Use lastEnteredProductionByProcess — latest row, including P=0. */
 export function lastPositiveProductionByProcess(
   rows: Array<{ itemName: string; notes: string | null }>,

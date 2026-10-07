@@ -6,11 +6,9 @@ import { sumCallPutupKm } from "@/components/today/hub/process-row-out-label";
 export function HubStockQuadProcessBody({
   vm,
   processes,
-  independentClosing = false,
 }: {
   vm: TodayHubVm;
   processes: string[];
-  independentClosing?: boolean;
 }) {
   const {
     stockWipCalc, stockOpeningEditable, stockWipOpening, setStockWipOpening,
@@ -32,7 +30,6 @@ export function HubStockQuadProcessBody({
           setStockProcessQtys={setStockProcessQtys}
           stockProcessHints={stockProcessHints}
           orderPutupKm={formPutupKm}
-          independentClosing={independentClosing}
         />
       ))}
     </tbody>

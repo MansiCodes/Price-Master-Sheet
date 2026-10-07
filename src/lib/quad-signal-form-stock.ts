@@ -1,8 +1,8 @@
 /**
- * Signalling/Quad **form** stock only.
- * Closing = Opening + Production, Outer also − call put-up.
- * Do not use the WIP chain (O + P − next process) here — that belongs
- * to calculateQuadSignalWip for Insulation / Single Quad only.
+ * Signalling/Quad form + production-status remaining.
+ * Size processes: Closing = Opening + Production − next process Production
+ * (DST Out = Outer production). Outer also − call put-up.
+ * Insulation is not part of this map.
  */
 
 export function isFormOuterProcess(name: string): boolean {
@@ -41,16 +41,32 @@ function qty(map: Record<string, number> | undefined, proc: string): number {
   return 0;
 }
 
+function nextSizeProcess(
+  processNames: readonly string[],
+  index: number,
+): string | undefined {
+  for (let j = index + 1; j < processNames.length; j++) {
+    if (processNames[j]!.trim().toLowerCase() === "insulation") continue;
+    return processNames[j];
+  }
+  return undefined;
+}
+
 export function formProcessClosing(
   processName: string,
   opening: number,
   production: number,
   putupKm: number,
+  nextProduction = 0,
 ): number {
   const o = Number(opening) || 0;
   const p = Number(production) || 0;
-  const putup = isFormOuterProcess(processName) ? Number(putupKm) || 0 : 0;
-  return Math.round((o + p - putup) * 1000) / 1000;
+  if (isFormOuterProcess(processName)) {
+    const putup = Number(putupKm) || 0;
+    return Math.round((o + p - putup) * 1000) / 1000;
+  }
+  const next = Number(nextProduction) || 0;
+  return Math.round((o + p - next) * 1000) / 1000;
 }
 
 export function formClosingByProcess(
@@ -60,18 +76,22 @@ export function formClosingByProcess(
   putupKm: number,
 ): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const proc of processNames) {
+  for (let i = 0; i < processNames.length; i++) {
+    const proc = processNames[i]!;
     if (proc.trim().toLowerCase() === "insulation") continue;
+    const next = nextSizeProcess(processNames, i);
     out[proc] = formProcessClosing(
       proc,
       qty(opening, proc),
       qty(production, proc),
       putupKm,
+      next ? qty(production, next) : 0,
     );
   }
   return out;
 }
 
+/** Tomorrow's Opening = yesterday remaining (chain + Outer after put-up). */
 export function nextDayFormOpeningFromMeta(
   processNames: readonly string[],
   meta: {

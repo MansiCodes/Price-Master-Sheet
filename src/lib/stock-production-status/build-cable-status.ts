@@ -138,15 +138,22 @@ function processLinesFromMeta(
   if (isSignallingCableName(cable) || isQuadCableName(cable)) {
     names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
   }
-  if (isSignallingCableName(cable)) {
+  if (isSignallingCableName(cable) || isQuadCableName(cable)) {
     const putupKm = sessionPutupKmFromItems(meta.callPutupItems);
     const by = formClosingByProcess(names, meta.opening, production, putupKm);
-    return names.map((name) => ({
-      name,
-      shortName: shortProcessName(name),
-      closing: by[name] ?? processQtyFromMeta(closing, name),
-      production: processQtyFromMeta(production, name),
-    }));
+    return names.map((name) => {
+      const stored = processQtyFromMeta(closing, name);
+      const closingQty =
+        name.trim().toLowerCase() === "single quad"
+          ? singleQuadClosingFromMeta(meta, size, stored)
+          : (by[name] ?? stored);
+      return {
+        name,
+        shortName: shortProcessName(name),
+        closing: Math.round(closingQty * 1000) / 1000,
+        production: processQtyFromMeta(production, name),
+      };
+    });
   }
   return names.map((name, i) => {
     const prod = processQtyFromMeta(production, name);
