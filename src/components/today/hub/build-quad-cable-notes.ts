@@ -15,6 +15,7 @@ import {
   applyOuterCallPutupClosing,
   sumCallPutupKm,
 } from "@/components/today/hub/process-row-out-label";
+import { formClosingByProcess } from "@/lib/quad-signal-form-stock";
 
 export type QuadCableNotesPayloadArgs = {
   resolvedCable: string;
@@ -63,8 +64,14 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     Number(args.stockCallPutupLoadedKm) || 0,
     formPutupKm,
   );
+  const sizeClosing = formClosingByProcess(
+    Object.keys({ ...args.openingQty, ...args.processes }),
+    args.openingQty,
+    args.processes,
+    formPutupKm,
+  );
   const closing = applyOuterCallPutupClosing(
-    args.wip.byProcess,
+    { ...args.wip.byProcess, ...sizeClosing },
     args.openingQty,
     args.processes,
     formPutupKm,

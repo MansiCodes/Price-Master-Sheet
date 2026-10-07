@@ -5,6 +5,7 @@ import {
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName, normalizeCableName } from "@/lib/quad-signal-wip";
+import { nextDayFormOpeningFromMeta } from "@/lib/quad-signal-form-stock";
 
 export const INSULATION_KEY = "Insulation";
 
@@ -188,11 +189,12 @@ export function lastEnteredOpeningByProcess(
       ? { ...(meta.opening ?? {}), ...closing }
       : { ...closing, ...(meta.opening ?? {}) };
     const out: Record<string, number> = {};
-    if (skipInsulation) {
-      Object.assign(out, signallingProcessClosingsFromMeta(meta, names));
+    const keys = names.length > 0 ? names : Object.keys(src);
+    if (useLastClosing) {
+      Object.assign(out, nextDayFormOpeningFromMeta(keys, meta));
     } else {
-      const keys = names.length > 0 ? names : Object.keys(src);
       for (const proc of keys) {
+        if (skipInsulation && proc.trim().toLowerCase() === "insulation") continue;
         const n = qtyOnMap(src, proc);
         if (Number.isFinite(n)) out[proc] = n;
       }

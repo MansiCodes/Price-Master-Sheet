@@ -180,22 +180,28 @@ export async function GET(
   } else if (!putupsAlreadyClosed) {
     callPutupItems = latestPutups;
   }
-  const callPutupOriginalKm = frozenCallPutupKm(
-    existingMeta?.kind === "cable" ? existingMeta.callPutupOriginalKm : 0,
-    callPutupItems,
-  );
+  const loadPutups = callPutupItems.length > 0;
+  const callPutupOriginalKm = loadPutups
+    ? frozenCallPutupKm(
+        existingMeta?.kind === "cable" ? existingMeta.callPutupOriginalKm : 0,
+        callPutupItems,
+      )
+    : 0;
 
   const stockMeta =
     existingMeta?.kind === "cable"
       ? {
-          callPutup:
-            callPutupItems[0]?.qty != null
+          callPutup: loadPutups
+            ? callPutupItems[0]?.qty != null
               ? String(callPutupItems[0].qty)
-              : existingMeta.callPutup ?? "",
-          putupDate:
-            callPutupItems[0]?.date ?? existingMeta.putupDate ?? "",
-          partyName:
-            callPutupItems[0]?.partyName ?? existingMeta.partyName ?? "",
+              : existingMeta.callPutup ?? ""
+            : "",
+          putupDate: loadPutups
+            ? callPutupItems[0]?.date ?? existingMeta.putupDate ?? ""
+            : "",
+          partyName: loadPutups
+            ? callPutupItems[0]?.partyName ?? existingMeta.partyName ?? ""
+            : "",
           dispatchPending:
             existingMeta.dispatchPending != null
               ? String(existingMeta.dispatchPending)

@@ -5,8 +5,13 @@ import {
 } from "@/lib/plant-catalogs";
 import {
   calculateQuadSignalWip,
+  isSignallingCableName,
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
+import {
+  formClosingByProcess,
+  sessionPutupKmFromItems,
+} from "@/lib/quad-signal-form-stock";
 
 export function recomputeCableNotesWithOpening(
   meta: QuadSignalStockMeta,
@@ -39,11 +44,20 @@ export function recomputeCableNotesWithOpening(
     lengthFactor,
     insulationConsumedOverride,
   });
+  const sizeClosing = isSignallingCableName(cable)
+    ? formClosingByProcess(
+        processes,
+        opening,
+        production,
+        sessionPutupKmFromItems(meta.callPutupItems),
+      )
+    : {};
+  const closing = { ...wip.byProcess, ...sizeClosing };
   const next: QuadSignalStockMeta = {
     ...meta,
     opening,
-    closing: wip.byProcess,
-    processes: wip.byProcess,
+    closing,
+    processes: closing,
     sharedInsulation,
     calcSnapshot: {
       ...wip.calcSnapshot,

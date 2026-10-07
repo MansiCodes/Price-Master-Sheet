@@ -10,9 +10,12 @@ import { getQuadFactorFromSize, isQuadCableName, isSignallingCableName } from "@
 import { isPowerCableName } from "@/lib/power-cable";
 import {
   processQtyFromMeta,
-  signallingProcessClosingsFromMeta,
   stageClosingFromMeta,
 } from "@/lib/quad-signal-opening-match";
+import {
+  formClosingByProcess,
+  sessionPutupKmFromItems,
+} from "@/lib/quad-signal-form-stock";
 import { pickSharedInsulationPool, familyInsulationCandidate } from "./build-cable-insulation";
 import {
   isOuterProcess,
@@ -136,11 +139,12 @@ function processLinesFromMeta(
     names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
   }
   if (isSignallingCableName(cable)) {
-    const by = signallingProcessClosingsFromMeta(meta, names);
+    const putupKm = sessionPutupKmFromItems(meta.callPutupItems);
+    const by = formClosingByProcess(names, meta.opening, production, putupKm);
     return names.map((name) => ({
       name,
       shortName: shortProcessName(name),
-      closing: Math.round((by[name] ?? processQtyFromMeta(closing, name)) * 1000) / 1000,
+      closing: by[name] ?? processQtyFromMeta(closing, name),
       production: processQtyFromMeta(production, name),
     }));
   }

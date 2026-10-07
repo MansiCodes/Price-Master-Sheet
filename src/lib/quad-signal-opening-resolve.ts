@@ -103,12 +103,6 @@ export async function resolveQuadSignalStockOpening(params: {
   const block = built.blocks.find(
     (b) => quadSignalCableSizeDedupeKey(b.cable, b.size) === wantKey,
   );
-  if (block) {
-    for (const line of block.processes) {
-      if (line.name.trim().toLowerCase() === "insulation") continue;
-      opening[line.name] = line.closing;
-    }
-  }
 
   const familyIns = signalling
     ? built.sharedInsulation

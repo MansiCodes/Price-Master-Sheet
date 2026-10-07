@@ -1,6 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { WipCalcResult } from "@/lib/quad-signal-wip";
 import { processRowOpening, processRowOutLabel, isOuterProcessName, outerFormOutAndClose } from "@/components/today/hub/process-row-out-label";
+import { formProcessClosing } from "@/lib/quad-signal-form-stock";
 import {
   HubStockQuadOpeningCell,
   HubStockQuadProductionCell,
@@ -18,6 +19,7 @@ type ProcessRowProps = {
   setStockProcessQtys: Dispatch<SetStateAction<Record<string, string>>>;
   stockProcessHints?: Record<string, string>;
   orderPutupKm?: number;
+  independentClosing?: boolean;
 };
 
 export function HubStockQuadProcessRow(props: ProcessRowProps) {
@@ -30,6 +32,23 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
         props.orderPutupKm ?? 0,
       )
     : null;
+  const prodRaw = props.stockProcessQtys[props.proc] ?? "";
+  const prodN = prodRaw.trim() === "" || prodRaw === "." ? 0 : Number(prodRaw);
+  const independentLive =
+    props.independentClosing &&
+    !isOuterProcessName(props.proc) &&
+    props.proc.trim().toLowerCase() !== "insulation"
+      ? {
+          out: 0,
+          closing: formProcessClosing(
+            props.proc,
+            openingVal,
+            Number.isFinite(prodN) ? prodN : 0,
+            0,
+          ),
+        }
+      : null;
+  const live = outerLive ?? independentLive;
   return (
     <tr key={props.proc}>
       {props.hideProcessLabel ? null : props.processLabelExtra ? (
@@ -56,11 +75,11 @@ export function HubStockQuadProcessRow(props: ProcessRowProps) {
         hint={props.stockProcessHints?.[props.proc]}
       />
       <td className="qs-wip__num qs-wip__calc">
-        {outerLive ? String(outerLive.out) : processRowOutLabel(stage)}
+        {live ? String(live.out) : processRowOutLabel(stage)}
       </td>
       <td className="qs-wip__num qs-wip__calc">
-        {outerLive
-          ? String(outerLive.closing)
+        {live
+          ? String(live.closing)
           : stage != null
             ? String(stage.closing)
             : "—"}

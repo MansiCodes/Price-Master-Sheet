@@ -34,7 +34,7 @@ export function HubStockQuadSignallingTable({ vm }: { vm: TodayHubVm }) {
       <div className="qs-wip__table-wrap">
         <table className="qs-wip__table">
           <HubStockQuadWipTableHead />
-          <HubStockQuadProcessBody vm={vm} processes={otherProcesses} />
+          <HubStockQuadProcessBody vm={vm} processes={otherProcesses} independentClosing />
         </table>
       </div>
     </div>

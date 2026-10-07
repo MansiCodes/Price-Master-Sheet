@@ -115,7 +115,7 @@ function applyCallPutupFromMeta(
       date: p.date ?? "",
       partyName: p.partyName ?? "",
     }));
-  } else if (meta?.callPutup || meta?.putupDate || meta?.partyName) {
+  } else if (rawPutups == null && (meta?.callPutup || meta?.putupDate || meta?.partyName)) {
     items = [{
       qty: meta.callPutup ?? "",
       date: meta.putupDate ?? "",
@@ -370,8 +370,8 @@ function applyQtyMaps(
     }
     return next;
   });
-  const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
   const productionStrings: Record<string, string> = {};
+  const productionSrc: Record<string, number> = { ...(data.production ?? {}) };
   for (const [key, raw] of Object.entries(productionSrc)) {
     if (isInsulationKey(key)) continue;
     const n = Number(raw);
@@ -383,7 +383,7 @@ function applyQtyMaps(
     }
   }
   s.setStockProcessHints(productionStrings);
-  s.setStockProcessQtys({});
+  s.setStockProcessQtys(data.sameDay ? { ...productionStrings } : {});
 }
 
 export function applyQuadWipContextData(
