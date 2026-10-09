@@ -6,7 +6,7 @@ import type {
 import {
   formatDeliveryDisplay,
   formatNum,
-  getPartyInHandKm,
+  partyDoneFromOrder,
 } from "./stock-status-format";
 
 export function StockOrderPanel({
@@ -75,10 +75,10 @@ export function StockOrderPanel({
             </thead>
             <tbody>
               {partyLines.map((p, i) => {
-                const inHandKm = getPartyInHandKm(p.partyName, block);
+                const doneKm = partyDoneFromOrder(p.partyName, p.done, block);
                 const partyBalance = Math.max(
                   0,
-                  Math.round((p.qty - inHandKm) * 10000) / 10000,
+                  Math.round((p.qty - doneKm) * 10000) / 10000,
                 );
                 return (
                   <tr
@@ -91,13 +91,7 @@ export function StockOrderPanel({
                       <strong>{formatNum(p.qty)}</strong> km
                     </td>
                     <td className="col-inhand">
-                      {inHandKm > 0 ? (
-                        <>
-                          <strong>{formatNum(inHandKm)}</strong> km
-                        </>
-                      ) : (
-                        "—"
-                      )}
+                      <strong>{formatNum(doneKm)}</strong> km
                     </td>
                     <td className="col-balance">
                       <strong>{formatNum(partyBalance)}</strong> km

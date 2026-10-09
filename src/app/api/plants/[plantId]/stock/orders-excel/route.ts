@@ -16,6 +16,7 @@ function buildOrdersByKeyMap(
     size: string;
     partyName: string;
     qty: unknown;
+    done?: unknown;
     deliveryPeriod: string | null;
   }>,
 ): Record<string, StockOrderBySize> {
@@ -32,9 +33,11 @@ function buildOrdersByKeyMap(
     }
     const qtyNum = Number(row.qty);
     const qtyVal = Number.isFinite(qtyNum) ? qtyNum : 0;
+    const doneNum = Number(row.done);
     map[key].parties.push({
       partyName: row.partyName,
       qty: qtyVal,
+      done: Number.isFinite(doneNum) && doneNum > 0 ? doneNum : 0,
       deliveryPeriod: row.deliveryPeriod,
     });
     map[key].totalQty += qtyVal;
@@ -95,43 +98,73 @@ export async function POST(req: NextRequest, ctx: RouteContext) {
   try {
     const parsed = await parseStockOrdersExcel(buffer);
 
+    if (parsed.matchedRows > 0) {
+      await (prisma as any).plantStockOrder.deleteMany({
+        where: { plantId },
+      });
+    }
+
+    type SaveRow = {
+      cable: string;
+      size: string;
+      partyName: string;
+      qty: number;
+      done: number;
+      deliveryPeriod: string | null;
+    };
+    const byUnique = new Map<string, SaveRow>();
     for (const item of Object.values(parsed.byKey)) {
       for (const p of item.parties) {
         const partyNameClean = p.partyName.trim();
-        if (!partyNameClean) continue;
-        await (prisma as any).plantStockOrder.upsert({
-          where: {
-            plantId_cable_size_partyName: {
-              plantId,
-              cable: item.cable,
-              size: item.size,
-              partyName: partyNameClean,
-            },
-          },
-          create: {
-            plantId,
+        if (!partyNameClean || partyNameClean === "—") continue;
+        const doneKm = Number(p.done) > 0 ? Number(p.done) : 0;
+        p.done = doneKm;
+        const key = `${item.cable}\0${item.size}\0${partyNameClean.toLowerCase()}`;
+        const prev = byUnique.get(key);
+        if (prev) {
+          prev.qty = Math.round((prev.qty + p.qty) * 10000) / 10000;
+          prev.done = Math.round((prev.done + doneKm) * 10000) / 10000;
+        } else {
+          byUnique.set(key, {
             cable: item.cable,
             size: item.size,
             partyName: partyNameClean,
             qty: p.qty,
+            done: doneKm,
             deliveryPeriod: p.deliveryPeriod,
-          },
-          update: {
-            qty: p.qty,
-            deliveryPeriod: p.deliveryPeriod,
-          },
-        });
+          });
+        }
       }
     }
-
-    const dbOrders = await (prisma as any).plantStockOrder.findMany({
-      where: { plantId },
-      orderBy: { createdAt: "asc" },
-    });
-    const mergedByKey = buildOrdersByKeyMap(dbOrders);
+    for (const row of byUnique.values()) {
+      await (prisma as any).plantStockOrder.upsert({
+        where: {
+          plantId_cable_size_partyName: {
+            plantId,
+            cable: row.cable,
+            size: row.size,
+            partyName: row.partyName,
+          },
+        },
+        create: {
+          plantId,
+          cable: row.cable,
+          size: row.size,
+          partyName: row.partyName,
+          qty: row.qty,
+          done: row.done,
+          deliveryPeriod: row.deliveryPeriod,
+        },
+        update: {
+          qty: row.qty,
+          done: row.done,
+          deliveryPeriod: row.deliveryPeriod,
+        },
+      });
+    }
 
     return NextResponse.json({
-      byKey: mergedByKey,
+      byKey: parsed.byKey,
       matchedRows: parsed.matchedRows,
       unmatchedSizes: parsed.unmatchedSizes,
       skippedRows: parsed.skippedRows,

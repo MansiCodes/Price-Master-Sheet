@@ -53,6 +53,19 @@ export function getPartyInHandKm(
   return Math.round(putupSum * 10000) / 10000;
 }
 
+/** Done from the uploaded order Excel only (not Today's call put-up). */
+export function partyDoneFromOrder(
+  _partyName: string,
+  excelDone: number | undefined,
+  _block?: CableStockStatusBlock | null,
+): number {
+  const fromExcel = Number(excelDone);
+  if (Number.isFinite(fromExcel) && fromExcel > 0) {
+    return Math.round(fromExcel * 10000) / 10000;
+  }
+  return 0;
+}
+
 export function extraCablesFromBlocks(
   cableBlocks: CableStockStatusBlock[],
 ): string[] {

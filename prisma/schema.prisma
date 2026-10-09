@@ -719,6 +719,7 @@ model PlantStockOrder {
   size           String
   partyName      String
   qty            Decimal  @db.Decimal(18, 4)
+  done           Decimal  @default(0) @db.Decimal(18, 4)
   deliveryPeriod String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

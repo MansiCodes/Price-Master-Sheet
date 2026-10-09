@@ -14,7 +14,7 @@ export function useStockOrders(plantId: string) {
   const [ordersFileName, setOrdersFileName] = useState<string | null>(null);
   const [ordersUploading, setOrdersUploading] = useState(false);
   const [ordersHydrated, setOrdersHydrated] = useState(false);
-  const ordersStorageKey = `stock-orders-excel:v2:${plantId}`;
+  const ordersStorageKey = `stock-orders-excel:v4:${plantId}`;
 
   useEffect(() => {
     let ignore = false;

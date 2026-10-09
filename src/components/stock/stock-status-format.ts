@@ -19,5 +19,6 @@ export {
   extraCablesFromBlocks,
   extraSizesFromData,
   getPartyInHandKm,
+  partyDoneFromOrder,
 } from "./stock-status-lists";
 export { buildDisplayCards } from "./stock-status-cards";

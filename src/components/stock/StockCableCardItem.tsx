@@ -11,7 +11,11 @@ import {
 } from "@/lib/stock/order-excel-types";
 import { StockOrderPanel } from "./StockOrderPanel";
 import { CalendarIcon } from "./StockStatusToolbar";
-import { formatNum, type DisplayCard } from "./stock-status-format";
+import {
+  formatNum,
+  partyDoneFromOrder,
+  type DisplayCard,
+} from "./stock-status-format";
 import { getProcessIcon } from "./stock-process-icon";
 
 export function StockCableCardItem({
@@ -33,11 +37,11 @@ export function StockCableCardItem({
   const order = lookupStockOrder(ordersByKey, card.cable, card.size);
   const stockTotal = block?.totalKm ?? 0;
   const orderQty = order?.totalQty ?? 0;
-  const orderPutupKm = (block?.orderPutupItems ?? block?.callPutupItems ?? []).reduce(
-    (sum, item) => sum + (Number(item.qty) > 0 ? Number(item.qty) : 0),
+  const totalDoneKm = (order?.parties ?? []).reduce(
+    (sum, item) =>
+      sum + partyDoneFromOrder(item.partyName, item.done, block),
     0,
   );
-  const totalDoneKm = orderPutupKm;
   const balanceTotal =
     Math.round((orderQty - totalDoneKm) * 10000) / 10000;
   const partyLines = order

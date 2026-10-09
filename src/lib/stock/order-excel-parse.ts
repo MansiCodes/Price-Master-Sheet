@@ -68,6 +68,51 @@ function findCol(
   return undefined;
 }
 
+/** Exact Done/Supplied header only — not "dated" (contains "done"). */
+function findDoneCol(map: Map<string, number>): number | undefined {
+  const exact = [
+    "done",
+    "done qty",
+    "qty done",
+    "supplied",
+    "supplied qty",
+    "qty supplied",
+    "offered",
+    "offered qty",
+    "ready qty",
+    "executed",
+    "executed qty",
+    "call putup",
+    "call put up",
+  ];
+  for (const a of exact) {
+    const hit = map.get(a);
+    if (hit != null) return hit;
+  }
+  for (const [h, idx] of map) {
+    if (h === "dated" || h === "date") continue;
+    if (/\bdone\b/.test(h) || /\bsupplied\b/.test(h)) return idx;
+  }
+  return undefined;
+}
+
+function isCarryParty(raw: string): boolean {
+  const t = raw.trim().toLowerCase();
+  if (!t || t === "—" || t === "-") return true;
+  const n = t.replace(/[.\s'"-]/g, "");
+  return n === "do" || n === "ditto" || n === "same";
+}
+
+function cellStr(
+  row: { getCell: (col: number) => unknown },
+  col: number,
+): string {
+  const cell = row.getCell(col) as {
+    master?: Parameters<typeof cellVal>[0];
+  } & Parameters<typeof cellVal>[0];
+  return str(cellVal(cell.master ?? cell));
+}
+
 function isJunkRow(size: string, party: string): boolean {
   const blob = `${size} ${party}`.toLowerCase();
   return (
@@ -104,6 +149,7 @@ function addLine(
   );
   if (same) {
     same.qty = Math.round((same.qty + line.qty) * 10000) / 10000;
+    same.done = Math.round((same.done + line.done) * 10000) / 10000;
   } else {
     existing.parties.push(line);
   }
@@ -119,6 +165,7 @@ export async function parseStockOrdersExcel(
   const unmatched = new Set<string>();
   let matchedRows = 0;
   let skippedRows = 0;
+  let hasDoneColumn = false;
 
   for (const sheet of wb.worksheets) {
     if (!sheet || sheet.state === "hidden" || sheet.state === "veryHidden") {
@@ -169,13 +216,10 @@ export async function parseStockOrdersExcel(
       "order in hand",
     ])!;
     const uomCol = findCol(colMap, ["uom", "unit", "units"]);
-    const partyCol = findCol(colMap, [
-      "party name",
-      "party",
-      "consignee",
-      "customer",
-      "customer name",
-    ]);
+    const partyCol =
+      findCol(colMap, ["party name"]) ??
+      findCol(colMap, ["party"]) ??
+      findCol(colMap, ["consignee", "customer", "customer name"]);
     const deliveryCol = findCol(colMap, [
       "delivery date",
       "delivery period",
@@ -183,14 +227,18 @@ export async function parseStockOrdersExcel(
       "del date",
       "due date",
     ]);
+    const doneCol = findDoneCol(colMap);
+    if (doneCol != null) hasDoneColumn = true;
 
     const last = Math.min(sheet.rowCount || headerRow, headerRow + 5000);
+    let lastParty = "";
+    let lastUom = "";
     for (let r = headerRow + 1; r <= last; r++) {
       const row = sheet.getRow(r);
-      const sizeRaw = str(cellVal(row.getCell(sizeCol)));
-      const partyName = partyCol
-        ? str(cellVal(row.getCell(partyCol))) || "—"
-        : "—";
+      const sizeRaw = cellStr(row, sizeCol);
+      let partyName = partyCol ? cellStr(row, partyCol) : "";
+      if (isCarryParty(partyName)) partyName = lastParty;
+      else lastParty = partyName.trim();
       if (isJunkRow(sizeRaw, partyName)) {
         skippedRows += 1;
         continue;
@@ -200,7 +248,9 @@ export async function parseStockOrdersExcel(
         skippedRows += 1;
         continue;
       }
-      const uom = uomCol ? str(cellVal(row.getCell(uomCol))) : "";
+      let uom = uomCol ? cellStr(row, uomCol) : "";
+      if (!uom.trim() && lastUom) uom = lastUom;
+      else if (uom.trim()) lastUom = uom;
       const qtyKm = qtyToKm(qtyRaw, uom);
       if (qtyKm <= 0) {
         skippedRows += 1;
@@ -209,6 +259,13 @@ export async function parseStockOrdersExcel(
       const deliveryPeriod = deliveryCol
         ? formatDelivery(cellVal(row.getCell(deliveryCol)))
         : null;
+      let doneKm = 0;
+      if (doneCol != null) {
+        const doneRaw = num(cellVal(row.getCell(doneCol)));
+        if (doneRaw != null && doneRaw >= 0) {
+          doneKm = qtyToKm(doneRaw, uom);
+        }
+      }
 
       const matched = matchCableAndSize(sizeRaw);
       if (!matched) {
@@ -220,6 +277,7 @@ export async function parseStockOrdersExcel(
       addLine(byKey, matched, {
         partyName,
         qty: qtyKm,
+        done: doneKm,
         deliveryPeriod,
       });
       matchedRows += 1;
@@ -231,5 +289,6 @@ export async function parseStockOrdersExcel(
     matchedRows,
     unmatchedSizes: [...unmatched].sort((a, b) => a.localeCompare(b)),
     skippedRows,
+    hasDoneColumn,
   };
 }

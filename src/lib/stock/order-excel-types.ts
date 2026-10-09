@@ -3,6 +3,8 @@
 export type StockOrderPartyLine = {
   partyName: string;
   qty: number;
+  /** From Excel Done/Supplied (not from Today's call put-up). */
+  done: number;
   deliveryPeriod: string | null;
 };
 
@@ -19,6 +21,8 @@ export type ParseStockOrdersResult = {
   matchedRows: number;
   unmatchedSizes: string[];
   skippedRows: number;
+  /** True when the sheet has a Done/Supplied column to copy. */
+  hasDoneColumn: boolean;
 };
 
 export function orderKey(cable: string, size: string): string {
