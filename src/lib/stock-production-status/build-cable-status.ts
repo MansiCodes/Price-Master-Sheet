@@ -186,14 +186,6 @@ function processLinesFromMeta(
   });
 }
 
-function sizeWipEmpty(processes: StockProcessLine[]): boolean {
-  return processes.every(
-    (p) =>
-      p.name.trim().toLowerCase() === "insulation" ||
-      (p.closing === 0 && p.production === 0),
-  );
-}
-
 function totalKmFromProcesses(
   processes: StockProcessLine[],
   totalPutupKm: number,
@@ -255,11 +247,6 @@ export function buildCableStockStatus(
           block.orderPutupItems ?? block.callPutupItems ?? [],
           putupItemsFromMeta(meta),
         );
-        const incoming = processLinesFromMeta(meta, cable, size);
-        if (sizeWipEmpty(block.processes) && !sizeWipEmpty(incoming)) {
-          block.processes = incoming;
-          block.entryDate = entryDate;
-        }
         continue;
       }
 

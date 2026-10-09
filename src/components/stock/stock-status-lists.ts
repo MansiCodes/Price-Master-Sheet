@@ -53,17 +53,24 @@ export function getPartyInHandKm(
   return Math.round(putupSum * 10000) / 10000;
 }
 
-/** Done from the uploaded order Excel only (not Today's call put-up). */
+/**
+ * Excel upload starts Done at 0. After that, today's call put-up for
+ * that party is added (so 29 km put-up → Done 29, Balance 0).
+ */
 export function partyDoneFromOrder(
-  _partyName: string,
+  partyName: string,
   excelDone: number | undefined,
-  _block?: CableStockStatusBlock | null,
+  block?: CableStockStatusBlock | null,
 ): number {
   const fromExcel = Number(excelDone);
-  if (Number.isFinite(fromExcel) && fromExcel > 0) {
-    return Math.round(fromExcel * 10000) / 10000;
-  }
-  return 0;
+  const excelKm =
+    Number.isFinite(fromExcel) && fromExcel > 0
+      ? Math.round(fromExcel * 10000) / 10000
+      : 0;
+  const putupKm = getPartyInHandKm(partyName, block
+    ? { ...block, orderPutupItems: [] }
+    : null);
+  return Math.round((excelKm + putupKm) * 10000) / 10000;
 }
 
 export function extraCablesFromBlocks(
