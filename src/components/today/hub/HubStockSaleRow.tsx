@@ -130,11 +130,11 @@ export function HubStockSaleRow({
           <span />
         )}
         <div className="qs-wip__sale-totals">
-          <div className="field">
+          <div className="qs-wip__sale-total">
             <span className="qs-wip__sale-label">Total</span>
             <span className="qs-wip__sale-calc">{total ? total.toFixed(2) : "0"}</span>
           </div>
-          <div className="field">
+          <div className="qs-wip__sale-total">
             <span className="qs-wip__sale-label">Grand total</span>
             <span className="qs-wip__sale-calc">{grand ? grand.toFixed(2) : "0"}</span>
           </div>

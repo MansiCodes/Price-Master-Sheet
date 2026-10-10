@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = [
@@ -35,6 +36,26 @@ function shiftMonth(year: number, month: number, delta: number) {
   return { year: d.getFullYear(), month: d.getMonth() };
 }
 
+const MENU_WIDTH = 260;
+const MENU_HEIGHT = 320;
+const EDGE = 16;
+const GAP = 8;
+
+function measureMenu(trigger: HTMLElement, alignEnd: boolean) {
+  const rect = trigger.getBoundingClientRect();
+  const width = Math.min(MENU_WIDTH, window.innerWidth - EDGE * 2);
+  let left = alignEnd ? rect.right - width : rect.left;
+  left = Math.min(left, window.innerWidth - EDGE - width);
+  left = Math.max(EDGE, left);
+  const spaceBelow = window.innerHeight - rect.bottom - GAP - EDGE;
+  const spaceAbove = rect.top - GAP - EDGE;
+  const openUp = spaceBelow < MENU_HEIGHT && spaceAbove > spaceBelow;
+  const top = openUp
+    ? Math.max(EDGE, rect.top - GAP - Math.min(MENU_HEIGHT, spaceAbove))
+    : rect.bottom + GAP;
+  return { top, left, width };
+}
+
 export function PnlThemedDateField({
   id,
   label,
@@ -57,11 +78,17 @@ export function PnlThemedDateField({
   onChange: (next: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const parsed = value ? new Date(`${value}T00:00:00`) : new Date();
   const [year, setYear] = useState(parsed.getFullYear());
   const [month, setMonth] = useState(parsed.getMonth());
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -70,26 +97,42 @@ export function PnlThemedDateField({
     setMonth(base.getMonth());
   }, [open, value]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    const el = rootRef.current;
+    if (!el) return;
+    function place() {
+      const node = rootRef.current;
+      if (!node) return;
+      setPos(measureMenu(node, align === "end"));
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [open]);
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, align, year, month]);
 
   useEffect(() => {
     if (!open) return;
-    const menu = menuRef.current;
-    if (!menu) return;
-    menu.style.transform = "";
-    const r = menu.getBoundingClientRect();
-    let shift = 0;
-    if (r.right > window.innerWidth - 20) shift = window.innerWidth - 20 - r.right;
-    if (r.left + shift < 12) shift += 12 - (r.left + shift);
-    menu.style.transform = shift ? `translateX(${shift}px)` : "";
-  }, [open, year, month]);
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [open]);
 
   const firstDow = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -118,15 +161,22 @@ export function PnlThemedDateField({
           onClick={() => setOpen((v) => !v)}
         >
           <span className={value ? "" : "is-placeholder"}>
-            {value ? formatDisplay(value) : "dd-mm-yyyy"}
+            {value ? formatDisplay(value) : "Select date"}
           </span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <rect x="3" y="5" width="18" height="16" rx="3" />
             <path d="M3 10h18M8 3v4M16 3v4" />
           </svg>
         </button>
-        {open ? (
-          <div className="pnl-date-picker__menu" role="dialog" aria-label={label} ref={menuRef}>
+        {mounted && open && pos
+          ? createPortal(
+          <div
+            className="pnl-date-picker__menu pnl-date-picker__menu--portal"
+            role="dialog"
+            aria-label={label}
+            ref={menuRef}
+            style={{ top: pos.top, left: pos.left, width: pos.width }}
+          >
             <div className="pnl-date-picker__nav">
               <button
                 type="button"
@@ -211,8 +261,10 @@ export function PnlThemedDateField({
                 Today
               </button>
             </div>
-          </div>
-        ) : null}
+          </div>,
+            document.body,
+          )
+          : null}
       </div>
     </div>
   );

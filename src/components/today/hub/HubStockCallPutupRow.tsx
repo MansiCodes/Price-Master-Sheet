@@ -136,19 +136,15 @@ export function HubStockCallPutupRow({
   item, idx, items, setItems, onFirstQty, onFirstDate, onFirstParty, onRemove,
 }: HubStockCallPutupRowProps) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: items.length > 1 ? "1fr 1.4fr 2.5fr 36px" : "1fr 1.4fr 2.5fr",
-        gap: "10px",
-        alignItems: "flex-end",
-        marginBottom: idx < items.length - 1 ? "12px" : 0,
-      }}
-    >
-      <HubStockCallPutupQtyField item={item} idx={idx} setItems={setItems} onFirstQty={onFirstQty} />
-      <HubStockCallPutupDateField item={item} idx={idx} setItems={setItems} onFirstDate={onFirstDate} />
+    <div className={`qs-wip__putup-row${idx < items.length - 1 ? " qs-wip__putup-row--gap" : ""}`}>
+      <div
+        className={`qs-wip__putup-top${items.length > 1 ? " qs-wip__putup-top--remove" : ""}`}
+      >
+        <HubStockCallPutupQtyField item={item} idx={idx} setItems={setItems} onFirstQty={onFirstQty} />
+        <HubStockCallPutupDateField item={item} idx={idx} setItems={setItems} onFirstDate={onFirstDate} />
+        <HubStockCallPutupRemove idx={idx} count={items.length} onRemove={onRemove} />
+      </div>
       <HubStockCallPutupPartyField item={item} idx={idx} setItems={setItems} onFirstParty={onFirstParty} />
-      <HubStockCallPutupRemove idx={idx} count={items.length} onRemove={onRemove} />
     </div>
   );
 }

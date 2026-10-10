@@ -117,6 +117,12 @@
   cursor: pointer;
 }
 
+.pnl-date-picker__trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pnl-date-picker__trigger .is-placeholder {
   color: var(--fg-muted, #5b6b66);
 }
@@ -146,9 +152,18 @@
   box-sizing: border-box;
 }
 
-.pnl-date-picker--end .pnl-date-picker__menu {
+.pnl-date-picker--end .pnl-date-picker__menu:not(.pnl-date-picker__menu--portal) {
   left: auto;
   right: 0;
+}
+
+.pnl-date-picker__menu--portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 200;
+  max-width: calc(100vw - 2rem);
 }
 
 .pnl-date-picker__nav {
