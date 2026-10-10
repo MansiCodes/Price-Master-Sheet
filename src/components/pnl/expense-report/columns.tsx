@@ -24,12 +24,13 @@ export function buildExpenseColumns(opts: {
   cat6: boolean;
   pvc: boolean;
   upcast: boolean;
+  isQuad?: boolean;
   page: number;
   pageSize: number;
   t: (key: string) => string;
   tCommon: (key: string) => string;
 }): ReportColumn<ExpenseRow>[] {
-  const { cat6, pvc, upcast, page, pageSize, t, tCommon } = opts;
+  const { cat6, pvc, upcast, isQuad, page, pageSize, t, tCommon } = opts;
   if (cat6) {
     return [
       {
@@ -211,6 +212,16 @@ export function buildExpenseColumns(opts: {
     },
     { key: "date", label: t("date"), render: (r) => isoDate(r.date) },
     { key: "head", label: t("category"), render: (r) => r.expenseHead },
+    ...(isQuad
+      ? [
+          {
+            key: "expenseName",
+            label: "Expense name",
+            wrap: true as const,
+            render: (r: ExpenseRow) => r.expenseName || tCommon("dash"),
+          },
+        ]
+      : []),
     {
       key: "desc",
       label: t("remarksNotes"),

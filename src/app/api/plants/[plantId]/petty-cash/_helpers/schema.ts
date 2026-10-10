@@ -11,6 +11,7 @@ export const pettyCashSchema = z.object({
   payMode: z.string().min(1),
   expenseHead: z.string().min(1),
   nature: z.string().optional().nullable(),
+  expenseName: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   checkedBy: z.string().optional().nullable(),

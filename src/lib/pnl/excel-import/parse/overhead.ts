@@ -56,6 +56,7 @@ export function parseElectricitySheets(
         target: "electricity",
         expenseHead: "Electricity",
         nature: null,
+        expenseName: null,
         description: str(getCell(sheet, r, header.map, "notes")) || null,
         payMode: "Bank",
         amount,
@@ -116,6 +117,7 @@ export function parseRentSheets(
         target: "rent",
         expenseHead: "Factory Rent",
         nature: null,
+        expenseName: null,
         description: str(getCell(sheet, r, header.map, "notes")) || null,
         payMode: "Bank",
         amount,
@@ -172,6 +174,7 @@ export function parseFarSheet(
           target: "far",
           expenseHead: "FAR",
           nature: null,
+          expenseName: null,
           description: descFinal,
           payMode: "Bank",
           amount: 0,
@@ -239,6 +242,7 @@ export function parseUnloadingSheet(
           target: "petty",
           expenseHead: "Unloading of MT",
           nature: null,
+          expenseName: null,
           description:
             [paidTo && `Paid to ${paidTo}`, notes, qty != null && `Qty ${qty} MT`]
               .filter(Boolean)

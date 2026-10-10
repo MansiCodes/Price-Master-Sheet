@@ -14,6 +14,10 @@ import {
   upcastMiscExpenseBody,
 } from "@/components/today/hub/build-expense-payloads";
 import {
+  expenseNameMissingMessage,
+  requiresExpenseName,
+} from "@/lib/plant-catalogs";
+import {
   submitExpensePettyCat6,
   submitExpensePettyDefault,
 } from "@/components/today/hub/submit-expense-petty";
@@ -57,6 +61,13 @@ export async function submitExpenseGeneric(args: SubmitExpenseGenericArgs): Prom
   const amount = Number(args.expenseAmount);
   if (!(amount > 0) || !args.expenseHead) {
     args.fail(args.enterCategoryAmountMsg);
+    return { status: "failed" };
+  }
+  if (
+    requiresExpenseName(args.plantCode, args.expenseHead) &&
+    !String(args.expenseName ?? "").trim()
+  ) {
+    args.fail(expenseNameMissingMessage());
     return { status: "failed" };
   }
   const result = await postJson(`/api/plants/${args.plantId}/petty-cash`, genericExpenseBody(args, amount));

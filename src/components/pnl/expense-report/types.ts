@@ -5,6 +5,7 @@ export type ExpenseRow = {
   expenseHead: string;
   payMode?: string | null;
   nature?: string | null;
+  expenseName?: string | null;
   description: string | null;
   location?: string | null;
   checkedBy?: string | null;

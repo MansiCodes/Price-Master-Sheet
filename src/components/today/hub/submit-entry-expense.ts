@@ -52,7 +52,7 @@ export async function submitExpenseKind(
     return submitExpensePetty({ ...shared, isCat6: flags.isCat6, ...misc, enterPettyCashMsg: t("enterPettyCash") });
   }
   return submitExpenseGeneric({
-    ...shared, ...expense, isCat6: flags.isCat6, isPvcStyleExpense: flags.isPvcStyleExpense,
+    ...shared, ...expense, plantCode: vm.plantCode, isCat6: flags.isCat6, isPvcStyleExpense: flags.isPvcStyleExpense,
     enterCategoryAmountMsg: t("enterCategoryAmount"),
   });
 }

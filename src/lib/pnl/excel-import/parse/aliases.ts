@@ -140,12 +140,18 @@ export const EXPENSE_ALIASES: Record<string, string[]> = {
     "nature",
   ],
   nature: ["nature of expense", "nature", "sub nature", "misc nature"],
+  expenseName: ["expense name"],
   description: [
+    "expense name / description",
     "description of expense",
     "description",
     "particulars",
     "narration",
     "details",
+    "remarks / notes",
+    "remarks",
+    "remark",
+    "notes",
   ],
   payMode: ["pay mode", "payment mode", "mode", "payment"],
   amount: [

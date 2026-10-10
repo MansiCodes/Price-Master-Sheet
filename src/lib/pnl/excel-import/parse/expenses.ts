@@ -30,6 +30,7 @@ export function parseExpenseSheet(
         const headRaw =
           str(getCell(sheet, r, header.map, "head")) ||
           str(getCell(sheet, r, header.map, "nature"));
+        const expenseName = str(getCell(sheet, r, header.map, "expenseName"));
         const description = str(getCell(sheet, r, header.map, "description"));
         const amount = num(getCell(sheet, r, header.map, "amount")) ?? 0;
         const contractor =
@@ -37,8 +38,9 @@ export function parseExpenseSheet(
         const supervisor =
           num(getCell(sheet, r, header.map, "supervisor")) ?? 0;
         const cost = num(getCell(sheet, r, header.map, "cost"));
-        if (!headRaw && !description && amount === 0 && !cost) continue;
-        if (/\bTOTAL\b/i.test(headRaw + description)) break;
+        if (!headRaw && !expenseName && !description && amount === 0 && !cost)
+          continue;
+        if (/\bTOTAL\b/i.test(headRaw + expenseName + description)) break;
         const dateRaw = asUtcDate(getCell(sheet, r, header.map, "date"));
         const dateFinal = dateRaw ?? todayUtc();
         const headFinal = headRaw || description || "General Expense";
@@ -52,6 +54,7 @@ export function parseExpenseSheet(
           target,
           expenseHead,
           nature: natureRaw || null,
+          expenseName: expenseName || null,
           description: description || null,
           payMode: str(getCell(sheet, r, header.map, "payMode")) || "Cash",
           amount,

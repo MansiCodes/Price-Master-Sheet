@@ -14,6 +14,10 @@ import { prisma } from "@/lib/db";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { resolveCanonicalWritePlantId } from "@/lib/plant-merge";
 import { pettyCashSchema, type PettyCashRouteContext } from "./schema";
+import {
+  expenseNameMissingMessage,
+  requiresExpenseName,
+} from "@/lib/plant-catalogs";
 
 export async function POST(
   request: NextRequest,
@@ -42,6 +46,19 @@ export async function POST(
   if (!parsed.success) return zodErrorResponse(parsed.error);
 
   const data = parsed.data;
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  if (
+    requiresExpenseName(plant?.code, data.expenseHead) &&
+    !String(data.expenseName ?? "").trim()
+  ) {
+    return NextResponse.json(
+      { error: expenseNameMissingMessage() },
+      { status: 400 },
+    );
+  }
   const backdated = isBackdated(data.date);
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
   const approval = entryApprovalCreateData(session.user.globalRole, data.date);
@@ -60,6 +77,7 @@ export async function POST(
       payMode: data.payMode,
       expenseHead: data.expenseHead,
       nature: data.nature?.trim() || null,
+      expenseName: data.expenseName?.trim() || null,
       description: data.description ?? null,
       location: data.location?.trim() || null,
       checkedBy: data.checkedBy?.trim() || null,

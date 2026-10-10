@@ -22,9 +22,10 @@ export function buildExpenseEditFields(opts: {
   cat6: boolean;
   editingElectricity: boolean;
   isPettyCategory: boolean;
+  isQuad?: boolean;
   t: (key: string) => string;
 }) {
-  const { cat6, editingElectricity, isPettyCategory, t } = opts;
+  const { cat6, editingElectricity, isPettyCategory, isQuad, t } = opts;
   const base: Array<{
     name: string;
     label: string;
@@ -84,6 +85,9 @@ export function buildExpenseEditFields(opts: {
       required: true,
     },
     { name: "expenseHead", label: t("category"), required: true },
+    ...(isQuad
+      ? [{ name: "expenseName", label: "Expense name" }]
+      : []),
     {
       name: "description",
       label: cat6 ? "Remarks" : t("remarksNotes"),
@@ -247,6 +251,7 @@ function saveExpenseEdit(
     void crud.save({
       date,
       expenseHead: crud.values.expenseHead,
+      expenseName: crud.values.expenseName || null,
       description: crud.values.description || null,
       amount,
       payMode: crud.values.payMode || undefined,

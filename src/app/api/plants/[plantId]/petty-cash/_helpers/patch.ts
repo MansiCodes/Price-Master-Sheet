@@ -12,6 +12,10 @@ import { isBackdated, parseDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { normalizeBillPhotoUrls } from "@/lib/cloudinary";
 import { pettyCashSchema, type PettyCashRouteContext } from "./schema";
+import {
+  expenseNameMissingMessage,
+  requiresExpenseName,
+} from "@/lib/plant-catalogs";
 
 export async function PATCH(
   request: NextRequest,
@@ -48,6 +52,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Entry not found" }, { status: 404 });
   }
 
+  const plant = await prisma.plant.findUnique({
+    where: { id: plantId },
+    select: { code: true },
+  });
+  const nextHead = data.expenseHead ?? existing.expenseHead;
+  const nextName =
+    data.expenseName !== undefined ? data.expenseName : existing.expenseName;
+  if (
+    requiresExpenseName(plant?.code, nextHead) &&
+    !String(nextName ?? "").trim()
+  ) {
+    return NextResponse.json(
+      { error: expenseNameMissingMessage() },
+      { status: 400 },
+    );
+  }
   const dateStr = data.date ?? existing.date.toISOString().slice(0, 10);
   const approvalReset = entryApprovalResetOnEdit(
     session.user.globalRole,
@@ -66,6 +86,7 @@ export async function PATCH(
       payMode: data.payMode,
       expenseHead: data.expenseHead,
       nature: data.nature,
+      expenseName: data.expenseName,
       description: data.description,
       location: data.location,
       checkedBy: data.checkedBy,

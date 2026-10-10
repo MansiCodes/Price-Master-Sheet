@@ -104,7 +104,7 @@ export async function GET(
         : kind.toUpperCase();
   const sheet = workbook.addWorksheet(sheetName);
 
-  const listOpts = { pScope, byUser, dateFilter, cat6 };
+  const listOpts = { pScope, byUser, dateFilter, cat6, plantCode: plant.code };
 
   if (kind === "pnl") {
     const forbidden = await fillPnlSheet(sheet, {

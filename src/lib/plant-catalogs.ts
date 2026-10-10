@@ -98,3 +98,10 @@ export {
   upcastExpensePnlLine,
   usesExpenseSections,
 } from "./plant-catalogs/expenses";
+export {
+  QUAD_EXPENSE_NAME_EXAMPLES,
+  QUAD_NAMED_EXPENSE_HEADS,
+  expenseNameMissingMessage,
+  namedExpenseDescription,
+  requiresExpenseName,
+} from "./plant-catalogs/quad-expense-name";

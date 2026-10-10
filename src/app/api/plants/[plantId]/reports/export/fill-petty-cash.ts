@@ -1,6 +1,7 @@
 import type ExcelJS from "exceljs";
 import { PettyCashKind } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { iso, styleHeader, toNum, type DateFilter } from "./export-utils";
 
 export async function fillPettyCashSheet(
@@ -74,6 +75,7 @@ export async function fillExpenseSheet(
     byUser: Record<string, unknown>;
     dateFilter: DateFilter;
     cat6: boolean;
+    plantCode?: string;
   },
 ) {
   const rows = await prisma.pettyCashEntry.findMany({
@@ -98,7 +100,14 @@ export async function fillExpenseSheet(
         { header: "Date", key: "date", width: 12 },
         { header: "Shift", key: "shift", width: 10 },
         { header: "Category", key: "head", width: 18 },
-        { header: "Remarks / notes", key: "desc", width: 36 },
+        ...(isQuadSignalPlant(opts.plantCode)
+          ? [{ header: "Expense Name", key: "expenseName", width: 28 }]
+          : []),
+        {
+          header: "Remarks / notes",
+          key: "desc",
+          width: 36,
+        },
         { header: "Opening reading", key: "opening", width: 16 },
         { header: "Closing reading", key: "closing", width: 16 },
         { header: "Amount", key: "amount", width: 14 },
@@ -110,6 +119,7 @@ export async function fillExpenseSheet(
       date: iso(r.date),
       shift: r.shift,
       head: r.expenseHead,
+      expenseName: r.expenseName ?? "",
       desc: r.description ?? "",
       opening:
         r.openingReading == null ? "" : toNum(r.openingReading),

@@ -71,6 +71,7 @@ export type ParsedExpenseRow = {
   target: ExpenseTarget;
   expenseHead: string;
   nature: string | null;
+  expenseName: string | null;
   description: string | null;
   payMode: string;
   amount: number;

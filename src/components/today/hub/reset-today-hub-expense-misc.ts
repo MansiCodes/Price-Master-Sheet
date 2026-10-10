@@ -34,6 +34,7 @@ export function resetTodayHubExpenseFields(
   expense.setExpenseAmount("");
   expense.setPaidTo("");
   expense.setExpenseDesc(isCat6 ? "Salary" : "");
+  expense.setExpenseName("");
   expense.setExpenseOpeningReading("");
   expense.setExpenseClosingReading("");
   expense.setExpenseRate("");

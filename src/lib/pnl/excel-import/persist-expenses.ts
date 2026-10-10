@@ -9,6 +9,7 @@ import {
   persistRent,
 } from "@/lib/pnl/excel-import/persist-overhead";
 import { approvalFor, type PersistCtx } from "@/lib/pnl/excel-import/persist-types";
+import { namedExpenseDescription } from "@/lib/plant-catalogs";
 
 export async function persistExpenses(
   ctx: PersistCtx,
@@ -66,6 +67,20 @@ export async function persistExpenses(
       continue;
     }
 
+    const named = namedExpenseDescription(
+      familyKey,
+      row.expenseHead,
+      row.expenseName,
+    );
+    if (!named.ok) {
+      summary.skipped.push({
+        sheet: "Expense",
+        row: row.row,
+        reason: named.error,
+      });
+      continue;
+    }
+
     const existing = await prisma.pettyCashEntry.findFirst({
       where: {
         ...pScope,
@@ -104,6 +119,7 @@ export async function persistExpenses(
         payMode: row.payMode || "Cash",
         expenseHead: row.nature || row.expenseHead,
         nature: row.nature,
+        expenseName: named.value || row.expenseName || null,
         description: row.description,
         billNumber: row.billNumber,
         openingReading: row.openingReading,

@@ -108,6 +108,9 @@ export function addInstructionsSheet(
         "8. Quad + Signal Plant — Purchase: fill Raw Material first, then Vendor's Name (vendors depend on material). Debit Qty is optional.",
       ]);
       guide.addRow([
+        "   Expense: for Miscellaneous or Direct Other, fill Expense Name as well as Description / Remarks.",
+      ]);
+      guide.addRow([
         "   Sales Item Details include both Signalling cables / RDSO and Railway Quad / Star Quad products.",
       ]);
       guide.addRow([

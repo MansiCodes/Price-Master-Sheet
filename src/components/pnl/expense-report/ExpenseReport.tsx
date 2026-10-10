@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { ReportTable } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import {
   getExpenseHeadsForSection,
   getUpcastMiscQueryHeads,
@@ -49,6 +49,7 @@ export function ExpenseReport({
   const cat6 = isCat6Plant(plantCode);
   const pvc = plantCode?.toUpperCase() === "PVC";
   const upcast = plantCode?.toUpperCase() === "UPCAST";
+  const isQuad = isQuadSignalPlant(plantCode);
   const usesSections = usesExpenseSections(plantCode);
 
   const [section, setSection] = useState<PvcExpenseSection>("direct");
@@ -107,12 +108,13 @@ export function ExpenseReport({
         cat6,
         pvc,
         upcast,
+        isQuad,
         page,
         pageSize,
         t,
         tCommon,
       }),
-    [cat6, pvc, upcast, page, pageSize, t, tCommon],
+    [cat6, pvc, upcast, isQuad, page, pageSize, t, tCommon],
   );
   const activeColumns = useMemo(() => columns, [columns]);
   const editingElectricity = isElectricityExpenseHead(
@@ -124,9 +126,10 @@ export function ExpenseReport({
         cat6,
         editingElectricity,
         isPettyCategory,
+        isQuad,
         t,
       }),
-    [cat6, editingElectricity, isPettyCategory, t],
+    [cat6, editingElectricity, isPettyCategory, isQuad, t],
   );
 
   function onSectionChange(next: PvcExpenseSection) {
@@ -200,6 +203,7 @@ export function ExpenseReport({
                                 date: ymd,
                                 month: ymd.slice(0, 7),
                                 expenseHead: r.expenseHead ?? "",
+                                expenseName: r.expenseName ?? "",
                                 description: r.description ?? "",
                                 amount: String(r.amount ?? ""),
                                 rate,

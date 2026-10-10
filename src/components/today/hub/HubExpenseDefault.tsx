@@ -3,6 +3,10 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { BillUpload } from "@/components/today/BillUpload";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
+import {
+  QUAD_EXPENSE_NAME_EXAMPLES,
+  requiresExpenseName,
+} from "@/lib/plant-catalogs";
 
 export function HubExpenseDefaultPay({ vm }: { vm: TodayHubVm }) {
   const { isPvcStyleExpense, expensePayMode, setExpensePayMode } = bindExpenseLocals(vm);
@@ -52,12 +56,47 @@ export function HubExpenseDefaultNotes({
   vm: TodayHubVm;
   t: (key: string) => string;
 }) {
-  const { isCat6, expenseDesc, setExpenseDesc, expensePhotos, setExpensePhotos } = bindExpenseLocals(vm);
+  const {
+    isCat6,
+    expenseHead,
+    plantCode,
+    expenseDesc,
+    setExpenseDesc,
+    expenseName,
+    setExpenseName,
+    expensePhotos,
+    setExpensePhotos,
+  } = bindExpenseLocals(vm);
+  const named = requiresExpenseName(plantCode, expenseHead);
   return (
     <>
+      {named ? (
+        <div className="field">
+          <label htmlFor="e-name">Expense name</label>
+          <input
+            id="e-name"
+            list="e-name-examples"
+            required
+            value={expenseName}
+            onChange={(e) => setExpenseName(e.target.value)}
+            placeholder="e.g. Labour Wages, Transport Charges"
+            autoComplete="off"
+          />
+          <datalist id="e-name-examples">
+            {QUAD_EXPENSE_NAME_EXAMPLES.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+        </div>
+      ) : null}
       <div className="field expense-desc">
         <label htmlFor="e-desc">{isCat6 ? "Remarks" : t("remarksNotes")}</label>
-        <textarea id="e-desc" value={expenseDesc} onChange={(e) => setExpenseDesc(e.target.value)} rows={4} />
+        <textarea
+          id="e-desc"
+          value={expenseDesc}
+          onChange={(e) => setExpenseDesc(e.target.value)}
+          rows={4}
+        />
       </div>
       <BillUpload urls={expensePhotos} onChange={setExpensePhotos} />
     </>

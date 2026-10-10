@@ -75,6 +75,7 @@ export function genericExpenseBody(args: SubmitExpenseGenericArgs, amount: numbe
     entryType: "EXPENSE",
     payMode: genericExpensePayMode(args),
     expenseHead: String(args.expenseHead),
+    expenseName: args.expenseName?.trim() || null,
     description: genericExpenseDescription(args) || null,
     openingReading: null,
     closingReading: null,

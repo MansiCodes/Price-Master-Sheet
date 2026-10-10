@@ -22,6 +22,7 @@ export function useTodayHubExpenseCore(
   const [expenseAmount, setExpenseAmount] = useState("");
   const [paidTo, setPaidTo] = useState("");
   const [expenseDesc, setExpenseDesc] = useState("");
+  const [expenseName, setExpenseName] = useState("");
   return {
     expenseSection,
     setExpenseSection,
@@ -34,5 +35,7 @@ export function useTodayHubExpenseCore(
     setPaidTo,
     expenseDesc,
     setExpenseDesc,
+    expenseName,
+    setExpenseName,
   };
 }

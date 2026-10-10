@@ -151,6 +151,7 @@ export function expenseSourceKey(
   row: {
     date: string;
     expenseHead: string;
+    expenseName?: string | null;
     description: string | null;
     amount: number;
     contractorSalary: number;
@@ -163,6 +164,7 @@ export function expenseSourceKey(
     familyKey,
     row.date,
     row.expenseHead,
+    row.expenseName,
     row.description,
     row.amount,
     row.contractorSalary,

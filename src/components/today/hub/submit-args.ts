@@ -159,6 +159,7 @@ export type SubmitExpensePettyArgs = {
 
 export type SubmitExpenseGenericArgs = {
   plantId: string;
+  plantCode?: string;
   entryDate: string;
   shift: ShiftKey;
   expenseAmount: string;
@@ -168,6 +169,7 @@ export type SubmitExpenseGenericArgs = {
   expensePayMode: "Cash" | "Bank";
   paidTo: string;
   expenseDesc: string;
+  expenseName?: string;
   expensePhotos: string[];
   fail: FailFn;
   enterCategoryAmountMsg: string;

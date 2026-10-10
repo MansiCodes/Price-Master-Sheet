@@ -164,6 +164,18 @@ export function miscExpenseHeaders(family: PlantFamily): string[] {
         "Amount",
         "Remarks",
       ];
+    case "quadsignal":
+      return [
+        "Date",
+        "Expense section",
+        "Expense Head",
+        "Expense Name",
+        "Nature",
+        "Description",
+        "Pay Mode",
+        "Amount",
+        "Remarks",
+      ];
     default:
       return [
         "Date",

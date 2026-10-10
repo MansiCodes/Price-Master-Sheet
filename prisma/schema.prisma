@@ -319,6 +319,7 @@ model PettyCashEntry {
   payMode           String
   expenseHead       String
   nature            String?
+  expenseName       String?
   description       String?
   location          String?
   checkedBy         String?
