@@ -387,6 +387,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.line-stack__row--meta.cols-2-unit-qty.has-gst,
+.line-stack__row--meta.has-unit.cols-2-unit-qty.has-gst {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .line-stack__row--meta.line-stack__row--debit-rate {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 0;
@@ -553,6 +558,11 @@
   .line-stack__row--meta.cols-3 > .field:last-child:nth-child(odd),
   .line-stack__row--meta.has-unit.cols-3 > .field:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+  }
+
+  .line-stack__row--meta.cols-2-unit-qty.has-gst,
+  .line-stack__row--meta.has-unit.cols-2-unit-qty.has-gst {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

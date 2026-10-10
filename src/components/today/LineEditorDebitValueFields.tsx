@@ -28,7 +28,9 @@ export function LineEditorDebitValueFields({
 }: LineEditorFieldProps) {
   return (
     <>
-      <div className="line-stack__row line-stack__row--meta has-unit cols-2-unit-qty">
+      <div
+        className={`line-stack__row line-stack__row--meta has-unit cols-2-unit-qty${showGst ? " has-gst" : ""}`}
+      >
         {unitOptions ? (
           <div className="field" style={{ margin: 0 }}>
             <label htmlFor={`line-unit-${line.id}`}>Unit</label>
@@ -56,6 +58,18 @@ export function LineEditorDebitValueFields({
             }}
           />
         </div>
+        {showGst ? (
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor={`line-gst-${line.id}`}>GST %</label>
+            <DecimalInput
+              id={`line-gst-${line.id}`}
+              value={line.gstPercent}
+              onChange={(gstPercent) => {
+                patchLine(lines, idx, line, onChange, { gstPercent });
+              }}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="line-stack__row line-stack__row--meta line-stack__row--debit-rate">
         <div className="field" style={{ margin: 0 }}>
@@ -107,20 +121,6 @@ export function LineEditorDebitValueFields({
           />
         </div>
       </div>
-      {showGst ? (
-        <div className="line-stack__row line-stack__row--meta">
-          <div className="field" style={{ margin: 0 }}>
-            <label htmlFor={`line-gst-${line.id}`}>GST %</label>
-            <DecimalInput
-              id={`line-gst-${line.id}`}
-              value={line.gstPercent}
-              onChange={(gstPercent) => {
-                patchLine(lines, idx, line, onChange, { gstPercent });
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
     </>
   );
 }
