@@ -3,18 +3,6 @@ import { isQuadSignalPlant } from "@/lib/plant-layout";
 /** Direct Other / Indirect Miscellaneous on Quad + Signal. */
 export const QUAD_NAMED_EXPENSE_HEADS = ["Other", "Miscellaneous"] as const;
 
-export const QUAD_EXPENSE_NAME_EXAMPLES = [
-  "Labour Wages",
-  "Staff Salary",
-  "Overtime Wages",
-  "Loading/Unloading",
-  "Transport Charges",
-  "Repairs and Maintenance",
-  "Stationery",
-  "Cleaning Supplies",
-  "Other Consumables",
-] as const;
-
 export function requiresExpenseName(
   plantCode: string | null | undefined,
   expenseHead: string | null | undefined,
@@ -25,7 +13,7 @@ export function requiresExpenseName(
 }
 
 export function expenseNameMissingMessage(): string {
-  return "Enter an expense name for Miscellaneous or Direct Other (e.g. Labour Wages, Transport Charges).";
+  return "Enter an expense name for Miscellaneous or Direct Other.";
 }
 
 export function namedExpenseDescription(

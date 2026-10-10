@@ -15,9 +15,11 @@ export function onExpenseHeadChange(vm: TodayHubVm, next: string) {
     isCat6,
     expenseDesc,
     setExpenseDesc,
+    setExpenseName,
   } = bindExpenseLocals(vm);
   if (expenseHeads.length === 0) return;
   setExpenseHead(next);
+  setExpenseName("");
   if (next !== "Electricity" && next !== "Fuel & Power") {
     setExpenseOpeningReading("");
     setExpenseClosingReading("");

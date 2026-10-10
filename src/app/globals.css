@@ -1696,6 +1696,34 @@ textarea {
   line-height: 1;
 }
 
+.select-menu__trigger--combo {
+  cursor: text;
+  padding-right: 0.55rem;
+}
+
+.select-menu__combo-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  padding: 0;
+}
+
+.select-menu__chevron-btn {
+  appearance: none;
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 0.15rem;
+  cursor: pointer;
+}
+
 .select-menu__native {
   position: absolute;
   opacity: 0;

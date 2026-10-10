@@ -3,10 +3,8 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { BillUpload } from "@/components/today/BillUpload";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
-import {
-  QUAD_EXPENSE_NAME_EXAMPLES,
-  requiresExpenseName,
-} from "@/lib/plant-catalogs";
+import { useSavedExpenseNames } from "@/components/today/hub/useSavedExpenseNames";
+import { requiresExpenseName } from "@/lib/plant-catalogs";
 
 export function HubExpenseDefaultPay({ vm }: { vm: TodayHubVm }) {
   const { isPvcStyleExpense, expensePayMode, setExpensePayMode } = bindExpenseLocals(vm);
@@ -68,25 +66,25 @@ export function HubExpenseDefaultNotes({
     setExpensePhotos,
   } = bindExpenseLocals(vm);
   const named = requiresExpenseName(plantCode, expenseHead);
+  const savedNames = useSavedExpenseNames(
+    vm.plantId,
+    expenseHead,
+    named && Boolean(vm.session.panelOpen),
+  );
+  const pickedSavedName = savedNames.includes(expenseName.trim());
   return (
     <>
-      {named ? (
+      {named && !pickedSavedName ? (
         <div className="field">
           <label htmlFor="e-name">Expense name</label>
           <input
             id="e-name"
-            list="e-name-examples"
             required
             value={expenseName}
             onChange={(e) => setExpenseName(e.target.value)}
-            placeholder="e.g. Labour Wages, Transport Charges"
+            placeholder="Type expense name"
             autoComplete="off"
           />
-          <datalist id="e-name-examples">
-            {QUAD_EXPENSE_NAME_EXAMPLES.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
         </div>
       ) : null}
       <div className="field expense-desc">

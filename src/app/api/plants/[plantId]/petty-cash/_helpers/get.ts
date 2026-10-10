@@ -34,6 +34,25 @@ export async function GET(
   const writePlantId = await resolveCanonicalWritePlantId(plantId);
 
   const sp = request.nextUrl.searchParams;
+  if (sp.get("distinctExpenseNames") === "1") {
+    const head = sp.get("expenseHead")?.trim() || "";
+    if (!head) return NextResponse.json({ names: [] });
+    const rows = await prisma.pettyCashEntry.findMany({
+      where: {
+        ...pScope,
+        expenseHead: head,
+        expenseName: { not: null },
+      },
+      select: { expenseName: true },
+      distinct: ["expenseName"],
+      orderBy: { expenseName: "asc" },
+      take: 200,
+    });
+    const names = rows
+      .map((r) => String(r.expenseName ?? "").trim())
+      .filter(Boolean);
+    return NextResponse.json({ names });
+  }
   const { filter, error } = dateRangeFromSearchParams(sp);
   if (error) {
     return NextResponse.json({ error }, { status: 400 });

@@ -3,10 +3,19 @@ import { PVC_EXPENSE_SECTIONS, getExpenseHeadsForSection, getUpcastMiscNaturesFo
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindExpenseLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { onExpenseHeadChange } from "@/components/today/hub/on-expense-head-change";
+import { useSavedExpenseNames } from "@/components/today/hub/useSavedExpenseNames";
+import { isQuadSignalPlant } from "@/lib/plant-layout";
 
 export function HubExpenseSectionField({ vm }: { vm: TodayHubVm }) {
-  const { hasExpenseSections, expenseSection, setExpenseSection, setExpenseHead, plantCode, setUpcastMiscNature } =
-    bindExpenseLocals(vm);
+  const {
+    hasExpenseSections,
+    expenseSection,
+    setExpenseSection,
+    setExpenseHead,
+    plantCode,
+    setUpcastMiscNature,
+    setExpenseName,
+  } = bindExpenseLocals(vm);
   if (!hasExpenseSections) return null;
   return (
     <div className="field">
@@ -22,6 +31,7 @@ export function HubExpenseSectionField({ vm }: { vm: TodayHubVm }) {
           setExpenseSection(next.value);
           const heads = [...getExpenseHeadsForSection(plantCode, next.value)];
           setExpenseHead(heads[0] ?? "");
+          setExpenseName("");
           const natures = getUpcastMiscNaturesForSection(next.value);
           setUpcastMiscNature?.(natures[0] ?? "");
         }}
@@ -37,17 +47,46 @@ export function HubExpenseCategoryField({
   vm: TodayHubVm;
   t: (key: string) => string;
 }) {
-  const { expenseHead, expenseHeads, isCat6, expenseSection } = bindExpenseLocals(vm);
+  const {
+    expenseHead,
+    expenseHeads,
+    isCat6,
+    expenseSection,
+    plantCode,
+    expenseName,
+    setExpenseName,
+  } = bindExpenseLocals(vm);
+  const namedHead = expenseSection === "indirect" ? "Miscellaneous" : "Other";
+  const savedNames = useSavedExpenseNames(
+    vm.plantId,
+    namedHead,
+    isQuadSignalPlant(plantCode) && Boolean(vm.session.panelOpen),
+  );
+  const categoryOptions = [
+    ...expenseHeads,
+    ...savedNames.filter((name) => !expenseHeads.includes(name)),
+  ];
+  const categoryValue =
+    expenseName.trim() && savedNames.includes(expenseName.trim())
+      ? expenseName.trim()
+      : String(expenseHead);
   return (
     <div className="field">
       <label htmlFor="e-head">{t("category")}</label>
       <SelectMenu
         id="e-head"
-        value={String(expenseHead)}
-        options={expenseHeads.length > 0 ? expenseHeads : ["—"]}
-        required={expenseHeads.length > 0}
+        value={categoryValue}
+        options={categoryOptions.length > 0 ? categoryOptions : ["—"]}
+        required={categoryOptions.length > 0}
         disabled={expenseHeads.length === 0}
-        onChange={(next) => onExpenseHeadChange(vm, next)}
+        onChange={(next) => {
+          if (savedNames.includes(next)) {
+            onExpenseHeadChange(vm, namedHead);
+            setExpenseName(next);
+            return;
+          }
+          onExpenseHeadChange(vm, next);
+        }}
       />
       {isCat6 && expenseSection === "indirect" && expenseHeads.length === 0 ? (
         <p className="field-hint">

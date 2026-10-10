@@ -22,6 +22,15 @@ export type SelectMenuItem = {
   searchText?: string;
 };
 
+function optionStartsWith(opt: SelectMenuItem, q: string) {
+  const parts = [opt.label, opt.searchText ?? "", opt.value]
+    .join(" ")
+    .toLowerCase()
+    .split(/[^a-z0-9.]+/)
+    .filter(Boolean);
+  return parts.some((part) => part.startsWith(q));
+}
+
 type SelectMenuProps = {
   id?: string;
   label?: string;
@@ -35,6 +44,8 @@ type SelectMenuProps = {
   placeholder?: string;
   /** Show a filter input at the top of the dropdown. */
   searchable?: boolean;
+  /** Type a value that is not in the list (saved as the field value). */
+  allowCustom?: boolean;
   searchPlaceholder?: string;
   onChange: (value: string) => void;
   className?: string;
@@ -49,6 +60,7 @@ export function SelectMenu({
   disabled = false,
   placeholder = "Select…",
   searchable = false,
+  allowCustom = false,
   searchPlaceholder = "Search…",
   onChange,
   className,
@@ -62,21 +74,34 @@ export function SelectMenu({
   const [pos, setPos] = useState<SelectMenuPos | null>(null);
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const resolvedItems = useMemo<SelectMenuItem[]>(() => {
     if (items) return [...items];
     return (options ?? []).map((opt) => ({ value: opt, label: opt }));
   }, [items, options]);
 
+  const canSearch =
+    !allowCustom && (searchable || resolvedItems.length >= 6);
+  const showSuggestions = allowCustom && resolvedItems.length > 0;
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search), 150);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
   const filteredItems = useMemo(() => {
-    if (!searchable) return resolvedItems;
-    const q = search.trim().toLowerCase();
+    const q = allowCustom
+      ? value.trim().toLowerCase()
+      : debouncedSearch.trim().toLowerCase();
+    if (allowCustom) {
+      if (!q) return resolvedItems;
+      return resolvedItems.filter((opt) => optionStartsWith(opt, q));
+    }
+    if (!canSearch) return resolvedItems;
     if (!q) return resolvedItems;
-    return resolvedItems.filter((opt) => {
-      const hay = `${opt.label} ${opt.searchText ?? ""} ${opt.value}`.toLowerCase();
-      return hay.includes(q);
-    });
-  }, [resolvedItems, searchable, search]);
+    return resolvedItems.filter((opt) => optionStartsWith(opt, q));
+  }, [resolvedItems, canSearch, debouncedSearch, allowCustom, value]);
 
   const selectedLabel =
     resolvedItems.find((opt) => opt.value === value)?.label ?? "";
@@ -90,15 +115,15 @@ export function SelectMenu({
       setSearch("");
       return;
     }
-    if (!searchable) return;
+    if (!canSearch) return;
     const t = window.setTimeout(() => searchRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
-  }, [open, searchable]);
+  }, [open, canSearch]);
 
   function updatePosition() {
     const el = rootRef.current;
     if (!el) return;
-    setPos(measureSelectMenuPos(el, searchable));
+    setPos(measureSelectMenuPos(el, canSearch || showSuggestions));
   }
 
   useLayoutEffect(() => {
@@ -113,7 +138,7 @@ export function SelectMenu({
       window.removeEventListener("resize", onReposition);
       window.removeEventListener("scroll", onReposition, true);
     };
-  }, [open, searchable]);
+  }, [open, canSearch]);
 
   useEffect(() => {
     if (!open) return;
@@ -150,17 +175,27 @@ export function SelectMenu({
     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       setOpen(true);
+      return;
     }
+    if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+    e.preventDefault();
+    if (canSearch) {
+      setSearch((prev) => (open ? prev + e.key : e.key));
+      setOpen(true);
+      return;
+    }
+    const hit = resolvedItems.find((opt) => optionStartsWith(opt, e.key.toLowerCase()));
+    if (hit) onChange(hit.value);
   }
 
   const triggerId = `${fieldId}-trigger`;
 
   const menu =
-    mounted && open && pos
+    mounted && open && pos && (!allowCustom || filteredItems.length > 0)
       ? createPortal(
           <div
             ref={listRef}
-            className={`select-menu__list${searchable ? " select-menu__list--searchable" : ""}`}
+            className={`select-menu__list${canSearch ? " select-menu__list--searchable" : ""}`}
             role="listbox"
             id={`${fieldId}-listbox`}
             aria-labelledby={triggerId}
@@ -174,7 +209,7 @@ export function SelectMenu({
               zIndex: 200,
             }}
           >
-            {searchable ? (
+            {canSearch ? (
               <div className="select-menu__search">
                 <input
                   ref={searchRef}
@@ -229,37 +264,73 @@ export function SelectMenu({
         Put the public `id` on a non-button control so <label htmlFor> only
         focuses this field and does NOT open the options list.
       */}
-      <input
-        id={fieldId}
-        tabIndex={-1}
-        aria-hidden
-        value={value}
-        onChange={() => undefined}
-        className="select-menu__native"
-      />
-      <button
-        id={triggerId}
-        type="button"
-        className="select-menu__trigger"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={open ? `${fieldId}-listbox` : undefined}
-        aria-required={required || undefined}
-        disabled={disabled}
-        onClick={() => {
-          if (!disabled) setOpen((v) => !v);
-        }}
-        onKeyDown={onTriggerKey}
-      >
-        <span
-          className={`select-menu__value${!selectedLabel ? " is-placeholder" : ""}`}
-        >
-          {selectedLabel || placeholder}
-        </span>
-        <span className="select-menu__chevron" aria-hidden>
-          ▾
-        </span>
-      </button>
+      {allowCustom ? (
+        <div className="select-menu__trigger select-menu__trigger--combo">
+          <input
+            id={fieldId}
+            className="select-menu__combo-input"
+            required={required}
+            disabled={disabled}
+            autoComplete="off"
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              if (showSuggestions) setOpen(true);
+            }}
+            onFocus={() => {
+              if (showSuggestions) setOpen(true);
+            }}
+          />
+          {showSuggestions ? (
+            <button
+              type="button"
+              className="select-menu__chevron-btn"
+              tabIndex={-1}
+              aria-label="Previous names"
+              onClick={() => {
+                if (!disabled) setOpen((v) => !v);
+              }}
+            >
+              ▾
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <input
+            id={fieldId}
+            tabIndex={-1}
+            aria-hidden
+            value={value}
+            onChange={() => undefined}
+            className="select-menu__native"
+          />
+          <button
+            id={triggerId}
+            type="button"
+            className="select-menu__trigger"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={open ? `${fieldId}-listbox` : undefined}
+            aria-required={required || undefined}
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) setOpen((v) => !v);
+            }}
+            onKeyDown={onTriggerKey}
+          >
+            <span
+              className={`select-menu__value${!selectedLabel ? " is-placeholder" : ""}`}
+            >
+              {selectedLabel || placeholder}
+            </span>
+            <span className="select-menu__chevron" aria-hidden>
+              ▾
+            </span>
+          </button>
+        </>
+      )}
       {menu}
     </div>
   );
