@@ -22,13 +22,21 @@ export type SelectMenuItem = {
   searchText?: string;
 };
 
-function optionStartsWith(opt: SelectMenuItem, q: string) {
-  const parts = [opt.label, opt.searchText ?? "", opt.value]
-    .join(" ")
+function firstWordFirstLetter(s: string) {
+  const word = s
     .toLowerCase()
+    .trim()
     .split(/[^a-z0-9.]+/)
-    .filter(Boolean);
-  return parts.some((part) => part.startsWith(q));
+    .find(Boolean);
+  return word?.charAt(0) ?? "";
+}
+
+function optionStartsWith(opt: SelectMenuItem, q: string) {
+  const key = q.charAt(0);
+  if (!key) return true;
+  return [opt.label, opt.searchText ?? ""].some(
+    (s) => firstWordFirstLetter(s) === key,
+  );
 }
 
 type SelectMenuProps = {
