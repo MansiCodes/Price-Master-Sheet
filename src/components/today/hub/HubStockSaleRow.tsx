@@ -1,4 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { PnlThemedDateField } from "@/components/pnl/PnlThemedDateField";
 import type { StockSaleItem } from "@/components/today/today-hub-model";
 
 function patchSale(
@@ -71,15 +72,16 @@ export function HubStockSaleRow({
           />
         </SaleField>
         <SaleField id={`st-sale-date-${idx}`} label="Date">
-          <input
-            id={`st-sale-date-${idx}`}
-            type="date"
-            aria-label="Invoice date"
-            title={ph(hint?.date, "")}
-            placeholder={ph(hint?.date, "")}
-            value={item.date}
-            onChange={(e) => patchSale(setItems, idx, { date: e.target.value })}
-          />
+          <div className="today-hub-date">
+            <PnlThemedDateField
+              id={`st-sale-date-${idx}`}
+              label="Date"
+              hideLabel
+              align="end"
+              value={item.date}
+              onChange={(val) => patchSale(setItems, idx, { date: val })}
+            />
+          </div>
         </SaleField>
         <SaleField id={`st-sale-party-${idx}`} label="Party name">
           <input

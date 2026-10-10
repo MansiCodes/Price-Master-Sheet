@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { todayLocalISO } from "@/lib/client-forms";
+import { PnlThemedDateField } from "@/components/pnl/PnlThemedDateField";
 import type { StockCallPutupItem } from "@/components/today/today-hub-model";
 
 function patchCallPutupItem(
@@ -53,15 +54,16 @@ function HubStockCallPutupDateField({
   item, idx, setItems, onFirstDate,
 }: CallPutupFieldProps & { onFirstDate: (val: string) => void }) {
   return (
-    <div className="field">
+    <div className="field today-hub-date">
       <label htmlFor={`st-putup-date-${idx}`}>Date</label>
-      <input
+      <PnlThemedDateField
         id={`st-putup-date-${idx}`}
-        type="date"
-        max={todayLocalISO()}
+        label="Date"
+        hideLabel
+        align="end"
         value={item.date}
-        onChange={(e) => {
-          const val = e.target.value;
+        max={todayLocalISO()}
+        onChange={(val) => {
           patchCallPutupItem(setItems, idx, { date: val });
           if (idx === 0) onFirstDate(val);
         }}

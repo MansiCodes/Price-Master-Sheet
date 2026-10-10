@@ -102,7 +102,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  width: 8.6rem;
+  width: 10.25rem;
   max-width: 100%;
   min-width: 0;
   height: 1.9rem;
@@ -137,8 +137,8 @@
   left: 0;
   z-index: 80;
   width: 16.25rem;
-  max-width: min(16.25rem, calc(100vw - 1.25rem));
-  padding: 0.75rem;
+  max-width: min(16.25rem, calc(100% + 4.5rem));
+  padding: 0.85rem 0.95rem 0.8rem;
   border-radius: 16px;
   border: 1px solid var(--border, #d7e0dc);
   background: #fff;
@@ -219,8 +219,44 @@
   color: #fff;
 }
 
+.pnl-date-picker__day.is-today:not(.is-selected) {
+  box-shadow: inset 0 0 0 1.5px var(--teal, #127269);
+  color: var(--teal-ink, #0e5a54);
+}
+
 .pnl-date-picker__day:disabled {
   opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pnl-date-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #d7e0dc);
+}
+
+.pnl-date-picker__footer-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--teal, #127269);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.2rem 0.15rem;
+}
+
+.pnl-date-picker__footer-btn:hover:not(:disabled) {
+  color: var(--teal-ink, #0e5a54);
+}
+
+.pnl-date-picker__footer-btn:disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 

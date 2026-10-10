@@ -1151,3 +1151,24 @@
   padding: 0.4rem 0.35rem !important;
 }
 
+.today-hub-date .pnl-date-picker,
+.today-hub-date .pnl-date-picker__trigger {
+  width: 100%;
+}
+
+.today-hub-date .pnl-date-picker__trigger {
+  height: auto;
+  min-height: 2.65rem;
+  padding: 0.7rem 1.05rem;
+  border-radius: 999px;
+  border-color: var(--border-strong);
+}
+
+.today-hub-date .pnl-date-picker__menu {
+  left: auto;
+  right: 0;
+  z-index: 80;
+  border-radius: var(--radius, 16px);
+  max-width: min(16.25rem, calc(100vw - 3rem));
+}
+

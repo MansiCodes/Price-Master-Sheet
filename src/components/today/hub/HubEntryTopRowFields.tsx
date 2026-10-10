@@ -1,6 +1,8 @@
 import { todayLocalISO } from "@/lib/client-forms";
+import { PnlThemedDateField } from "@/components/pnl/PnlThemedDateField";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
+import "@/components/ui/date-filter.css";
 
 export function HubEntryStockTypeField({ vm }: { vm: TodayHubVm }) {
   const { stockKind, setStockKind, setStockProcessQtys, setStockProcessHints } = vm.stock;
@@ -31,15 +33,17 @@ export function HubEntryDateField({
 }) {
   const { entryDate, setEntryDate } = vm.session;
   return (
-    <div className="field">
+    <div className="field today-hub-date">
       <label htmlFor="entry-date">{label}</label>
-      <input
+      <PnlThemedDateField
         id="entry-date"
-        type="date"
+        label={label}
+        hideLabel
         required
-        max={todayLocalISO()}
+        align="end"
         value={entryDate}
-        onChange={(e) => setEntryDate(e.target.value)}
+        max={todayLocalISO()}
+        onChange={setEntryDate}
       />
     </div>
   );

@@ -98,12 +98,17 @@ export function nextDayFormOpeningFromMeta(
     opening?: Record<string, number>;
     production?: Record<string, number>;
     callPutupItems?: Array<{ qty?: number | string | null }>;
+    /** Closing already took put-up off Outer — do not subtract the same km again. */
+    outerClosingIncludesPutup?: boolean;
   },
 ): Record<string, number> {
+  const putupKm = meta.outerClosingIncludesPutup
+    ? 0
+    : sessionPutupKmFromItems(meta.callPutupItems);
   return formClosingByProcess(
     processNames,
     meta.opening,
     meta.production,
-    sessionPutupKmFromItems(meta.callPutupItems),
+    putupKm,
   );
 }

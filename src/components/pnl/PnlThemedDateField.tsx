@@ -7,6 +7,10 @@ const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+const MONTHS_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -20,7 +24,10 @@ function formatDisplay(iso: string) {
   if (!iso) return "";
   const [y, m, d] = iso.split("-");
   if (!y || !m || !d) return iso;
-  return `${d}-${m}-${y}`;
+  const month = MONTHS_SHORT[Number(m) - 1];
+  const day = Number(d);
+  if (!month || !Number.isFinite(day) || day < 1) return iso;
+  return `${day} ${month} ${y}`;
 }
 
 function shiftMonth(year: number, month: number, delta: number) {
@@ -35,6 +42,8 @@ export function PnlThemedDateField({
   min,
   max,
   align = "start",
+  hideLabel = false,
+  required = false,
   onChange,
 }: {
   id: string;
@@ -43,6 +52,8 @@ export function PnlThemedDateField({
   min?: string;
   max?: string;
   align?: "start" | "end";
+  hideLabel?: boolean;
+  required?: boolean;
   onChange: (next: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -75,8 +86,8 @@ export function PnlThemedDateField({
     menu.style.transform = "";
     const r = menu.getBoundingClientRect();
     let shift = 0;
-    if (r.right > window.innerWidth - 8) shift = window.innerWidth - 8 - r.right;
-    if (r.left + shift < 8) shift += 8 - (r.left + shift);
+    if (r.right > window.innerWidth - 20) shift = window.innerWidth - 20 - r.right;
+    if (r.left + shift < 12) shift += 12 - (r.left + shift);
     menu.style.transform = shift ? `translateX(${shift}px)` : "";
   }, [open, year, month]);
 
@@ -87,9 +98,16 @@ export function PnlThemedDateField({
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
 
+  const todayIso = toISO(
+    new Date().getFullYear(),
+    new Date().getMonth(),
+    new Date().getDate(),
+  );
+  const todayDisabled = Boolean((min && todayIso < min) || (max && todayIso > max));
+
   return (
-    <div className="pnl-date-filter__field">
-      <label htmlFor={id}>{label}</label>
+    <div className={hideLabel ? undefined : "pnl-date-filter__field"}>
+      {hideLabel ? null : <label htmlFor={id}>{label}</label>}
       <div className={`pnl-date-picker${align === "end" ? " pnl-date-picker--end" : ""}`} ref={rootRef}>
         <button
           id={id}
@@ -149,12 +167,13 @@ export function PnlThemedDateField({
                 const iso = toISO(year, month, day);
                 const disabled = Boolean((min && iso < min) || (max && iso > max));
                 const selected = iso === value;
+                const isToday = iso === todayIso;
                 return (
                   <button
                     key={iso}
                     type="button"
                     disabled={disabled}
-                    className={`pnl-date-picker__day${selected ? " is-selected" : ""}`}
+                    className={`pnl-date-picker__day${selected ? " is-selected" : ""}${isToday && !selected ? " is-today" : ""}`}
                     onClick={() => {
                       onChange(iso);
                       setOpen(false);
@@ -164,6 +183,33 @@ export function PnlThemedDateField({
                   </button>
                 );
               })}
+            </div>
+            <div className="pnl-date-picker__footer">
+              {required ? (
+                <span />
+              ) : (
+                <button
+                  type="button"
+                  className="pnl-date-picker__footer-btn"
+                  onClick={() => {
+                    onChange("");
+                    setOpen(false);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                className="pnl-date-picker__footer-btn pnl-date-picker__footer-btn--today"
+                disabled={todayDisabled}
+                onClick={() => {
+                  onChange(todayIso);
+                  setOpen(false);
+                }}
+              >
+                Today
+              </button>
             </div>
           </div>
         ) : null}
