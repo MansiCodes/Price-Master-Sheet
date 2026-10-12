@@ -29,15 +29,15 @@ export function buildPvcSalesColumns(
       render: (r) => r.customerName?.trim() || "—",
     },
     {
+      key: "invoice",
+      label: "Invoice no.",
+      render: (r) => r.billNumber?.trim() || "—",
+    },
+    {
       key: "remarks",
       label: "Remarks",
       wrap: "wide",
       render: (r) => r.notes?.trim() || "—",
-    },
-    {
-      key: "invoice",
-      label: "Invoice no.",
-      render: (r) => r.billNumber?.trim() || "—",
     },
     {
       key: "product",

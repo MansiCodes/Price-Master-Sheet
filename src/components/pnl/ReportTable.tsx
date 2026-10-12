@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 export type ReportColumn<T> = {
   key: string;
@@ -45,6 +45,30 @@ export function ReportTable<T extends { id: string }>({
   const tableClass = isRegister
     ? "pnl-report-table pnl-report-table--register"
     : "pnl-report-table";
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const skipSerial =
+    /^(s|sno)$/i.test(columns[0]?.key ?? "") ||
+    /^s\.?\s*no/i.test(columns[0]?.label ?? "");
+  const stickyFrom = skipSerial ? 1 : 0;
+
+  useLayoutEffect(() => {
+    const wrap = wrapRef.current;
+    const ths = wrap?.querySelectorAll("thead th");
+    const firstSticky = ths?.[stickyFrom];
+    if (!wrap || !firstSticky) return;
+
+    const sync = () => {
+      const width = firstSticky.getBoundingClientRect().width;
+      wrap.style.setProperty(
+        "--pnl-sticky-col1",
+        `${Math.max(0, Math.floor(width) - 1)}px`,
+      );
+    };
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(firstSticky);
+    return () => ro.disconnect();
+  }, [columns, rows, loading, stickyFrom]);
 
   function alignClass(align?: "left" | "right" | "center") {
     if (align === "right") return "is-right";
@@ -58,26 +82,52 @@ export function ReportTable<T extends { id: string }>({
     return "";
   }
 
-  function cellClass(col: ReportColumn<T>) {
+  function isStickyCol(colIndex?: number) {
+    return (
+      colIndex != null &&
+      colIndex >= stickyFrom &&
+      colIndex < stickyFrom + 2
+    );
+  }
+
+  function cellClass(col: ReportColumn<T>, colIndex?: number) {
     return [
       alignClass(col.align),
       wrapClass(col.wrap),
       col.compact ? "is-compact" : "",
       col.key === "actions" ? "is-actions" : "",
+      isStickyCol(colIndex) ? "is-sticky-col" : "",
+      colIndex === stickyFrom + 1 ? "is-sticky-edge" : "",
     ]
       .filter(Boolean)
       .join(" ");
   }
 
-  function headerClass(col: ReportColumn<T>) {
+  function headerClass(col: ReportColumn<T>, colIndex?: number) {
     return [
       alignClass(col.headerAlign ?? col.align),
       wrapClass(col.wrap),
       col.compact ? "is-compact" : "",
       col.key === "actions" ? "is-actions" : "",
+      isStickyCol(colIndex) ? "is-sticky-col" : "",
+      colIndex === stickyFrom + 1 ? "is-sticky-edge" : "",
     ]
       .filter(Boolean)
       .join(" ");
+  }
+
+  function colStyle(col: ReportColumn<T>, colIndex: number) {
+    const sticky = isStickyCol(colIndex)
+      ? {
+          left:
+            colIndex === stickyFrom ? 0 : "var(--pnl-sticky-col1)",
+        }
+      : {};
+    if (!col.width && !isStickyCol(colIndex)) return undefined;
+    return {
+      ...(col.width ? { width: col.width, minWidth: col.width } : {}),
+      ...sticky,
+    };
   }
 
   const showEmpty = !loading && rows.length === 0;
@@ -90,16 +140,17 @@ export function ReportTable<T extends { id: string }>({
 
   return (
     <div
+      ref={wrapRef}
       className={`pnl-report-table-wrap${isRegister ? " pnl-report-table-wrap--register" : ""}`}
     >
       <table className={tableClass}>
         <thead>
           <tr>
-            {columns.map((col) => (
+            {columns.map((col, colIndex) => (
               <th
                 key={col.key}
-                className={headerClass(col) || undefined}
-                style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                className={headerClass(col, colIndex) || undefined}
+                style={colStyle(col, colIndex)}
               >
                 {col.label}
               </th>
@@ -111,7 +162,11 @@ export function ReportTable<T extends { id: string }>({
             Array.from({ length: 8 }, (_, rowIndex) => (
               <tr key={`skeleton-${rowIndex}`} className="pnl-report-skeleton-row">
                 {columns.map((col, columnIndex) => (
-                  <td key={col.key} className={cellClass(col) || undefined}>
+                  <td
+                    key={col.key}
+                    className={cellClass(col, columnIndex) || undefined}
+                    style={colStyle(col, columnIndex)}
+                  >
                     <span
                       className="pnl-skeleton-line"
                       style={{ width: `${55 + ((rowIndex + columnIndex) % 4) * 10}%` }}
@@ -129,11 +184,11 @@ export function ReportTable<T extends { id: string }>({
           ) : (
             rows.map((row, index) => (
               <tr key={row.id}>
-                {columns.map((col) => (
+                {columns.map((col, colIndex) => (
                   <td
                     key={col.key}
-                    className={cellClass(col) || undefined}
-                    style={col.width ? { width: col.width, minWidth: col.width } : undefined}
+                    className={cellClass(col, colIndex) || undefined}
+                    style={colStyle(col, colIndex)}
                   >
                     {col.render(row, index)}
                   </td>
@@ -156,8 +211,12 @@ export function ReportTable<T extends { id: string }>({
                 {foot.colSpanContent ? (
                   <td colSpan={columns.length}>{foot.colSpanContent}</td>
                 ) : (
-                  columns.map((col) => (
-                    <td key={col.key} className={cellClass(col) || undefined}>
+                  columns.map((col, colIndex) => (
+                    <td
+                      key={col.key}
+                      className={cellClass(col, colIndex) || undefined}
+                      style={colStyle(col, colIndex)}
+                    >
                       {(foot.cells ?? {})[col.key] ?? ""}
                     </td>
                   ))
