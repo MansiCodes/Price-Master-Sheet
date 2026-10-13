@@ -67,8 +67,7 @@ export type SubmitStockOtherArgs = {
   upcastIncomingQty: string;
   upcastOutwardQty: string;
   upcastTotalScrapWeight: string;
-  upcastPettyQty: string;
-  upcastWeightPerPetty: string;
+  upcastPettyItems: Array<{ qty: string; weight: string }>;
   upcastTotalPettyWeight: number;
   upcastSortingLossWeight: number;
   upcastBurningLossWeight: string;

@@ -10,6 +10,7 @@ export type ChecklistJson = {
   customSuppliers?: string[];
   customCustomers?: string[];
   customPurchaseItems?: string[];
+  customPurchaseItemsByType?: Record<string, string[]>;
   customSaleItems?: string[];
   customStockItems?: string[];
   customFarVendors?: string[];

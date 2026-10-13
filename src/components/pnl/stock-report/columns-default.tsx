@@ -71,7 +71,11 @@ export function buildDefaultStockColumns(
               return (
                 <div style={{ textAlign: "right", fontSize: "0.8rem", lineHeight: "1.2" }}>
                   <div>Scrap: {formatQty(meta.totalScrapWeight)} kg</div>
-                  {meta.pettyQty != null && meta.weightPerPetty != null && (
+                  {meta.pettyItems && meta.pettyItems.length > 1 ? (
+                    <div style={{ color: "#64748b" }}>
+                      Petty: {meta.pettyItems.map((p) => `${p.qty} × ${p.weightPerPetty}`).join(" + ")} = {meta.totalPettyWeight} kg
+                    </div>
+                  ) : meta.pettyQty != null && meta.weightPerPetty != null && (
                     <div style={{ color: "#64748b" }}>
                       Petty: {meta.pettyQty} × {meta.weightPerPetty} = {meta.totalPettyWeight ?? (meta.pettyQty * meta.weightPerPetty)} kg
                     </div>

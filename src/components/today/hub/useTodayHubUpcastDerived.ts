@@ -17,8 +17,8 @@ export function useTodayHubUpcastBalance(isUpcast: boolean, fields: Fields) {
     [isUpcast, fields.upcastOpeningQty, fields.upcastIncomingQty, fields.upcastOutwardQty],
   );
   const upcastTotalPettyWeight = useMemo(
-    () => computeUpcastPettyWeight(isUpcast, fields.upcastPettyQty, fields.upcastWeightPerPetty),
-    [isUpcast, fields.upcastPettyQty, fields.upcastWeightPerPetty],
+    () => computeUpcastPettyWeight(isUpcast, fields.upcastPettyItems),
+    [isUpcast, fields.upcastPettyItems],
   );
   const upcastSortingLossWeight = useMemo(
     () => computeUpcastSortingLoss(isUpcast, fields.upcastTotalScrapWeight, upcastTotalPettyWeight),

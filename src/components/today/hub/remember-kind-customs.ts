@@ -7,8 +7,16 @@ export function rememberPurchaseCustoms(vm: TodayHubVm) {
       ? vm.purchase.vendorNameOther.trim()
       : vm.purchase.vendorName.trim();
   rememberCustomOption(vm.catalogs.setCustomSuppliers, vendor);
+  const purchaseType = vm.purchase.purchaseType;
   for (const l of vm.purchase.purchaseLines) {
     rememberCustomOption(vm.catalogs.setCustomPurchaseItems, l.itemDescription);
+    const item = l.itemDescription.trim();
+    if (item && !/^(other|others)$/i.test(item)) {
+      vm.catalogs.setCustomPurchaseItemsByType((prev) => {
+        const list = prev[purchaseType] ?? [];
+        return list.includes(item) ? prev : { ...prev, [purchaseType]: [...list, item] };
+      });
+    }
     rememberCustomOption(vm.catalogs.setCustomUnits, l.unit);
   }
   if (vm.expense.farVendor) {

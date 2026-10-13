@@ -97,16 +97,17 @@ export function HubPurchaseVendorOther({ vm }: { vm: TodayHubVm }) {
 
 export function HubPurchaseDefaultLineEditor({ vm }: { vm: TodayHubVm }) {
   const { isCat6, isQuad } = vm.flags;
-  const { purchaseItemOptions, purchaseUnitOptions } = vm.catalogs;
-  const { purchaseSource, purchaseLines, setPurchaseLines } = vm.purchase;
+  const { purchaseItemOptions, purchaseItemOptionsByType, purchaseUnitOptions } = vm.catalogs;
+  const { purchaseSource, purchaseLines, setPurchaseLines, purchaseType } = vm.purchase;
   if (!(!isQuad || purchaseSource === "atcl")) return null;
+  const itemOptions = purchaseItemOptionsByType[purchaseType] ?? purchaseItemOptions;
   return (
     <LineEditor
       lines={purchaseLines}
       onChange={setPurchaseLines}
       defaultUnit={isCat6 ? "NOS" : "KGS"}
       itemLabel={purchaseSource === "atcl" ? "Items Details" : isCat6 ? "Item Details" : "Description"}
-      itemOptions={purchaseItemOptions}
+      itemOptions={itemOptions}
       itemPlaceholder={isCat6 ? "Select item details" : "Select description"}
       unitOptions={purchaseUnitOptions}
       showGst={!isCat6 && purchaseSource !== "atcl"}

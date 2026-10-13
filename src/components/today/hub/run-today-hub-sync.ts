@@ -6,6 +6,9 @@ export async function runTodayHubSync(vm: TodayHubVm) {
     if (data.customSuppliers) vm.catalogs.setCustomSuppliers(data.customSuppliers);
     if (data.customCustomers) vm.catalogs.setCustomCustomers(data.customCustomers);
     if (data.customPurchaseItems) vm.catalogs.setCustomPurchaseItems(data.customPurchaseItems);
+    if (data.customPurchaseItemsByType) {
+      vm.catalogs.setCustomPurchaseItemsByType(data.customPurchaseItemsByType);
+    }
     if (data.customSaleItems) vm.catalogs.setCustomSaleItems(data.customSaleItems);
     if (data.customStockItems) vm.catalogs.setCustomStockItems(data.customStockItems);
     if (data.customFarVendors) vm.catalogs.setCustomFarVendors(data.customFarVendors);

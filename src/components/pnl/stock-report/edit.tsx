@@ -3,6 +3,7 @@ import {
   encodeQuadSignalStockNotes,
   encodeUpcastStockNotes,
   parseQuadSignalStockNotes,
+  parseUpcastStockNotes,
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import type { StockRow } from "@/components/pnl/stock-report/types";
@@ -143,7 +144,16 @@ function saveStockEdit(
     const totalScrapWeight = crud.values.upcastTotalScrapWeight !== "" && crud.values.upcastTotalScrapWeight != null ? Number(crud.values.upcastTotalScrapWeight) || 0 : undefined;
     const pettyQty = crud.values.upcastPettyQty !== "" && crud.values.upcastPettyQty != null ? Number(crud.values.upcastPettyQty) || 0 : undefined;
     const weightPerPetty = crud.values.upcastWeightPerPetty !== "" && crud.values.upcastWeightPerPetty != null ? Number(crud.values.upcastWeightPerPetty) || 0 : undefined;
-    const totalPettyWeight = pettyQty != null && weightPerPetty != null ? pettyQty * weightPerPetty : undefined;
+    const prevMeta = parseUpcastStockNotes(crud.editing?.notes).meta;
+    const keepPettyItems =
+      prevMeta?.pettyItems != null &&
+      prevMeta.pettyItems.length > 1 &&
+      pettyQty === prevMeta.pettyQty &&
+      weightPerPetty === prevMeta.weightPerPetty;
+    const pettyItems = keepPettyItems ? prevMeta?.pettyItems : undefined;
+    const totalPettyWeight = keepPettyItems
+      ? prevMeta?.totalPettyWeight
+      : pettyQty != null && weightPerPetty != null ? pettyQty * weightPerPetty : undefined;
     const sortingLossWeight = totalScrapWeight != null && totalPettyWeight != null ? totalScrapWeight - totalPettyWeight : undefined;
 
     const burningLossWeight = crud.values.upcastBurningLossWeight !== "" && crud.values.upcastBurningLossWeight != null ? Number(crud.values.upcastBurningLossWeight) || 0 : undefined;
@@ -169,6 +179,7 @@ function saveStockEdit(
         pettyQty,
         weightPerPetty,
         totalPettyWeight,
+        ...(pettyItems ? { pettyItems } : {}),
         sortingLossWeight,
         burningLossWeight,
         weightAfterBurning,

@@ -74,7 +74,7 @@ function upcastSubmitFields(upcast: TodayHubVm["upcast"]) {
   return {
     upcastOpeningQty: upcast.upcastOpeningQty, upcastIncomingQty: upcast.upcastIncomingQty,
     upcastOutwardQty: upcast.upcastOutwardQty, upcastTotalScrapWeight: upcast.upcastTotalScrapWeight,
-    upcastPettyQty: upcast.upcastPettyQty, upcastWeightPerPetty: upcast.upcastWeightPerPetty,
+    upcastPettyItems: upcast.upcastPettyItems,
     upcastTotalPettyWeight: upcast.upcastTotalPettyWeight,
     upcastSortingLossWeight: upcast.upcastSortingLossWeight,
     upcastBurningLossWeight: upcast.upcastBurningLossWeight,

@@ -1066,6 +1066,49 @@
   line-height: 1;
   cursor: pointer;
 }
+.upcast-petty {
+  display: grid;
+  gap: 8px;
+}
+.upcast-petty__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+.upcast-petty__add {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1.5px solid #0d9488;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #0d9488;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.upcast-petty__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+  gap: 10px;
+  align-items: end;
+}
+.upcast-petty__remove {
+  width: 36px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+}
 .qs-wip__sale-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

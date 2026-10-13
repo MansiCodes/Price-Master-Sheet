@@ -1,6 +1,24 @@
 import { encodeUpcastStockNotes, pvcStockEntryNotes } from "@/lib/plant-catalogs";
 import type { SubmitStockOtherArgs } from "@/components/today/hub/submit-args";
 
+function upcastPettyMeta(a: SubmitStockOtherArgs) {
+  const pettyItems = a.upcastPettyItems
+    .map((p) => ({ qty: Number(p.qty) || 0, weightPerPetty: Number(p.weight) || 0 }))
+    .filter((p) => p.qty > 0 || p.weightPerPetty > 0);
+  const pettyQty = pettyItems.reduce((sum, p) => sum + p.qty, 0);
+  const weightPerPetty =
+    pettyItems.length === 1
+      ? pettyItems[0].weightPerPetty
+      : pettyQty > 0
+        ? Math.round((a.upcastTotalPettyWeight / pettyQty) * 1000) / 1000
+        : 0;
+  return {
+    pettyQty,
+    weightPerPetty,
+    ...(pettyItems.length > 1 ? { pettyItems } : {}),
+  };
+}
+
 export function buildUpcastStockNotes(a: SubmitStockOtherArgs) {
   return encodeUpcastStockNotes(
     {
@@ -9,8 +27,7 @@ export function buildUpcastStockNotes(a: SubmitStockOtherArgs) {
       outward: Number(a.upcastOutwardQty) || 0,
       closing: a.issuedQty,
       totalScrapWeight: Number(a.upcastTotalScrapWeight) || 0,
-      pettyQty: Number(a.upcastPettyQty) || 0,
-      weightPerPetty: Number(a.upcastWeightPerPetty) || 0,
+      ...upcastPettyMeta(a),
       totalPettyWeight: a.upcastTotalPettyWeight,
       sortingLossWeight: a.upcastSortingLossWeight,
       burningLossWeight: Number(a.upcastBurningLossWeight) || 0,

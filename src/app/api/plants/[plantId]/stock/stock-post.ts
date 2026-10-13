@@ -20,6 +20,7 @@ import { applyQuadSignalOpeningLockToNotes } from "@/lib/quad-signal-opening";
 import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
 import { resolveStockLineAmounts, stockEntryCreateData } from "./stock-amounts";
 import { stockBatchSchema, stockSingleSchema, type RouteContext } from "./stock-schemas";
+import { findStockInvoiceConflict } from "./stock-invoice-unique";
 
 async function writeStockEntry(
   db: {
@@ -108,6 +109,15 @@ export async function POST(
       };
 
       const plantIds = await resolveReportPlantIds(plantId);
+      const invoiceConflict = await findStockInvoiceConflict({
+        plantIds,
+        day,
+        shift: data.shift,
+        lines: data.entries,
+      });
+      if (invoiceConflict) {
+        return NextResponse.json({ error: invoiceConflict }, { status: 409 });
+      }
       const allowOpeningOverride = canAlwaysEditQuadOpeningStock(
         session.user.email,
       );
@@ -186,6 +196,15 @@ export async function POST(
     const backdated = isBackdated(data.date);
     const day = parseDateOnly(data.date);
     const plantIds = await resolveReportPlantIds(plantId);
+    const invoiceConflict = await findStockInvoiceConflict({
+      plantIds,
+      day,
+      shift: data.shift,
+      lines: [data],
+    });
+    if (invoiceConflict) {
+      return NextResponse.json({ error: invoiceConflict }, { status: 409 });
+    }
     const lockedNotes = await applyQuadSignalOpeningLockToNotes({
       plantIds,
       day,

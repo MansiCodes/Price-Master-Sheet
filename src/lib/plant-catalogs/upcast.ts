@@ -9,6 +9,7 @@ export type UpcastStockMeta = {
   pettyQty?: number;
   weightPerPetty?: number;
   totalPettyWeight?: number;
+  pettyItems?: Array<{ qty: number; weightPerPetty: number }>;
   sortingLossWeight?: number;
   burningLossWeight?: number;
   weightAfterBurning?: number;

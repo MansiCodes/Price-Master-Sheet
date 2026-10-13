@@ -12,6 +12,7 @@ export async function loadCustomCatalog(pScope: PlantIdFilter) {
     stockItems,
     stockUnits,
     assets,
+    formPurchaseItems,
   ] = await Promise.all([
     prisma.purchase.findMany({
       where: { ...pScope },
@@ -58,6 +59,11 @@ export async function loadCustomCatalog(pScope: PlantIdFilter) {
       select: { vendor: true },
       distinct: ["vendor"],
     }),
+    prisma.purchase.findMany({
+      where: { ...pScope, sourceKey: null, excelUploadedAt: null },
+      select: { itemDescription: true, type: true },
+      distinct: ["itemDescription", "type"],
+    }),
   ]);
 
   const isOtherLabel = (v: string) => /^(other|others)$/i.test(v.trim());
@@ -74,6 +80,14 @@ export async function loadCustomCatalog(pScope: PlantIdFilter) {
     customSuppliers: uniq(purchaseVendors.map((p) => p.vendorName)),
     customCustomers: uniq(saleCustomers.map((s) => s.customerName)),
     customPurchaseItems: uniq(purchaseItems.map((p) => p.itemDescription)),
+    customPurchaseItemsByType: {
+      RAW_MATERIAL: uniq(
+        formPurchaseItems.filter((p) => p.type === "RAW_MATERIAL").map((p) => p.itemDescription),
+      ),
+      CONSUMABLE: uniq(
+        formPurchaseItems.filter((p) => p.type === "CONSUMABLE").map((p) => p.itemDescription),
+      ),
+    },
     customSaleItems: uniq(saleItems.map((s) => s.itemDescription)),
     customStockItems: uniq(stockItems.map((s) => s.itemName)),
     customFarVendors: uniq(assets.map((a) => a.vendor)),

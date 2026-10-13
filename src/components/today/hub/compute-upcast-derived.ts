@@ -6,9 +6,16 @@ export function computeUpcastClosing(isUpcast: boolean, opening: string, incomin
   return Math.max(0, o + i - w);
 }
 
-export function computeUpcastPettyWeight(isUpcast: boolean, pettyQty: string, weightPerPetty: string) {
+export function computeUpcastPettyWeight(
+  isUpcast: boolean,
+  items: Array<{ qty: string; weight: string }>,
+) {
   if (!isUpcast) return 0;
-  return (Number(pettyQty) || 0) * (Number(weightPerPetty) || 0);
+  const total = items.reduce(
+    (sum, item) => sum + (Number(item.qty) || 0) * (Number(item.weight) || 0),
+    0,
+  );
+  return Math.round(total * 1000) / 1000;
 }
 
 export function computeUpcastSortingLoss(isUpcast: boolean, totalScrap: string, pettyWeight: number) {

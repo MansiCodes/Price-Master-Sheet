@@ -16,10 +16,26 @@ export function useTodayHubLineOptions(
   bases: CatalogBases,
   custom: CustomCatalogs,
 ) {
-  const purchaseItemOptions = useMemo(
-    () => buildPurchaseItemOptions(bases.purchaseCatalog.goods, custom.customPurchaseItems),
-    [bases.purchaseCatalog.goods, custom.customPurchaseItems],
-  );
+  const { goods, goodsByType, excludedCustomGoods } = bases.purchaseCatalog;
+  const purchaseItemOptionsByType = useMemo(() => {
+    if (!goodsByType) return {};
+    const blocked = new Set(
+      [...goods, ...(excludedCustomGoods ?? [])].map((x) => x.trim().toLowerCase()),
+    );
+    return Object.fromEntries(
+      Object.entries(goodsByType).map(([type, list]) => {
+        const customs = (custom.customPurchaseItemsByType[type] ?? []).filter(
+          (x) => !blocked.has(x.trim().toLowerCase()),
+        );
+        return [type, buildPurchaseItemOptions(list ?? [], customs)];
+      }),
+    ) as Partial<Record<string, string[]>>;
+  }, [goods, goodsByType, excludedCustomGoods, custom.customPurchaseItemsByType]);
+  const purchaseItemOptions = useMemo(() => {
+    if (!goodsByType) return buildPurchaseItemOptions(goods, custom.customPurchaseItems);
+    const typed = Object.values(purchaseItemOptionsByType).flatMap((opts) => opts ?? []);
+    return buildPurchaseItemOptions(goods, typed.filter((x) => !goods.includes(x)));
+  }, [goods, goodsByType, custom.customPurchaseItems, purchaseItemOptionsByType]);
   const saleItemOptions = useMemo(
     () => buildSaleItemOptions(bases.saleProducts, custom.customSaleItems),
     [bases.saleProducts, custom.customSaleItems],
@@ -28,5 +44,5 @@ export function useTodayHubLineOptions(
     () => buildStockParticulars(flags.isQuad, bases.stockCatalog.particulars, custom.customStockItems),
     [bases.stockCatalog.particulars, custom.customStockItems, flags.isQuad],
   );
-  return { purchaseItemOptions, saleItemOptions, stockParticulars };
+  return { purchaseItemOptions, purchaseItemOptionsByType, saleItemOptions, stockParticulars };
 }

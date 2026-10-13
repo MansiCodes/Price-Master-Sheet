@@ -18,8 +18,9 @@ export type ProductionEntryFieldState = {
   setPlanned: (v: string) => void;
   actual: string;
   setActual: (v: string) => void;
-  coilNo: string;
-  setCoilNo: (v: string) => void;
+  coilInvoices: string[];
+  setCoilInvoices: (fn: (prev: string[]) => string[]) => void;
+  totalCoils: number;
   weight: string;
   setWeight: (v: string) => void;
   operatorName: string;
@@ -77,6 +78,7 @@ export function ProductionEntryFields({
         <input value={processName ?? "—"} readOnly />
       </label>
 
+      <div className="mp-form__row mp-form__row--top">
       <div className="mp-field">
         <span>Cable type</span>
         <SelectMenu
@@ -168,6 +170,7 @@ export function ProductionEntryFields({
           </button>
         ) : null}
       </div>
+      </div>
 
       <div className="mp-form__row">
         <label className="mp-field">
@@ -180,44 +183,80 @@ export function ProductionEntryFields({
         </label>
       </div>
 
-      <div className="mp-form__row">
-        <label className="mp-field">
-          <span>Coil No.</span>
-          <input
-            type="text"
-            value={f.coilNo}
-            onChange={(e) => f.setCoilNo(e.target.value)}
+      <div className="mp-field">
+        <span className="mp-field__head">
+          Coil invoice no.
+          <span className="mp-field__head-note">Total coils: {f.totalCoils}</span>
+          <button
+            type="button"
+            className="mp-field__add"
             disabled={f.busy}
-            placeholder="Enter coil number"
-          />
-        </label>
-        <label className="mp-field">
-          <span>Weight (kg)</span>
-          <DecimalInput
-            value={f.weight}
-            onChange={f.setWeight}
-            disabled={f.busy}
-            placeholder="Enter weight"
-          />
-        </label>
+            onClick={() => f.setCoilInvoices((prev) => [...prev, ""])}
+            title="Add coil invoice"
+          >
+            +
+          </button>
+        </span>
+        {f.coilInvoices.map((invoice, idx) => (
+          <div key={`coil-invoice-${idx}`} className="mp-field__extra-row mp-field__extra-row--tight">
+            <input
+              type="text"
+              className="mp-field__extra"
+              value={invoice}
+              onChange={(e) => {
+                const val = e.target.value;
+                f.setCoilInvoices((prev) => prev.map((v, j) => (j === idx ? val : v)));
+              }}
+              disabled={f.busy}
+              placeholder="Enter coil invoice no."
+            />
+            {f.coilInvoices.length > 1 || invoice.trim() ? (
+              <button
+                type="button"
+                className="mp-field__row-remove"
+                disabled={f.busy}
+                onClick={() =>
+                  f.setCoilInvoices((prev) => {
+                    const next = prev.filter((_, j) => j !== idx);
+                    return next.length > 0 ? next : [""];
+                  })
+                }
+                title="Remove coil invoice"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
+        ))}
       </div>
 
       <label className="mp-field">
-        <span>Operator name</span>
-        <input
-          type="text"
-          value={f.operatorName}
-          onChange={(e) => f.setOperatorName(e.target.value)}
+        <span>Weight (kg)</span>
+        <DecimalInput
+          value={f.weight}
+          onChange={f.setWeight}
           disabled={f.busy}
-          placeholder="Enter operator name"
-          required
+          placeholder="Enter weight"
         />
       </label>
 
-      <label className="mp-field">
-        <span>Efficiency %</span>
-        <input value={f.efficiency.toFixed(2)} readOnly />
-      </label>
+      <div className="mp-form__row">
+        <label className="mp-field">
+          <span>Operator name</span>
+          <input
+            type="text"
+            value={f.operatorName}
+            onChange={(e) => f.setOperatorName(e.target.value)}
+            disabled={f.busy}
+            placeholder="Enter operator name"
+            required
+          />
+        </label>
+        <label className="mp-field">
+          <span>Efficiency %</span>
+          <input value={f.efficiency.toFixed(2)} readOnly />
+        </label>
+      </div>
 
       <div className="mp-form__row">
         <label className="mp-field">
@@ -244,22 +283,23 @@ export function ProductionEntryFields({
         </label>
       </div>
 
-      <label className="mp-field">
-        <span>Total manpower</span>
-        <input value={String(f.totalManpower)} readOnly />
-      </label>
-
-      <label className="mp-field">
-        <span>Date</span>
-        <input
-          type="date"
-          required
-          max={todayLocalISO()}
-          value={f.entryDate}
-          onChange={(e) => f.setEntryDate(e.target.value)}
-          disabled={f.busy}
-        />
-      </label>
+      <div className="mp-form__row">
+        <label className="mp-field">
+          <span>Total manpower</span>
+          <input value={String(f.totalManpower)} readOnly />
+        </label>
+        <label className="mp-field">
+          <span>Date</span>
+          <input
+            type="date"
+            required
+            max={todayLocalISO()}
+            value={f.entryDate}
+            onChange={(e) => f.setEntryDate(e.target.value)}
+            disabled={f.busy}
+          />
+        </label>
+      </div>
 
       <label className="mp-field">
         <span>Remarks</span>

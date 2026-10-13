@@ -35,7 +35,7 @@ const createSchema = z.object({
   helpers: z.number().int().nonnegative(),
   operatorName: z.string().trim().min(1).max(120),
   remarks: z.string().trim().max(2000).optional().nullable(),
-  coilNo: z.string().trim().max(100).optional().nullable(),
+  coilNo: z.string().trim().max(2000).optional().nullable(),
   weight: z.number().finite().nonnegative().optional().nullable(),
   photoUrls: z.array(z.string().url()).max(20).optional(),
 });

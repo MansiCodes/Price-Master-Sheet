@@ -43,7 +43,7 @@ export function ProductionEntryForm({
   const [remarks, setRemarks] = useState("");
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [coilNo, setCoilNo] = useState("");
+  const [coilInvoices, setCoilInvoices] = useState<string[]>([""]);
   const [weight, setWeight] = useState("");
   const [operatorName, setOperatorName] = useState("");
   const [entryDate, setEntryDate] = useState("");
@@ -55,7 +55,7 @@ export function ProductionEntryForm({
     setOperators("1");
     setHelpers("0");
     setRemarks("");
-    setCoilNo("");
+    setCoilInvoices([""]);
     setWeight("");
     setOperatorName("");
     setEntryDate(viewSlot?.entryDate ? viewSlot.entryDate.split("T")[0] : todayLocalISO());
@@ -69,6 +69,7 @@ export function ProductionEntryForm({
   const totalManpower = ops + helps;
   const efficiency =
     plannedNum > 0 ? Math.round((actualNum / plannedNum) * 10000) / 100 : 0;
+  const filledCoilInvoices = coilInvoices.map((v) => v.trim()).filter(Boolean);
 
   const dateTimeLabel = useMemo(() => {
     return new Intl.DateTimeFormat("en-IN", {
@@ -159,7 +160,7 @@ export function ProductionEntryForm({
         helpers: helps,
         operatorName: operatorName.trim(),
         remarks: remarks.trim() || null,
-        coilNo: coilNo.trim() || null,
+        coilNo: filledCoilInvoices.join(", ") || null,
         weight: weight ? Number(weight) : null,
         photoUrls,
       },
@@ -197,8 +198,9 @@ export function ProductionEntryForm({
               setPlanned,
               actual,
               setActual,
-              coilNo,
-              setCoilNo,
+              coilInvoices,
+              setCoilInvoices,
+              totalCoils: filledCoilInvoices.length,
               weight,
               setWeight,
               operatorName,
