@@ -74,29 +74,30 @@ function HubStockDispatchPartyField({
   );
 }
 
+function dispatchRowRemovable(item: StockDispatchPendingItem, count: number) {
+  return count > 1 || Boolean(item.qty.trim()) || Boolean(item.partyName.trim());
+}
+
 function HubStockDispatchRemove({
-  idx, count, onRemove,
+  idx, item, count, onRemove,
 }: {
   idx: number;
+  item: StockDispatchPendingItem;
   count: number;
   onRemove: (idx: number) => void;
 }) {
-  if (count <= 1) return null;
+  if (!dispatchRowRemovable(item, count)) return null;
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
-      {idx > 0 ? (
-        <button
-          type="button"
-          className="btn btn--sm btn--danger"
-          style={REMOVE_BTN_STYLE}
-          onClick={() => onRemove(idx)}
-          title="Remove Dispatch pending"
-        >
-          ✕
-        </button>
-      ) : (
-        <div style={{ width: "36px", height: "38px" }} />
-      )}
+      <button
+        type="button"
+        className="btn btn--sm btn--danger"
+        style={REMOVE_BTN_STYLE}
+        onClick={() => onRemove(idx)}
+        title="Remove Dispatch pending"
+      >
+        ✕
+      </button>
     </div>
   );
 }
@@ -118,7 +119,9 @@ export function HubStockDispatchPendingRow({
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: items.length > 1 ? "1fr 3.9fr 36px" : "1fr 3.9fr",
+        gridTemplateColumns: items.some((row) => dispatchRowRemovable(row, items.length))
+          ? "1fr 3.9fr 36px"
+          : "1fr 3.9fr",
         gap: "10px",
         alignItems: "flex-end",
         marginBottom: idx < items.length - 1 ? "12px" : 0,
@@ -126,7 +129,7 @@ export function HubStockDispatchPendingRow({
     >
       <HubStockDispatchQtyField item={item} idx={idx} setItems={setItems} onFirstQty={onFirstQty} />
       <HubStockDispatchPartyField item={item} idx={idx} setItems={setItems} onFirstParty={onFirstParty} />
-      <HubStockDispatchRemove idx={idx} count={items.length} onRemove={onRemove} />
+      <HubStockDispatchRemove idx={idx} item={item} count={items.length} onRemove={onRemove} />
     </div>
   );
 }

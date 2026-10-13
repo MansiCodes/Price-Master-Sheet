@@ -165,7 +165,15 @@ export async function GET(
   const latestPutups = callPutupsFromNotes(latestStock?.notes);
 
   let callPutupItems: NoteCallPutup[] = [];
-  if (existingStock) {
+  let callPutupCarriedItems: NoteCallPutup[] = [];
+  const carriedCount =
+    existingMeta?.kind === "cable"
+      ? Math.max(0, Math.floor(Number(existingMeta.callPutupCarriedCount) || 0))
+      : 0;
+  if (existingStock && carriedCount > 0) {
+    callPutupCarriedItems = latestPutups.slice(0, carriedCount);
+    callPutupItems = latestPutups.slice(carriedCount);
+  } else if (existingStock) {
     const todayItems = mergeNoteCallPutups(
       todayStocks.flatMap((row) => callPutupsFromNotes(row.notes)),
     );
@@ -176,9 +184,17 @@ export async function GET(
         orderBy: [{ date: "desc" }, { updatedAt: "desc" }],
         select: { notes: true },
       });
-      callPutupItems = callPutupsFromNotes(prevStock?.notes);
+      const { meta: prevMeta } = parseQuadSignalStockNotes(prevStock?.notes);
+      const prevPutups = callPutupsFromNotes(prevStock?.notes);
+      if (prevMeta?.kind === "cable" && prevMeta.outerClosingIncludesPutup) {
+        callPutupCarriedItems = prevPutups;
+      } else {
+        callPutupItems = prevPutups;
+      }
     }
-  } else if (!putupsAlreadyClosed) {
+  } else if (putupsAlreadyClosed) {
+    callPutupCarriedItems = latestPutups;
+  } else {
     callPutupItems = latestPutups;
   }
   const loadPutups = callPutupItems.length > 0;
@@ -209,6 +225,7 @@ export async function GET(
               : "",
           dispatchParty: existingMeta.dispatchParty ?? "",
           callPutupItems,
+          callPutupCarriedItems,
           callPutupOriginalKm,
           dispatchPendingItems: existingMeta.dispatchPendingItems ?? [],
           dispatchSettledKm: existingMeta.dispatchSettledKm ?? 0,

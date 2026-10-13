@@ -1010,6 +1010,62 @@
 .qs-wip__putup-row .field {
   min-width: 0;
 }
+.qs-wip__carried {
+  margin-bottom: 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed rgba(13, 148, 136, 0.35);
+  border-radius: 10px;
+  background: #f4faf9;
+}
+.qs-wip__carried-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f766e;
+  margin-bottom: 0.4rem;
+}
+.qs-wip__carried-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+.qs-wip__carried-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  min-width: 0;
+}
+.qs-wip__carried-qty {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.qs-wip__carried-meta {
+  color: var(--fg-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qs-wip__carried-remove {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff;
+  color: #dc2626;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+}
 .qs-wip__sale-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

@@ -3,6 +3,7 @@ import type { TodayHubVm } from "@/components/today/hub/today-hub-view-model";
 import { bindStockLocals } from "@/components/today/hub/bind-today-hub-locals";
 import { HubStockCallPutupRow } from "@/components/today/hub/HubStockCallPutupRow";
 import { sumCallPutupKm } from "@/components/today/hub/process-row-out-label";
+import { formatDayMonthYear } from "@/lib/dates";
 
 const ADD_BTN_STYLE = {
   display: "inline-flex",
@@ -87,6 +88,39 @@ function HubStockCallPutupList({ vm }: { vm: TodayHubVm }) {
   );
 }
 
+function HubStockCallPutupCarried({ vm }: { vm: TodayHubVm }) {
+  const { stockCallPutupLoadedItems, setStockCallPutupLoadedItems } = bindStockLocals(vm);
+  if (stockCallPutupLoadedItems.length === 0) return null;
+  const km = Math.round(sumCallPutupKm(stockCallPutupLoadedItems) * 1000) / 1000;
+  return (
+    <div className="qs-wip__carried">
+      <div className="qs-wip__carried-head">Total {km} km</div>
+      <ul className="qs-wip__carried-list">
+        {stockCallPutupLoadedItems.map((item, idx) => (
+          <li key={`carried-putup-${idx}`} className="qs-wip__carried-item">
+            <span className="qs-wip__carried-qty">{item.qty} km</span>
+            <span className="qs-wip__carried-meta">
+              {[item.date ? formatDayMonthYear(item.date) : "", item.partyName]
+                .filter(Boolean)
+                .join(" · ") || "—"}
+            </span>
+            <button
+              type="button"
+              className="qs-wip__carried-remove"
+              title="Remove from list (stock is not changed)"
+              onClick={() =>
+                setStockCallPutupLoadedItems((prev) => prev.filter((_, j) => j !== idx))
+              }
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function HubStockQuadCallPutup({ vm }: { vm: TodayHubVm }) {
   const {
     setStockCallPutupItems,
@@ -107,6 +141,7 @@ export function HubStockQuadCallPutup({ vm }: { vm: TodayHubVm }) {
             setStockCallPutupItems((prev) => [...prev, { qty: "", date: "", partyName: "" }])
           }
         />
+        <HubStockCallPutupCarried vm={vm} />
         <HubStockCallPutupList vm={vm} />
       </div>
     </>

@@ -9,6 +9,7 @@ import {
   dispatchSpreads,
   lockDispatchHistory,
   mappedCallPutupItems,
+  mergeCallPutupItems,
   mappedSaleItems,
 } from "@/components/today/hub/build-quad-cable-notes-items";
 import {
@@ -58,7 +59,11 @@ export type QuadCableNotesPayloadArgs = {
 };
 
 export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
-  const putups = mappedCallPutupItems(args.stockCallPutupItems);
+  const carriedCount = mappedCallPutupItems(args.stockCallPutupLoadedItems).length;
+  const putups = mergeCallPutupItems(
+    args.stockCallPutupLoadedItems,
+    args.stockCallPutupItems,
+  );
   const formPutupKm = sumCallPutupKm(args.stockCallPutupItems);
   const callPutupOriginalKm = Math.max(
     Number(args.stockCallPutupLoadedKm) || 0,
@@ -98,6 +103,7 @@ export function buildQuadCableNotesPayload(args: QuadCableNotesPayloadArgs) {
     processes: closing,
     salesKm: args.stockWipSalesKm,
     ...(putups.length > 0 ? { callPutupItems: putups } : {}),
+    ...(carriedCount > 0 ? { callPutupCarriedCount: carriedCount } : {}),
     ...(callPutupOriginalKm > 0 ? { callPutupOriginalKm } : {}),
     ...(locked.pendingItems.length > 0 ? { dispatchPendingItems: locked.pendingItems } : {}),
     ...(sales.length > 0 ? { saleItems: sales } : {}),

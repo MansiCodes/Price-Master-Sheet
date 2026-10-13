@@ -139,7 +139,11 @@ function processLinesFromMeta(
     names = names.filter((n) => n.trim().toLowerCase() !== "insulation");
   }
   if (isSignallingCableName(cable) || isQuadCableName(cable)) {
-    const putupKm = sessionPutupKmFromItems(meta.callPutupItems);
+    const putupKm = sessionPutupKmFromItems(
+      (meta.callPutupItems ?? []).slice(
+        Math.max(0, Math.floor(Number(meta.callPutupCarriedCount) || 0)),
+      ),
+    );
     const by = formClosingByProcess(names, meta.opening, production, putupKm);
     return names.map((name) => {
       const stored = processQtyFromMeta(closing, name);

@@ -61,9 +61,13 @@ function HubStockDispatchList({ vm }: { vm: TodayHubVm }) {
           setItems={setStockDispatchPendingItems}
           onFirstQty={setStockDispatchPending}
           onFirstParty={setStockDispatchParty}
-          onRemove={(i) =>
-            setStockDispatchPendingItems((prev) => prev.filter((_, j) => j !== i))
-          }
+          onRemove={(i) => {
+            const rest = stockDispatchPendingItems.filter((_, j) => j !== i);
+            const next = rest.length > 0 ? rest : [{ qty: "", partyName: "" }];
+            setStockDispatchPendingItems(next);
+            setStockDispatchPending(next[0]!.qty);
+            setStockDispatchParty(next[0]!.partyName);
+          }}
         />
       ))}
     </>

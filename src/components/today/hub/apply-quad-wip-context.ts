@@ -104,6 +104,7 @@ function applyCallPutupFromMeta(
     putupDate: string;
     partyName: string;
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
+    callPutupCarriedItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
     callPutupOriginalKm?: number;
   } | null,
 ) {
@@ -127,7 +128,13 @@ function applyCallPutupFromMeta(
     return sum + (Number.isFinite(n) && n > 0 ? n : 0);
   }, 0);
   const original = Number(meta?.callPutupOriginalKm);
-  s.setStockCallPutupLoadedItems([]);
+  s.setStockCallPutupLoadedItems(
+    (meta?.callPutupCarriedItems ?? []).map((p) => ({
+      qty: p.qty != null ? String(p.qty) : "",
+      date: p.date ?? "",
+      partyName: p.partyName ?? "",
+    })),
+  );
   s.setStockCallPutupLoadedKm(
     Number.isFinite(original) && original > 0 ? Math.max(original, formKm) : formKm,
   );
@@ -278,6 +285,7 @@ export type QuadWipContextData = {
     dispatchPending: string;
     dispatchParty: string;
     callPutupItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
+    callPutupCarriedItems?: Array<{ qty: number | string; date?: string; partyName?: string }>;
     callPutupOriginalKm?: number;
     dispatchPendingItems?: Array<{ qty: number | string; partyName?: string }>;
     dispatchSettledKm?: number;

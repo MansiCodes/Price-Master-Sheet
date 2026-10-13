@@ -100,15 +100,28 @@ export function nextDayFormOpeningFromMeta(
     callPutupItems?: Array<{ qty?: number | string | null }>;
     /** Closing already took put-up off Outer — do not subtract the same km again. */
     outerClosingIncludesPutup?: boolean;
+    closing?: Record<string, number>;
   },
 ): Record<string, number> {
   const putupKm = meta.outerClosingIncludesPutup
     ? 0
     : sessionPutupKmFromItems(meta.callPutupItems);
-  return formClosingByProcess(
+  const out = formClosingByProcess(
     processNames,
     meta.opening,
     meta.production,
     putupKm,
   );
+  if (meta.outerClosingIncludesPutup && meta.closing) {
+    const saved = Object.entries(meta.closing).find(([key]) =>
+      isFormOuterProcess(key),
+    );
+    const savedOuter = saved ? Number(saved[1]) : NaN;
+    if (Number.isFinite(savedOuter)) {
+      for (const proc of processNames) {
+        if (isFormOuterProcess(proc)) out[proc] = savedOuter;
+      }
+    }
+  }
+  return out;
 }

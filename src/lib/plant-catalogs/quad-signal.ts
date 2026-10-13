@@ -50,6 +50,8 @@ export type QuadSignalStockMeta = {
   }>;
   /** First filled Call put-up km; stays put if rows are later removed. */
   callPutupOriginalKm?: number;
+  /** Leading `callPutupItems` carried from an earlier fill; already off this row's Outer opening. */
+  callPutupCarriedCount?: number;
   dispatchPendingItems?: Array<{
     qty: number | string;
     partyName?: string;
