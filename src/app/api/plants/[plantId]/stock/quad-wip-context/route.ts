@@ -17,6 +17,7 @@ import {
 } from "@/components/today/hub/process-row-out-label";
 import { isQuadSignalPlant } from "@/lib/plant-layout";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
+import { isFormOuterProcess } from "@/lib/quad-signal-form-stock";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
 import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
 import {
@@ -30,6 +31,24 @@ type RouteContext = { params: Promise<{ plantId: string }> };
 function callPutupsFromNotes(notes: string | null | undefined): NoteCallPutup[] {
   const { meta } = parseQuadSignalStockNotes(notes);
   return meta?.kind === "cable" ? callPutupItemsFromCableMeta(meta) : [];
+}
+
+function outerQty(map: Record<string, number> | undefined): number | null {
+  const hit = Object.entries(map ?? {}).find(([key]) => isFormOuterProcess(key));
+  const n = hit ? Number(hit[1]) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Saved Outer closing is below opening + production, i.e. that save subtracted put-up. */
+function outerClosingTookPutup(meta: {
+  opening?: Record<string, number>;
+  production?: Record<string, number>;
+  closing?: Record<string, number>;
+}): boolean {
+  const closing = outerQty(meta.closing);
+  if (closing == null) return true;
+  const gross = (outerQty(meta.opening) ?? 0) + (outerQty(meta.production) ?? 0);
+  return gross - closing > 0.0005;
 }
 
 function stripInsulationQty(map: Record<string, number>) {
@@ -178,6 +197,15 @@ export async function GET(
       todayStocks.flatMap((row) => callPutupsFromNotes(row.notes)),
     );
     callPutupItems = todayItems.length > 0 ? todayItems : latestPutups;
+    if (
+      callPutupItems.length > 0 &&
+      putupsAlreadyClosed &&
+      existingMeta?.kind === "cable" &&
+      !outerClosingTookPutup(existingMeta)
+    ) {
+      callPutupCarriedItems = callPutupItems;
+      callPutupItems = [];
+    }
     if (callPutupItems.length === 0) {
       const prevStock = await prisma.stockEntry.findFirst({
         where: { ...pScope, itemName, date: { lt: day } },
