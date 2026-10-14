@@ -9,9 +9,30 @@ import {
   resolveQuadSignalVariant,
 } from "@/lib/quad-signal-wip";
 import {
+  deductiblePutupKm,
   formClosingByProcess,
-  sessionPutupKmFromItems,
+  formProcessClosing,
+  isFormOuterProcess,
 } from "@/lib/quad-signal-form-stock";
+
+function outerClosingAfterPutup(
+  processes: readonly string[],
+  opening: Record<string, number>,
+  production: Record<string, number>,
+  putupKm: number,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const proc of processes) {
+    if (!isFormOuterProcess(proc)) continue;
+    out[proc] = formProcessClosing(
+      proc,
+      Number(opening[proc]) || 0,
+      Number(production[proc]) || 0,
+      putupKm,
+    );
+  }
+  return out;
+}
 
 export function recomputeCableNotesWithOpening(
   meta: QuadSignalStockMeta,
@@ -49,9 +70,9 @@ export function recomputeCableNotesWithOpening(
         processes,
         opening,
         production,
-        sessionPutupKmFromItems(meta.callPutupItems),
+        deductiblePutupKm(meta),
       )
-    : {};
+    : outerClosingAfterPutup(processes, opening, production, deductiblePutupKm(meta));
   const closing = { ...wip.byProcess, ...sizeClosing };
   const next: QuadSignalStockMeta = {
     ...meta,

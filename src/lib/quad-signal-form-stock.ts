@@ -22,6 +22,19 @@ export function sessionPutupKmFromItems(
   return Math.round(sum * 1000) / 1000;
 }
 
+/** Put-ups still to take off Outer (leading carried items were taken off on an earlier save). */
+export function deductiblePutupKm(meta: {
+  callPutupItems?: Array<{ qty?: number | string | null }>;
+  callPutupCarriedCount?: number;
+}): number {
+  const carried = Math.max(0, Math.floor(Number(meta.callPutupCarriedCount) || 0));
+  return sessionPutupKmFromItems((meta.callPutupItems ?? []).slice(carried));
+}
+
+function isSingleQuadProcess(name: string): boolean {
+  return name.trim().toLowerCase() === "single quad";
+}
+
 function qty(map: Record<string, number> | undefined, proc: string): number {
   if (!map) return 0;
   const want = proc.trim().toLowerCase();
@@ -98,21 +111,30 @@ export function nextDayFormOpeningFromMeta(
     opening?: Record<string, number>;
     production?: Record<string, number>;
     callPutupItems?: Array<{ qty?: number | string | null }>;
+    callPutupCarriedCount?: number;
     /** Closing already took put-up off Outer — do not subtract the same km again. */
     outerClosingIncludesPutup?: boolean;
     closing?: Record<string, number>;
   },
 ): Record<string, number> {
-  const putupKm = meta.outerClosingIncludesPutup
+  const hasCarried = Number(meta.callPutupCarriedCount) > 0;
+  const putupKm = meta.outerClosingIncludesPutup && !hasCarried
     ? 0
-    : sessionPutupKmFromItems(meta.callPutupItems);
+    : deductiblePutupKm(meta);
   const out = formClosingByProcess(
     processNames,
     meta.opening,
     meta.production,
     putupKm,
   );
-  if (meta.outerClosingIncludesPutup && meta.closing) {
+  if (meta.closing) {
+    for (const proc of processNames) {
+      if (!isSingleQuadProcess(proc)) continue;
+      const saved = Number(qty(meta.closing, proc));
+      if (Number.isFinite(saved) && proc in meta.closing) out[proc] = saved;
+    }
+  }
+  if (meta.outerClosingIncludesPutup && !hasCarried && meta.closing) {
     const saved = Object.entries(meta.closing).find(([key]) =>
       isFormOuterProcess(key),
     );
