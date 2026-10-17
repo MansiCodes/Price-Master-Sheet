@@ -72,15 +72,17 @@ export function ProductionEntryFields({
         </p>
       ) : null}
 
-      <label className="mp-field">
-        <span>Machine</span>
-        <input value={`${machine.name} (${machine.code})`} readOnly />
-      </label>
+      <div className="mp-form__row">
+        <label className="mp-field">
+          <span>Machine</span>
+          <input value={`${machine.name} (${machine.code})`} readOnly />
+        </label>
 
-      <label className="mp-field">
-        <span>Current process</span>
-        <input value={processName ?? "—"} readOnly />
-      </label>
+        <label className="mp-field">
+          <span>Current process</span>
+          <input value={processName ?? "—"} readOnly />
+        </label>
+      </div>
 
       <div className="mp-form__row mp-form__row--top">
       <div className="mp-field">
