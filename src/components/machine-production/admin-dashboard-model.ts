@@ -28,6 +28,8 @@ export type EntryRow = {
   totalManpower: number;
   operatorName: string | null;
   remarks: string | null;
+  coilNo?: string | null;
+  weight?: number | null;
   photoUrls: string[];
   submittedAt: string;
   status: string;

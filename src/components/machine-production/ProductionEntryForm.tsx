@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ProductionEntryFields } from "@/components/machine-production/ProductionEntryFields";
+import { ProductionEntryFields, type ProductionCoilItem } from "@/components/machine-production/ProductionEntryFields";
 import { useProductionCableCatalog } from "@/components/machine-production/useProductionCableCatalog";
 import { SlideOver } from "@/components/ui/SlideOver";
 import { postJson, todayLocalISO } from "@/lib/client-forms";
@@ -43,8 +43,9 @@ export function ProductionEntryForm({
   const [remarks, setRemarks] = useState("");
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [coilInvoices, setCoilInvoices] = useState<string[]>([""]);
-  const [weight, setWeight] = useState("");
+  const [coils, setCoils] = useState<ProductionCoilItem[]>([
+    { invoice: "", weight: "" },
+  ]);
   const [operatorName, setOperatorName] = useState("");
   const [entryDate, setEntryDate] = useState("");
 
@@ -55,8 +56,7 @@ export function ProductionEntryForm({
     setOperators("1");
     setHelpers("0");
     setRemarks("");
-    setCoilInvoices([""]);
-    setWeight("");
+    setCoils([{ invoice: "", weight: "" }]);
     setOperatorName("");
     setEntryDate(viewSlot?.entryDate ? viewSlot.entryDate.split("T")[0] : todayLocalISO());
     setPhotoUrls([]);
@@ -69,7 +69,19 @@ export function ProductionEntryForm({
   const totalManpower = ops + helps;
   const efficiency =
     plannedNum > 0 ? Math.round((actualNum / plannedNum) * 10000) / 100 : 0;
-  const filledCoilInvoices = coilInvoices.map((v) => v.trim()).filter(Boolean);
+  const filledCoils = coils.filter(
+    (c) => c.invoice.trim() !== "" || c.weight.trim() !== "",
+  );
+  const totalCoils = filledCoils.length;
+  const hasAnyWeight = coils.some((c) => c.weight.trim() !== "");
+  const totalWeight = hasAnyWeight
+    ? Math.round(
+        coils.reduce((sum, c) => {
+          const w = parseFloat(c.weight);
+          return sum + (Number.isFinite(w) && w >= 0 ? w : 0);
+        }, 0) * 10000,
+      ) / 10000
+    : null;
 
   const dateTimeLabel = useMemo(() => {
     return new Intl.DateTimeFormat("en-IN", {
@@ -143,6 +155,16 @@ export function ProductionEntryForm({
       return;
     }
 
+    const coilDescriptions = filledCoils
+      .map((c, i) => {
+        const inv = c.invoice.trim();
+        const wt = c.weight.trim();
+        if (inv && wt) return `${inv} (${wt} kg)`;
+        if (inv) return inv;
+        return wt ? `Coil ${i + 1} (${wt} kg)` : "";
+      })
+      .filter(Boolean);
+
     setSaving(true);
     const res = await postJson<{ ok: boolean; error?: string }>(
       "/api/machine-production/entries",
@@ -160,8 +182,8 @@ export function ProductionEntryForm({
         helpers: helps,
         operatorName: operatorName.trim(),
         remarks: remarks.trim() || null,
-        coilNo: filledCoilInvoices.join(", ") || null,
-        weight: weight ? Number(weight) : null,
+        coilNo: coilDescriptions.join(", ") || null,
+        weight: totalWeight,
         photoUrls,
       },
     );
@@ -198,11 +220,10 @@ export function ProductionEntryForm({
               setPlanned,
               actual,
               setActual,
-              coilInvoices,
-              setCoilInvoices,
-              totalCoils: filledCoilInvoices.length,
-              weight,
-              setWeight,
+              coils,
+              setCoils,
+              totalCoils,
+              totalWeight,
               operatorName,
               setOperatorName,
               operators,

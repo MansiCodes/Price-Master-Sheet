@@ -13,16 +13,20 @@ import { DecimalInput } from "@/components/ui/DecimalInput";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { todayLocalISO } from "@/lib/client-forms";
 
+export type ProductionCoilItem = {
+  invoice: string;
+  weight: string;
+};
+
 export type ProductionEntryFieldState = {
   planned: string;
   setPlanned: (v: string) => void;
   actual: string;
   setActual: (v: string) => void;
-  coilInvoices: string[];
-  setCoilInvoices: (fn: (prev: string[]) => string[]) => void;
+  coils: ProductionCoilItem[];
+  setCoils: (fn: (prev: ProductionCoilItem[]) => ProductionCoilItem[]) => void;
   totalCoils: number;
-  weight: string;
-  setWeight: (v: string) => void;
+  totalWeight: number | null;
   operatorName: string;
   setOperatorName: (v: string) => void;
   operators: string;
@@ -185,60 +189,79 @@ export function ProductionEntryFields({
 
       <div className="mp-field">
         <span className="mp-field__head">
-          Coil invoice no.
-          <span className="mp-field__head-note">Total coils: {f.totalCoils}</span>
+          Coil invoice no. & weight
+          <span className="mp-field__head-note">
+            Total coils: {f.totalCoils}
+            {f.totalWeight != null ? ` · ${f.totalWeight} kg` : ""}
+          </span>
           <button
             type="button"
             className="mp-field__add"
             disabled={f.busy}
-            onClick={() => f.setCoilInvoices((prev) => [...prev, ""])}
-            title="Add coil invoice"
+            onClick={() =>
+              f.setCoils((prev) => [...prev, { invoice: "", weight: "" }])
+            }
+            title="Add coil"
           >
             +
           </button>
         </span>
-        {f.coilInvoices.map((invoice, idx) => (
-          <div key={`coil-invoice-${idx}`} className="mp-field__extra-row mp-field__extra-row--tight">
-            <input
-              type="text"
-              className="mp-field__extra"
-              value={invoice}
-              onChange={(e) => {
-                const val = e.target.value;
-                f.setCoilInvoices((prev) => prev.map((v, j) => (j === idx ? val : v)));
-              }}
-              disabled={f.busy}
-              placeholder="Enter coil invoice no."
-            />
-            {f.coilInvoices.length > 1 || invoice.trim() ? (
-              <button
-                type="button"
-                className="mp-field__row-remove"
-                disabled={f.busy}
-                onClick={() =>
-                  f.setCoilInvoices((prev) => {
-                    const next = prev.filter((_, j) => j !== idx);
-                    return next.length > 0 ? next : [""];
-                  })
-                }
-                title="Remove coil invoice"
-              >
-                ✕
-              </button>
-            ) : null}
-          </div>
-        ))}
+        <div className="mp-coil-list">
+          {f.coils.map((coil, idx) => (
+            <div key={`coil-box-${idx}`} className="mp-coil-box">
+              <div className="mp-coil-box__head">
+                <span className="mp-coil-box__badge">Coil #{idx + 1}</span>
+                {f.coils.length > 1 || coil.invoice.trim() || coil.weight.trim() ? (
+                  <button
+                    type="button"
+                    className="mp-coil-box__remove"
+                    disabled={f.busy}
+                    onClick={() =>
+                      f.setCoils((prev) => {
+                        const next = prev.filter((_, j) => j !== idx);
+                        return next.length > 0 ? next : [{ invoice: "", weight: "" }];
+                      })
+                    }
+                    title="Remove coil"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+              <div className="mp-coil-box__row">
+                <label className="mp-field">
+                  <span className="mp-coil-box__sublabel">Coil invoice no.</span>
+                  <input
+                    type="text"
+                    value={coil.invoice}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      f.setCoils((prev) =>
+                        prev.map((c, j) => (j === idx ? { ...c, invoice: val } : c)),
+                      );
+                    }}
+                    disabled={f.busy}
+                    placeholder="Enter coil invoice no."
+                  />
+                </label>
+                <label className="mp-field">
+                  <span className="mp-coil-box__sublabel">Weight (kg)</span>
+                  <DecimalInput
+                    value={coil.weight}
+                    onChange={(val) => {
+                      f.setCoils((prev) =>
+                        prev.map((c, j) => (j === idx ? { ...c, weight: val } : c)),
+                      );
+                    }}
+                    disabled={f.busy}
+                    placeholder="Enter weight"
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-
-      <label className="mp-field">
-        <span>Weight (kg)</span>
-        <DecimalInput
-          value={f.weight}
-          onChange={f.setWeight}
-          disabled={f.busy}
-          placeholder="Enter weight"
-        />
-      </label>
 
       <div className="mp-form__row">
         <label className="mp-field">

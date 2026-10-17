@@ -170,6 +170,18 @@ export function AdminEntryDetail({
                   {selected.totalManpower}
                 </dd>
               </div>
+              {selected.coilNo ? (
+                <div>
+                  <dt>Coils</dt>
+                  <dd>{selected.coilNo}</dd>
+                </div>
+              ) : null}
+              {selected.weight != null ? (
+                <div>
+                  <dt>Weight</dt>
+                  <dd>{selected.weight} kg</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>Remarks</dt>
                 <dd>{selected.remarks || "—"}</dd>
