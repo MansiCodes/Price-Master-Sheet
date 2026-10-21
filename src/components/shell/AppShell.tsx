@@ -101,6 +101,7 @@ export function AppShell({
       </div>
       <TodayEntryHost
         plant={entryPlant}
+        plants={plants}
         canEnter={canEnter}
         userRole={user?.role ?? ""}
         canAccessStock={Boolean(user?.canAccessStock)}

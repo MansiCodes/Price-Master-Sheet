@@ -35,7 +35,11 @@ export function TodayHub(props: TodayHubProps) {
       <SlideOver
         open={session.panelOpen}
         onClose={session.closePanel}
-        title={flags.stockEntryOnly ? "Stock" : t("title")}
+        title={
+          flags.stockEntryOnly
+            ? `Stock · ${props.plantName}`
+            : `${t("title")} · ${props.plantName}`
+        }
         footer={
           <>
             <Button variant="secondary" onClick={session.closePanel}>

@@ -56,11 +56,13 @@ export function TodayEntryHost({
   canEnter,
   userRole = "",
   canAccessStock = false,
+  plants = [],
 }: {
   plant: PlantInfo | null;
   canEnter: boolean;
   userRole?: string;
   canAccessStock?: boolean;
+  plants?: PlantInfo[];
 }) {
   const pathname = usePathname();
   const date = useMemo(() => todayLocalISO(), []);
@@ -69,21 +71,32 @@ export function TodayEntryHost({
   );
   const [open, setOpen] = useState(false);
 
+  // If user is currently on /plants/[plantId]/..., bind the quick-entry slide-over
+  // to that active plant rather than the fallback/cookie plant.
+  const activePlant = useMemo(() => {
+    const match = pathname?.match(/^\/plants\/([^/]+)/);
+    if (match && match[1] && plants.length > 0) {
+      const found = plants.find((p) => p.id === match[1] || p.code?.toUpperCase() === match[1]?.toUpperCase());
+      if (found) return found;
+    }
+    return plant;
+  }, [pathname, plants, plant]);
+
   // Dashboard "/" normally uses embedded TodayHub. Machine Supervisor + Stock
   // only has MachineProductionHome on "/", so the global host must work there too.
   const allowOnHome =
     userRole === "MACHINE_SUPERVISOR" && canAccessStock;
   const enabled = Boolean(
-    plant && canEnter && (pathname !== "/" || allowOnHome),
+    activePlant && canEnter && (pathname !== "/" || allowOnHome),
   );
 
   useEffect(() => {
-    if (!enabled || !plant) return;
+    if (!enabled || !activePlant) return;
 
     void (async () => {
       try {
         const res = await fetch(
-          `/api/plants/${plant.id}/today?date=${encodeURIComponent(date)}`,
+          `/api/plants/${activePlant.id}/today?date=${encodeURIComponent(date)}`,
         );
         if (!res.ok) return;
         const json = (await res.json()) as {
@@ -101,7 +114,7 @@ export function TodayEntryHost({
         // keep defaults
       }
     })();
-  }, [date, enabled, plant]);
+  }, [date, enabled, activePlant]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -116,13 +129,13 @@ export function TodayEntryHost({
     };
   }, [enabled]);
 
-  if (!enabled || !plant) return null;
+  if (!enabled || !activePlant) return null;
 
   return (
     <TodayHub
-      plantId={plant.id}
-      plantName={plant.name}
-      plantCode={plant.code}
+      plantId={activePlant.id}
+      plantName={activePlant.name}
+      plantCode={activePlant.code}
       date={date}
       shiftModules={shiftModules}
       canEnter={canEnter}
