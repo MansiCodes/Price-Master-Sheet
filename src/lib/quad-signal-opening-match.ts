@@ -5,6 +5,7 @@ import {
   type QuadSignalStockMeta,
 } from "@/lib/plant-catalogs";
 import { isSignallingCableName, normalizeCableName } from "@/lib/quad-signal-wip";
+import { isPowerCableName } from "@/lib/power-cable";
 import { nextDayFormOpeningFromMeta } from "@/lib/quad-signal-form-stock";
 
 export const INSULATION_KEY = "Insulation";
@@ -192,6 +193,10 @@ export function lastEnteredOpeningByProcess(
     const keys = names.length > 0 ? names : Object.keys(src);
     if (useLastClosing) {
       Object.assign(out, nextDayFormOpeningFromMeta(keys, meta));
+      if (isPowerCableName(cable) && out[INSULATION_KEY] == null) {
+        const insVal = qtyOnMap(closing, INSULATION_KEY);
+        if (Number.isFinite(insVal)) out[INSULATION_KEY] = insVal;
+      }
     } else {
       for (const proc of keys) {
         if (skipInsulation && proc.trim().toLowerCase() === "insulation") continue;

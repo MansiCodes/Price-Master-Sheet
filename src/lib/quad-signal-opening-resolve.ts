@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getQuadSignalCableProcesses, quadSignalCableSizeDedupeKey } from "@/lib/plant-catalogs";
 import { plantIdFilter } from "@/lib/plant-merge";
 import { isQuadCableName, isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isPowerCableName } from "@/lib/power-cable";
 import { buildCableStockStatus } from "@/lib/stock-production-status";
 import {
   INSULATION_KEY,
@@ -143,6 +144,24 @@ export async function resolveQuadSignalStockOpening(params: {
   } else if (signalling) {
     delete opening[INSULATION_KEY];
     delete production[INSULATION_KEY];
+  } else if (isPowerCableName(cable)) {
+    if (sameDayEntryId && !todayIdle) {
+      const sameDayInsOpen = sizeOpen.opening[INSULATION_KEY];
+      if (sameDayInsOpen != null && Number.isFinite(Number(sameDayInsOpen))) {
+        opening[INSULATION_KEY] = Number(sameDayInsOpen);
+      }
+      const sameDayInsProd = sizeProduction[INSULATION_KEY];
+      if (sameDayInsProd != null && Number.isFinite(Number(sameDayInsProd))) {
+        production[INSULATION_KEY] = Number(sameDayInsProd);
+      }
+    } else {
+      const insProcess = block?.processes.find(
+        (p) => p.name.trim().toLowerCase() === "insulation",
+      );
+      if (insProcess && Number.isFinite(insProcess.closing)) {
+        opening[INSULATION_KEY] = insProcess.closing;
+      }
+    }
   }
 
   if (Object.keys(opening).length === 0 && !sameDayEntryId && production[INSULATION_KEY] == null) {

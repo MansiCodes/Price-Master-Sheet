@@ -3,6 +3,7 @@ import { extrasFromPoolContributions } from "@/components/today/hub/add-insulati
 import { EMPTY_STOCK_SALE_ITEM } from "@/components/today/hub/useTodayHubStockCallFields";
 import type { StockSaleItem } from "@/components/today/today-hub-model";
 import { isSignallingCableName } from "@/lib/quad-signal-wip";
+import { isPowerCableName } from "@/lib/power-cable";
 import { liveDispatchLock } from "@/lib/stock-production-status/dispatch-history";
 
 type QuadWipSetters = Pick<
@@ -344,6 +345,7 @@ function applyQtyMaps(
   opts?: ApplyQuadWipOpts,
 ) {
   const preserveIns = Boolean(opts?.preserveInsulation);
+  const isPower = isPowerCableName(data.cable ?? "");
   const savedOpen = data.stockMeta?.opening;
   const processAliases: Record<string, string> = {
     Outer: "Outer Sheath",
@@ -359,7 +361,7 @@ function applyQtyMaps(
   const putOpening = (map?: Record<string, number> | null) => {
     if (!map) return;
     for (const [key, raw] of Object.entries(map)) {
-      if (isInsulationKey(key)) continue;
+      if (!isPower && isInsulationKey(key)) continue;
       const n = Number(raw);
       if (!Number.isFinite(n)) continue;
       openingStrings[key] = String(n);
@@ -369,7 +371,7 @@ function applyQtyMaps(
   };
   putOpening(data.opening);
   if (data.sameDay) putOpening(savedOpen);
-  const insOpen = insulationQty([data.opening]);
+  const insOpen = insulationQty(data.sameDay ? [savedOpen, data.opening] : [data.opening]);
   s.setStockWipOpening((prev) => {
     const next = { ...openingStrings };
     if (preserveIns && prev.Insulation != null && prev.Insulation !== "") {
@@ -382,12 +384,12 @@ function applyQtyMaps(
   const toProdMap = (src: Record<string, number> | undefined) => {
     const productionStrings: Record<string, string> = {};
     for (const [key, raw] of Object.entries(src ?? {})) {
-      if (isInsulationKey(key)) continue;
+      if (!isPower && isInsulationKey(key)) continue;
       const n = Number(raw);
       if (!Number.isFinite(n) || n <= 0) continue;
       productionStrings[key] = String(n);
       const canon = processAliases[key] ?? processAliases[key.trim().toLowerCase()];
-      if (canon && !isInsulationKey(canon)) {
+      if (canon && (isPower || !isInsulationKey(canon))) {
         productionStrings[canon] = String(n);
       }
     }

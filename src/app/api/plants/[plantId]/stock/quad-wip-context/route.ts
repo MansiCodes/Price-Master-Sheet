@@ -20,6 +20,7 @@ import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { isFormOuterProcess } from "@/lib/quad-signal-form-stock";
 import { resolveQuadSignalStockOpening } from "@/lib/quad-signal-opening";
 import { canAlwaysEditQuadOpeningStock } from "@/lib/rbac";
+import { isPowerCableName } from "@/lib/power-cable";
 import {
   resolveQuadSignalVariant,
   saleMatchesCableSize,
@@ -260,8 +261,8 @@ export async function GET(
           dispatchSettledItems: existingMeta.dispatchSettledItems ?? [],
           outerClosingIncludesPutup: Boolean(existingMeta.outerClosingIncludesPutup),
           saleItems: existingMeta.saleItems ?? [],
-          opening: stripInsulationQty(existingMeta.opening ?? {}),
-          production: stripInsulationQty(existingMeta.production ?? {}),
+          opening: isPowerCableName(cable) ? (existingMeta.opening ?? {}) : stripInsulationQty(existingMeta.opening ?? {}),
+          production: isPowerCableName(cable) ? (existingMeta.production ?? {}) : stripInsulationQty(existingMeta.production ?? {}),
           powerLayingFactor: existingMeta.powerLayingFactor,
         }
       : null;
