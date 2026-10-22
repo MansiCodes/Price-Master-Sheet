@@ -6,7 +6,7 @@ import {
   round2,
   zodErrorResponse,
 } from "@/lib/api";
-import { writeAuditLog } from "@/lib/audit";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore } from "@/lib/credit-score";
@@ -132,7 +132,7 @@ export async function POST(
       return created;
     });
 
-    await writeAuditLog({
+    await safeWriteAuditLog({
       entityType: "Sale",
       entityId: sales[0].id,
       field: "create",
@@ -216,7 +216,7 @@ export async function POST(
     }),
   });
 
-  await writeAuditLog({
+  await safeWriteAuditLog({
     entityType: "Sale",
     entityId: sale.id,
     field: "create",

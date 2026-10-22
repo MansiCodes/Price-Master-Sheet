@@ -43,6 +43,26 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--teal, #127269) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--teal, #127269);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal-ink, #0e5a54);
 }
 
 input:focus,
@@ -406,6 +426,24 @@ textarea {
   flex-direction: column;
   gap: 1.1rem;
   scrollbar-width: thin;
+  scrollbar-color: var(--teal, #127269) transparent;
+}
+
+.dash-sidebar__nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.dash-sidebar__nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dash-sidebar__nav::-webkit-scrollbar-thumb {
+  background: var(--teal, #127269);
+  border-radius: 999px;
+}
+
+.dash-sidebar__nav::-webkit-scrollbar-thumb:hover {
+  background: var(--teal-ink, #0e5a54);
 }
 
 .dash-sidebar__section {

@@ -50,6 +50,16 @@ type PlantInfo = {
   code: string;
 };
 
+const KNOWN_PLANT_MAP: Record<string, { code: string; name: string }> = {
+  cmt6unbg00000hkw3dv99l7i6: { code: "UPCAST", name: "Upcast Plant" },
+  cmswyttlh00016kw3iw0znc7b: { code: "PVC", name: "PVC RP Plant" },
+  cmswyttng00026kw37anz946f: { code: "LEDROPE", name: "Rope Light Plant" },
+  cmt6unbpu0003hkw3p4lui4gp: { code: "SLSSL", name: "SL SSL Plant" },
+  cmswytt5s00006kw3uxjbbcpc: { code: "CAT6", name: "CAT-6 Cable Plant" },
+  cmtjqe9n500074of5lex7731x: { code: "CONDUCTOR", name: "Conductor Plant" },
+  cmt6unbs40006hkw3hh5j1og8: { code: "QUAD", name: "Quad + Signal Plant" },
+};
+
 /** Global slide-over entry form — opens from header on any page except dashboard. */
 export function TodayEntryHost({
   plant,
@@ -75,9 +85,31 @@ export function TodayEntryHost({
   // to that active plant rather than the fallback/cookie plant.
   const activePlant = useMemo(() => {
     const match = pathname?.match(/^\/plants\/([^/]+)/);
-    if (match && match[1] && plants.length > 0) {
-      const found = plants.find((p) => p.id === match[1] || p.code?.toUpperCase() === match[1]?.toUpperCase());
-      if (found) return found;
+    if (match && match[1]) {
+      const param = match[1];
+      if (plants && plants.length > 0) {
+        const found = plants.find(
+          (p) =>
+            p.id === param ||
+            p.code?.toUpperCase() === param.toUpperCase(),
+        );
+        if (found) return found;
+      }
+      const known = KNOWN_PLANT_MAP[param];
+      if (known) {
+        return { id: param, name: known.name, code: known.code };
+      }
+      const byCode = Object.entries(KNOWN_PLANT_MAP).find(
+        ([, v]) => v.code.toUpperCase() === param.toUpperCase(),
+      );
+      if (byCode) {
+        return { id: byCode[0], name: byCode[1].name, code: byCode[1].code };
+      }
+      return {
+        id: param,
+        name: plant?.id === param ? plant.name : "Plant",
+        code: plant?.id === param ? plant.code : "",
+      };
     }
     return plant;
   }, [pathname, plants, plant]);
@@ -133,6 +165,7 @@ export function TodayEntryHost({
 
   return (
     <TodayHub
+      key={activePlant.id}
       plantId={activePlant.id}
       plantName={activePlant.name}
       plantCode={activePlant.code}

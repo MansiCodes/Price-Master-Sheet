@@ -6,13 +6,14 @@ import { formatINR } from "@/lib/format/inr";
 import { ReportTable, type ReportColumn } from "@/components/pnl/ReportTable";
 import { Pagination } from "@/components/ui/Pagination";
 import { usePaginatedReport } from "@/components/pnl/usePaginatedReport";
-import { isCat6Plant } from "@/lib/plant-layout";
+import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { toYmd } from "@/components/pnl/EntryEditDrawer";
 import { useReportCrud } from "@/components/pnl/useReportCrud";
 import { collectBillPhotoUrls } from "@/lib/bill-photos";
 import { buildCat6SalesColumns } from "@/components/pnl/sales-report/columns-cat6";
 import { buildPvcSalesColumns } from "@/components/pnl/sales-report/columns-pvc";
+import { formatQty } from "@/components/pnl/sales-report/format";
 import { SalesEditDrawer } from "@/components/pnl/sales-report/edit";
 import type { SaleRow } from "@/components/pnl/sales-report/types";
 
@@ -33,6 +34,7 @@ export function SalesReport({
 }) {
   const t = useTranslations("pnl");
   const cat6 = isCat6Plant(plantCode);
+  const isQuad = isQuadSignalPlant(plantCode);
   const isPvc = plantCode?.toUpperCase() === "PVC";
   // CAT6 Sales tab mirrors Sales-NF sheet (SUM J3:J504). P&L adds online + extra rows separately.
   const baseUrl = isPvc
@@ -41,7 +43,16 @@ export function SalesReport({
   const { rows, page, pageSize, total, loading, error, response, reload, setPage, setPageSize } =
     usePaginatedReport<SaleRow>(baseUrl, t("failedSales"));
   const totals = response?.totals as
-    | { salesValue?: number; quantity?: number }
+    | {
+        salesValue?: number;
+        quantity?: number;
+        goodsSales?: number;
+        goodsQuantity?: number;
+        freightSales?: number;
+        inspectionSales?: number;
+        interestSales?: number;
+        totalSales?: number;
+      }
     | undefined;
   const crud = useReportCrud<SaleRow>(`/api/plants/${plantId}/sales`, reload);
 
@@ -99,10 +110,32 @@ export function SalesReport({
                   customer: "TOTAL",
                   sales: formatINR(totals.salesValue ?? 0),
                 }
-              : {
-                  customer: "TOTAL",
-                  goods: formatINR(totals.salesValue ?? 0),
-                }
+              : isQuad
+                ? {
+                    customer: "Total Sales",
+                    remarks: totals.freightSales
+                      ? `Freight: ${formatINR(totals.freightSales)}`
+                      : "Freight: ₹0.00",
+                    product: totals.inspectionSales
+                      ? `Inspection: ${formatINR(totals.inspectionSales)}`
+                      : "Inspection: ₹0.00",
+                    qty: formatQty(totals.goodsQuantity ?? totals.quantity ?? 0),
+                    goods: formatINR(totals.goodsSales ?? totals.salesValue ?? 0),
+                  }
+                : {
+                    customer: "TOTAL",
+                    goods: formatINR(totals.salesValue ?? 0),
+                  }
+            : undefined
+        }
+        secondaryFooter={
+          totals && isQuad
+            ? {
+                customer: "Gross Total Sales",
+                remarks: `Total Freight: ${formatINR(totals.freightSales ?? 0)}`,
+                product: `Total Inspection: ${formatINR(totals.inspectionSales ?? 0)}`,
+                goods: formatINR(totals.totalSales ?? totals.salesValue ?? 0),
+              }
             : undefined
         }
       />

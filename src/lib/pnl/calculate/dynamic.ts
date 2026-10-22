@@ -23,5 +23,5 @@ export async function buildDynamic(
     approvedOnly,
   );
   const totals = computeDynamicTotals(data, plantCode);
-  return assembleDynamicStatement(totals, data.isPvc);
+  return assembleDynamicStatement(totals, data.isPvc, plantCode);
 }

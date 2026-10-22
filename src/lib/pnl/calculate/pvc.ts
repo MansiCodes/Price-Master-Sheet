@@ -29,7 +29,9 @@ export async function buildPvcDynamic(
   const pvcFarMonths = Math.max(
     1,
     months.filter(
-      (m) => m.getUTCFullYear() === 2026 && m.getUTCMonth() >= 1,
+      (m) =>
+        (m.getUTCFullYear() === 2026 && m.getUTCMonth() >= 1) ||
+        m.getUTCFullYear() > 2026,
     ).length,
   );
 
@@ -46,9 +48,13 @@ export async function buildPvcDynamic(
     closingStockRaw,
     openingStockRaw,
   ] = await Promise.all([
-    // Excel P&L: Sales!J223 — entire outward register, not date-filtered.
     prisma.sale.aggregate({
-      where: { ...plantIdFilter(plantIds), ...byUser, ...globalApprovedFilter },
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
       _sum: { salesValue: true },
     }),
     prisma.purchase.findMany({

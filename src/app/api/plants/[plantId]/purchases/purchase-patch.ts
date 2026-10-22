@@ -6,7 +6,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
-import { writeAuditLog } from "@/lib/audit";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalResetOnEdit } from "@/lib/entry-approval";
 import { isBackdated, parseDateOnly } from "@/lib/dates";
 import { prisma } from "@/lib/db";
@@ -107,7 +107,7 @@ export async function PATCH(
     },
   });
 
-  await writeAuditLog({
+  await safeWriteAuditLog({
     entityType: "Purchase",
     entityId: purchase.id,
     field: "update",

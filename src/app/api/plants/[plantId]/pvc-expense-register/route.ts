@@ -78,17 +78,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const category = sp.get("category")?.trim() || null;
 
   const fromDate =
-    filter.date &&
-    typeof filter.date === "object" &&
-    "gte" in filter.date
-      ? filter.date.gte
-      : undefined;
+    filter.date instanceof Date
+      ? filter.date
+      : filter.date && typeof filter.date === "object" && "gte" in filter.date
+        ? (filter.date as { gte?: Date }).gte
+        : undefined;
   const toDate =
-    filter.date &&
-    typeof filter.date === "object" &&
-    "lte" in filter.date
-      ? filter.date.lte
-      : undefined;
+    filter.date instanceof Date
+      ? filter.date
+      : filter.date && typeof filter.date === "object" && "lte" in filter.date
+        ? (filter.date as { lte?: Date }).lte
+        : undefined;
   const fromMonth = fromDate ? startOfUtcMonth(fromDate) : undefined;
   const toMonth = toDate ? startOfUtcMonth(toDate) : undefined;
 
@@ -96,8 +96,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     prisma.electricityRent.findMany({
       where: {
         ...pScope,
-        ...(fromMonth && toMonth
-          ? { month: { gte: fromMonth, lte: toMonth } }
+        ...((fromMonth || toMonth)
+          ? {
+              month: {
+                ...(fromMonth ? { gte: fromMonth } : {}),
+                ...(toMonth ? { lte: toMonth } : {}),
+              },
+            }
           : {}),
       },
       orderBy: { month: "asc" },
@@ -253,11 +258,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const dateIso = row.billDate
       ? toIsoDateString(row.billDate)
       : toIsoDateString(row.createdAt);
-    if (fromDate && toDate && row.billDate) {
-      const billTime = row.billDate.getTime();
-      if (billTime < fromDate.getTime() || billTime > toDate.getTime()) {
-        continue;
-      }
+    const dateToCompare = row.billDate ?? row.createdAt;
+    if (dateToCompare) {
+      const time = dateToCompare.getTime();
+      if (fromDate && time < fromDate.getTime()) continue;
+      if (toDate && time > toDate.getTime()) continue;
     }
     unified.push({
       id: `far-${row.id}`,

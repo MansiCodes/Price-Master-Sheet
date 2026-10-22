@@ -203,6 +203,28 @@
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--teal, #0d9488) #f0fdfa;
+}
+
+.pnl-reports__body::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.pnl-reports__body::-webkit-scrollbar-track {
+  background: #f0fdfa;
+  border-radius: 999px;
+}
+
+.pnl-reports__body::-webkit-scrollbar-thumb {
+  background: var(--teal, #0d9488);
+  border-radius: 999px;
+  border: 2px solid #f0fdfa;
+}
+
+.pnl-reports__body::-webkit-scrollbar-thumb:hover {
+  background: var(--teal-ink, #0e5a54);
 }
 
 .pnl-tab-nav {
@@ -1021,6 +1043,28 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
   --pnl-sticky-col1: 3.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--teal, #0d9488) #f0fdfa;
+}
+
+.pnl-report-table-wrap::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.pnl-report-table-wrap::-webkit-scrollbar-track {
+  background: #f0fdfa;
+  border-radius: 999px;
+}
+
+.pnl-report-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--teal, #0d9488);
+  border-radius: 999px;
+  border: 2px solid #f0fdfa;
+}
+
+.pnl-report-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--teal-ink, #0e5a54);
 }
 
 .pnl-report-table-wrap--register {

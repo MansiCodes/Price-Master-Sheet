@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { usesExpenseSections } from "@/lib/plant-catalogs";
 import { isCat6Plant, isQuadSignalPlant } from "@/lib/plant-layout";
-import { CONDUCTOR_SALE_TYPES, SALE_TYPES } from "@/components/today/today-hub-model";
+import {
+  CONDUCTOR_SALE_TYPES,
+  QUAD_SIGNAL_SALE_TYPES,
+  SALE_TYPES,
+} from "@/components/today/today-hub-model";
 import { allowedEntryKinds, allowedModuleKeys } from "@/components/today/hub/today-hub-allowed-kinds";
 
 export function useTodayHubFlags(
@@ -13,7 +17,11 @@ export function useTodayHubFlags(
   const isUpcast = plantCode.toUpperCase() === "UPCAST";
   const isQuad = isQuadSignalPlant(plantCode);
   const isConductor = plantCode.toUpperCase() === "CONDUCTOR";
-  const saleTypeOptions = isConductor ? CONDUCTOR_SALE_TYPES : SALE_TYPES;
+  const saleTypeOptions = isConductor
+    ? CONDUCTOR_SALE_TYPES
+    : isQuad
+      ? QUAD_SIGNAL_SALE_TYPES
+      : SALE_TYPES;
   const isPvcStyleExpense = isPvc || isUpcast;
   /** Closing stock with RM/WIP/FG + rate × value (Excel ERS / PVC style). */
   const usesStockLedger = isPvc || isUpcast;

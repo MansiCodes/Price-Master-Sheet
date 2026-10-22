@@ -1,4 +1,5 @@
 import { upcastExpensePnlLine } from "@/lib/plant-catalogs";
+import { isQuadSignalPlant } from "@/lib/plant-layout";
 import type { PlantPnlStatement, PnlStatementLine } from "@/lib/pnl/types";
 import { line, ratioOf, round2 } from "./helpers";
 import type { DynamicTotals } from "./dynamic-compute";
@@ -6,9 +7,15 @@ import type { DynamicTotals } from "./dynamic-compute";
 export function assembleDynamicStatement(
   totals: DynamicTotals,
   isPvc: boolean,
+  plantCode?: string | null,
 ): PlantPnlStatement {
+  const isQuad = isQuadSignalPlant(plantCode);
   const {
     salesRevenue,
+    salesToCustomer,
+    freightOnSale,
+    inspectionCharge,
+    interestIncome,
     purchases,
     stockFromAtcl,
     totalPurchases,
@@ -112,15 +119,26 @@ export function assembleDynamicStatement(
     ),
   ];
 
+  const quadSalesLines: PnlStatementLine[] = [
+    line("Sales to Customer", salesToCustomer ?? 0, null, "item"),
+    line("Freight on Sale", freightOnSale ?? 0, null, "item"),
+    line("INSPECTION AND SERVICE CHARGE", inspectionCharge ?? 0, null, "item"),
+    line("Interest Income on LC Charges", interestIncome ?? 0, null, "item"),
+  ];
+
   const tradingCredit: PnlStatementLine[] = [
     line("CLOSING STOCK", closingStock || null, closingStock ? ratioOf(closingStock, salesBase) : null, "header"),
     line("SALES ACCOUNT", null, null, "header"),
-    line(
-      isPvc ? "Stock Move to ATCL" : "Sales to Customer",
-      salesRevenue || null,
-      null,
-      "item",
-    ),
+    ...(isQuad
+      ? quadSalesLines
+      : [
+          line(
+            isPvc ? "Stock Move to ATCL" : "Sales to Customer",
+            salesRevenue || null,
+            null,
+            "item",
+          ),
+        ]),
     line("Total Sales", salesRevenue || null, salesRevenue ? 100 : null, "subtotal"),
     line("GROSS LOSS", grossProfit < 0 ? Math.abs(grossProfit) : null, grossProfit < 0 ? ratioOf(Math.abs(grossProfit), salesBase) : null, "profit"),
   ];

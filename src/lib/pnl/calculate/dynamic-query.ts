@@ -39,6 +39,7 @@ export async function fetchDynamicInputs(
 
   const [
     salesAgg,
+    salesRows,
     purchaseRowsScoped,
     purchaseQtyAgg,
     stockInwardAgg,
@@ -58,6 +59,20 @@ export async function fetchDynamicInputs(
         ...approvedFilter,
       },
       _sum: { salesValue: true },
+    }),
+    prisma.sale.findMany({
+      where: {
+        ...plantIdFilter(plantIds),
+        ...byUser,
+        date: { gte: from, lte: to },
+        ...approvedFilter,
+      },
+      select: {
+        salesValue: true,
+        type: true,
+        typeOther: true,
+        itemDescription: true,
+      },
     }),
     prisma.purchase.findMany({
       where: {
@@ -154,6 +169,7 @@ export async function fetchDynamicInputs(
     periodDays,
     pvcFarMonths,
     salesAgg,
+    salesRows,
     purchaseRowsScoped,
     purchaseQtyAgg,
     stockInwardAgg,

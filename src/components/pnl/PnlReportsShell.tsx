@@ -59,6 +59,19 @@ export function PnlReportsShell({
     }
   }, [allowedTabs, tab, accountantLimited]);
 
+  useEffect(() => {
+    function onEntrySaved(e: Event) {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail || !detail.plantId || detail.plantId === plantId) {
+        setReloadKey((k) => k + 1);
+      }
+    }
+    window.addEventListener("cj:today-entry-saved", onEntrySaved);
+    return () => {
+      window.removeEventListener("cj:today-entry-saved", onEntrySaved);
+    };
+  }, [plantId]);
+
   const allowImport = canImport;
 
   const exportFrom = tab === "factoryRent" ? "2026-01-01" : from;

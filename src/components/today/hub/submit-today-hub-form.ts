@@ -67,4 +67,15 @@ export async function submitTodayHubForm(
   }
   void runSync();
   router.refresh();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("cj:today-entry-saved", {
+        detail: {
+          plantId: vm.plantId,
+          kind: vm.session.kind,
+          entryDate: vm.session.entryDate,
+        },
+      }),
+    );
+  }
 }

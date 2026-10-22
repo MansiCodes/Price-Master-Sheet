@@ -5,7 +5,7 @@ import {
   requireSession,
   zodErrorResponse,
 } from "@/lib/api";
-import { writeAuditLog } from "@/lib/audit";
+import { safeWriteAuditLog } from "@/lib/audit";
 import { entryApprovalCreateData } from "@/lib/entry-approval";
 import { safeRefreshDailyStatus } from "@/lib/daily-status";
 import { maybeAwardCreditScore } from "@/lib/credit-score";
@@ -108,7 +108,7 @@ export async function POST(
     },
   });
 
-    await writeAuditLog({
+    await safeWriteAuditLog({
       entityType: "PettyCashEntry",
       entityId: entry.id,
       field: "create",

@@ -6,7 +6,7 @@ import {
   zodErrorResponse,
 } from "@/lib/api";
 import { prisma } from "@/lib/db";
-import { writeAuditLog } from "@/lib/audit";
+import { safeWriteAuditLog } from "@/lib/audit";
 import {
   plantIdFilter,
   resolveCanonicalWritePlantId,
@@ -87,7 +87,7 @@ export async function POST(
     },
   });
 
-  await writeAuditLog({
+  await safeWriteAuditLog({
     entityType: "PlantContact",
     entityId: contact.id,
     field: "create",
@@ -140,7 +140,7 @@ export async function PATCH(
     },
   });
 
-  await writeAuditLog({
+  await safeWriteAuditLog({
     entityType: "PlantContact",
     entityId: contact.id,
     field: "update",
@@ -178,7 +178,7 @@ export async function DELETE(
 
   await prisma.plantContact.delete({ where: { id } });
 
-  await writeAuditLog({
+  await safeWriteAuditLog({
     entityType: "PlantContact",
     entityId: id,
     field: "delete",

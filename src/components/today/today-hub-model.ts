@@ -45,7 +45,8 @@ export type LineItem = {
 
 export type SaleTypeValue =
   | (typeof SALE_TYPES)[number]["value"]
-  | (typeof CONDUCTOR_SALE_TYPES)[number]["value"];
+  | (typeof CONDUCTOR_SALE_TYPES)[number]["value"]
+  | (typeof QUAD_SIGNAL_SALE_TYPES)[number]["value"];
 
 export type PurchaseTypeValue = (typeof PURCHASE_TYPES)[number]["value"];
 
@@ -195,6 +196,16 @@ export const SALE_TYPES = [
   { value: "FINISHED_GOOD", label: "Finished Good" },
   { value: "ALUMINIUM_SCRAP", label: "Aluminium Scrap" },
   { value: "COPPER_SCRAP", label: "Copper Scrap" },
+  { value: "OTHERS", label: "Others" },
+] as const;
+
+export const QUAD_SIGNAL_SALE_TYPES = [
+  { value: "FINISHED_GOOD", label: "Finished Good" },
+  { value: "ALUMINIUM_SCRAP", label: "Aluminium Scrap" },
+  { value: "COPPER_SCRAP", label: "Copper Scrap" },
+  { value: "FREIGHT_ON_SALE", label: "Freight on Sale" },
+  { value: "INSPECTION_CHARGE", label: "INSPECTION AND SERVICE CHARGE" },
+  { value: "INTEREST_INCOME", label: "Interest Income on LC Charges" },
   { value: "OTHERS", label: "Others" },
 ] as const;
 

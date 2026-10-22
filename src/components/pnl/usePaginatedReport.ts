@@ -34,6 +34,18 @@ export function usePaginatedReport<T>(
   }, [baseUrl]);
 
   useEffect(() => {
+    function onEntrySaved() {
+      setReloadKey((n) => n + 1);
+    }
+    if (typeof window !== "undefined") {
+      window.addEventListener("cj:today-entry-saved", onEntrySaved);
+      return () => {
+        window.removeEventListener("cj:today-entry-saved", onEntrySaved);
+      };
+    }
+  }, []);
+
+  useEffect(() => {
     if (!enabled) {
       setRows([]);
       setTotal(0);

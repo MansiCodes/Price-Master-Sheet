@@ -16,6 +16,10 @@ export function parseSaleType(v: unknown, desc: string): SaleType {
   if (s && Object.values(SaleType).includes(s as SaleType)) {
     return s as SaleType;
   }
+  const probe = `${s} ${desc}`.toLowerCase();
+  if (/freight/i.test(probe)) return SaleType.FREIGHT_ON_SALE;
+  if (/inspection/i.test(probe)) return SaleType.INSPECTION_CHARGE;
+  if (/interest/i.test(probe) || /lc charge/i.test(probe)) return SaleType.INTEREST_INCOME;
   if (/copper/i.test(desc) || /copper/i.test(s)) return SaleType.COPPER_SCRAP;
   if (/aluminium|aluminum/i.test(desc) || /alum/i.test(s)) {
     return SaleType.ALUMINIUM_SCRAP;

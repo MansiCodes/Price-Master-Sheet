@@ -7,6 +7,7 @@ import { isCat6Plant } from "@/lib/plant-layout";
 import { seesOwnEntriesOnly } from "@/lib/rbac";
 import { paginate } from "@/lib/ui/paginate";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
+import { getSaleCategory } from "@/lib/pnl/sales-category";
 import type { RouteContext } from "./sale-schemas";
 
 export async function GET(
@@ -44,7 +45,7 @@ export async function GET(
     where: {
       ...pScope,
       ...(ownOnly ? { enteredById: session.user.id } : {}),
-      ...(register && isPvc ? {} : filter),
+      ...filter,
       ...(cat6
         ? {
             OR: [
@@ -70,14 +71,49 @@ export async function GET(
   const { slice, ...pageInfo } = paginate(sales, page, pageSize);
   const totals = sales.reduce(
     (acc, row) => {
-      acc.salesValue += Number(row.salesValue) || 0;
-      acc.quantity += Number(row.quantity) || 0;
+      const val = Number(row.salesValue) || 0;
+      const qty = Number(row.quantity) || 0;
+      acc.salesValue += val;
+      acc.quantity += qty;
       acc.inMeter += Number(row.inMeter) || 0;
       acc.qtyMtr += Number(row.qtyMtr) || 0;
+
+      const cat = getSaleCategory(row);
+      if (cat === "FREIGHT") {
+        acc.freightSales += val;
+      } else if (cat === "INSPECTION") {
+        acc.inspectionSales += val;
+      } else if (cat === "INTEREST") {
+        acc.interestSales += val;
+      } else {
+        acc.goodsSales += val;
+        acc.goodsQuantity += qty;
+      }
       return acc;
     },
-    { salesValue: 0, quantity: 0, inMeter: 0, qtyMtr: 0 },
+    {
+      salesValue: 0,
+      quantity: 0,
+      inMeter: 0,
+      qtyMtr: 0,
+      goodsSales: 0,
+      goodsQuantity: 0,
+      freightSales: 0,
+      inspectionSales: 0,
+      interestSales: 0,
+      totalSales: 0,
+    },
   );
+  totals.totalSales = totals.salesValue;
+  if (
+    totals.goodsSales === 0 &&
+    totals.freightSales === 0 &&
+    totals.inspectionSales === 0 &&
+    totals.interestSales === 0
+  ) {
+    totals.goodsSales = totals.salesValue;
+    totals.goodsQuantity = totals.quantity;
+  }
 
   const rowsWithStatus = slice.map((s) => ({
     ...s,
