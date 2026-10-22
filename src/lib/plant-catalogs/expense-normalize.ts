@@ -5,6 +5,7 @@ export function normalizePvcExpenseHead(head: string): string {
   if (h === "Depreciation (FAR)" || h === "Depreciation") return "FAR";
   if (h === "Unloading MT") return "Unloading of MT";
   if (h === "Rent") return "Factory Rent";
+  if (/^financial cost$/i.test(h)) return "Financial Cost";
   return h;
 }
 

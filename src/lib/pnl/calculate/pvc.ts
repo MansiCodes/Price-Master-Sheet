@@ -1,6 +1,11 @@
 import { PettyCashKind } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { isAtclPurchase, atclStockEntryFilter } from "@/lib/plant-catalogs";
+import {
+  isAtclPurchase,
+  atclStockEntryFilter,
+  normalizePvcExpenseHead,
+  pvcExpenseSection,
+} from "@/lib/plant-catalogs";
 import type { PlantPnlStatement } from "@/lib/pnl/types";
 import { plantIdFilter } from "@/lib/plant-merge";
 import {
@@ -170,8 +175,9 @@ export async function buildPvcDynamic(
       )
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
-  const electricity =
-    electricityRentAmount > 0 ? electricityRentAmount : electricityFromPettyCash;
+  const electricity = round2(
+    electricityRentAmount + electricityFromPettyCash,
+  );
   const rent =
     rentFromElectricityRent > 0 ? rentFromElectricityRent : rentFromPettyCash;
 
@@ -186,34 +192,139 @@ export async function buildPvcDynamic(
       .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
 
-  const pettyCashRows = pettyEntries.filter(
-    (r) => r.entryType === PettyCashKind.PETTY_CASH,
+  const financialCost = round2(
+    pettyEntries
+      .filter((r) => {
+        const head = normalizePvcExpenseHead(r.expenseHead.trim());
+        return (
+          head === "Financial Cost" ||
+          /^financial cost$/i.test(r.expenseHead.trim())
+        );
+      })
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
   );
-  const pettyCashExp = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.amount), 0),
-  );
+
   const contractorSalary = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.contractorSalary), 0),
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizePvcExpenseHead(row.expenseHead?.trim() || "");
+      const isLabour =
+        head === "Labour Contractor" ||
+        /labour/i.test(row.expenseHead || "") ||
+        /contractor/i.test(row.expenseHead || "");
+      const fromField = toNumber(row.contractorSalary);
+      if (fromField > 0) return sum + fromField;
+      if (isLabour && toNumber(row.amount) > 0) {
+        return sum + toNumber(row.amount);
+      }
+      return sum;
+    }, 0),
   );
   const supervisorSalary = round2(
-    pettyCashRows.reduce((sum, row) => sum + toNumber(row.supervisorSalary), 0),
+    pettyEntries.reduce((sum, row) => {
+      const head = normalizePvcExpenseHead(row.expenseHead?.trim() || "");
+      const isSalary =
+        head === "Salary Expenses" ||
+        /salary/i.test(row.expenseHead || "");
+      const fromField = toNumber(row.supervisorSalary);
+      if (fromField > 0) return sum + fromField;
+      if (isSalary && toNumber(row.amount) > 0) {
+        return sum + toNumber(row.amount);
+      }
+      return sum;
+    }, 0),
   );
   const manpower = contractorSalary;
 
-  const directExpenses = round2(electricity + unloadingExpense + manpower);
+  const pettyCashExp = round2(
+    pettyEntries
+      .filter((r) => {
+        if (r.entryType !== PettyCashKind.PETTY_CASH) return false;
+        const head = normalizePvcExpenseHead(r.expenseHead?.trim() || "");
+        if (
+          head === "Financial Cost" ||
+          head === "Labour Contractor" ||
+          head === "Salary Expenses" ||
+          head === "Fuel & Power" ||
+          head === "Factory Rent" ||
+          /labour/i.test(r.expenseHead || "") ||
+          /contractor/i.test(r.expenseHead || "") ||
+          /salary/i.test(r.expenseHead || "")
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const otherDirectExpense = round2(
+    pettyEntries
+      .filter((r) => {
+        if (r.entryType !== PettyCashKind.EXPENSE) return false;
+        const head = normalizePvcExpenseHead(r.expenseHead?.trim() || "");
+        if (
+          head === "Fuel & Power" ||
+          head === "Electricity" ||
+          head === "Labour Contractor" ||
+          /labour/i.test(r.expenseHead || "") ||
+          /contractor/i.test(r.expenseHead || "") ||
+          /unloading/i.test(head) ||
+          /unloading/i.test(r.expenseHead || "")
+        ) {
+          return false;
+        }
+        return (
+          head === "Expense" ||
+          head === "Other" ||
+          pvcExpenseSection(head) === "direct"
+        );
+      })
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const transportExpense = round2(
+    pettyEntries
+      .filter((r) => {
+        if (r.entryType !== PettyCashKind.EXPENSE) return false;
+        const head = normalizePvcExpenseHead(r.expenseHead?.trim() || "");
+        return head === "Transport" || /transport/i.test(r.expenseHead || "");
+      })
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const miscellaneousExpense = round2(
+    pettyEntries
+      .filter((r) => {
+        if (r.entryType !== PettyCashKind.EXPENSE) return false;
+        const head = normalizePvcExpenseHead(r.expenseHead?.trim() || "");
+        if (
+          head === "Petty Cash" ||
+          head === "Salary Expenses" ||
+          /salary/i.test(r.expenseHead || "") ||
+          head === "Factory Rent" ||
+          head === "Financial Cost" ||
+          head === "FAR" ||
+          head === "Depreciation" ||
+          head === "Transport" ||
+          /transport/i.test(r.expenseHead || "") ||
+          pvcExpenseSection(head) === "direct"
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .reduce((sum, row) => sum + toNumber(row.amount), 0),
+  );
+
+  const otherIndirectExpense = round2(transportExpense + miscellaneousExpense);
+
+  const directExpenses = round2(
+    electricity + unloadingExpense + manpower + otherDirectExpense,
+  );
   const cogs = round2(openingStock + totalPurchases + directExpenses - closingStock);
   const grossProfit = round2(
     salesRevenue + closingStock - openingStock - purchasesRaw - stockFromAtcl - directExpenses,
   );
-
-  const maxInvoiceBasis = fixedAssets.reduce((maxBasis, asset) => {
-    const invoiceBasis =
-      toNumber(asset.invoiceValue) > 0
-        ? toNumber(asset.invoiceValue)
-        : toNumber(asset.cost) + toNumber(asset.gst);
-    return Math.max(maxBasis, invoiceBasis);
-  }, 0);
-  const financialCost = round4(maxInvoiceBasis * 0.12 * (pvcFarMonths / 12));
   const depreciation = round4(
     fixedAssets.reduce((sum, asset) => {
       const annual =
@@ -223,7 +334,13 @@ export async function buildPvcDynamic(
   );
 
   const profitBeforeTax = round2(
-    grossProfit - rent - pettyCashExp - supervisorSalary - depreciation - financialCost,
+    grossProfit -
+      rent -
+      pettyCashExp -
+      supervisorSalary -
+      depreciation -
+      financialCost -
+      otherIndirectExpense,
   );
   const incomeTax = profitBeforeTax > 0 ? round2(PVC_INCOME_TAX_BASE * INCOME_TAX_RATE) : 0;
   const netProfit = round2(profitBeforeTax - incomeTax);
@@ -248,5 +365,8 @@ export async function buildPvcDynamic(
     profitBeforeTax,
     financialCost,
     supervisorSalary,
+    otherDirectExpense,
+    transportExpense,
+    miscellaneousExpense,
   });
 }

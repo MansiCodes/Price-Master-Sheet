@@ -21,6 +21,9 @@ export function assemblePvcStatement(input: {
   profitBeforeTax: number;
   financialCost: number;
   supervisorSalary: number;
+  otherDirectExpense?: number;
+  transportExpense?: number;
+  miscellaneousExpense?: number;
 }): PlantPnlStatement {
   const {
     salesRevenue,
@@ -42,6 +45,9 @@ export function assemblePvcStatement(input: {
     profitBeforeTax,
     financialCost,
     supervisorSalary,
+    otherDirectExpense,
+    transportExpense,
+    miscellaneousExpense,
   } = input;
   const salesBase = salesRevenue;
   const tradingDebit: PnlStatementLine[] = [
@@ -80,6 +86,12 @@ export function assemblePvcStatement(input: {
       "item",
     ),
     line(
+      "DIRECT EXP.",
+      otherDirectExpense || null,
+      otherDirectExpense ? ratioOf(otherDirectExpense, salesBase) : null,
+      "item",
+    ),
+    line(
       "GROSS PROFIT",
       grossProfit > 0 ? grossProfit : null,
       grossProfit > 0 ? ratioOf(grossProfit, salesBase) : null,
@@ -99,9 +111,11 @@ export function assemblePvcStatement(input: {
     line("INDIRECT EXPENSES", null, null, "header"),
     line("PETTY CASH EXP", pettyCashExp || null, pettyCashExp ? ratioOf(pettyCashExp, salesBase) : null, "item"),
     line("SALARY EXPENSES", supervisorSalary || null, supervisorSalary ? ratioOf(supervisorSalary, salesBase) : null, "item"),
-    line("DEPRECIATION", depreciation || null, depreciation ? ratioOf(depreciation, salesBase) : null, "item"),
+    line("DEPRECIATION (FAR)", depreciation || null, depreciation ? ratioOf(depreciation, salesBase) : null, "item"),
     line("FINANCIAL COST", financialCost || null, financialCost ? ratioOf(financialCost, salesBase) : null, "item"),
     line("FACTORY RENT", rent || null, rent ? ratioOf(rent, salesBase) : null, "item"),
+    line("TRANSPORT", transportExpense || null, transportExpense ? ratioOf(transportExpense, salesBase) : null, "item"),
+    line("MISCELLANEOUS", miscellaneousExpense || null, miscellaneousExpense ? ratioOf(miscellaneousExpense, salesBase) : null, "item"),
     line(
       "INCOME TAX PAYABLE (2525000×25%)",
       incomeTax || null,

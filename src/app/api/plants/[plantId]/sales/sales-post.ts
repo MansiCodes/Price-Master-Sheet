@@ -81,24 +81,40 @@ export async function POST(
           billNumber: data.billNumber,
           quantity: item.quantity,
           rate: item.rate,
+          itemDescription: item.itemDescription,
         });
         if (existing) {
           const nextBill = preferFullerInvoice(
             existing.billNumber,
             data.billNumber,
           );
-          if (nextBill && nextBill !== (existing.billNumber ?? "").trim()) {
-            created.push(
-              await tx.sale.update({
-                where: { id: existing.id },
-                data: { billNumber: nextBill },
-              }),
-            );
-          } else {
-            created.push(
-              await tx.sale.findUniqueOrThrow({ where: { id: existing.id } }),
-            );
-          }
+          created.push(
+            await tx.sale.update({
+              where: { id: existing.id },
+              data: {
+                date: day,
+                shift: data.shift,
+                type: data.type,
+                typeOther: data.typeOther ?? null,
+                customerName: data.customerName,
+                billNumber: nextBill || data.billNumber,
+                billDate: data.billDate ? parseDateOnly(data.billDate) : null,
+                notes: data.notes ?? null,
+                itemDescription: item.itemDescription,
+                unit: item.unit,
+                quantity: item.quantity,
+                rate: item.rate,
+                salesValue,
+                inMeter: item.inMeter ?? null,
+                qtyMtr: item.qtyMtr ?? null,
+                meterUnit: item.meterUnit ?? null,
+                billPhotoUrl: photos.billPhotoUrl,
+                billPhotoUrls: photos.billPhotoUrls,
+                isBackdated: backdated,
+                ...approvalFields,
+              },
+            }),
+          );
           continue;
         }
         created.push(
@@ -134,7 +150,7 @@ export async function POST(
 
     await safeWriteAuditLog({
       entityType: "Sale",
-      entityId: sales[0].id,
+      entityId: sales[0]!.id,
       field: "create",
       newValue: {
         customerName: data.customerName,
@@ -164,6 +180,11 @@ export async function POST(
   const photos = normalizeBillPhotoUrls(data.billPhotoUrls, data.billPhotoUrl);
   const day = parseDateOnly(data.date);
   const plantIds = await resolveReportPlantIds(plantId);
+  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
+  const approvalFields = {
+    ...approval,
+    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
+  };
 
   const existing = await findMatchingSale({
     plantIds,
@@ -171,24 +192,56 @@ export async function POST(
     billNumber: data.billNumber,
     quantity: data.quantity,
     rate: data.rate,
+    itemDescription: data.itemDescription,
   });
   if (existing) {
     const nextBill = preferFullerInvoice(existing.billNumber, data.billNumber);
-    const sale =
-      nextBill && nextBill !== (existing.billNumber ?? "").trim()
-        ? await prisma.sale.update({
-            where: { id: existing.id },
-            data: { billNumber: nextBill },
-          })
-        : await prisma.sale.findUniqueOrThrow({ where: { id: existing.id } });
-    return NextResponse.json({ sale, merged: true });
-  }
+    const sale = await prisma.sale.update({
+      where: { id: existing.id },
+      data: {
+        date: day,
+        shift: data.shift,
+        type: data.type,
+        typeOther: data.typeOther ?? null,
+        customerName: data.customerName,
+        billNumber: nextBill || data.billNumber,
+        billDate: data.billDate ? parseDateOnly(data.billDate) : null,
+        notes: data.notes ?? null,
+        itemDescription: data.itemDescription,
+        unit: data.unit,
+        quantity: data.quantity,
+        rate: data.rate,
+        salesValue,
+        inMeter: data.inMeter ?? null,
+        qtyMtr: data.qtyMtr ?? null,
+        meterUnit: data.meterUnit ?? null,
+        billPhotoUrl: photos.billPhotoUrl,
+        billPhotoUrls: photos.billPhotoUrls,
+        isBackdated: backdated,
+        ...approvalFields,
+      },
+    });
 
-  const approval = entryApprovalCreateData(session.user.globalRole, data.date);
-  const approvalFields = {
-    ...approval,
-    ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
-  };
+    await safeWriteAuditLog({
+      entityType: "Sale",
+      entityId: sale.id,
+      field: "update",
+      newValue: {
+        customerName: sale.customerName,
+        billNumber: sale.billNumber,
+        itemDescription: sale.itemDescription,
+        salesValue: Number(sale.salesValue),
+      },
+      actorId: session.user.id,
+      plantId,
+      isBackdated: backdated,
+    });
+
+    await safeRefreshDailyStatus(plantId, day, data.shift, session.user.id);
+    await maybeAwardCreditScore(session.user.id, plantId, day, data.shift);
+
+    return NextResponse.json({ sale, updated: true }, { status: 200 });
+  }
 
   const sale = await prisma.sale.create({
     data: saleCreateData({

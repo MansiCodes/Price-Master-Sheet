@@ -16,8 +16,10 @@ import {
 } from "@/lib/plant-catalogs";
 import { ReportRowActions } from "@/components/pnl/ReportRowActions";
 import { EntryEditDrawer, toYmd } from "@/components/pnl/EntryEditDrawer";
-import { useReportCrud } from "@/components/pnl/useReportCrud";
+import { DeleteConfirmDialog } from "@/components/pnl/DeleteConfirmDialog";
 import { collectBillPhotoUrls } from "@/lib/bill-photos";
+import { deleteJson, patchJson } from "@/lib/client-forms";
+import { toast } from "sonner";
 
 type PvcExpenseRow = {
   id: string;
@@ -32,10 +34,32 @@ type PvcExpenseRow = {
   billPhotoUrls?: string[];
 };
 
-function pettyCashIdFromRegister(row: PvcExpenseRow): string | null {
-  if (row.source !== "pettyCash") return null;
-  const match = /^(?:petty|labour|salary)-(.+)$/.exec(row.id);
-  return match?.[1] ?? null;
+type RowEntityInfo = {
+  rawId: string;
+  source: "pettyCash" | "fixedAsset" | "electricityRent";
+  field?: "rent" | "bill";
+};
+
+function getRowEntityInfo(row: PvcExpenseRow): RowEntityInfo | null {
+  if (row.source === "pettyCash") {
+    const match = /^(?:petty|labour|salary)-(.+)$/.exec(row.id);
+    return match ? { rawId: match[1], source: "pettyCash" } : null;
+  }
+  if (row.source === "fixedAsset") {
+    const match = /^far-(.+)$/.exec(row.id);
+    return match ? { rawId: match[1], source: "fixedAsset" } : null;
+  }
+  if (row.source === "electricityRent") {
+    const match = /^elec-(rent|bill)-(.+)$/.exec(row.id);
+    return match
+      ? {
+          rawId: match[2],
+          source: "electricityRent",
+          field: match[1] as "rent" | "bill",
+        }
+      : null;
+  }
+  return null;
 }
 
 export function PvcExpenseRegisterReport({
@@ -65,10 +89,86 @@ export function PvcExpenseRegisterReport({
     usePaginatedReport<PvcExpenseRow>(baseUrl, t("networkError"), 20);
 
   const totals = response?.totals as { amount?: number } | undefined;
-  const crud = useReportCrud<PvcExpenseRow>(
-    `/api/plants/${plantId}/petty-cash`,
-    reload,
-  );
+
+  // Universal CRUD state for all expense types (petty cash, fixed assets, electricity/rent)
+  const [editingRow, setEditingRow] = useState<PvcExpenseRow | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const [pendingDeleteRow, setPendingDeleteRow] = useState<PvcExpenseRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirmDelete() {
+    if (!pendingDeleteRow || deleting) return;
+    const info = getRowEntityInfo(pendingDeleteRow);
+    if (!info) return;
+
+    setDeleting(true);
+    let url = "";
+    if (info.source === "pettyCash") {
+      url = `/api/plants/${plantId}/petty-cash?id=${encodeURIComponent(info.rawId)}&confirm=true`;
+    } else if (info.source === "fixedAsset") {
+      url = `/api/plants/${plantId}/fixed-assets?id=${encodeURIComponent(info.rawId)}`;
+    } else if (info.source === "electricityRent") {
+      url = `/api/plants/${plantId}/electricity-rent?id=${encodeURIComponent(info.rawId)}&field=${info.field}`;
+    }
+
+    const result = await deleteJson(url, { confirm: true });
+    setDeleting(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Entry deleted");
+    setPendingDeleteRow(null);
+    reload();
+  }
+
+  async function saveEdit() {
+    if (!editingRow || saving) return;
+    const info = getRowEntityInfo(editingRow);
+    if (!info) return;
+
+    setSaving(true);
+    setEditError(null);
+
+    let result;
+    if (info.source === "pettyCash") {
+      result = await patchJson(`/api/plants/${plantId}/petty-cash`, {
+        id: info.rawId,
+        date: editValues.date,
+        expenseHead: editValues.expenseHead,
+        description: editValues.description || null,
+        amount: Number(editValues.amount),
+        billPhotoUrls: photoUrls,
+      });
+    } else if (info.source === "fixedAsset") {
+      result = await patchJson(`/api/plants/${plantId}/fixed-assets`, {
+        id: info.rawId,
+        date: editValues.date,
+        description: editValues.description || null,
+        amount: Number(editValues.amount),
+      });
+    } else if (info.source === "electricityRent") {
+      result = await patchJson(`/api/plants/${plantId}/electricity-rent`, {
+        id: info.rawId,
+        field: info.field,
+        amount: Number(editValues.amount),
+        description: editValues.description || null,
+      });
+    }
+
+    setSaving(false);
+    if (!result || !result.ok) {
+      setEditError(result?.error ?? "Save failed");
+      return;
+    }
+    toast.success("Entry updated");
+    setEditingRow(null);
+    reload();
+  }
 
   const columns: ReportColumn<PvcExpenseRow>[] = useMemo(
     () => [
@@ -218,23 +318,22 @@ export function PvcExpenseRegisterReport({
                   label: "Actions",
                   compact: true,
                   render: (r) => {
-                    const entryId = pettyCashIdFromRegister(r);
-                    if (!entryId) return "—";
+                    const info = getRowEntityInfo(r);
+                    if (!info) return "—";
                     return (
                       <ReportRowActions
-                        onEdit={() =>
-                          crud.openEdit(
-                            { ...r, id: entryId },
-                            {
-                              date: toYmd(r.sortDate),
-                              expenseHead: r.expenseLabel,
-                              description: r.description ?? "",
-                              amount: String(r.amount ?? ""),
-                            },
-                            collectBillPhotoUrls(r),
-                          )
-                        }
-                        onDelete={() => void crud.remove(entryId)}
+                        onEdit={() => {
+                          setEditingRow(r);
+                          setEditValues({
+                            date: toYmd(r.sortDate),
+                            expenseHead: r.expenseLabel,
+                            description: r.description ?? "",
+                            amount: String(r.amount ?? ""),
+                          });
+                          setPhotoUrls(collectBillPhotoUrls(r));
+                          setEditError(null);
+                        }}
+                        onDelete={() => setPendingDeleteRow(r)}
                       />
                     );
                   },
@@ -260,35 +359,36 @@ export function PvcExpenseRegisterReport({
         onPageSizeChange={setPageSize}
       />
       <EntryEditDrawer
-        open={Boolean(crud.editing)}
-        title="Edit expense"
+        open={Boolean(editingRow)}
+        title={`Edit ${editingRow?.expenseLabel ?? "expense"}`}
         fields={[
           { name: "date", label: t("date"), type: "date", required: true },
           { name: "expenseHead", label: t("category"), required: true },
           { name: "description", label: t("remarksNotes"), type: "textarea" },
           { name: "amount", label: t("amount"), type: "number", required: true },
         ]}
-        values={crud.values}
-        saving={crud.saving}
-        error={crud.error}
-        onChange={crud.setField}
-        onClose={crud.closeEdit}
+        values={editValues}
+        saving={saving}
+        error={editError}
+        onChange={(name, val) =>
+          setEditValues((prev) => ({ ...prev, [name]: val }))
+        }
+        onClose={() => setEditingRow(null)}
         upload={{
-          urls: crud.photoUrls,
-          onChange: crud.setPhotoUrls,
+          urls: photoUrls,
+          onChange: setPhotoUrls,
           label: "Upload bill/document (optional)",
         }}
-        onSave={() =>
-          void crud.save({
-            date: crud.values.date,
-            expenseHead: crud.values.expenseHead,
-            description: crud.values.description || null,
-            amount: Number(crud.values.amount),
-            billPhotoUrls: crud.photoUrls,
-          })
-        }
+        onSave={() => void saveEdit()}
       />
-      {crud.deleteDialog}
+      <DeleteConfirmDialog
+        open={Boolean(pendingDeleteRow)}
+        deleting={deleting}
+        onNo={() => setPendingDeleteRow(null)}
+        onYes={() => void confirmDelete()}
+        title={`Delete ${pendingDeleteRow?.expenseLabel ?? "entry"}?`}
+        message={`Are you sure you want to delete this ${pendingDeleteRow?.expenseLabel ?? "expense"} record (${pendingDeleteRow?.description ?? ""})? This cannot be undone.`}
+      />
     </section>
   );
 }

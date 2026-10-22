@@ -76,21 +76,49 @@ export async function POST(
       const purchases = await prisma.$transaction(async (tx) => {
         const created = [];
         for (const item of data.items) {
-          created.push(
-            await tx.purchase.create({
-              data: purchaseCreateData(
-                writePlantId,
-                session.user.id,
-                data,
-                item,
-                headerGst,
-                photos,
-                approvalFields,
-                backdated,
-                day,
-              ),
-            }),
+          const createData = purchaseCreateData(
+            writePlantId,
+            session.user.id,
+            data,
+            item,
+            headerGst,
+            photos,
+            approvalFields,
+            backdated,
+            day,
           );
+          const billRaw = data.billNumber?.trim() || "";
+          const existing = billRaw
+            ? await tx.purchase.findFirst({
+                where: {
+                  plantId: writePlantId,
+                  billNumber: { equals: billRaw, mode: "insensitive" },
+                  ...(item.itemDescription
+                    ? {
+                        itemDescription: {
+                          equals: item.itemDescription.trim(),
+                          mode: "insensitive",
+                        },
+                      }
+                    : {}),
+                },
+              })
+            : null;
+
+          if (existing) {
+            created.push(
+              await tx.purchase.update({
+                where: { id: existing.id },
+                data: createData,
+              }),
+            );
+          } else {
+            created.push(
+              await tx.purchase.create({
+                data: createData,
+              }),
+            );
+          }
         }
         return created;
       });
@@ -134,28 +162,54 @@ export async function POST(
       ...(approval.approvedByHead ? { approvedByHeadId: session.user.id } : {}),
     };
 
-    const purchase = await prisma.purchase.create({
-      data: purchaseCreateData(
-        writePlantId,
-        session.user.id,
-        data,
-        {
-          itemDescription: data.itemDescription,
-          unit: data.unit,
-          quantity: data.quantity,
-          rate: data.rate,
-          gstPercent: data.gstPercent,
-          debitQuantity: data.debitQuantity ?? 0,
-          openingReading: data.openingReading,
-          closingReading: data.closingReading,
-        },
-        data.gstPercent,
-        photos,
-        approvalFields,
-        backdated,
-        day,
-      ),
-    });
+    const itemData = {
+      itemDescription: data.itemDescription,
+      unit: data.unit,
+      quantity: data.quantity,
+      rate: data.rate,
+      gstPercent: data.gstPercent,
+      debitQuantity: data.debitQuantity ?? 0,
+      openingReading: data.openingReading,
+      closingReading: data.closingReading,
+    };
+    const createData = purchaseCreateData(
+      writePlantId,
+      session.user.id,
+      data,
+      itemData,
+      data.gstPercent,
+      photos,
+      approvalFields,
+      backdated,
+      day,
+    );
+
+    const billRaw = data.billNumber?.trim() || "";
+    const existing = billRaw
+      ? await prisma.purchase.findFirst({
+          where: {
+            plantId: writePlantId,
+            billNumber: { equals: billRaw, mode: "insensitive" },
+            ...(data.itemDescription
+              ? {
+                  itemDescription: {
+                    equals: data.itemDescription.trim(),
+                    mode: "insensitive",
+                  },
+                }
+              : {}),
+          },
+        })
+      : null;
+
+    const purchase = existing
+      ? await prisma.purchase.update({
+          where: { id: existing.id },
+          data: createData,
+        })
+      : await prisma.purchase.create({
+          data: createData,
+        });
 
     await safeWriteAuditLog({
       entityType: "Purchase",

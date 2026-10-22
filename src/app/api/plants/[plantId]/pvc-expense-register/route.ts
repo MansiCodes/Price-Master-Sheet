@@ -5,6 +5,7 @@ import { dateRangeFromSearchParams } from "@/lib/api-date-range";
 import { parseDateOnly, toIsoDateString } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 import { normalizePvcExpenseHead } from "@/lib/plant-catalogs";
+import { monthStartsInRange } from "@/lib/pnl/calculate/helpers";
 import { plantIdFilter, resolveReportPlantIds } from "@/lib/plant-merge";
 import { paginate } from "@/lib/ui/paginate";
 
@@ -204,12 +205,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
         });
       }
       if (cashAmount > 0) {
+        const isFin = head === "Financial Cost";
         unified.push({
           id: `petty-${row.id}`,
-          expenseLabel: "Petty Cash",
+          expenseLabel: isFin ? "Financial Cost" : "Petty Cash",
           sortDate: dateIso,
           periodLabel: formatDay(dateIso),
-          description: row.description?.trim() || "Petty cash",
+          description:
+            row.description?.trim() || (isFin ? "Financial Cost" : "Petty cash"),
           details: row.nature?.trim() || row.payMode?.trim() || null,
           amount: cashAmount,
           source: "pettyCash",
@@ -217,6 +220,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
         });
       }
       continue;
+    }
+
+    if (head === "Factory Rent") {
+      const alreadyInElec = electricityRows.some(
+        (e) =>
+          Number(e.rentAmount) > 0 &&
+          e.month.getUTCFullYear() === row.date.getUTCFullYear() &&
+          e.month.getUTCMonth() === row.date.getUTCMonth(),
+      );
+      if (alreadyInElec) {
+        // Skip duplicate petty cash entry since rent for this month is already in the monthly rent register
+        continue;
+      }
     }
 
     unified.push({
@@ -254,6 +270,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     });
   }
 
+  const farMonthsList = monthStartsInRange(
+    fromDate ?? new Date("2026-01-01"),
+    toDate ?? new Date("2026-10-31"),
+  );
+  const pvcFarMonths = Math.max(
+    1,
+    farMonthsList.filter(
+      (m) =>
+        (m.getUTCFullYear() === 2026 && m.getUTCMonth() >= 1) ||
+        m.getUTCFullYear() > 2026,
+    ).length,
+  );
+
   for (const row of assetRows) {
     const dateIso = row.billDate
       ? toIsoDateString(row.billDate)
@@ -264,14 +293,28 @@ export async function GET(request: NextRequest, context: RouteContext) {
       if (fromDate && time < fromDate.getTime()) continue;
       if (toDate && time > toDate.getTime()) continue;
     }
+
+    const cost = Number(row.cost) || 0;
+    const depPercent = Number(row.depreciationPercent) || 18.1;
+    const annual = cost * (depPercent / 100);
+    const depAmount = Math.round(((annual * pvcFarMonths) / 12) * 100) / 100;
+
+    const vendorBill = [row.vendor, row.billNumber].filter(Boolean).join(" · ");
+    const details = [
+      `Asset Cost: ₹${cost.toLocaleString("en-IN")} @ ${depPercent}% p.a. (${pvcFarMonths} mos)`,
+      vendorBill,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
     unified.push({
       id: `far-${row.id}`,
       expenseLabel: "FAR",
       sortDate: dateIso,
       periodLabel: formatDay(dateIso),
       description: row.assetDescription,
-      details: [row.vendor, row.billNumber].filter(Boolean).join(" · ") || null,
-      amount: Number(row.cost) || 0,
+      details,
+      amount: depAmount,
       source: "fixedAsset",
     });
   }

@@ -39,55 +39,107 @@ export async function persistSales(
     const billRaw = row.billNumber?.trim() ?? "";
     const invoiceWhere = invoiceNumberMatchWhere(billRaw);
 
-    const existing = await prisma.sale.findFirst({
-      where: {
-        ...pScope,
-        OR: [
-          { sourceKey },
-          { id: sourceKey },
-          ...invoiceWhere.map((w) => ({
-            ...w,
-            date: day,
-            quantity: row.quantity,
-            rate: row.rate,
-          })),
-          {
-            date: day,
-            itemDescription: row.itemDescription,
-            quantity: row.quantity,
+    let existing = null;
+    if (billRaw) {
+      if (row.itemDescription?.trim()) {
+        existing = await prisma.sale.findFirst({
+          where: {
+            ...pScope,
+            OR: invoiceWhere.map((w) => ({
+              ...w,
+              itemDescription: {
+                equals: row.itemDescription.trim(),
+                mode: "insensitive",
+              },
+            })),
           },
-        ],
-      },
-      select: { id: true, billNumber: true },
-    });
+        });
+      }
+      if (!existing) {
+        existing = await prisma.sale.findFirst({
+          where: {
+            ...pScope,
+            OR: invoiceWhere,
+          },
+        });
+      }
+    }
+
+    if (!existing) {
+      existing = await prisma.sale.findFirst({
+        where: {
+          ...pScope,
+          OR: [
+            { sourceKey },
+            { id: sourceKey },
+            {
+              date: day,
+              customerName: row.customerName,
+              itemDescription: row.itemDescription,
+              quantity: row.quantity,
+              rate: row.rate,
+            },
+          ],
+        },
+      });
+    }
 
     const salesValue = round2(row.quantity * row.rate);
 
     if (existing) {
       const nextBill = preferFullerInvoice(existing.billNumber, billRaw);
-      if (nextBill && nextBill !== (existing.billNumber ?? "").trim()) {
-        await prisma.sale.update({
-          where: { id: existing.id },
-          data: {
-            billNumber: nextBill,
-            billDate: row.billDate ? parseDateOnly(row.billDate) : undefined,
-            customerName: row.customerName,
-            rate: row.rate,
-            salesValue,
-            excelUploadedAt: uploadedAt,
-          },
-        });
-        await safeWriteAuditLog({
-          entityType: "Sale",
-          entityId: existing.id,
-          field: "excel_import_update",
-          oldValue: { billNumber: existing.billNumber },
-          newValue: { billNumber: nextBill, excelUploadedAt: uploadedAt },
-          actorId: enteredById,
-          plantId: writePlantId,
-        });
-      }
-      markDuplicate("Sales", row.row, "Already uploaded / merged with existing record");
+      await prisma.sale.update({
+        where: { id: existing.id },
+        data: {
+          date: day,
+          shift: row.shift,
+          type: row.type,
+          typeOther: row.typeOther ?? existing.typeOther,
+          customerName: row.customerName,
+          billNumber: nextBill || existing.billNumber,
+          billDate: row.billDate ? parseDateOnly(row.billDate) : existing.billDate,
+          itemDescription: row.itemDescription,
+          unit: row.unit || existing.unit,
+          quantity: row.quantity,
+          rate: row.rate,
+          salesValue,
+          inMeter: row.inMeter ?? existing.inMeter,
+          qtyMtr: row.qtyMtr ?? existing.qtyMtr,
+          meterUnit: row.meterUnit ?? existing.meterUnit,
+          notes: row.notes ?? existing.notes,
+          sourceKey: existing.sourceKey || sourceKey,
+          excelUploadedAt: uploadedAt,
+        },
+      });
+
+      await safeWriteAuditLog({
+        entityType: "Sale",
+        entityId: existing.id,
+        field: "excel_import_update",
+        oldValue: {
+          billNumber: existing.billNumber,
+          customerName: existing.customerName,
+          quantity: String(existing.quantity),
+          salesValue: String(existing.salesValue),
+        },
+        newValue: {
+          billNumber: nextBill || existing.billNumber,
+          customerName: row.customerName,
+          quantity: String(row.quantity),
+          salesValue: String(salesValue),
+          excelUploadedAt: uploadedAt,
+        },
+        actorId: enteredById,
+        plantId: writePlantId,
+      });
+
+      summary.updated += 1;
+      summary.skipped.push({
+        sheet: "Sales",
+        row: row.row,
+        reason: `Overwritten existing record (Invoice #${billRaw || row.customerName})`,
+      });
+      daysToRefresh.set(`${row.date}|${row.shift}`, row.shift);
       continue;
     }
 
