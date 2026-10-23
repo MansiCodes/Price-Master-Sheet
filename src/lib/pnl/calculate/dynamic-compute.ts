@@ -1,5 +1,6 @@
 import { PettyCashKind } from "@prisma/client";
 import {
+  expenseSectionForPlant,
   isAtclPurchase,
   normalizeUpcastExpenseHead,
   upcastEntryHead,
@@ -179,19 +180,46 @@ export function computeDynamicTotals(
   );
   const supervisorSalary = round2(
     pettyEntries.reduce((sum, row) => {
-      const head = normalizeUpcastExpenseHead(row.expenseHead || "");
+      const rawHead = row.expenseHead || row.nature || "";
+      const head = normalizeUpcastExpenseHead(rawHead);
       const fromField = toNumber(row.supervisorSalary);
       if (fromField > 0) return sum + fromField;
-      if (
-        isUpcast &&
-        head === "Salary Expenses" &&
-        toNumber(row.amount) > 0
-      ) {
-        return sum + toNumber(row.amount);
+      const amt = toNumber(row.amount);
+      if (!(amt > 0)) return sum;
+      if (isUpcast) {
+        return head === "Salary Expenses" ? sum + amt : sum;
       }
+      if (/salary/i.test(rawHead)) return sum + amt;
       return sum;
     }, 0),
   );
+
+  const otherDirectExpense = isUpcast
+    ? 0
+    : round2(
+        pettyEntries.reduce((sum, row) => {
+          const rawHead = (row.expenseHead || row.nature || "").trim();
+          const amt = toNumber(row.amount);
+          if (!(amt > 0)) return sum;
+          if (/salary|electric|fuel|unload|labour|contractor|rent|far|financial|misc|petty/i.test(rawHead)) {
+            return sum;
+          }
+          if (expenseSectionForPlant(plantCode, rawHead) !== "direct") return sum;
+          return sum + amt;
+        }, 0),
+      );
+
+  const miscellaneousExpense = isUpcast
+    ? 0
+    : round2(
+        pettyEntries.reduce((sum, row) => {
+          const rawHead = (row.expenseHead || row.nature || "").trim();
+          const amt = toNumber(row.amount);
+          if (!(amt > 0)) return sum;
+          if (!/misc/i.test(rawHead)) return sum;
+          return sum + amt;
+        }, 0),
+      );
 
   const manpowerFromEntries = round2(toNumber(manpowerAgg._sum.totalCost));
   const manpower = manpowerFromEntries + contractorSalary;
@@ -200,6 +228,7 @@ export function computeDynamicTotals(
     electricity +
       unloadingExpense +
       manpower +
+      otherDirectExpense +
       (isUpcast ? upcastMiscDirectTotal : 0),
   );
   const cogs = round2(openingStock + totalPurchases + directExpenses - closingStock);
@@ -230,6 +259,7 @@ export function computeDynamicTotals(
       rent -
       pettyCashExp -
       supervisorSalary -
+      miscellaneousExpense -
       depreciation -
       financialCost,
   );
@@ -255,6 +285,8 @@ export function computeDynamicTotals(
     upcastMiscDirectTotals,
     upcastMiscDirectTotal,
     pettyCashExp,
+    otherDirectExpense,
+    miscellaneousExpense,
     manpower,
     cogs,
     grossProfit,

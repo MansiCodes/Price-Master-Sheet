@@ -28,6 +28,8 @@ export function assembleDynamicStatement(
     upcastMiscDirectTotals,
     upcastMiscDirectTotal,
     pettyCashExp,
+    otherDirectExpense,
+    miscellaneousExpense,
     manpower,
     cogs,
     grossProfit,
@@ -89,6 +91,12 @@ export function assembleDynamicStatement(
           "LABOUR CONTRACTOR",
           manpower || null,
           manpower ? ratioOf(manpower, salesBase) : null,
+          "item",
+        ),
+        line(
+          "DIRECT EXP.",
+          otherDirectExpense || null,
+          otherDirectExpense ? ratioOf(otherDirectExpense, salesBase) : null,
           "item",
         ),
       ];
@@ -179,6 +187,12 @@ export function assembleDynamicStatement(
       "FACTORY RENT",
       rent || null,
       rent ? ratioOf(rent, salesBase) : null,
+      "item",
+    ),
+    line(
+      "MISCELLANEOUS",
+      miscellaneousExpense || null,
+      miscellaneousExpense ? ratioOf(miscellaneousExpense, salesBase) : null,
       "item",
     ),
     line(

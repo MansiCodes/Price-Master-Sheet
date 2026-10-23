@@ -41,28 +41,9 @@ export async function persistSales(
 
     let existing = null;
     if (billRaw) {
-      if (row.itemDescription?.trim()) {
-        existing = await prisma.sale.findFirst({
-          where: {
-            ...pScope,
-            OR: invoiceWhere.map((w) => ({
-              ...w,
-              itemDescription: {
-                equals: row.itemDescription.trim(),
-                mode: "insensitive",
-              },
-            })),
-          },
-        });
-      }
-      if (!existing) {
-        existing = await prisma.sale.findFirst({
-          where: {
-            ...pScope,
-            OR: invoiceWhere,
-          },
-        });
-      }
+      existing = await prisma.sale.findFirst({
+        where: { ...pScope, type: row.type, OR: invoiceWhere },
+      });
     }
 
     if (!existing) {
