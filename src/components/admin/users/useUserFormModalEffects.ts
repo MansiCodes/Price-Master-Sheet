@@ -129,21 +129,19 @@ export function useUserFormModalEffects({
 
   useEffect(() => {
     if (!open) return;
-    if (
-      globalRole === "SUPER_ADMIN" ||
-      globalRole === "VIEWER"
-    ) {
+    if (globalRole === "SUPER_ADMIN") {
       setSelectedPlantIds([]);
       setPlantError(null);
       setCanMachineSupervise(false);
       setCanAccessStock(false);
-      if (globalRole === "SUPER_ADMIN") {
-        setCanViewPriceSheet(true);
-        setCanAdminMachineProduction(true);
-      } else if (globalRole === "VIEWER") {
-        setCanViewPriceSheet(true);
-      }
+      setCanViewPriceSheet(true);
+      setCanAdminMachineProduction(true);
       return;
+    }
+    if (globalRole === "VIEWER") {
+      setCanMachineSupervise(false);
+      setCanAccessStock(false);
+      setCanViewPriceSheet(true);
     }
     if (globalRole === "MACHINE_SUPERVISOR") {
       setCanMachineSupervise(false);

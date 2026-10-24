@@ -21,7 +21,9 @@ export async function canAccessPlant(
 
   if (!user || !user.isActive) return false;
   if (hasGlobalPlantAccess(user.globalRole)) return true;
-  return user.plantRoles.length > 0;
+  if (user.plantRoles.length > 0) return true;
+  // shortcut: older Viewers had no plant rows; treat as all plants until re-saved
+  return user.globalRole === GlobalRole.VIEWER;
 }
 
 export async function getAccessiblePlantIds(userId: string): Promise<string[]> {
@@ -47,6 +49,15 @@ export async function getAccessiblePlantIds(userId: string): Promise<string[]> {
 
   if (user.plantRoles.length > 0) {
     return user.plantRoles.map((r) => r.plantId);
+  }
+
+  if (user.globalRole === GlobalRole.VIEWER) {
+    const plants = await prisma.plant.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true },
+    });
+    return plants.map((p) => p.id);
   }
 
   // Plant managers created without a plant still need a dashboard + today's report.

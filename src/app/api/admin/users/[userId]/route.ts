@@ -178,7 +178,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     const plantIds = [...new Set(data.plantIds)];
     const needsPlant =
       nextRole !== GlobalRole.SUPER_ADMIN &&
-      nextRole !== GlobalRole.VIEWER &&
       (nextRole !== GlobalRole.MACHINE_SUPERVISOR || nextCanAccessStock);
     if (needsPlant && plantIds.length === 0) {
       return NextResponse.json(

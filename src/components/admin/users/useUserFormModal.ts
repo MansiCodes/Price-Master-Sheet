@@ -165,7 +165,6 @@ export function useUserFormModal({
       isActive: editing?.isActive ?? true,
       plantIds:
         globalRole === "SUPER_ADMIN" ||
-        globalRole === "VIEWER" ||
         (globalRole === "MACHINE_SUPERVISOR" && !canAccessStock)
           ? []
           : selectedPlantIds,

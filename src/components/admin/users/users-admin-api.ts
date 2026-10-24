@@ -1,4 +1,5 @@
 import {
+  assignedPlantsLabel,
   ROLE_LABEL,
   ROLES,
   type PlantOption,
@@ -163,9 +164,7 @@ export function exportUsersCsv(filtered: UserRow[]) {
       u.email,
       u.phone ?? "",
       ROLE_LABEL[u.globalRole as (typeof ROLES)[number]] ?? u.globalRole,
-      u.globalRole === "SUPER_ADMIN" || u.globalRole === "VIEWER"
-        ? "All plants"
-        : (u.plantRoles ?? []).map((role) => role.plant.name).join(", "),
+      assignedPlantsLabel(u, "All plants", ""),
       u.canViewPriceSheet ? "Yes" : "No",
       u.canMachineSupervise ? "Yes" : "No",
       u.canAdminMachineProduction || u.globalRole === "SUPER_ADMIN"

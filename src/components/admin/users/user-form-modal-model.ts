@@ -38,8 +38,7 @@ export function computeUserFormFlags(
   const selectedHasQuadSignal = selectedPlantIds.some((id) =>
     plantHasQuadSignal(activePlants.find((p) => p.id === id)?.code),
   );
-  const showPlantPicker =
-    globalRole !== "SUPER_ADMIN" && globalRole !== "VIEWER";
+  const showPlantPicker = globalRole !== "SUPER_ADMIN";
   const requiresPlants =
     showPlantPicker &&
     (globalRole !== "MACHINE_SUPERVISOR" || canAccessStock);

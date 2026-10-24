@@ -179,7 +179,6 @@ export async function POST(request: Request) {
   const role = parsed.data.globalRole;
   const needsPlants =
     role !== GlobalRole.SUPER_ADMIN &&
-    role !== GlobalRole.VIEWER &&
     role !== GlobalRole.MACHINE_SUPERVISOR;
   if (needsPlants && plantIds.length === 0) {
     return NextResponse.json(

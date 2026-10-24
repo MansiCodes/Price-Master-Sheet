@@ -129,9 +129,9 @@ export function isViewer(role: GlobalRole | Role): boolean {
   return role === GlobalRole.VIEWER;
 }
 
-/** Super Admin + Viewer: every active plant without per-plant assignment. */
+/** Super Admin: every active plant without per-plant assignment. */
 export function hasGlobalPlantAccess(role: GlobalRole | Role): boolean {
-  return isSuperAdmin(role) || isViewer(role);
+  return isSuperAdmin(role);
 }
 
 /** List users in Admin → Users (view). Mutations stay Super Admin only. */

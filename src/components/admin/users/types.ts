@@ -48,6 +48,17 @@ export const ROLE_LABEL: Record<RoleValue, string> = {
   MACHINE_SUPERVISOR: "Machine Supervisor",
 };
 
+export function assignedPlantsLabel(
+  user: Pick<UserRow, "globalRole" | "plantRoles">,
+  allPlantsLabel: string,
+  emptyLabel: string,
+) {
+  if (user.globalRole === "SUPER_ADMIN") return allPlantsLabel;
+  const names = (user.plantRoles ?? []).map((role) => role.plant.name);
+  if (user.globalRole === "VIEWER" && names.length === 0) return allPlantsLabel;
+  return names.join(", ") || emptyLabel;
+}
+
 export function userInitials(name: string | null, email: string): string {
   const base = (name || email).trim();
   const parts = base.split(/[\s@_]+/).filter(Boolean);

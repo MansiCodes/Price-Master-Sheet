@@ -2,7 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { Pagination } from "@/components/ui/Pagination";
-import { ROLE_LABEL, ROLES, userInitials, type UserRow } from "./types";
+import {
+  assignedPlantsLabel,
+  ROLE_LABEL,
+  ROLES,
+  userInitials,
+  type UserRow,
+} from "./types";
 
 type UsersTableProps = {
   rows: UserRow[];
@@ -88,14 +94,11 @@ export function UsersTable({
                     </span>
                   </td>
                   <td>
-                    {u.globalRole === "SUPER_ADMIN" ||
-                    u.globalRole === "VIEWER" ? (
+                    {u.globalRole === "SUPER_ADMIN" ? (
                       <span className="users-pill">{t("allPlants")}</span>
                     ) : (
                       <span className="users-plants-cell">
-                        {(u.plantRoles ?? [])
-                          .map((role) => role.plant.name)
-                          .join(", ") || tCommon("dash")}
+                        {assignedPlantsLabel(u, t("allPlants"), tCommon("dash"))}
                       </span>
                     )}
                   </td>
