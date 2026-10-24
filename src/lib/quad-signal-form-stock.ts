@@ -35,6 +35,10 @@ function isSingleQuadProcess(name: string): boolean {
   return name.trim().toLowerCase() === "single quad";
 }
 
+function isFormConductorProcess(name: string): boolean {
+  return name.trim().toLowerCase() === "conductor";
+}
+
 function qty(map: Record<string, number> | undefined, proc: string): number {
   if (!map) return 0;
   const want = proc.trim().toLowerCase();
@@ -58,11 +62,7 @@ function nextSizeProcess(
   processNames: readonly string[],
   index: number,
 ): string | undefined {
-  for (let j = index + 1; j < processNames.length; j++) {
-    if (processNames[j]!.trim().toLowerCase() === "insulation") continue;
-    return processNames[j];
-  }
-  return undefined;
+  return processNames[index + 1];
 }
 
 export function formProcessClosing(
@@ -129,7 +129,7 @@ export function nextDayFormOpeningFromMeta(
   );
   if (meta.closing) {
     for (const proc of processNames) {
-      if (!isSingleQuadProcess(proc)) continue;
+      if (!isSingleQuadProcess(proc) && !isFormConductorProcess(proc)) continue;
       const saved = Number(qty(meta.closing, proc));
       if (Number.isFinite(saved) && proc in meta.closing) out[proc] = saved;
     }
