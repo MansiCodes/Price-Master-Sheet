@@ -10,6 +10,7 @@ declare module "next-auth" {
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
     canAccessStock: boolean;
+    canManageUsers: boolean;
     rememberMe?: boolean;
   }
 
@@ -22,6 +23,7 @@ declare module "next-auth" {
       canMachineSupervise: boolean;
       canAdminMachineProduction: boolean;
       canAccessStock: boolean;
+      canManageUsers: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -35,6 +37,7 @@ declare module "next-auth/jwt" {
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
     canAccessStock: boolean;
+    canManageUsers: boolean;
     rememberMe?: boolean;
   }
 }

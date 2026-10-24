@@ -10,7 +10,14 @@ export default async function AdminHubPage() {
   if (!session?.user) redirect("/login");
 
   const role = session.user.globalRole;
-  if (isSuperAdmin(role) || canViewUsersDirectory(role)) redirect("/admin/users");
+  if (
+    isSuperAdmin(role) ||
+    canViewUsersDirectory(role, {
+      canManageUsers: session.user.canManageUsers,
+    })
+  ) {
+    redirect("/admin/users");
+  }
   if (isAdminOrHead(role)) redirect("/admin/audit");
   redirect("/");
 }

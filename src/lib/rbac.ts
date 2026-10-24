@@ -6,6 +6,7 @@ export type {
   MachineAccessOpts,
   PriceSheetUser,
 } from "@/lib/rbac-types";
+export type { UsersAccessOpts } from "@/lib/rbac-checks";
 export {
   canAccessMachineProduction,
   canAdminMachineProduction,

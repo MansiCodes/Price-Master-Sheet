@@ -15,7 +15,8 @@ export type ExtraAccessKey =
   | "PRICE_SHEET"
   | "MACHINE_SUPERVISOR"
   | "MP_ADMIN"
-  | "STOCK";
+  | "STOCK"
+  | "USERS";
 
 export type ExtraAccessOption = {
   id: ExtraAccessKey;

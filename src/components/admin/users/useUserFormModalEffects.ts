@@ -23,6 +23,7 @@ type UserFormModalEffectsArgs = {
   selectedHasQuadSignal: boolean;
   canAccessStock: boolean;
   setCanAccessStock: (value: boolean) => void;
+  setCanManageUsers: (value: boolean) => void;
   globalRole: RoleValue;
   canMachineSupervise: boolean;
   selectedPlantIdsLength: number;
@@ -54,6 +55,7 @@ export function useUserFormModalEffects({
   selectedHasQuadSignal,
   canAccessStock,
   setCanAccessStock,
+  setCanManageUsers,
   globalRole,
   canMachineSupervise,
   selectedPlantIdsLength,
@@ -94,6 +96,7 @@ export function useUserFormModalEffects({
       setCanMachineSupervise(Boolean(editing.canMachineSupervise));
       setCanAdminMachineProduction(Boolean(editing.canAdminMachineProduction));
       setCanAccessStock(Boolean(editing.canAccessStock));
+      setCanManageUsers(Boolean(editing.canManageUsers));
       setSelectedPlantIds(
         editing.plantRoles?.map((role) => role.plantId) ?? [],
       );
@@ -107,6 +110,7 @@ export function useUserFormModalEffects({
       setCanMachineSupervise(false);
       setCanAdminMachineProduction(false);
       setCanAccessStock(false);
+      setCanManageUsers(false);
       setSelectedPlantIds(
         activePlants[0] ? [activePlants[0].id] : [],
       );
@@ -134,6 +138,7 @@ export function useUserFormModalEffects({
       setPlantError(null);
       setCanMachineSupervise(false);
       setCanAccessStock(false);
+      setCanManageUsers(false);
       setCanViewPriceSheet(true);
       setCanAdminMachineProduction(true);
       return;
@@ -141,7 +146,6 @@ export function useUserFormModalEffects({
     if (globalRole === "VIEWER") {
       setCanMachineSupervise(false);
       setCanAccessStock(false);
-      setCanViewPriceSheet(true);
     }
     if (globalRole === "MACHINE_SUPERVISOR") {
       setCanMachineSupervise(false);

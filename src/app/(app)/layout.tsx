@@ -41,6 +41,7 @@ export default async function AppLayout({
       canMachineSupervise: true,
       canAdminMachineProduction: true,
       canViewPriceSheet: true,
+      canManageUsers: true,
       globalRole: true,
       name: true,
       email: true,
@@ -57,6 +58,7 @@ export default async function AppLayout({
     canMachineSupervise: Boolean(dbUser.canMachineSupervise),
     canAdminMachineProduction: Boolean(dbUser.canAdminMachineProduction),
     canViewPriceSheet: Boolean(dbUser.canViewPriceSheet),
+    canManageUsers: Boolean(dbUser.canManageUsers),
     name: dbUser.name ?? session.user.name,
     email: dbUser.email ?? session.user.email,
   };
@@ -199,7 +201,7 @@ export default async function AppLayout({
   const showAdmin = role && !isMachineSupervisorOnly(role) ? isAdminOrHead(role) : false;
   const showUsers =
     role && !isMachineSupervisorOnly(role)
-      ? canViewUsersDirectory(role)
+      ? canViewUsersDirectory(role, { canManageUsers: user.canManageUsers })
       : false;
   const showApprovals =
     role && !isMachineSupervisorOnly(role) ? canApproveEntries(role) : false;

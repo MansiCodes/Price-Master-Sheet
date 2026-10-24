@@ -19,6 +19,7 @@ export type UserFormModalProps = {
     canMachineSupervise: boolean;
     canAdminMachineProduction: boolean;
     canAccessStock: boolean;
+    canManageUsers: boolean;
     isActive: boolean;
     plantIds: string[];
   }) => Promise<void>;
@@ -44,9 +45,9 @@ export function computeUserFormFlags(
     (globalRole !== "MACHINE_SUPERVISOR" || canAccessStock);
   const canAddMachineSupervise =
     globalRole === "PLANT_MANAGER" || globalRole === "ACCOUNTANT";
-  const priceSheetLocked =
-    globalRole === "SUPER_ADMIN" || globalRole === "VIEWER";
+  const priceSheetLocked = globalRole === "SUPER_ADMIN";
   const mpAdminLocked = globalRole === "SUPER_ADMIN";
+  const showUsersExtra = globalRole !== "SUPER_ADMIN";
   return {
     selectedHasQuadSignal,
     showPlantPicker,
@@ -54,6 +55,7 @@ export function computeUserFormFlags(
     canAddMachineSupervise,
     priceSheetLocked,
     mpAdminLocked,
+    showUsersExtra,
   };
 }
 
@@ -62,6 +64,7 @@ export function buildExtraAccessOptions(args: {
   priceSheetLocked: boolean;
   mpAdminLocked: boolean;
   selectedHasQuadSignal: boolean;
+  showUsersExtra: boolean;
 }): ExtraAccessOption[] {
   const opts: ExtraAccessOption[] = [
     {
@@ -87,6 +90,12 @@ export function buildExtraAccessOptions(args: {
       label: "Stock (page + Today's Entry)",
     });
   }
+  if (args.showUsersExtra) {
+    opts.push({
+      id: "USERS",
+      label: "Users (create / edit)",
+    });
+  }
   return opts;
 }
 
@@ -95,10 +104,12 @@ export function buildExtraAccessValue(args: {
   canMachineSupervise: boolean;
   canAdminMachineProduction: boolean;
   canAccessStock: boolean;
+  canManageUsers: boolean;
   canAddMachineSupervise: boolean;
   priceSheetLocked: boolean;
   mpAdminLocked: boolean;
   selectedHasQuadSignal: boolean;
+  showUsersExtra: boolean;
 }): ExtraAccessKey[] {
   const selected: ExtraAccessKey[] = [];
   if (args.canViewPriceSheet || args.priceSheetLocked) selected.push("PRICE_SHEET");
@@ -107,5 +118,6 @@ export function buildExtraAccessValue(args: {
   }
   if (args.canAdminMachineProduction || args.mpAdminLocked) selected.push("MP_ADMIN");
   if (args.canAccessStock && args.selectedHasQuadSignal) selected.push("STOCK");
+  if (args.showUsersExtra && args.canManageUsers) selected.push("USERS");
   return selected;
 }

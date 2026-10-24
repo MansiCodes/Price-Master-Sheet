@@ -22,6 +22,7 @@ export type UserRow = {
   canMachineSupervise: boolean;
   canAdminMachineProduction: boolean;
   canAccessStock: boolean;
+  canManageUsers: boolean;
   isActive: boolean;
   coinsBalance: number;
   createdAt: string;

@@ -11,6 +11,7 @@ export type UsersAdminLoadResult = {
   users: UserRow[];
   plants: PlantOption[];
   canManage: boolean;
+  allowSuperAdmin: boolean;
   canManageSuperAdmins: boolean;
   primarySuperAdminEmail: string | null;
 };
@@ -27,6 +28,7 @@ export async function loadUsersAdminData(): Promise<UsersAdminLoadResult> {
     message?: string;
     users?: UserRow[];
     canManage?: boolean;
+    allowSuperAdmin?: boolean;
     canManageSuperAdmins?: boolean;
     primarySuperAdminEmail?: string | null;
   };
@@ -61,6 +63,7 @@ export async function loadUsersAdminData(): Promise<UsersAdminLoadResult> {
     users: usersJson.users ?? [],
     plants: plantsJson.plants ?? [],
     canManage: Boolean(usersJson.canManage),
+    allowSuperAdmin: Boolean(usersJson.allowSuperAdmin),
     canManageSuperAdmins: Boolean(usersJson.canManageSuperAdmins),
     primarySuperAdminEmail:
       usersJson.primarySuperAdminEmail?.trim().toLowerCase() || null,
@@ -77,6 +80,7 @@ export type UserFormSubmitPayload = {
   canMachineSupervise: boolean;
   canAdminMachineProduction: boolean;
   canAccessStock: boolean;
+  canManageUsers: boolean;
   isActive: boolean;
   plantIds: string[];
 };
@@ -95,6 +99,7 @@ export async function saveUserForm(
       canMachineSupervise: payload.canMachineSupervise,
       canAdminMachineProduction: payload.canAdminMachineProduction,
       canAccessStock: payload.canAccessStock,
+      canManageUsers: payload.canManageUsers,
       isActive: payload.isActive,
       plantIds: payload.plantIds,
     };
@@ -124,6 +129,7 @@ export async function saveUserForm(
       canMachineSupervise: payload.canMachineSupervise,
       canAdminMachineProduction: payload.canAdminMachineProduction,
       canAccessStock: payload.canAccessStock,
+      canManageUsers: payload.canManageUsers,
       plantIds: payload.plantIds,
     }),
   });

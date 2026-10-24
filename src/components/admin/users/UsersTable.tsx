@@ -91,6 +91,9 @@ export function UsersTable({
                       u.globalRole !== "SUPER_ADMIN"
                         ? " + MP Admin"
                         : ""}
+                      {u.canManageUsers && u.globalRole !== "SUPER_ADMIN"
+                        ? " + Users"
+                        : ""}
                     </span>
                   </td>
                   <td>

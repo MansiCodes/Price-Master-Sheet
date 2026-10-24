@@ -134,13 +134,25 @@ export function hasGlobalPlantAccess(role: GlobalRole | Role): boolean {
   return isSuperAdmin(role);
 }
 
-/** List users in Admin → Users (view). Mutations stay Super Admin only. */
-export function canViewUsersDirectory(role: GlobalRole | Role): boolean {
-  return isSuperAdmin(role) || isViewer(role);
+export type UsersAccessOpts = {
+  canManageUsers?: boolean;
+};
+
+/** List users in Admin → Users (view). Super Admin, Viewer, or Users extra. */
+export function canViewUsersDirectory(
+  role: GlobalRole | Role,
+  opts?: UsersAccessOpts,
+): boolean {
+  return isSuperAdmin(role) || isViewer(role) || Boolean(opts?.canManageUsers);
 }
 
-export function canManageUsers(role: GlobalRole | Role): boolean {
-  return isSuperAdmin(role);
+/** Create / edit users: Super Admin, or Users extra access. */
+export function canManageUsers(
+  role: GlobalRole | Role,
+  opts?: UsersAccessOpts,
+): boolean {
+  if (isSuperAdmin(role)) return true;
+  return Boolean(opts?.canManageUsers);
 }
 
 /** Same P&L filters / visibility as Super Admin (read path). */

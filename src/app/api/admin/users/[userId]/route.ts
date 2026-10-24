@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { prisma } from "@/lib/db";
-import { isPrimarySuperAdmin, isSuperAdmin } from "@/lib/rbac";
+import { canManageUsers, isPrimarySuperAdmin, isSuperAdmin } from "@/lib/rbac";
 
 type RouteContext = { params: Promise<{ userId: string }> };
 
@@ -27,6 +27,7 @@ const patchSchema = z.object({
   canMachineSupervise: z.boolean().optional(),
   canAdminMachineProduction: z.boolean().optional(),
   canAccessStock: z.boolean().optional(),
+  canManageUsers: z.boolean().optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(128).optional(),
   plantIds: z.array(z.string().min(1)).optional(),
@@ -34,12 +35,20 @@ const patchSchema = z.object({
 
 export async function PATCH(request: Request, context: RouteContext) {
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.id) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
-  if (!isSuperAdmin(session.user.globalRole)) {
+  const actor = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, email: true, globalRole: true, canManageUsers: true },
+  });
+  if (
+    !actor ||
+    !canManageUsers(actor.globalRole, { canManageUsers: actor.canManageUsers })
+  ) {
     return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
   }
+  const actorIsSuperAdmin = isSuperAdmin(actor.globalRole);
 
   const { userId } = await context.params;
 
@@ -70,7 +79,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     existing.globalRole === GlobalRole.SUPER_ADMIN &&
     parsed.data.isActive !== undefined
   ) {
-    if (!isPrimarySuperAdmin(session.user.email)) {
+    if (!isPrimarySuperAdmin(actor.email)) {
       return NextResponse.json(
         {
           ok: false,
@@ -94,7 +103,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
   }
   if (
-    existing.id === session.user.id &&
+    existing.id === actor.id &&
     parsed.data.globalRole &&
     parsed.data.globalRole !== GlobalRole.SUPER_ADMIN
   ) {
@@ -130,6 +139,16 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
   }
   const nextRole = data.globalRole ?? existing.globalRole;
+  if (
+    !actorIsSuperAdmin &&
+    (existing.globalRole === GlobalRole.SUPER_ADMIN ||
+      nextRole === GlobalRole.SUPER_ADMIN)
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "Only Super Admin can edit Super Admin users" },
+      { status: 403 },
+    );
+  }
 
   if (data.plantIds) {
     const plantIds = [...new Set(data.plantIds)];
@@ -174,6 +193,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       ? data.canAccessStock
       : existing.canAccessStock;
 
+  const nextCanManageUsers =
+    nextRole === GlobalRole.SUPER_ADMIN
+      ? false
+      : data.canManageUsers !== undefined
+        ? data.canManageUsers
+        : existing.canManageUsers;
+
   if (data.plantIds) {
     const plantIds = [...new Set(data.plantIds)];
     const needsPlant =
@@ -198,18 +224,17 @@ export async function PATCH(request: Request, context: RouteContext) {
         ...(data.canViewPriceSheet !== undefined
           ? {
               canViewPriceSheet:
-                nextRole === GlobalRole.SUPER_ADMIN ||
-                nextRole === GlobalRole.VIEWER
+                nextRole === GlobalRole.SUPER_ADMIN
                   ? true
                   : data.canViewPriceSheet,
             }
-          : nextRole === GlobalRole.SUPER_ADMIN ||
-              nextRole === GlobalRole.VIEWER
+          : nextRole === GlobalRole.SUPER_ADMIN
             ? { canViewPriceSheet: true }
             : {}),
         canMachineSupervise: nextCanMachineSupervise,
         canAdminMachineProduction: nextCanAdminMachineProduction,
         canAccessStock: nextCanAccessStock,
+        canManageUsers: nextCanManageUsers,
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
         // For now it is prefilled only for SUPER_ADMIN.
         creditScore: nextCreditScore,
@@ -226,6 +251,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         canMachineSupervise: true,
         canAdminMachineProduction: true,
         canAccessStock: true,
+        canManageUsers: true,
         isActive: true,
       },
     });
@@ -264,7 +290,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       plantIds: data.plantIds,
       passwordChanged: Boolean(data.password),
     },
-    actorId: session.user.id,
+    actorId: actor.id,
   });
 
   return NextResponse.json({ ok: true, user: updated });

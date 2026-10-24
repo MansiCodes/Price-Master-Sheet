@@ -31,13 +31,12 @@ export function useUsersAdmin() {
   const [confirmUser, setConfirmUser] = useState<UserRow | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [allowSuperAdmin, setAllowSuperAdmin] = useState(false);
   const [canManageSuperAdmins, setCanManageSuperAdmins] = useState(false);
   const [primarySuperAdminEmail, setPrimarySuperAdminEmail] = useState<
     string | null
   >(null);
   const pageSize = 10;
-
-  const allowSuperAdmin = canManage;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +46,7 @@ export function useUsersAdmin() {
       setUsers(data.users);
       setPlants(data.plants);
       setCanManage(data.canManage);
+      setAllowSuperAdmin(data.allowSuperAdmin);
       setCanManageSuperAdmins(data.canManageSuperAdmins);
       setPrimarySuperAdminEmail(data.primarySuperAdminEmail);
     } catch (err) {

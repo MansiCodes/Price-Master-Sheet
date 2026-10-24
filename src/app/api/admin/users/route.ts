@@ -31,46 +31,57 @@ const createSchema = z.object({
   canMachineSupervise: z.boolean().optional().default(false),
   canAdminMachineProduction: z.boolean().optional().default(false),
   canAccessStock: z.boolean().optional().default(false),
+  canManageUsers: z.boolean().optional().default(false),
   plantIds: z.array(z.string().min(1)).optional().default([]),
 });
 
-function requireUsersViewer(
-  session: { user?: { globalRole?: unknown; id?: string } } | null | undefined,
-): NextResponse | null {
-  if (!session?.user) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+type UsersActor = {
+  id: string;
+  email: string | null;
+  globalRole: GlobalRole;
+  canManageUsers: boolean;
+};
+
+async function loadUsersActor(
+  session: { user?: { id?: string } } | null | undefined,
+): Promise<
+  { actor: UsersActor } | { error: NextResponse }
+> {
+  if (!session?.user?.id) {
+    return {
+      error: NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 }),
+    };
   }
-  if (
-    !canViewUsersDirectory(
-      session.user.globalRole as Parameters<typeof canViewUsersDirectory>[0],
-    )
-  ) {
-    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+  const actor = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      email: true,
+      globalRole: true,
+      canManageUsers: true,
+    },
+  });
+  if (!actor) {
+    return {
+      error: NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 }),
+    };
   }
-  return null;
+  return { actor };
 }
 
-function requireUsersManager(
-  session: { user?: { globalRole?: unknown; id?: string } } | null | undefined,
-): NextResponse | null {
-  if (!session?.user) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
-  if (
-    !canManageUsers(
-      session.user.globalRole as Parameters<typeof canManageUsers>[0],
-    )
-  ) {
-    return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
-  }
-  return null;
+function usersAccessOpts(actor: UsersActor) {
+  return { canManageUsers: actor.canManageUsers };
 }
 
 export async function GET() {
   try {
     const session = await auth();
-    const denied = requireUsersViewer(session);
-    if (denied) return denied;
+    const loaded = await loadUsersActor(session);
+    if ("error" in loaded) return loaded.error;
+    const { actor } = loaded;
+    if (!canViewUsersDirectory(actor.globalRole, usersAccessOpts(actor))) {
+      return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+    }
 
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
@@ -85,6 +96,7 @@ export async function GET() {
         canMachineSupervise: true,
         canAdminMachineProduction: true,
         canAccessStock: true,
+        canManageUsers: true,
         isActive: true,
         coinsBalance: true,
         createdAt: true,
@@ -101,10 +113,9 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       users,
-      canManage: canManageUsers(
-        session!.user!.globalRole as Parameters<typeof canManageUsers>[0],
-      ),
-      canManageSuperAdmins: isPrimarySuperAdmin(session!.user!.email),
+      canManage: canManageUsers(actor.globalRole, usersAccessOpts(actor)),
+      allowSuperAdmin: actor.globalRole === GlobalRole.SUPER_ADMIN,
+      canManageSuperAdmins: isPrimarySuperAdmin(actor.email),
       primarySuperAdminEmail: getPrimarySuperAdminEmail(),
     });
   } catch (err) {
@@ -123,8 +134,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const session = await auth();
-    const denied = requireUsersManager(session);
-    if (denied) return denied;
+    const loaded = await loadUsersActor(session);
+    if ("error" in loaded) return loaded.error;
+    const { actor } = loaded;
+    if (!canManageUsers(actor.globalRole, usersAccessOpts(actor))) {
+      return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
+    }
 
     let json: unknown;
     try {
@@ -177,6 +192,15 @@ export async function POST(request: Request) {
     }
 
   const role = parsed.data.globalRole;
+  if (
+    role === GlobalRole.SUPER_ADMIN &&
+    actor.globalRole !== GlobalRole.SUPER_ADMIN
+  ) {
+    return NextResponse.json(
+      { ok: false, message: "Only Super Admin can create Super Admin users" },
+      { status: 403 },
+    );
+  }
   const needsPlants =
     role !== GlobalRole.SUPER_ADMIN &&
     role !== GlobalRole.MACHINE_SUPERVISOR;
@@ -189,7 +213,7 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(parsed.data.password, 12);
     const canViewPriceSheet =
-      role === GlobalRole.SUPER_ADMIN || role === GlobalRole.VIEWER
+      role === GlobalRole.SUPER_ADMIN
         ? true
         : Boolean(parsed.data.canViewPriceSheet);
     const canMachineSupervise =
@@ -201,6 +225,10 @@ export async function POST(request: Request) {
         ? true
         : Boolean(parsed.data.canAdminMachineProduction);
     const canAccessStock = Boolean(parsed.data.canAccessStock);
+    const canManageUsersFlag =
+      role === GlobalRole.SUPER_ADMIN
+        ? false
+        : Boolean(parsed.data.canManageUsers);
 
     const user = await prisma.user.create({
       data: {
@@ -214,6 +242,7 @@ export async function POST(request: Request) {
         canMachineSupervise,
         canAdminMachineProduction,
         canAccessStock,
+        canManageUsers: canManageUsersFlag,
         isActive: true,
         plantRoles: {
           create: plantIds.map((plantId) => ({
@@ -233,6 +262,7 @@ export async function POST(request: Request) {
         canMachineSupervise: true,
         canAdminMachineProduction: true,
         canAccessStock: true,
+        canManageUsers: true,
         isActive: true,
       },
     });
@@ -250,8 +280,9 @@ export async function POST(request: Request) {
         canMachineSupervise: user.canMachineSupervise,
         canAdminMachineProduction: user.canAdminMachineProduction,
         canAccessStock: user.canAccessStock,
+        canManageUsers: user.canManageUsers,
       },
-      actorId: session!.user!.id,
+      actorId: actor.id,
     });
 
     return NextResponse.json({ ok: true, user }, { status: 201 });

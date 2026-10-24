@@ -26,7 +26,9 @@ export async function GET() {
     if (
       session.user.globalRole !== GlobalRole.SUPER_ADMIN &&
       session.user.globalRole !== GlobalRole.BUSINESS_HEAD &&
-      !canViewUsersDirectory(session.user.globalRole)
+      !canViewUsersDirectory(session.user.globalRole, {
+        canManageUsers: session.user.canManageUsers,
+      })
     ) {
       return NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 });
     }

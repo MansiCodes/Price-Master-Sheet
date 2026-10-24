@@ -43,6 +43,7 @@ export function useUserFormModal({
   const [canAdminMachineProduction, setCanAdminMachineProduction] =
     useState(false);
   const [canAccessStock, setCanAccessStock] = useState(false);
+  const [canManageUsers, setCanManageUsers] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>([]);
   const [plantError, setPlantError] = useState<string | null>(null);
@@ -68,12 +69,14 @@ export function useUserFormModal({
         priceSheetLocked: flags.priceSheetLocked,
         mpAdminLocked: flags.mpAdminLocked,
         selectedHasQuadSignal: flags.selectedHasQuadSignal,
+        showUsersExtra: flags.showUsersExtra,
       }),
     [
       flags.canAddMachineSupervise,
       flags.priceSheetLocked,
       flags.mpAdminLocked,
       flags.selectedHasQuadSignal,
+      flags.showUsersExtra,
     ],
   );
   const extraAccessValue = useMemo(
@@ -83,20 +86,24 @@ export function useUserFormModal({
         canMachineSupervise,
         canAdminMachineProduction,
         canAccessStock,
+        canManageUsers,
         canAddMachineSupervise: flags.canAddMachineSupervise,
         priceSheetLocked: flags.priceSheetLocked,
         mpAdminLocked: flags.mpAdminLocked,
         selectedHasQuadSignal: flags.selectedHasQuadSignal,
+        showUsersExtra: flags.showUsersExtra,
       }),
     [
       canViewPriceSheet,
       canMachineSupervise,
       canAdminMachineProduction,
       canAccessStock,
+      canManageUsers,
       flags.canAddMachineSupervise,
       flags.priceSheetLocked,
       flags.mpAdminLocked,
       flags.selectedHasQuadSignal,
+      flags.showUsersExtra,
     ],
   );
 
@@ -115,6 +122,7 @@ export function useUserFormModal({
     selectedHasQuadSignal: flags.selectedHasQuadSignal,
     canAccessStock,
     setCanAccessStock,
+    setCanManageUsers,
     globalRole,
     canMachineSupervise,
     selectedPlantIdsLength: selectedPlantIds.length,
@@ -162,6 +170,7 @@ export function useUserFormModal({
           : false,
       canAdminMachineProduction: flags.mpAdminLocked || canAdminMachineProduction,
       canAccessStock: flags.selectedHasQuadSignal ? canAccessStock : false,
+      canManageUsers: flags.showUsersExtra ? canManageUsers : false,
       isActive: editing?.isActive ?? true,
       plantIds:
         globalRole === "SUPER_ADMIN" ||
@@ -182,6 +191,7 @@ export function useUserFormModal({
       flags.canAddMachineSupervise && next.includes("MACHINE_SUPERVISOR"),
     );
     setCanAdminMachineProduction(flags.mpAdminLocked || next.includes("MP_ADMIN"));
+    setCanManageUsers(flags.showUsersExtra && next.includes("USERS"));
     const stockOn = flags.selectedHasQuadSignal && next.includes("STOCK");
     setCanAccessStock(stockOn);
     if (
