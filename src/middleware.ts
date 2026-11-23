@@ -3,7 +3,10 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 import { SESSION_COOKIE } from "@/auth.config";
 import { CENTRAL_APP_COOKIE } from "@/lib/central/app-session";
-import { portalPublicUrl } from "@/lib/central/portal-public-url";
+import {
+  isPortalLoginDelegated,
+  portalPublicUrl,
+} from "@/lib/central/portal-public-url";
 import {
   defaultLocale,
   isAppLocale,
@@ -93,12 +96,13 @@ export default async function middleware(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Portal login /apps live on Installation_frontend now.
+  // Only when PORTAL_PUBLIC_URL is set (centralisation/EC2). Amplify leaves it unset.
   if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/apps") ||
-    pathname.startsWith("/forgot-password") ||
-    pathname.startsWith("/reset-password")
+    isPortalLoginDelegated() &&
+    (pathname.startsWith("/login") ||
+      pathname.startsWith("/apps") ||
+      pathname.startsWith("/forgot-password") ||
+      pathname.startsWith("/reset-password"))
   ) {
     return NextResponse.redirect(portalRedirect(pathname));
   }
@@ -120,7 +124,9 @@ export default async function middleware(req: NextRequest) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const login = new URL(`${portalPublicUrl()}/login`);
+    const login = isPortalLoginDelegated()
+      ? new URL(`${portalPublicUrl()}/login`)
+      : new URL("/login", req.nextUrl.origin);
     if (pathname !== "/") login.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(login);
   }
