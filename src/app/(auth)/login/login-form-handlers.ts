@@ -121,7 +121,8 @@ export function createLoginFormHandlers(params: {
         setError(t("invalidOtp"));
         return;
       }
-      router.replace("/apps");
+      // Amplify P&L: stay here. /apps is the centralisation chooser (localhost:5173).
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));
@@ -147,7 +148,7 @@ export function createLoginFormHandlers(params: {
         setError(t("invalidEmailPassword"));
         return;
       }
-      router.replace("/apps");
+      router.replace("/");
       router.refresh();
     } catch {
       setError(t("signInFailed"));

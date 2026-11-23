@@ -81,15 +81,21 @@ function HeaderDateAndEntry({
 }
 
 function HeaderRightControls({ showAppsHome }: { showAppsHome: boolean }) {
-  const appsUrl = (
+  const portal = (
     process.env.NEXT_PUBLIC_PORTAL_PUBLIC_URL ||
     process.env.NEXT_PUBLIC_WORKSPACE_PUBLIC_URL ||
-    "http://localhost:5173"
-  ).replace(/\/$/, "") + "/apps";
+    ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+  const appsUrl =
+    portal && !/localhost|127\.0\.0\.1/i.test(portal)
+      ? `${portal}/apps`
+      : null;
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-      {showAppsHome ? (
+      {showAppsHome && appsUrl ? (
         <a href={appsUrl} className="dash-header__logout dash-header__apps" title="All apps">
           Apps
         </a>

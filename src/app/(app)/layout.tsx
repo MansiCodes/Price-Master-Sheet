@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/shell/AppShell";
 import { accessCount, resolveCentralAccess } from "@/lib/central/access";
-import { portalPublicUrl } from "@/lib/central/portal-public-url";
+import {
+  isPortalLoginDelegated,
+  portalPublicUrl,
+} from "@/lib/central/portal-public-url";
 import { prisma } from "@/lib/db";
 import {
   canAccessMachineProduction,
@@ -36,7 +39,9 @@ export default async function AppLayout({
 }) {
   const session = await getLayoutSession();
   if (!session?.user) {
-    redirect(`${portalPublicUrl()}/login`);
+    redirect(
+      isPortalLoginDelegated() ? `${portalPublicUrl()}/login` : "/login",
+    );
   }
 
   const dbUser = await prisma.user.findUnique({
@@ -55,7 +60,9 @@ export default async function AppLayout({
     },
   });
   if (!dbUser || !dbUser.isActive) {
-    redirect(`${portalPublicUrl()}/login`);
+    redirect(
+      isPortalLoginDelegated() ? `${portalPublicUrl()}/login` : "/login",
+    );
   }
   const user = {
     ...session.user,

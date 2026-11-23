@@ -1,7 +1,13 @@
 import { redirect } from "next/navigation";
-import { portalPublicUrl } from "@/lib/central/portal-public-url";
+import {
+  isPortalLoginDelegated,
+  portalPublicUrl,
+} from "@/lib/central/portal-public-url";
 
-/** App chooser moved to Installation_frontend — keep route for bookmarks. */
+/** App chooser lives on Installation portal when configured; Amplify P&L stays home. */
 export default function AppsPage() {
-  redirect(`${portalPublicUrl()}/apps`);
+  if (isPortalLoginDelegated()) {
+    redirect(`${portalPublicUrl()}/apps`);
+  }
+  redirect("/");
 }
